@@ -3,7 +3,7 @@
 // آخر تحديث: 2026-03-04
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Download, RefreshCw, Play, Square, Search, FileJson, X, Upload, Edit2, Save, Plus, Trash2, Music, Volume2, VolumeX, Copy } from 'lucide-react';
+import { Download, RefreshCw, Play, Square, Search, FileJson, X, Upload, Edit2, Save, Plus, Trash2, Music, Volume2, VolumeX, Copy, ArrowUp, ArrowDown } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
 import { db, storage } from '../firebase';
@@ -22,6 +22,7 @@ interface Zikr {
   transliteration: string;
   translations: Record<string, string>;
   count: number;
+  sortOrder?: number;
   reference: string;
   benefit: string | Record<string, string>;
   audio: string;
@@ -69,12 +70,12 @@ const CATEGORIES = [
   { id: '6', name: 'الذكر قبل الوضوء', icon: '💧', color: 'bg-blue-400' },
   { id: '80', name: 'الدعاء عند سماع الرعد', icon: '🌿', color: 'bg-green-500' },
   { id: '73', name: 'الدعاء عند الإفطار', icon: '🌙', color: 'bg-violet-500' },
-  { id: '18', name: 'دعاء الاستفتاح', icon: '🤲', color: 'bg-accent-dark' },
+  { id: '18', name: 'دعاء الاستفتاح', icon: 'hand-heart', color: 'bg-accent-dark' },
   { id: '107', name: 'الصلاة على النبي', icon: '☪️', color: 'bg-green-600' },
-  { id: '129', name: 'الاستغفار والتوبة', icon: '🤲', color: 'bg-teal-600' },
+  { id: '129', name: 'الاستغفار والتوبة', icon: 'hand-heart', color: 'bg-teal-600' },
   { id: '130', name: 'فضائل الأذكار', icon: '📜', color: 'bg-yellow-600' },
   { id: '28', name: 'دعاء الاستخارة', icon: '🌟', color: 'bg-red-500' },
-  { id: '32', name: 'دعاء القنوت', icon: '🤲', color: 'bg-rose-500' },
+  { id: '32', name: 'دعاء القنوت', icon: 'hand-heart', color: 'bg-rose-500' },
 ];
 
 const SUBCATEGORIES: Record<string, { id: string; name: string }[]> = {
@@ -90,6 +91,22 @@ const MAX_AUDIO_SIZE_MB = 15;
 
 // ✅ استخدام raw.githubusercontent لتجنب مشكلة jsDelivr cache
 const AZKAR_JSON_URL = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/json/azkar.json';
+
+const getZikrSortOrder = (zikr: Zikr): number => {
+  const sortOrder = Number(zikr.sortOrder);
+  return Number.isFinite(sortOrder) ? sortOrder : Number.POSITIVE_INFINITY;
+};
+
+const compareAzkar = (a: Zikr, b: Zikr): number => {
+  const categoryDiff = String(a.category || '').localeCompare(String(b.category || ''), undefined, { numeric: true });
+  if (categoryDiff !== 0) return categoryDiff;
+  const aOrder = getZikrSortOrder(a);
+  const bOrder = getZikrSortOrder(b);
+  if (aOrder !== bOrder) return aOrder - bOrder;
+  return (a.id || 0) - (b.id || 0);
+};
+
+const sortAzkarList = (items: Zikr[]): Zikr[] => [...items].sort(compareAzkar);
 
 // ========================================
 // المكون الرئيسي
@@ -124,7 +141,9 @@ const AzkarManager: React.FC = () => {
   // ========================================
 
   useEffect(() => {
-    loadAzkarFromGitHub();
+    // On mount, prefer Firestore (source of truth for the live app).
+    // Falls back to GitHub JSON only if Firestore is empty (first-time bootstrap).
+    loadFromFirestoreOrGithub();
   }, []);
 
   useEffect(() => {
@@ -167,11 +186,23 @@ const AzkarManager: React.FC = () => {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data: AzkarData = await response.json();
+      const data = await response.json();
 
-      setAzkarData(data);
-      setAzkarList(data.azkar || []);
-      showNotification(`✅ تم تحميل ${data.azkar?.length || 0} ذكر بنجاح`, 'success');
+      // Support both shapes: a bare array OR { azkar: [...] }
+      const list: Zikr[] = Array.isArray(data)
+        ? (data as Zikr[])
+        : (data?.azkar || []);
+      const sortedList = sortAzkarList(list);
+
+      setAzkarData({
+        version: (data?.version as string) || '2.0',
+        lastUpdate: (data?.lastUpdate as string) || new Date().toISOString().split('T')[0],
+        totalCount: sortedList.length,
+        azkar: sortedList,
+      });
+      setAzkarList(sortedList);
+      setDataSource('github');
+      showNotification(`✅ تم تحميل ${sortedList.length} ذكر بنجاح`, 'success');
 
     } catch (error) {
       console.error('Error loading azkar:', error);
@@ -179,6 +210,38 @@ const AzkarManager: React.FC = () => {
     }
 
     setLoading(false);
+  };
+
+  /**
+   * Load from Firestore (source of truth used by the mobile app). If Firestore
+   * is empty (first-time bootstrap), fall back to the bundled GitHub JSON so
+   * the admin can then click "رفع إلى Firestore" to seed it.
+   */
+  const loadFromFirestoreOrGithub = async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'azkar'));
+      if (!snap.empty) {
+        const items = snap.docs.map((d) => d.data() as Zikr).filter((z) => z && typeof z.id === 'number');
+        const sortedItems = sortAzkarList(items);
+        setAzkarList(sortedItems);
+        setAzkarData({
+          version: 'firestore',
+          lastUpdate: new Date().toISOString().split('T')[0],
+          totalCount: sortedItems.length,
+          azkar: sortedItems,
+        });
+        setDataSource('firestore');
+        showNotification(`✅ تم تحميل ${sortedItems.length} ذكر من Firestore`, 'success');
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.warn('Firestore load failed, falling back to GitHub:', e);
+    }
+    setLoading(false);
+    // Firestore empty or unreachable — load bundled JSON
+    await loadAzkarFromGitHub();
   };
 
   // ========================================
@@ -190,20 +253,32 @@ const AzkarManager: React.FC = () => {
     setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 3000);
   };
 
-  const playAudio = (url: string) => {
+  const playAudio = (audioPath: string) => {
     if (audioElement) {
       audioElement.pause();
     }
 
+    if (!audioPath) {
+      showNotification('❌ لا يوجد صوت لهذا الذكر', 'error');
+      return;
+    }
+    const isAbsolute = /^https?:\/\//i.test(audioPath);
+    const url = isAbsolute
+      ? audioPath
+      : `https://raw.githubusercontent.com/hossam-gamal22/Quran/main/assets/sounds/azkar_authentic/${encodeURIComponent(audioPath)}`;
+
     const audio = new Audio(url);
     audio.onended = () => setPlayingAudio(null);
     audio.onerror = () => {
-      showNotification('❌ خطأ في تشغيل الصوت', 'error');
+      showNotification(`❌ خطأ في تشغيل الصوت (${audioPath})`, 'error');
       setPlayingAudio(null);
     };
-    audio.play();
+    audio.play().catch((err) => {
+      showNotification(`❌ فشل التشغيل: ${err?.message || 'unknown'}`, 'error');
+      setPlayingAudio(null);
+    });
     setAudioElement(audio);
-    setPlayingAudio(url);
+    setPlayingAudio(audioPath);
   };
 
   const stopAudio = () => {
@@ -211,6 +286,39 @@ const AzkarManager: React.FC = () => {
       audioElement.pause();
     }
     setPlayingAudio(null);
+  };
+
+  // Download the audio file currently linked to a zikr.
+  // Supports both Firebase Storage URLs and bare filenames (resolved against
+  // the GitHub CDN used by the mobile app's azkar-audio-cache).
+  const GITHUB_AUDIO_BASE =
+    'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/assets/sounds/azkar_authentic/';
+
+  const downloadAudio = async (zikr: Zikr) => {
+    if (!zikr.audio) {
+      showNotification('❌ لا يوجد صوت لهذا الذكر', 'error');
+      return;
+    }
+    const isAbsolute = /^https?:\/\//i.test(zikr.audio);
+    const url = isAbsolute ? zikr.audio : `${GITHUB_AUDIO_BASE}${encodeURIComponent(zikr.audio)}`;
+    const ext = (zikr.audio.match(/\.([a-zA-Z0-9]{1,5})(?:\?|$)/)?.[1] || 'm4a').toLowerCase();
+    const catName = (CATEGORIES.find(c => c.id === zikr.category)?.name || 'azkar').replace(/\s+/g, '_');
+    const fileName = `zikr_${zikr.id}_${catName}.${ext}`;
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      await navigator.clipboard?.writeText(url).catch(() => {});
+      showNotification(`✅ تم فتح رابط التحميل ونسخه: ${fileName}`, 'success');
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      showNotification(`✅ تم فتح رابط الصوت في تبويب جديد: ${fileName}`, 'success');
+    }
   };
 
   const exportToJson = () => {
@@ -231,6 +339,31 @@ const AzkarManager: React.FC = () => {
     showNotification(`📥 تم تصدير ${azkarList.length} ذكر`, 'success');
   };
 
+  const getNewZikrCategory = () => {
+    return selectedCategory === 'all' ? CATEGORIES[0].id : selectedCategory;
+  };
+
+  const getNextSortOrder = (categoryId: string) => {
+    const sameCategory = azkarList.filter(z => z.category === categoryId);
+    const finiteOrders = sameCategory
+      .map(z => Number(z.sortOrder))
+      .filter(Number.isFinite);
+    if (finiteOrders.length > 0) return Math.max(...finiteOrders) + 1;
+    return sameCategory.length + 1;
+  };
+
+  const normalizeZikrForSave = (zikr: Zikr): Zikr => {
+    const sortOrder = Number(zikr.sortOrder);
+    return {
+      ...zikr,
+      category: zikr.category || CATEGORIES[0].id,
+      count: Math.max(1, Number(zikr.count) || 1),
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : getNextSortOrder(zikr.category || CATEGORIES[0].id),
+      audio: zikr.audio || '',
+      translations: zikr.translations || {},
+    };
+  };
+
   // ========================================
   // Firestore CRUD
   // ========================================
@@ -244,8 +377,7 @@ const AzkarManager: React.FC = () => {
         setLoading(false);
         return;
       }
-      const items = snap.docs.map(d => d.data() as Zikr);
-      items.sort((a, b) => a.id - b.id);
+      const items = sortAzkarList(snap.docs.map(d => d.data() as Zikr));
       setAzkarList(items);
       setAzkarData({ version: 'firestore', lastUpdate: new Date().toISOString().split('T')[0], totalCount: items.length, azkar: items });
       setDataSource('firestore');
@@ -258,7 +390,20 @@ const AzkarManager: React.FC = () => {
 
   const syncToFirestore = async () => {
     if (!azkarList.length) return;
-    if (!confirm(`رفع ${azkarList.length} ذكر إلى Firestore؟ سيتم استبدال البيانات الموجودة.`)) return;
+    // EXTRA SAFETY: this is a destructive bulk-overwrite. Block it when the
+    // current data came from GitHub — otherwise it would wipe per-zikr edits
+    // that admins have saved directly to Firestore.
+    if (dataSource === 'github') {
+      const confirmed = confirm(
+        '⚠️ تحذير خطير:\n\n' +
+        'البيانات الحالية محملة من GitHub (النسخة الأصلية).\n' +
+        'الرفع الآن سيمسح كل التعديلات المحفوظة في Firestore (النصوص، الأصوات، الترجمات).\n\n' +
+        'هل أنت متأكد؟ العملية لا يمكن التراجع عنها.',
+      );
+      if (!confirmed) return;
+    } else if (!confirm(`رفع ${azkarList.length} ذكر إلى Firestore؟ سيتم استبدال البيانات الموجودة.`)) {
+      return;
+    }
     setIsSyncing(true);
     try {
       const batchSize = 400;
@@ -279,11 +424,12 @@ const AzkarManager: React.FC = () => {
 
   const saveZikr = async (zikr: Zikr) => {
     try {
-      await setDoc(doc(db, 'azkar', String(zikr.id)), zikr);
+      const normalized = normalizeZikrForSave(zikr);
+      await setDoc(doc(db, 'azkar', String(normalized.id)), normalized);
       setAzkarList(prev => {
-        const idx = prev.findIndex(z => z.id === zikr.id);
-        if (idx >= 0) return prev.map(z => z.id === zikr.id ? zikr : z);
-        return [...prev, zikr].sort((a, b) => a.id - b.id);
+        const idx = prev.findIndex(z => z.id === normalized.id);
+        if (idx >= 0) return sortAzkarList(prev.map(z => z.id === normalized.id ? normalized : z));
+        return sortAzkarList([...prev, normalized]);
       });
       setShowEditModal(false);
       setEditingZikr(null);
@@ -305,9 +451,11 @@ const AzkarManager: React.FC = () => {
   };
 
   const openEditZikr = (zikr?: Zikr) => {
+    const newCategory = getNewZikrCategory();
     setEditingZikr(zikr || {
       id: Math.max(0, ...azkarList.map(z => z.id)) + 1,
-      category: selectedCategory === 'all' ? 'morning' : selectedCategory,
+      category: newCategory,
+      sortOrder: getNextSortOrder(newCategory),
       arabic: '', transliteration: '', translations: {}, count: 1, reference: '', benefit: '', audio: '',
     });
     setShowEditModal(true);
@@ -343,7 +491,7 @@ const AzkarManager: React.FC = () => {
       if (updatedZikr) {
         const updated = { ...updatedZikr, audio: url };
         await setDoc(doc(db, 'azkar', String(zikrId)), updated);
-        setAzkarList(prev => prev.map(z => z.id === zikrId ? updated : z));
+        setAzkarList(prev => sortAzkarList(prev.map(z => z.id === zikrId ? updated : z)));
       }
 
       if (editingZikr && editingZikr.id === zikrId) {
@@ -374,7 +522,7 @@ const AzkarManager: React.FC = () => {
 
       const updated = { ...zikr, audio: '' };
       await setDoc(doc(db, 'azkar', String(zikrId)), updated);
-      setAzkarList(prev => prev.map(z => z.id === zikrId ? updated : z));
+      setAzkarList(prev => sortAzkarList(prev.map(z => z.id === zikrId ? updated : z)));
 
       if (editingZikr && editingZikr.id === zikrId) {
         setEditingZikr({ ...editingZikr, audio: '' });
@@ -406,12 +554,52 @@ const AzkarManager: React.FC = () => {
       await batch.commit();
       setAzkarList(prev => {
         const map = new Map(updated.map(u => [u.id, u]));
-        return prev.map(z => map.get(z.id) || z);
+        return sortAzkarList(prev.map(z => map.get(z.id) || z));
       });
       showNotification(`✅ تم تعيين الصوت لـ ${updated.length} ذكر`, 'success');
     } catch (err) {
       showNotification(`❌ ${(err as Error).message}`, 'error');
     }
+  };
+
+  const moveZikr = async (zikrId: number, direction: 'up' | 'down') => {
+    const target = azkarList.find(z => z.id === zikrId);
+    if (!target) return;
+
+    const categoryItems = sortAzkarList(azkarList.filter(z => z.category === target.category));
+    const currentIdx = categoryItems.findIndex(z => z.id === zikrId);
+    const swapIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
+    if (currentIdx < 0 || swapIdx < 0 || swapIdx >= categoryItems.length) return;
+
+    const reordered = [...categoryItems];
+    [reordered[currentIdx], reordered[swapIdx]] = [reordered[swapIdx], reordered[currentIdx]];
+    const normalized = reordered.map((z, index) => ({ ...z, sortOrder: index + 1 }));
+
+    try {
+      const batch = writeBatch(db);
+      normalized.forEach(z => {
+        batch.set(doc(db, 'azkar', String(z.id)), z, { merge: true });
+      });
+      await batch.commit();
+
+      const updatedById = new Map(normalized.map(z => [z.id, z]));
+      setAzkarList(prev => sortAzkarList(prev.map(z => updatedById.get(z.id) || z)));
+      if (editingZikr && updatedById.has(editingZikr.id)) {
+        setEditingZikr(updatedById.get(editingZikr.id) || editingZikr);
+      }
+      showNotification('✅ تم تحديث ترتيب الأذكار', 'success');
+    } catch (err) {
+      showNotification(`❌ ${(err as Error).message}`, 'error');
+    }
+  };
+
+  const getMoveState = (zikr: Zikr) => {
+    const categoryItems = sortAzkarList(azkarList.filter(z => z.category === zikr.category));
+    const index = categoryItems.findIndex(z => z.id === zikr.id);
+    return {
+      canMoveUp: index > 0,
+      canMoveDown: index >= 0 && index < categoryItems.length - 1,
+    };
   };
 
   // ========================================
@@ -490,7 +678,7 @@ const AzkarManager: React.FC = () => {
             تحميل من Firestore
           </button>
           <button
-            onClick={loadAzkarFromGitHub}
+            onClick={loadFromFirestoreOrGithub}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-accent-dark hover:bg-accent-dark text-white rounded-xl disabled:opacity-50 transition-colors"
           >
@@ -618,14 +806,34 @@ const AzkarManager: React.FC = () => {
               </div>
             </div>
             <div className="divide-y divide-slate-700/50 max-h-[600px] overflow-y-auto">
-              {filteredList.map(zikr => (
+              {filteredList.map(zikr => {
+                const moveState = getMoveState(zikr);
+                return (
                 <div key={zikr.id} className="p-3 hover:bg-admin-surface-light/20 transition-colors">
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm leading-relaxed line-clamp-2">{zikr.arabic}</p>
-                      <p className="text-slate-500 text-xs mt-1">#{zikr.id} • {CATEGORIES.find(c => c.id === zikr.category)?.name}</p>
+                      <p className="text-slate-500 text-xs mt-1">#{zikr.id} • ترتيب {Number.isFinite(Number(zikr.sortOrder)) ? zikr.sortOrder : '—'} • {CATEGORIES.find(c => c.id === zikr.category)?.name}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => moveZikr(zikr.id, 'up')}
+                        disabled={!moveState.canMoveUp}
+                        className="p-2 text-slate-300 hover:bg-admin-surface-light rounded-lg transition-colors disabled:opacity-30"
+                        aria-label="تحريك لأعلى"
+                        title="تحريك لأعلى"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveZikr(zikr.id, 'down')}
+                        disabled={!moveState.canMoveDown}
+                        className="p-2 text-slate-300 hover:bg-admin-surface-light rounded-lg transition-colors disabled:opacity-30"
+                        aria-label="تحريك لأسفل"
+                        title="تحريك لأسفل"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
                       {zikr.audio ? (
                         <>
                           <button
@@ -637,6 +845,14 @@ const AzkarManager: React.FC = () => {
                             title={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
                           >
                             {playingAudio === zikr.audio ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => downloadAudio(zikr)}
+                            className="p-2 text-cyan-400 hover:bg-cyan-500/20 rounded-lg transition-colors"
+                            aria-label="تحميل الصوت"
+                            title="تحميل الصوت"
+                          >
+                            <Download className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => removeAudio(zikr.id)}
@@ -672,7 +888,8 @@ const AzkarManager: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         </div>
@@ -759,6 +976,7 @@ const AzkarManager: React.FC = () => {
               <thead>
                 <tr className="bg-admin-surface-light/50">
                   <th className="text-right text-white p-3 font-medium w-16">#</th>
+                  <th className="text-right text-white p-3 font-medium w-24">ترتيب</th>
                   <th className="text-right text-white p-3 font-medium w-32">الفئة</th>
                   <th className="text-right text-white p-3 font-medium">النص العربي</th>
                   <th className="text-right text-white p-3 font-medium w-20">التكرار</th>
@@ -769,9 +987,35 @@ const AzkarManager: React.FC = () => {
               <tbody>
                 {filteredList.map(zikr => {
                   const category = CATEGORIES.find(c => c.id === zikr.category);
+                  const moveState = getMoveState(zikr);
                   return (
                     <tr key={zikr.id} className="border-t border-admin-border/50 hover:bg-admin-surface-light/30 transition-colors">
                       <td className="p-3 text-slate-300 font-mono">{zikr.id}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-1">
+                          <span className="px-2 py-1 bg-admin-surface-light text-white rounded text-sm min-w-10 text-center">
+                            {Number.isFinite(Number(zikr.sortOrder)) ? zikr.sortOrder : '—'}
+                          </span>
+                          <button
+                            onClick={() => moveZikr(zikr.id, 'up')}
+                            disabled={!moveState.canMoveUp}
+                            className="p-1.5 text-slate-300 hover:bg-admin-surface-light rounded-lg transition-colors disabled:opacity-30"
+                            aria-label="تحريك لأعلى"
+                            title="تحريك لأعلى"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => moveZikr(zikr.id, 'down')}
+                            disabled={!moveState.canMoveDown}
+                            className="p-1.5 text-slate-300 hover:bg-admin-surface-light rounded-lg transition-colors disabled:opacity-30"
+                            aria-label="تحريك لأسفل"
+                            title="تحريك لأسفل"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
                       <td className="p-3">
                         <span className={`px-2 py-1 ${category?.color || 'bg-admin-surface-light'} text-white rounded text-xs`}>
                           {category?.icon} {category?.name || zikr.category}
@@ -789,18 +1033,28 @@ const AzkarManager: React.FC = () => {
                       </td>
                       <td className="p-3">
                         {zikr.audio ? (
-                          <button
-                            onClick={() => playingAudio === zikr.audio ? stopAudio() : playAudio(zikr.audio)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              playingAudio === zikr.audio
-                                ? 'bg-red-500 text-white'
-                                : 'bg-accent/20 text-accent-light hover:bg-accent/30'
-                            }`}
-                            aria-label={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
-                            title={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
-                          >
-                            {playingAudio === zikr.audio ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                          </button>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => playingAudio === zikr.audio ? stopAudio() : playAudio(zikr.audio)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                playingAudio === zikr.audio
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-accent/20 text-accent-light hover:bg-accent/30'
+                              }`}
+                              aria-label={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
+                              title={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
+                            >
+                              {playingAudio === zikr.audio ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => downloadAudio(zikr)}
+                              className="p-2 text-cyan-400 hover:bg-cyan-500/20 rounded-lg transition-colors"
+                              aria-label="تحميل الصوت"
+                              title="تحميل الصوت"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-slate-500">—</span>
                         )}
@@ -827,7 +1081,7 @@ const AzkarManager: React.FC = () => {
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => openEditZikr({ ...zikr, id: Math.max(0, ...azkarList.map(z => z.id)) + 1, arabic: zikr.arabic + ' (نسخة)' })}
+                            onClick={() => openEditZikr({ ...zikr, id: Math.max(0, ...azkarList.map(z => z.id)) + 1, sortOrder: getNextSortOrder(zikr.category), arabic: zikr.arabic + ' (نسخة)' })}
                             className="p-2 text-accent-light hover:bg-accent/20 rounded-lg transition-colors"
                             aria-label="تكرار"
                             title="تكرار"
@@ -918,7 +1172,7 @@ const AzkarManager: React.FC = () => {
               {selectedZikr.audio && (
                 <div>
                   <h3 className="text-accent-light font-medium mb-2">الصوت</h3>
-                  <div className="flex items-center gap-4 bg-admin-bg p-4 rounded-xl">
+                  <div className="flex items-center gap-3 bg-admin-bg p-4 rounded-xl flex-wrap">
                     <button
                       onClick={() => playingAudio === selectedZikr.audio ? stopAudio() : playAudio(selectedZikr.audio)}
                       className={`px-6 py-3 rounded-xl font-medium transition-colors ${
@@ -928,6 +1182,13 @@ const AzkarManager: React.FC = () => {
                       }`}
                     >
                       {playingAudio === selectedZikr.audio ? '⏹️ إيقاف' : '▶️ تشغيل'}
+                    </button>
+                    <button
+                      onClick={() => downloadAudio(selectedZikr)}
+                      className="px-6 py-3 rounded-xl font-medium bg-cyan-600 text-white hover:bg-cyan-700 transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      تحميل
                     </button>
                   </div>
                 </div>
@@ -984,7 +1245,7 @@ const AzkarManager: React.FC = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">الفئة</label>
-                  <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="الفئة" title="الفئة" value={editingZikr.category} onChange={e => setEditingZikr({ ...editingZikr, category: e.target.value, subcategory: undefined })}>
+                  <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="الفئة" title="الفئة" value={editingZikr.category} onChange={e => setEditingZikr({ ...editingZikr, category: e.target.value, subcategory: undefined, sortOrder: getNextSortOrder(e.target.value) })}>
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
@@ -999,6 +1260,10 @@ const AzkarManager: React.FC = () => {
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">العدد</label>
                   <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="العدد" placeholder="العدد" value={editingZikr.count} onChange={e => setEditingZikr({ ...editingZikr, count: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <label className="text-slate-300 text-sm block mb-1">الترتيب</label>
+                  <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="الترتيب" placeholder="الترتيب" value={editingZikr.sortOrder ?? ''} onChange={e => setEditingZikr({ ...editingZikr, sortOrder: e.target.value === '' ? undefined : Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">المرجع</label>

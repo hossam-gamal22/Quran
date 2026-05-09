@@ -194,7 +194,7 @@ export async function installSoundForNotifications(
     
     try {
       await Notifications.setNotificationChannelAsync(androidChannelId, {
-        name: `${t('notifications.customSound')}: ${soundName}`,
+        name: `${t('notificationSounds.customSound')}: ${soundName}`,
         importance: Notifications.AndroidImportance.HIGH,
         // Android accepts file:// URIs for custom sounds
         sound: destPath,

@@ -49,6 +49,7 @@ export async function syncPrayerDataToFirestore(uid: string, force = false): Pro
   const settings = await getEffectivePrayerCalcSettings();
 
   try {
+    const db = getFirestore(getApp());
     const ref = doc(db, 'userPrayerSettings', uid);
     await setDoc(
       ref,

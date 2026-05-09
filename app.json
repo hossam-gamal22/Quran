@@ -217,7 +217,12 @@
         {
           "fonts": [
             "./assets/fonts/Amiri-Regular.ttf",
-            "./assets/fonts/Amiri-Bold.ttf"
+            "./assets/fonts/Amiri-Bold.ttf",
+            "./assets/fonts/WidgetFont.ttf",
+            "./assets/fonts/Rubik-Regular.ttf",
+            "./assets/fonts/Rubik-Medium.ttf",
+            "./assets/fonts/Rubik-Bold.ttf",
+            "./assets/fonts/KFGQPC-Uthmanic-Script.ttf"
           ],
           "widgets": [
             {

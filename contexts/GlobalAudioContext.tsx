@@ -16,10 +16,10 @@ import { getAzkarAudioUri } from '@/lib/azkar-audio-cache';
 import { Asset } from 'expo-asset';
 import type { RadioStation, RadioPlaybackState } from '@/types/radio';
 
-// True if the value already looks like a playable URI (http(s)/file/asset/content/data).
+// True if the value already looks like a non-cacheable playable URI.
 function isAbsoluteUri(value: string | undefined | null): boolean {
   if (!value) return false;
-  return /^(https?:|file:|asset:|content:|data:)/i.test(value);
+  return /^(file:|asset:|content:|data:)/i.test(value);
 }
 
 // Resolve a track's `url` field to a real playable URI.
@@ -32,18 +32,28 @@ async function resolveAzkarTrackUri(t: { url: string; localSource?: any }): Prom
       const asset = Asset.fromModule(t.localSource);
       if (!asset.localUri) await asset.downloadAsync();
       const resolved = asset.localUri || asset.uri;
-      if (resolved) return resolved;
+      if (resolved) {
+        console.log('[GlobalAudio] Azkar track URI (bundled):', resolved.substring(0, 120));
+        return resolved;
+      }
     } catch {}
   }
-  if (isAbsoluteUri(t.url)) return t.url;
   if (t.url) {
+    if (isAbsoluteUri(t.url)) {
+      console.log('[GlobalAudio] Azkar track URI (absolute):', t.url.substring(0, 120));
+      return t.url;
+    }
     try {
       const uri = await getAzkarAudioUri(t.url);
-      if (uri) return uri;
+      if (uri) {
+        console.log('[GlobalAudio] Azkar track URI (resolved from "' + t.url + '"):', uri.substring(0, 120));
+        return uri;
+      }
     } catch (e) {
       console.warn('[GlobalAudio] Failed to resolve azkar URI for', t.url, e);
     }
   }
+  console.warn('[GlobalAudio] Azkar track URI (fallback raw):', t.url);
   return t.url;
 }
 
@@ -89,6 +99,25 @@ export interface AudioTrack {
   localSource?: number;
   /** Category ID for intro trimming (azkar only). */
   categoryId?: string;
+  /** Original dhikr id for repeat-aware azkar playback. */
+  zikrId?: number;
+  /** Index in the visible azkar audio list, before repeat expansion. */
+  baseIndex?: number;
+  /** 1-based repeat number for this playable track. */
+  repeatIndex?: number;
+  /** Total repeats for the owning dhikr. */
+  repeatTotal?: number;
+  /** 1-based part number for multi-part tracks, such as Quran ayah ranges. */
+  repeatPartIndex?: number;
+  /** Total parts inside one repeat. */
+  repeatPartTotal?: number;
+  /** Whether finishing this track should increment the dhikr counter. */
+  countsForRepeat?: boolean;
+}
+
+interface PlayAzkarQueueOptions {
+  onTrackComplete?: (track: AudioTrack, index: number) => void;
+  repeatDelayMs?: number;
 }
 
 export interface GlobalAudioState {
@@ -115,7 +144,7 @@ export interface GlobalAudioState {
 interface GlobalAudioContextType {
   state: GlobalAudioState;
   // Azkar queue controls
-  playAzkarQueue: (tracks: AudioTrack[], startIndex?: number, sourceRoute?: string) => Promise<void>;
+  playAzkarQueue: (tracks: AudioTrack[], startIndex?: number, sourceRoute?: string, options?: PlayAzkarQueueOptions) => Promise<void>;
   // Radio controls
   playRadio: (station: RadioStation) => Promise<void>;
   stopRadio: () => Promise<void>;
@@ -186,6 +215,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const [quranState, setQuranState] = useState<PlaybackState>(defaultState.quranState);
   const [radioState, setRadioState] = useState<RadioPlaybackState>(defaultRadioState);
   const [playbackSpeed, setPlaybackSpeedState] = useState(1);
+  const [azkarDelayPending, setAzkarDelayPending] = useState(false);
 
   const sourceRef = useRef<AudioSource>('none');
   const azkarPlayingRef = useRef(false);
@@ -194,6 +224,14 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const trackPlayerListeners = useRef<(() => void)[]>([]);
   const progressPoller = useRef<number | null>(null);
   const isTogglingRef = useRef(false);
+  const queueIndexRef = useRef(0);
+  const azkarTrackCompleteRef = useRef<PlayAzkarQueueOptions['onTrackComplete']>(undefined);
+  const azkarRepeatDelayMsRef = useRef(0);
+  const completedAzkarTracksRef = useRef<Set<string>>(new Set());
+  const azkarDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressAzkarCompletionRef = useRef(false);
+  const progressRef = useRef({ position: 0, duration: 0 });
+  const azkarRunIdRef = useRef(0);
 
   // Keep refs in sync
   useEffect(() => { sourceRef.current = source; }, [source]);
@@ -206,6 +244,68 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     onTrackPlayerSetupDone(() => setTpReady(true));
   }, [tpReady]);
 
+  const clearAzkarDelayTimer = useCallback(() => {
+    if (azkarDelayTimerRef.current) {
+      clearTimeout(azkarDelayTimerRef.current);
+      azkarDelayTimerRef.current = null;
+    }
+    setAzkarDelayPending(false);
+  }, []);
+
+  const finishSuppressingAzkarCompletionSoon = useCallback(() => {
+    setTimeout(() => {
+      suppressAzkarCompletionRef.current = false;
+    }, 250);
+  }, []);
+
+  const shouldDelayBeforeTrack = useCallback((from?: AudioTrack, to?: AudioTrack): boolean => {
+    if (!from || !to) return false;
+    if (from.countsForRepeat === false) return false;
+    if (from.baseIndex === undefined || to.baseIndex === undefined) return false;
+    return from.baseIndex === to.baseIndex && from.repeatIndex !== to.repeatIndex;
+  }, []);
+
+  const markAzkarTrackComplete = useCallback((idx: number) => {
+    const track = azkarQueue.current[idx];
+    if (!track || track.countsForRepeat === false) return;
+
+    const completionKey = `${idx}:${track.id}:${track.repeatIndex ?? 1}:${track.repeatPartIndex ?? 1}`;
+    if (completedAzkarTracksRef.current.has(completionKey)) return;
+
+    completedAzkarTracksRef.current.add(completionKey);
+    azkarTrackCompleteRef.current?.(track, idx);
+  }, []);
+
+  const findAdjacentLogicalAzkarIndex = useCallback((direction: 1 | -1): number => {
+    const queue = azkarQueue.current;
+    const currentIndex = queueIndexRef.current;
+    const currentTrack = queue[currentIndex];
+    const currentBaseIndex = currentTrack?.baseIndex;
+
+    if (currentBaseIndex === undefined) {
+      return currentIndex + direction;
+    }
+
+    if (direction > 0) {
+      for (let i = currentIndex + 1; i < queue.length; i += 1) {
+        if (queue[i]?.baseIndex !== currentBaseIndex) return i;
+      }
+      return queue.length;
+    }
+
+    let previousBaseIndex: number | undefined;
+    for (let i = currentIndex - 1; i >= 0; i -= 1) {
+      if (queue[i]?.baseIndex !== currentBaseIndex) {
+        previousBaseIndex = queue[i]?.baseIndex;
+        break;
+      }
+    }
+
+    if (previousBaseIndex === undefined) return -1;
+    const firstIndex = queue.findIndex(track => track.baseIndex === previousBaseIndex);
+    return firstIndex >= 0 ? firstIndex : -1;
+  }, []);
+
   // Setup TrackPlayer event listeners for azkar (re-runs when tpReady flips to true)
   useEffect(() => {
     if (!tpReady || !TrackPlayer || !Event || !State) return;
@@ -216,10 +316,56 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       async (event) => {
         if (sourceRef.current !== 'azkar') return;
         if (event.track) {
+          const previousIndex = queueIndexRef.current;
           const index = event.index ?? 0;
+          const previousTrack = azkarQueue.current[previousIndex];
+          const nextTrack = azkarQueue.current[index];
+          const { position: lastPosition, duration: lastDuration } = progressRef.current;
+          const looksFinished = lastDuration <= 0 || lastPosition >= Math.max(0, lastDuration - 1250);
+
+          if (
+            !suppressAzkarCompletionRef.current &&
+            previousIndex !== index &&
+            previousTrack &&
+            looksFinished
+          ) {
+            markAzkarTrackComplete(previousIndex);
+          }
+
+          clearAzkarDelayTimer();
+          queueIndexRef.current = index;
           setQueueIndex(index);
           setTrackTitle(event.track.title || '');
           setTrackSubtitle(event.track.artist);
+          setPosition(0);
+          setDuration(0);
+          progressRef.current = { position: 0, duration: 0 };
+
+          if (
+            !suppressAzkarCompletionRef.current &&
+            previousIndex !== index &&
+            shouldDelayBeforeTrack(previousTrack, nextTrack)
+          ) {
+            const delayMs = azkarRepeatDelayMsRef.current;
+            if (delayMs > 0) {
+              const runId = azkarRunIdRef.current;
+              try {
+                await TrackPlayer.pause();
+                await TrackPlayer.seekTo(0);
+              } catch {}
+              setAzkarDelayPending(true);
+              azkarDelayTimerRef.current = setTimeout(async () => {
+                if (
+                  sourceRef.current === 'azkar' &&
+                  queueIndexRef.current === index &&
+                  azkarRunIdRef.current === runId
+                ) {
+                  setAzkarDelayPending(false);
+                  try { await TrackPlayer?.play(); } catch {}
+                }
+              }, delayMs);
+            }
+          }
         }
       }
     );
@@ -230,10 +376,15 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       Event.PlaybackQueueEnded,
       async () => {
         if (sourceRef.current !== 'azkar') return;
+        if (!suppressAzkarCompletionRef.current) {
+          markAzkarTrackComplete(queueIndexRef.current);
+        }
+        clearAzkarDelayTimer();
         // Queue finished
         setAzkarPlaying(false);
         azkarPlayingRef.current = false;
         setAzkarLoading(false);
+        setAzkarDelayPending(false);
         setSource('none');
         sourceRef.current = 'none';
         audioCoordinator.releaseFocus('azkar-queue', 'azkar');
@@ -251,6 +402,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         setAzkarPlaying(isPlaying);
         azkarPlayingRef.current = isPlaying;
         setAzkarLoading(isLoading);
+        if (isPlaying) setAzkarDelayPending(false);
       }
     );
     trackPlayerListeners.current.push(() => stateListener.remove());
@@ -262,8 +414,11 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         const progress = await TrackPlayer.getProgress();
         const pos = progress.position;
         const dur = progress.duration;
-        setPosition(pos * 1000); // Convert to ms
-        setDuration(dur * 1000);
+        const positionMs = pos * 1000;
+        const durationMs = dur * 1000;
+        progressRef.current = { position: positionMs, duration: durationMs };
+        setPosition(positionMs);
+        setDuration(durationMs);
       } catch {}
     }, 500) as unknown as number;
 
@@ -275,10 +430,12 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         progressPoller.current = null;
       }
     };
-  }, [tpReady]);
+  }, [clearAzkarDelayTimer, markAzkarTrackComplete, shouldDelayBeforeTrack, tpReady]);
 
   // Cleanup azkar sound (both TrackPlayer and expo-av)
   const cleanupAzkar = useCallback(async () => {
+    suppressAzkarCompletionRef.current = true;
+    clearAzkarDelayTimer();
     if (isTrackPlayerReady() && TrackPlayer) {
       try {
         await TrackPlayer.stop();
@@ -293,7 +450,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       } catch {}
       azkarSound.current = null;
     }
-  }, []);
+    finishSuppressingAzkarCompletionSoon();
+  }, [clearAzkarDelayTimer, finishSuppressingAzkarCompletionSoon]);
 
   // Play a specific item from the azkar queue by index
   const playAzkarAtIndex = useCallback(async (idx: number) => {
@@ -304,6 +462,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       setAzkarPlaying(false);
       azkarPlayingRef.current = false;
       setAzkarLoading(false);
+      setAzkarDelayPending(false);
       setSource('none');
       sourceRef.current = 'none';
       audioCoordinator.releaseFocus('azkar-queue', 'azkar');
@@ -311,20 +470,25 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     }
 
     const track = queue[idx];
+    queueIndexRef.current = idx;
+    progressRef.current = { position: 0, duration: 0 };
     setQueueIndex(idx);
     setTrackTitle(track.title);
     setTrackSubtitle(track.subtitle);
     setAzkarLoading(true);
+    setAzkarDelayPending(false);
 
     await cleanupAzkar();
 
     // Request audio focus — this will stop any other audio source
     await audioCoordinator.requestFocus('azkar', {
       stop: async () => {
+        azkarRunIdRef.current += 1;
         await cleanupAzkar();
         setAzkarPlaying(false);
         azkarPlayingRef.current = false;
         setAzkarLoading(false);
+        setAzkarDelayPending(false);
         setSource('none');
         sourceRef.current = 'none';
       },
@@ -332,6 +496,23 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
     try {
       if (isTrackPlayerReady() && TrackPlayer) {
+        // Force the shared iOS AVAudioSession into Playback mode BEFORE
+        // TrackPlayer.play(). expo-av's setAudioModeAsync mutates the same
+        // singleton session that TrackPlayer uses on iOS, so this overrides
+        // any wrong category that may have been left by a previous subsystem
+        // (e.g. expo-av sound effect, notification preview, radio player).
+        // Without this, TrackPlayer plays the file but the OS routes audio
+        // to silence because the session category respects the silent switch.
+        try {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
+          });
+        } catch {}
+
         // Use TrackPlayer for native platforms (with lock screen controls)
         const tpTracks = await Promise.all(queue.map(async (t, i) => {
           const resolvedUrl = await resolveAzkarTrackUri(t);
@@ -347,13 +528,18 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
         await TrackPlayer.reset();
         await TrackPlayer.add(tpTracks);
-
         if (idx > 0) {
           await TrackPlayer.skip(idx);
         }
 
+        // Force max volume — guards against the case where another audio
+        // subsystem (radio, Quran player, focus loss/duck) left the player
+        // at reduced or zero volume on the previous session.
+        try { await TrackPlayer.setVolume(1.0); } catch {}
+
         await TrackPlayer.setRate(playbackSpeed);
         await TrackPlayer.play();
+        finishSuppressingAzkarCompletionSoon();
 
         // Apply intro trim for current track if configured
         const trimMs = track.categoryId ? getCategoryTrimMs(track.categoryId) : 0;
@@ -389,13 +575,32 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
             if (status.isLoaded) {
               setPosition(status.positionMillis || 0);
               setDuration(status.durationMillis || 0);
+              progressRef.current = {
+                position: status.positionMillis || 0,
+                duration: status.durationMillis || 0,
+              };
               setAzkarPlaying(status.isPlaying);
               azkarPlayingRef.current = status.isPlaying;
               setAzkarLoading(false);
 
               if (status.didJustFinish) {
-                // Auto-advance to next track
-                playAzkarAtIndex(idx + 1);
+                markAzkarTrackComplete(idx);
+                const nextTrack = azkarQueue.current[idx + 1];
+                const delayMs = shouldDelayBeforeTrack(track, nextTrack) ? azkarRepeatDelayMsRef.current : 0;
+                const runId = azkarRunIdRef.current;
+                const playNext = () => {
+                  if (azkarRunIdRef.current === runId) {
+                    playAzkarAtIndex(idx + 1);
+                  }
+                };
+
+                if (delayMs > 0) {
+                  clearAzkarDelayTimer();
+                  setAzkarDelayPending(true);
+                  azkarDelayTimerRef.current = setTimeout(playNext, delayMs);
+                } else {
+                  playNext();
+                }
               }
             } else if (status.error) {
               // Sound failed to load/play — skip to next track
@@ -425,10 +630,18 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       console.error('[GlobalAudio] Error playing azkar track:', error);
       setAzkarLoading(false);
+      setAzkarDelayPending(false);
       // Try next track
       playAzkarAtIndex(idx + 1);
     }
-  }, [cleanupAzkar, playbackSpeed]);
+  }, [
+    cleanupAzkar,
+    clearAzkarDelayTimer,
+    finishSuppressingAzkarCompletionSoon,
+    markAzkarTrackComplete,
+    playbackSpeed,
+    shouldDelayBeforeTrack,
+  ]);
 
   // Subscribe to Quran audio changes
   useEffect(() => {
@@ -466,9 +679,19 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     return unsub;
   }, []);
 
-  const playAzkarQueue = useCallback(async (tracks: AudioTrack[], startIndex = 0, route?: string) => {
+  const playAzkarQueue = useCallback(async (
+    tracks: AudioTrack[],
+    startIndex = 0,
+    route?: string,
+    options?: PlayAzkarQueueOptions,
+  ) => {
     if (tracks.length === 0) return;
+    azkarRunIdRef.current += 1;
     azkarQueue.current = tracks;
+    completedAzkarTracksRef.current = new Set();
+    azkarTrackCompleteRef.current = options?.onTrackComplete;
+    azkarRepeatDelayMsRef.current = Math.max(0, options?.repeatDelayMs ?? 0);
+    queueIndexRef.current = startIndex;
     if (route) setSourceRoute(route);
 
     // Stop Quran if playing
@@ -497,6 +720,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         try { await cleanupAzkar(); } catch {}
         setAzkarPlaying(false);
         setAzkarLoading(false);
+        setAzkarDelayPending(false);
+        azkarTrackCompleteRef.current = undefined;
         azkarQueue.current = [];
         setQueueLength(0);
       }
@@ -526,6 +751,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       if (currentSource === 'quran') {
         audioPlayer.togglePlayPause();
       } else if (currentSource === 'azkar') {
+        clearAzkarDelayTimer();
         if (isTrackPlayerReady() && TrackPlayer) {
           if (isCurrentlyPlaying) {
             // Immediately update state so UI responds
@@ -558,7 +784,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     } finally {
       isTogglingRef.current = false;
     }
-  }, []);
+  }, [clearAzkarDelayTimer]);
 
   const stop = useCallback(async () => {
     const currentSource = sourceRef.current;
@@ -575,6 +801,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     setAzkarPlaying(false);
     azkarPlayingRef.current = false;
     setAzkarLoading(false);
+    setAzkarDelayPending(false);
+    azkarRunIdRef.current += 1;
+    azkarTrackCompleteRef.current = undefined;
     azkarQueue.current = [];
     setQueueLength(0);
   }, [cleanupAzkar]);
@@ -600,33 +829,40 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     if (currentSource === 'quran') {
       audioPlayer.playNextAyah();
     } else if (currentSource === 'azkar') {
+      const nextIdx = findAdjacentLogicalAzkarIndex(1);
+      if (nextIdx < 0 || nextIdx >= azkarQueue.current.length) return;
+      clearAzkarDelayTimer();
       if (isTrackPlayerReady() && TrackPlayer) {
-        // TrackPlayer handles queue automatically
-        await TrackPlayer.skipToNext();
+        suppressAzkarCompletionRef.current = true;
+        queueIndexRef.current = nextIdx;
+        await TrackPlayer.skip(nextIdx);
+        await TrackPlayer.play();
+        finishSuppressingAzkarCompletionSoon();
       } else {
-        const nextIdx = queueIndex + 1;
-        if (nextIdx < azkarQueue.current.length) {
-          await playAzkarAtIndex(nextIdx);
-        }
+        await playAzkarAtIndex(nextIdx);
       }
     }
-  }, [queueIndex, playAzkarAtIndex]);
+  }, [clearAzkarDelayTimer, findAdjacentLogicalAzkarIndex, finishSuppressingAzkarCompletionSoon, playAzkarAtIndex]);
 
   const previous = useCallback(async () => {
     const currentSource = sourceRef.current;
     if (currentSource === 'quran') {
       audioPlayer.playPreviousAyah();
     } else if (currentSource === 'azkar') {
+      const prevIdx = findAdjacentLogicalAzkarIndex(-1);
+      if (prevIdx < 0 || prevIdx >= azkarQueue.current.length) return;
+      clearAzkarDelayTimer();
       if (isTrackPlayerReady() && TrackPlayer) {
-        await TrackPlayer.skipToPrevious();
+        suppressAzkarCompletionRef.current = true;
+        queueIndexRef.current = prevIdx;
+        await TrackPlayer.skip(prevIdx);
+        await TrackPlayer.play();
+        finishSuppressingAzkarCompletionSoon();
       } else {
-        const prevIdx = queueIndex - 1;
-        if (prevIdx >= 0) {
-          await playAzkarAtIndex(prevIdx);
-        }
+        await playAzkarAtIndex(prevIdx);
       }
     }
-  }, [queueIndex, playAzkarAtIndex]);
+  }, [clearAzkarDelayTimer, findAdjacentLogicalAzkarIndex, finishSuppressingAzkarCompletionSoon, playAzkarAtIndex]);
 
   const setPlaybackSpeed = useCallback(async (speed: number) => {
     setPlaybackSpeedState(speed);
@@ -645,7 +881,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const state: GlobalAudioState = {
     source,
     isPlaying: source === 'quran' ? quranState.isPlaying : source === 'azkar' ? azkarPlaying : source === 'radio' ? radioState.status === 'playing' : false,
-    isLoading: source === 'quran' ? quranState.isLoading : source === 'azkar' ? azkarLoading : source === 'radio' ? (radioState.status === 'loading' || radioState.status === 'buffering') : false,
+    isLoading: source === 'quran' ? quranState.isLoading : source === 'azkar' ? (azkarLoading || azkarDelayPending) : source === 'radio' ? (radioState.status === 'loading' || radioState.status === 'buffering') : false,
     trackTitle: source === 'quran' ? '' : source === 'radio' ? (radioState.currentStation?.name || '') : trackTitle,
     trackSubtitle: source === 'quran' ? undefined : source === 'radio' ? (radioState.currentStation?.nameTranslations?.en) : trackSubtitle,
     position: source === 'quran' ? quranState.position : position,

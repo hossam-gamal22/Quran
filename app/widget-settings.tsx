@@ -36,6 +36,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -54,12 +55,12 @@ const ACCENT_COLORS = [
 ];
 
 const AZKAR_CATEGORIES = [
-  { key: '1', nameKey: 'widget.morningAzkar', icon: 'weather-sunny' },
+  { key: '1', nameKey: 'widget.morningAzkar', icon: 'weather-sunset-up' },
   { key: '1b', nameKey: 'widget.eveningAzkar', icon: 'weather-night' },
-  { key: '2', nameKey: 'widget.sleepAzkar', icon: 'sleep' },
-  { key: '3', nameKey: 'widget.wakeupAzkar', icon: 'alarm' },
-  { key: '27', nameKey: 'widget.afterPrayerAzkar', icon: 'mosque' },
-  { key: '26', nameKey: 'widget.miscAzkar', icon: 'bookmark-multiple' },
+  { key: '2', nameKey: 'widget.sleepAzkar', icon: 'weather-night' },
+  { key: '3', nameKey: 'widget.wakeupAzkar', icon: 'white-balance-sunny' },
+  { key: '27', nameKey: 'widget.afterPrayerAzkar', icon: '🤲' },
+  { key: '26', nameKey: 'widget.miscAzkar', icon: 'book-open-variant' },
 ];
 
 // ========================================
@@ -149,6 +150,46 @@ const SettingRow: React.FC<SettingRowProps> = ({
   );
 };
 
+interface StylePickerProps {
+  options: { key: string; label: string; subtitle?: string }[];
+  selected: string;
+  onSelect: (key: string) => void;
+  isRTL?: boolean;
+}
+
+const StylePicker: React.FC<StylePickerProps> = ({ options, selected, onSelect, isRTL }) => {
+  const colors = useColors();
+  return (
+    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12 }}>
+      {options.map((opt) => {
+        const active = selected === opt.key;
+        return (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSelect(opt.key);
+            }}
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 14,
+              borderRadius: 14,
+              borderWidth: 1.5,
+              borderColor: active ? '#0d8e62' : colors.border,
+              backgroundColor: active ? '#0d8e6222' : colors.surface,
+            }}
+          >
+            <Text style={{ color: colors.text, fontFamily: 'Cairo-SemiBold', fontSize: 13, textAlign: 'center' }}>{opt.label}</Text>
+            {opt.subtitle ? (
+              <Text style={{ color: colors.textLight, fontFamily: 'Cairo-Regular', fontSize: 10, textAlign: 'center', marginTop: 2 }}>{opt.subtitle}</Text>
+            ) : null}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
 interface ColorPickerProps {
   selectedColor: string;
   onSelect: (color: string) => void;
@@ -223,11 +264,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
                 onToggle(category.key);
               }}
             >
-              <MaterialCommunityIcons
-                name={category.icon as any}
-                size={20}
-                color={isSelected ? '#fff' : colors.icon}
-              />
+              <AppIcon name={category.icon} size={20} color={isSelected ? '#fff' : colors.icon} />
               <Text
                 style={[
                   styles.categoryText,
@@ -544,46 +581,36 @@ export default function WidgetSettingsScreen() {
             isDarkMode={isDarkMode}
             isRTL={isRTL}
           />
-          <SettingRow
-            label={t('widgets.showAllPrayers')}
-            description={t('widgets.showAllPrayersDesc')}
-            value={settings.prayerWidget.showAllPrayers}
-            onValueChange={(value) => updatePrayerWidget({ showAllPrayers: value })}
-            isDarkMode={isDarkMode}
+
+          <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {isRTL ? 'تصميم الويدجت المتوسط (4×2)' : 'Medium widget design (4×2)'}
+            </Text>
+          </View>
+          <StylePicker
             isRTL={isRTL}
-          />
-          <SettingRow
-            label={t('widgets.showHijriDate')}
-            value={settings.prayerWidget.showHijriDate}
-            onValueChange={(value) => updatePrayerWidget({ showHijriDate: value })}
-            isDarkMode={isDarkMode}
-            isRTL={isRTL}
-          />
-          <SettingRow
-            label={t('widgets.showLocation')}
-            value={settings.prayerWidget.showLocation}
-            onValueChange={(value) => updatePrayerWidget({ showLocation: value })}
-            isDarkMode={isDarkMode}
-            isRTL={isRTL}
-          />
-          <SettingRow
-            label={t('widgets.trackPrayerCompletion')}
-            description={t('widgets.trackPrayerCompletionDesc')}
-            value={settings.prayerWidget.showCompletion}
-            onValueChange={(value) => updatePrayerWidget({ showCompletion: value })}
-            isDarkMode={isDarkMode}
-            isRTL={isRTL}
+            selected={settings.prayerWidget.style ?? 'pair'}
+            onSelect={(key) => updatePrayerWidget({ style: key as 'pair' | 'table' | 'banner' })}
+            options={[
+              { key: 'pair', label: isRTL ? 'ثنائي' : 'Pair', subtitle: isRTL ? 'وقت + اسم' : 'Time + Name' },
+              { key: 'table', label: isRTL ? 'جدول' : 'Table', subtitle: isRTL ? '٥ صلوات' : '5 prayers' },
+              { key: 'banner', label: isRTL ? 'لافتتان' : 'Banner', subtitle: isRTL ? 'بطاقتان' : 'Two cards' },
+            ]}
           />
 
           <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {t('widgets.accentColor')}
+              {isRTL ? 'تصميم الويدجت الصغير (2×2)' : 'Small widget design (2×2)'}
             </Text>
           </View>
-          <ColorPicker
-            selectedColor={settings.prayerWidget.accentColor}
-            onSelect={(color) => updatePrayerWidget({ accentColor: color })}
-            isDarkMode={isDarkMode}
+          <StylePicker
+            isRTL={isRTL}
+            selected={settings.prayerWidget.smallStyle ?? 'compact'}
+            onSelect={(key) => updatePrayerWidget({ smallStyle: key as 'compact' | 'simple' })}
+            options={[
+              { key: 'compact', label: isRTL ? 'مدمج' : 'Compact', subtitle: isRTL ? 'اسم + وقت + عداد' : 'Name + Time + Timer' },
+              { key: 'simple', label: isRTL ? 'بسيط' : 'Simple', subtitle: isRTL ? 'وقت + اسم' : 'Time + Name' },
+            ]}
           />
         </SettingSection>
 

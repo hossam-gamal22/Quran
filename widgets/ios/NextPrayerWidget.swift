@@ -53,6 +53,10 @@ struct WidgetSettings: Codable {
         var showCompletion: Bool?
         var colorScheme: String
         var accentColor: String
+        /// Visual style for the medium (4×2) prayer widget: "pair" | "table" | "banner".
+        var style: String?
+        /// Visual style for the small (2×2) prayer widget: "compact" | "simple".
+        var smallStyle: String?
     }
 }
 
@@ -92,6 +96,7 @@ struct PrayerWidgetEntry: TimelineEntry {
     let date: Date
     let data: PrayerWidgetData?
     let settings: WidgetSettings?
+    var language: String? = nil
 }
 
 struct PrayerWidgetProvider: TimelineProvider {
@@ -104,7 +109,8 @@ struct PrayerWidgetProvider: TimelineProvider {
         PrayerWidgetEntry(
             date: Date(),
             data: sampleData,
-            settings: nil
+            settings: nil,
+            language: "ar"
         )
     }
     
@@ -112,7 +118,8 @@ struct PrayerWidgetProvider: TimelineProvider {
         let entry = PrayerWidgetEntry(
             date: Date(),
             data: loadData(),
-            settings: loadSettings()
+            settings: loadSettings(),
+            language: loadLanguage()
         )
         completion(entry)
     }
@@ -121,6 +128,7 @@ struct PrayerWidgetProvider: TimelineProvider {
         let currentDate = Date()
         let data = loadData()
         let settings = loadSettings()
+        let language = loadLanguage()
         
         // إنشاء entries للتحديث كل 15 دقيقة
         var entries: [PrayerWidgetEntry] = []
@@ -130,7 +138,8 @@ struct PrayerWidgetProvider: TimelineProvider {
             let entry = PrayerWidgetEntry(
                 date: entryDate,
                 data: data,
-                settings: settings
+                settings: settings,
+                language: language
             )
             entries.append(entry)
         }
@@ -156,6 +165,14 @@ struct PrayerWidgetProvider: TimelineProvider {
             return nil
         }
         return widgetData.settings
+    }
+
+    private func loadLanguage() -> String {
+        guard let data = loadSharedRawData(),
+              let widgetData = try? JSONDecoder().decode(SharedWidgetData.self, from: data) else {
+            return "ar"
+        }
+        return widgetData.language ?? "ar"
     }
     
     // بيانات تجريبية
@@ -190,6 +207,7 @@ struct PrayerWidgetProvider: TimelineProvider {
 struct SharedWidgetData: Codable {
     var prayer: PrayerWidgetData
     var settings: WidgetSettings
+    var language: String?
 }
 
 // ========================================
@@ -201,65 +219,12 @@ struct SmallPrayerWidgetView: View {
     let theme: IOSWidgetTheme
     
     var body: some View {
-        ZStack {
-            ThemedWidgetBackground(theme: theme)
-            
-            VStack(spacing: 6) {
-                // App icon
-                WidgetAppIcon(size: 32)
-                
-                // اسم الصلاة القادمة
-                Text(entry.data?.nextPrayerNameAr ?? "الظهر")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(theme.textColor)
-                
-                // الوقت
-                Text(entry.data?.nextPrayerTime ?? "12:15 م")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textColor)
-                
-                // الوقت المتبقي
-                GlassPill(color: theme.badgeBg.opacity(0.6)) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "timer")
-                            .font(.system(size: 10))
-                        Text(entry.data?.timeRemaining ?? "2:30")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(theme.badgeText)
-                }
-                
-                // التاريخ الهجري
-                if entry.settings?.prayerWidget.showHijriDate ?? true {
-                    Text(entry.data?.hijriDate ?? "15 رمضان")
-                        .font(.system(size: 9))
-                        .foregroundColor(theme.mutedColor.opacity(0.6))
-                }
-                // الموقع
-                if entry.settings?.prayerWidget.showLocation ?? true,
-                   let loc = entry.data?.location, !loc.isEmpty {
-                    Text(loc)
-                        .font(.system(size: 8))
-                        .foregroundColor(theme.mutedColor.opacity(0.4))
-                }
-            }
-            .padding()
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
-        )
-    }
-    
-    var prayerIcon: String {
-        switch entry.data?.nextPrayer ?? "dhuhr" {
-        case "fajr": return "sunrise"
-        case "sunrise": return "sun.max"
-        case "dhuhr": return "sun.max.fill"
-        case "asr": return "sun.haze"
-        case "maghrib": return "sunset"
-        case "isha": return "moon.stars"
-        default: return "clock"
+        let style = entry.settings?.prayerWidget.smallStyle ?? "compact"
+        switch style {
+        case "simple":
+            RitualPrayerSimple(entry: entry)
+        default:
+            RitualPrayerCompact(entry: entry)
         }
     }
 }
@@ -273,97 +238,14 @@ struct MediumPrayerWidgetView: View {
     let theme: IOSWidgetTheme
     
     var body: some View {
-        ZStack {
-            ThemedWidgetBackground(theme: theme)
-            
-            VStack(spacing: 0) {
-                // Header with app icon
-                HStack {
-                    WidgetAppIcon(size: 20)
-                    Text("مواقيت الصلاة")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(theme.mutedColor)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 1) {
-                        if entry.settings?.prayerWidget.showHijriDate ?? true {
-                            Text(entry.data?.hijriDate ?? "15 رمضان")
-                                .font(.system(size: 10))
-                                .foregroundColor(theme.mutedColor.opacity(0.6))
-                        }
-                        if entry.settings?.prayerWidget.showLocation ?? true,
-                           let loc = entry.data?.location, !loc.isEmpty {
-                            Text(loc)
-                                .font(.system(size: 9))
-                                .foregroundColor(theme.mutedColor.opacity(0.4))
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
-                
-                HStack(spacing: 15) {
-                    // Left: next prayer info
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.data?.nextPrayerNameAr ?? "الظهر")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(theme.textColor)
-                        
-                        Text(entry.data?.nextPrayerTime ?? "12:15 م")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(theme.textColor)
-                        
-                        GlassPill(color: theme.badgeBg.opacity(0.6)) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "timer")
-                                    .font(.system(size: 10))
-                                Text(entry.data?.timeRemaining ?? "2:30")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .foregroundColor(theme.badgeText)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Right: all prayers list
-                    if entry.settings?.prayerWidget.showAllPrayers ?? true {
-                        VStack(alignment: .trailing, spacing: 3) {
-                            ForEach(entry.data?.allPrayers ?? []) { prayer in
-                                HStack(spacing: 6) {
-                                    Text(prayer.time)
-                                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                                    Text(prayer.nameAr)
-                                        .font(.system(size: 11, weight: prayer.isNext ? .bold : .regular))
-                                }
-                                .foregroundColor(prayer.isPassed ? theme.mutedColor.opacity(0.35) : prayer.isNext ? theme.badgeText : theme.textColor.opacity(0.8))
-                                .padding(.horizontal, prayer.isNext ? 6 : 0)
-                                .padding(.vertical, prayer.isNext ? 2 : 0)
-                                .background(prayer.isNext ? theme.badgeBg.opacity(0.5) : Color.clear)
-                                .cornerRadius(6)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 10)
-            }
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
-        )
-    }
-    
-    var prayerIcon: String {
-        switch entry.data?.nextPrayer ?? "dhuhr" {
-        case "fajr": return "sunrise"
-        case "sunrise": return "sun.max"
-        case "dhuhr": return "sun.max.fill"
-        case "asr": return "sun.haze"
-        case "maghrib": return "sunset"
-        case "isha": return "moon.stars"
-        default: return "clock"
+        let style = entry.settings?.prayerWidget.style ?? "pair"
+        switch style {
+        case "table":
+            RitualPrayerTable(entry: entry)
+        case "banner":
+            RitualPrayerBanner(entry: entry)
+        default:
+            RitualPrayerPair(entry: entry)
         }
     }
 }

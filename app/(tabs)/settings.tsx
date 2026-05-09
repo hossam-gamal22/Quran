@@ -938,7 +938,7 @@ const _styles = StyleSheet.create({
   },
   suggestOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,

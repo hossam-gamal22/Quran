@@ -35,7 +35,7 @@ export const FAVORITE_CATEGORIES: {
   types: FavoriteType[];
   icon: string;
 }[] = [
-  { key: 'duas', labelKey: 'favorites.categoryDuas', types: ['dua'], icon: 'hands-pray' },
+  { key: 'duas', labelKey: 'favorites.categoryDuas', types: ['dua'], icon: '🤲' },
   { key: 'ayat', labelKey: 'favorites.categoryVerses', types: ['ayah'], icon: 'book-open-variant' },
   { key: 'ahadith', labelKey: 'favorites.categoryHadiths', types: ['hadith', 'hadith_sifat'], icon: 'script-text' },
   { key: 'adhkar', labelKey: 'favorites.categoryAzkar', types: ['dhikr'], icon: 'counter' },

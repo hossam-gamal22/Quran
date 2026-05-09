@@ -203,7 +203,7 @@ const ALL_NOTIFICATION_TYPES = [
     titleAr: 'وقت وردك القرآني 📖', bodyAr: 'القليل الدائم خيرٌ من الكثير المنقطع.. ابدأ وردك الآن.',
     titleEn: 'Quran Reading', bodyEn: 'Time for your daily Quran reading.',
     hasScheduling: true, firestoreCategory: 'quranReading' },
-  // --- 🤲 تسبيح وصلاة ---
+  // --- hand-heart تسبيح وصلاة ---
   { id: 'salawat', category: 'dhikr', name: 'الصلاة على النبي', emoji: '💚', time: '17:00',
     titleAr: 'صلِّ على الحبيب ﷺ 💚', bodyAr: '"إن الله وملائكته يصلون على النبي".. عطر لسانك الآن.',
     titleEn: 'Salawat', bodyEn: 'Time to send blessings upon the Prophet ﷺ.',
@@ -212,7 +212,7 @@ const ALL_NOTIFICATION_TYPES = [
     titleAr: 'سبّح ليرتاح قلبك 📿', bodyAr: '"سبحان الله وبحمده".. غراس الجنة تناديك.',
     titleEn: 'Tasbih Reminder', bodyEn: 'SubhanAllah wa bihamdihi — seeds of Paradise await.',
     hasScheduling: true, firestoreCategory: 'tasbih' },
-  { id: 'istighfar', category: 'dhikr', name: 'الاستغفار', emoji: '🤲', time: '19:00',
+  { id: 'istighfar', category: 'dhikr', name: 'الاستغفار', emoji: 'hand-heart', time: '19:00',
     titleAr: 'استغفر.. يفتح الله لك الأبواب ✨', bodyAr: 'أستغفر الله العظيم وأتوب إليه.. طهّر صحيفتك الآن.',
     titleEn: 'Istighfar', bodyEn: 'Astaghfirullah — purify your record now.',
     hasScheduling: true, firestoreCategory: 'istighfar' },
@@ -231,7 +231,7 @@ const REMINDER_CATEGORIES = [
   { id: 'azkar', name: 'الأذكار', emoji: '📿' },
   { id: 'prayer', name: 'مواقيت الصلاة', emoji: '🕌' },
   { id: 'quran', name: 'القرآن', emoji: '📖' },
-  { id: 'dhikr', name: 'تسبيح وصلاة', emoji: '🤲' },
+  { id: 'dhikr', name: 'تسبيح وصلاة', emoji: 'hand-heart' },
   { id: 'worship', name: 'العبادات', emoji: '📊' },
 ];
 
@@ -598,6 +598,31 @@ const NotificationsPage: React.FC = () => {
     if (targetAudience === 'single_user' && !targetUserId) {
       setSendResult({ success: false, message: 'يرجى إدخال معرّف المستخدم' });
       return;
+    }
+
+    // ⚠️ Mass-send confirmation: protect against accidental broadcasts.
+    if (targetAudience !== 'single_user') {
+      const audience = targetLanguages.length > 0
+        ? `لغات: ${targetLanguages.join('، ')}`
+        : targetCountries.length > 0
+          ? `دول: ${targetCountries.join('، ')}`
+          : 'جميع المستخدمين';
+      const estimated = userStats?.withTokens ?? '؟';
+      const ok = confirm(
+        `⚠️ تأكيد الإرسال الجماعي\n\n` +
+        `الجمهور: ${audience}\n` +
+        `العدد المتوقع: ~${estimated} مستخدم\n` +
+        `العنوان: "${translations.ar.title}"\n\n` +
+        `هل تريد المتابعة؟`
+      );
+      if (!ok) return;
+      const second = prompt(
+        `للتأكيد النهائي اكتب: إرسال`
+      );
+      if (second?.trim() !== 'إرسال') {
+        setSendResult({ success: false, message: 'تم إلغاء الإرسال' });
+        return;
+      }
     }
 
     setIsSending(true);

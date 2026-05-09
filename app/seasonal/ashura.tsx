@@ -21,6 +21,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -97,7 +98,7 @@ const VIRTUES = [
 const RECOMMENDED_ACTIONS = [
   { id: 'fast_9', icon: 'food-off', title: 'صيام التاسع', subtitle: 'للمخالفة' },
   { id: 'fast_10', icon: 'food-off', title: 'صيام العاشر', subtitle: 'الأساسي' },
-  { id: 'dua', icon: 'hands-pray', title: 'الدعاء', subtitle: 'والاستغفار' },
+  { id: 'dua', icon: '🤲', title: 'الدعاء', subtitle: 'والاستغفار' },
   { id: 'sadaqa', icon: 'hand-coin', title: 'الصدقة', subtitle: 'والتوسعة على العيال' },
 ];
 
@@ -290,11 +291,7 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
       activeOpacity={0.7}
     >
       <View style={[styles.actionIcon, { backgroundColor: `${ashuraColor}15` }, isCompleted && styles.actionIconCompleted]}>
-        <MaterialCommunityIcons
-          name={action.icon as any}
-          size={22}
-          color={isCompleted ? '#fff' : ashuraColor}
-        />
+        <AppIcon name={action.icon} size={22} color={isCompleted ? '#fff' : ashuraColor} />
       </View>
       <View style={styles.actionContent}>
         <Text style={[styles.actionTitle, { color: isCompleted && !isDarkMode ? '#1B5E20' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{titleMap[action.id] || action.title}</Text>

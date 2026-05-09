@@ -83,26 +83,69 @@ const TasbihPresetsManager: React.FC = () => {
         <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-xl hover:bg-emerald-700 transition-colors">
           <Plus size={18} /> إضافة تسبيح
         </button>
-        {presets.length === 0 && (
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
-            onClick={async () => {
-              if (!confirm('هل تريد استيراد التسبيحات الافتراضية من التطبيق (15 تسبيح)؟')) return;
+        <button
+          className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
+          onClick={async () => {
+            const msg = presets.length === 0
+              ? 'هل تريد استيراد التسبيحات الافتراضية من التطبيق (15 تسبيح)؟'
+              : `يوجد ${presets.length} تسبيح بالفعل. هل تريد إضافة الافتراضي أيضاً؟`;
+            if (!confirm(msg)) return;
+            try {
+              const defaults = getDefaultTasbihPresets();
+              for (const p of defaults) {
+                await setDoc(doc(db, 'tasbihPresets', p.id), p);
+              }
+              await loadPresets();
+              setSaveMsg(`✅ تم استيراد ${defaults.length} تسبيح`);
+            } catch (e) {
+              alert(`❌ فشل الاستيراد: ${(e as Error).message}`);
+            }
+          }}
+        >
+          <Download size={18} /> استيراد الافتراضي
+        </button>
+        <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors cursor-pointer">
+          📥 استيراد JSON
+          <input
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
               try {
-                const defaults = getDefaultTasbihPresets();
-                for (const p of defaults) {
-                  await setDoc(doc(db, 'tasbihPresets', p.id), p);
+                const text = await file.text();
+                const items: TasbihPreset[] = JSON.parse(text);
+                if (!Array.isArray(items)) throw new Error('JSON must be an array');
+                for (const p of items) {
+                  const id = p.id || `tasbih_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+                  await setDoc(doc(db, 'tasbihPresets', id), { ...p, id });
                 }
                 await loadPresets();
-                setSaveMsg(`✅ تم استيراد ${defaults.length} تسبيح`);
-              } catch (e) {
-                alert(`❌ فشل الاستيراد: ${(e as Error).message}`);
+                setSaveMsg(`✅ تم استيراد ${items.length} عنصر`);
+              } catch (err) {
+                alert(`❌ فشل الاستيراد: ${(err as Error).message}`);
+              } finally {
+                if (e.target) e.target.value = '';
               }
             }}
-          >
-            <Download size={18} /> استيراد الافتراضي
-          </button>
-        )}
+          />
+        </label>
+        <button
+          className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-xl hover:bg-slate-700 transition-colors"
+          onClick={() => {
+            const data = JSON.stringify(presets, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tasbih-presets.json';
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          📤 تصدير JSON
+        </button>
       </div>
       {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-accent-light' : 'text-red-400'}`}>{saveMsg}</p>}
 

@@ -2,7 +2,7 @@
 // صلاتي - Smart Prayer Tracker with proximity/touch detection
 // Counts sujood automatically and calculates rakats
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import {
   Pressable,
   Platform,
   Dimensions,
-  Image,
   ScrollView,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,7 +29,6 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 
 import { useSettings } from '@/contexts/SettingsContext';
@@ -38,7 +39,6 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSacredContext } from '@/hooks/use-sacred-context';
-import { Spacing } from '@/constants/theme';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { usePrayerTracker } from '@/contexts/WorshipContext';
 import { getPrayerRecord, getTodayDate, type PrayerName } from '@/lib/worship-storage';
@@ -50,10 +50,14 @@ import { resolveNotificationSound } from '@/lib/resolve-notification-sound';
 import { useSujoodDetector } from '@/hooks/use-sujood-detector';
 import {
   PRAYER_CONFIG,
-  PRAYER_ORDER,
+  TEMPORARY_PRAYER_MAX_RAKATS,
+  TEMPORARY_PRAYER_MIN_RAKATS,
+  TEMPORARY_PRAYER_PRESETS,
   calculateRakat,
   isPrayerCompleted,
   type SalatiPrayerType,
+  type TemporaryPrayerPreset,
+  type TemporaryPrayerPresetKey,
 } from '@/lib/prayer-tracker';
 import SujudIcon from '@/assets/images/sujud.svg';
 
@@ -64,6 +68,32 @@ const ACCENT_GREEN = '#0d8e62';
 // View Types
 // ---------------------------------------------------------------------------
 type ViewState = 'instructions' | 'selection' | 'tracking' | 'completed';
+
+type SalatiPrayerSelection =
+  | { kind: 'required'; prayer: SalatiPrayerType }
+  | {
+      kind: 'temporary';
+      name: string;
+      rakats: number;
+      icon: string;
+      iconColor: string;
+    };
+
+interface TrackingPrayerInfo {
+  nameAr: string;
+  rakats: number;
+  icon: string;
+  iconColor: string;
+}
+
+const TEMPORARY_PRAYER_PRESET_TRANSLATION_KEYS: Record<TemporaryPrayerPresetKey, string> = {
+  qiyam: 'smartTracker.otherPrayerQiyam',
+  witr: 'smartTracker.otherPrayerWitr',
+  duha: 'smartTracker.otherPrayerDuha',
+  nafl: 'smartTracker.otherPrayerNafl',
+};
+
+const DEFAULT_TEMPORARY_PRAYER_PRESET = TEMPORARY_PRAYER_PRESETS[0];
 
 // Prayer times interface
 interface PrayerTimesMap {
@@ -126,7 +156,7 @@ const determinePrayerStatus = (
 export default function SalatiScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isDarkMode, settings } = useSettings();
+  const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -149,12 +179,20 @@ export default function SalatiScreen() {
 
   // State
   const [currentView, setCurrentView] = useState<ViewState>('instructions');
-  const [selectedPrayer, setSelectedPrayer] = useState<SalatiPrayerType | null>(null);
+  const [selectedPrayer, setSelectedPrayer] = useState<SalatiPrayerSelection | null>(null);
   const [timeValidationError, setTimeValidationError] = useState<string | null>(null);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimesMap>({});
+  const [showTemporaryPrayerModal, setShowTemporaryPrayerModal] = useState(false);
+  const [temporaryPrayerName, setTemporaryPrayerName] = useState(DEFAULT_TEMPORARY_PRAYER_PRESET.nameAr);
+  const [temporaryPrayerRakats, setTemporaryPrayerRakats] = useState(String(DEFAULT_TEMPORARY_PRAYER_PRESET.rakats));
+  const [selectedTemporaryPreset, setSelectedTemporaryPreset] = useState<TemporaryPrayerPresetKey | null>(DEFAULT_TEMPORARY_PRAYER_PRESET.key);
 
   // Sujood detector hook
   const detector = useSujoodDetector();
+
+  const getTemporaryPrayerPresetName = useCallback((preset: TemporaryPrayerPreset) => {
+    return t(TEMPORARY_PRAYER_PRESET_TRANSLATION_KEYS[preset.key]);
+  }, []);
 
   // Load prayer times on mount
   useEffect(() => {
@@ -234,7 +272,25 @@ export default function SalatiScreen() {
   }, [prayerTimes, nowMinutes, todayPrayer]);
 
   // Computed values
-  const prayerInfo = selectedPrayer ? PRAYER_CONFIG[selectedPrayer] : null;
+  const selectedRequiredPrayer = selectedPrayer?.kind === 'required' ? selectedPrayer.prayer : null;
+  const temporaryRakatsNumber = Number.parseInt(temporaryPrayerRakats, 10);
+  const isTemporaryPrayerValid =
+    temporaryPrayerName.trim().length > 0 &&
+    Number.isFinite(temporaryRakatsNumber) &&
+    temporaryRakatsNumber >= TEMPORARY_PRAYER_MIN_RAKATS &&
+    temporaryRakatsNumber <= TEMPORARY_PRAYER_MAX_RAKATS;
+  const prayerInfo: TrackingPrayerInfo | null = useMemo(() => {
+    if (!selectedPrayer) return null;
+    if (selectedPrayer.kind === 'required') {
+      return PRAYER_CONFIG[selectedPrayer.prayer];
+    }
+    return {
+      nameAr: selectedPrayer.name,
+      rakats: selectedPrayer.rakats,
+      icon: selectedPrayer.icon,
+      iconColor: selectedPrayer.iconColor,
+    };
+  }, [selectedPrayer]);
   const currentRakat = calculateRakat(detector.sujoodCount);
   const isCompleted = prayerInfo ? isPrayerCompleted(detector.sujoodCount, prayerInfo.rakats) : false;
 
@@ -261,13 +317,14 @@ export default function SalatiScreen() {
       detector.stop();
       setCurrentView('completed');
       
-      // Mark prayer as completed in worship tracker with smart status
-      if (selectedPrayer) {
+      // Required prayers keep the existing worship tracking + notification behavior.
+      if (selectedPrayer?.kind === 'required') {
+        const prayerKey = selectedPrayer.prayer;
         const now = new Date();
         const currentNowMinutes = (now.getHours() * 60) + now.getMinutes();
-        const status = determinePrayerStatus(selectedPrayer, prayerTimes, currentNowMinutes);
-        const selectedPrayerTime = prayerTimes[selectedPrayer];
-        updatePrayerWithTime(selectedPrayer as PrayerName, status, selectedPrayerTime).catch((error) => {
+        const status = determinePrayerStatus(prayerKey, prayerTimes, currentNowMinutes);
+        const selectedPrayerTime = prayerTimes[prayerKey];
+        updatePrayerWithTime(prayerKey as PrayerName, status, selectedPrayerTime).catch((error) => {
           console.error('[Salati] Prayer save failed:', error);
         });
 
@@ -280,14 +337,14 @@ export default function SalatiScreen() {
                 title: t('notifications.prayerAccepted'),
                 body: t('notifications.prayerAcceptedBody'),
                 sound: resolveNotificationSound('general_reminder', true),
-                data: { type: 'prayer_completed', prayer: selectedPrayer },
+                data: { type: 'prayer_completed', prayer: prayerKey },
                 ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.HIGH }),
                 ...(Platform.OS === 'android' && { channelId }),
                 ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
               },
               trigger: null,
             });
-            try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${selectedPrayer}`); } catch {}
+            try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayerKey}`); } catch {}
           } catch (e) {
             console.warn('[Salati] Failed to send completion notification:', e);
           }
@@ -297,7 +354,7 @@ export default function SalatiScreen() {
       // Haptic success feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [isCompleted, currentView, selectedPrayer, prayerTimes]);
+  }, [isCompleted, currentView, selectedPrayer, prayerTimes, updatePrayerWithTime]);
 
   // Handlers
   const handleStartPrayer = useCallback(() => {
@@ -307,22 +364,90 @@ export default function SalatiScreen() {
   const handleSelectPrayer = useCallback((prayer: SalatiPrayerType) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeValidationError(null);
-    setSelectedPrayer(prayer);
+    setSelectedPrayer({ kind: 'required', prayer });
   }, []);
+
+  const handleOpenTemporaryPrayerModal = useCallback(() => {
+    setTimeValidationError(null);
+    if (!selectedPrayer || selectedPrayer.kind !== 'temporary') {
+      setSelectedTemporaryPreset(DEFAULT_TEMPORARY_PRAYER_PRESET.key);
+      setTemporaryPrayerName(getTemporaryPrayerPresetName(DEFAULT_TEMPORARY_PRAYER_PRESET));
+      setTemporaryPrayerRakats(String(DEFAULT_TEMPORARY_PRAYER_PRESET.rakats));
+    }
+    setShowTemporaryPrayerModal(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [getTemporaryPrayerPresetName, selectedPrayer]);
+
+  const handleSelectTemporaryPreset = useCallback((preset: TemporaryPrayerPreset) => {
+    setSelectedTemporaryPreset(preset.key);
+    setTemporaryPrayerName(getTemporaryPrayerPresetName(preset));
+    setTemporaryPrayerRakats(String(preset.rakats));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [getTemporaryPrayerPresetName]);
+
+  const handleUseCustomTemporaryPrayer = useCallback(() => {
+    setSelectedTemporaryPreset(null);
+    setTemporaryPrayerName('');
+    setTemporaryPrayerRakats(String(DEFAULT_TEMPORARY_PRAYER_PRESET.rakats));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const handleTemporaryPrayerNameChange = useCallback((name: string) => {
+    setTemporaryPrayerName(name);
+    setSelectedTemporaryPreset(null);
+  }, []);
+
+  const handleTemporaryRakatsChange = useCallback((value: string) => {
+    setTemporaryPrayerRakats(value.replace(/[^0-9]/g, ''));
+  }, []);
+
+  const adjustTemporaryRakats = useCallback((delta: number) => {
+    const current = Number.parseInt(temporaryPrayerRakats, 10);
+    const next = Math.min(
+      TEMPORARY_PRAYER_MAX_RAKATS,
+      Math.max(TEMPORARY_PRAYER_MIN_RAKATS, (Number.isFinite(current) ? current : DEFAULT_TEMPORARY_PRAYER_PRESET.rakats) + delta)
+    );
+    setTemporaryPrayerRakats(String(next));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [temporaryPrayerRakats]);
+
+  const handleChooseTemporaryPrayer = useCallback(() => {
+    if (!isTemporaryPrayerValid) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    const preset = selectedTemporaryPreset
+      ? TEMPORARY_PRAYER_PRESETS.find((item) => item.key === selectedTemporaryPreset)
+      : null;
+
+    setSelectedPrayer({
+      kind: 'temporary',
+      name: temporaryPrayerName.trim(),
+      rakats: temporaryRakatsNumber,
+      icon: preset?.icon || 'star-crescent',
+      iconColor: preset?.iconColor || ACCENT_GREEN,
+    });
+    setShowTemporaryPrayerModal(false);
+    setTimeValidationError(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [isTemporaryPrayerValid, selectedTemporaryPreset, temporaryPrayerName, temporaryRakatsNumber]);
 
   const handleBeginTracking = useCallback(async () => {
     if (!selectedPrayer) return;
 
-    const now = new Date();
-    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+    if (selectedPrayer.kind === 'required') {
+      const now = new Date();
+      const nowMinutes = (now.getHours() * 60) + now.getMinutes();
 
-    // Check if prayer is available using smart logic
-    const isAvailable = isPrayerAvailable(selectedPrayer, prayerTimes, nowMinutes);
-    
-    if (!isAvailable) {
-      setTimeValidationError(t('smartTracker.prayerNotYet'));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
+      // Check if prayer is available using smart logic
+      const isAvailable = isPrayerAvailable(selectedPrayer.prayer, prayerTimes, nowMinutes);
+
+      if (!isAvailable) {
+        setTimeValidationError(t('smartTracker.prayerNotYet'));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
     }
 
     setTimeValidationError(null);
@@ -529,7 +654,7 @@ export default function SalatiScreen() {
         <View style={[styles.prayerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {(['fajr', 'dhuhr'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
-            const isSelected = selectedPrayer === prayer;
+            const isSelected = selectedRequiredPrayer === prayer;
             const { isAvailable, willBeLate, isCompleted } = getPrayerAvailability(prayer);
             return (
               <TouchableOpacity
@@ -589,7 +714,7 @@ export default function SalatiScreen() {
         <View style={[styles.prayerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {(['asr', 'maghrib'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
-            const isSelected = selectedPrayer === prayer;
+            const isSelected = selectedRequiredPrayer === prayer;
             const { isAvailable, willBeLate, isCompleted } = getPrayerAvailability(prayer);
             return (
               <TouchableOpacity
@@ -645,11 +770,11 @@ export default function SalatiScreen() {
           })}
         </View>
 
-        {/* Third row: Isha (centered) */}
-        <View style={styles.prayerRowCenter}>
+        {/* Third row: Isha, Other Prayer */}
+        <View style={[styles.prayerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {(['isha'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
-            const isSelected = selectedPrayer === prayer;
+            const isSelected = selectedRequiredPrayer === prayer;
             const { isAvailable, willBeLate, isCompleted } = getPrayerAvailability(prayer);
             return (
               <TouchableOpacity
@@ -703,6 +828,54 @@ export default function SalatiScreen() {
               </TouchableOpacity>
             );
           })}
+
+          <TouchableOpacity
+            style={[
+              styles.prayerCard,
+              {
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f2f2f7',
+                borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)',
+              },
+              selectedPrayer?.kind === 'temporary' && styles.prayerCardSelected,
+            ]}
+            onPress={handleOpenTemporaryPrayerModal}
+            activeOpacity={0.7}
+          >
+            <View style={styles.rakatBadge}>
+              <MaterialCommunityIcons
+                name={selectedPrayer?.kind === 'temporary' ? 'check-circle' : 'plus-circle-outline'}
+                size={14}
+                color={ACCENT_GREEN}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.prayerIconCircle,
+                { backgroundColor: `${selectedPrayer?.kind === 'temporary' ? selectedPrayer.iconColor : ACCENT_GREEN}20` },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={(selectedPrayer?.kind === 'temporary' ? selectedPrayer.icon : 'plus-circle-outline') as any}
+                size={32}
+                color={selectedPrayer?.kind === 'temporary' ? selectedPrayer.iconColor : ACCENT_GREEN}
+              />
+            </View>
+            <Text
+              style={[
+                styles.prayerCardText,
+                { color: selectedPrayer?.kind === 'temporary' ? ACCENT_GREEN : colors.text },
+              ]}
+              numberOfLines={2}
+            >
+              {selectedPrayer?.kind === 'temporary' ? selectedPrayer.name : t('smartTracker.otherPrayer')}
+            </Text>
+            <Text style={[styles.otherPrayerHint, { color: colors.textLight }]} numberOfLines={1}>
+              {selectedPrayer?.kind === 'temporary'
+                ? `${selectedPrayer.rakats} ${t('smartTracker.rakats')}`
+                : t('smartTracker.otherPrayerHint')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -730,6 +903,171 @@ export default function SalatiScreen() {
       )}
     </ScrollView>
     </Animated.View>
+  );
+
+  const renderTemporaryPrayerModal = () => (
+    <Modal
+      visible={showTemporaryPrayerModal}
+      animationType="slide"
+      transparent
+      onRequestClose={() => setShowTemporaryPrayerModal(false)}
+    >
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowTemporaryPrayerModal(false)} />
+        <View
+          style={[
+            styles.modalSheet,
+            {
+              backgroundColor: isDarkMode ? 'rgba(30,30,32,0.96)' : 'rgba(255,255,255,0.98)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
+            },
+          ]}
+        >
+          <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.modalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('smartTracker.otherPrayer')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowTemporaryPrayerModal(false)}
+              style={[styles.modalCloseButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.modalSectionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('smartTracker.otherPrayerPresets')}
+          </Text>
+          <View style={[styles.presetGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            {TEMPORARY_PRAYER_PRESETS.map((preset) => {
+              const isPresetSelected = selectedTemporaryPreset === preset.key;
+              return (
+                <TouchableOpacity
+                  key={preset.key}
+                  style={[
+                    styles.presetChip,
+                    {
+                      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.07)' : '#f2f2f7',
+                      borderColor: isPresetSelected ? ACCENT_GREEN : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                    },
+                  ]}
+                  onPress={() => handleSelectTemporaryPreset(preset)}
+                  activeOpacity={0.75}
+                >
+                  <MaterialCommunityIcons name={preset.icon as any} size={22} color={preset.iconColor} />
+                  <Text
+                    style={[styles.presetChipText, { color: isPresetSelected ? ACCENT_GREEN : colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {getTemporaryPrayerPresetName(preset)}
+                  </Text>
+                  <Text style={[styles.presetChipMeta, { color: colors.textLight }]}>
+                    {preset.rakats} {t('smartTracker.rakats')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.customPrayerButton,
+              {
+                backgroundColor: isDarkMode ? 'rgba(13, 142, 98, 0.12)' : 'rgba(13, 142, 98, 0.08)',
+                borderColor: selectedTemporaryPreset === null ? ACCENT_GREEN : 'rgba(13, 142, 98, 0.18)',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+              },
+            ]}
+            onPress={handleUseCustomTemporaryPrayer}
+            activeOpacity={0.75}
+          >
+            <MaterialCommunityIcons name="plus-circle-outline" size={24} color={ACCENT_GREEN} />
+            <View style={[styles.customPrayerTextWrap, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+              <Text style={[styles.customPrayerTitle, { color: ACCENT_GREEN, textAlign: isRTL ? 'right' : 'left' }]}>
+                {t('smartTracker.otherPrayerCustom')}
+              </Text>
+              <Text style={[styles.customPrayerHint, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                {t('smartTracker.otherPrayerCustomHint')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <Text style={[styles.inputLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('smartTracker.otherPrayerName')}
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.14)',
+                color: colors.text,
+                textAlign: isRTL ? 'right' : 'left',
+              },
+            ]}
+            value={temporaryPrayerName}
+            onChangeText={handleTemporaryPrayerNameChange}
+            placeholder={t('smartTracker.otherPrayerNamePlaceholder')}
+            placeholderTextColor={colors.textLight}
+            maxLength={32}
+          />
+
+          <Text style={[styles.inputLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('smartTracker.otherPrayerRakats')}
+          </Text>
+          <View style={[styles.stepperRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <TouchableOpacity
+              onPress={() => adjustTemporaryRakats(1)}
+              style={[styles.stepperButton, { backgroundColor: 'rgba(13, 142, 98, 0.14)' }]}
+            >
+              <MaterialCommunityIcons name="plus" size={22} color={ACCENT_GREEN} />
+            </TouchableOpacity>
+            <TextInput
+              style={[
+                styles.stepperInput,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.14)',
+                  color: colors.text,
+                },
+              ]}
+              value={temporaryPrayerRakats}
+              onChangeText={handleTemporaryRakatsChange}
+              keyboardType="number-pad"
+              placeholder={String(DEFAULT_TEMPORARY_PRAYER_PRESET.rakats)}
+              placeholderTextColor={colors.textLight}
+              textAlign="center"
+              maxLength={2}
+            />
+            <TouchableOpacity
+              onPress={() => adjustTemporaryRakats(-1)}
+              style={[styles.stepperButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}
+            >
+              <MaterialCommunityIcons name="minus" size={22} color={colors.textLight} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.rangeHint, { color: isTemporaryPrayerValid ? colors.textLight : '#ef5350', textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('smartTracker.otherPrayerRange', {
+              min: TEMPORARY_PRAYER_MIN_RAKATS,
+              max: TEMPORARY_PRAYER_MAX_RAKATS,
+            })}
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.modalPrimaryButton, !isTemporaryPrayerValid && styles.primaryButtonDisabled]}
+            onPress={handleChooseTemporaryPrayer}
+            disabled={!isTemporaryPrayerValid}
+          >
+            <Text style={styles.primaryButtonText}>
+              {t('smartTracker.choosePrayer')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 
   const renderTracking = () => (
@@ -852,18 +1190,22 @@ export default function SalatiScreen() {
 
       {/* Title */}
       <Text style={[styles.completedTitle, { color: colors.text }]}>
-        {t('smartTracker.completed')}
+        {selectedPrayer?.kind === 'temporary'
+          ? t('smartTracker.otherPrayerCompleted')
+          : t('smartTracker.completed')}
       </Text>
 
       {/* Verse */}
-      <GlassCard style={styles.verseCard}>
-        <Text style={[styles.verseText, { color: colors.text }]}>
-          {t('smartTracker.completedVerse')}
-        </Text>
-        <Text style={[styles.verseRef, { color: colors.textLight }]}>
-          {t('smartTracker.completedRef')}
-        </Text>
-      </GlassCard>
+      {selectedPrayer?.kind !== 'temporary' && (
+        <GlassCard style={styles.verseCard}>
+          <Text style={[styles.verseText, { color: colors.text }]}>
+            {t('smartTracker.completedVerse')}
+          </Text>
+          <Text style={[styles.verseRef, { color: colors.textLight }]}>
+            {t('smartTracker.completedRef')}
+          </Text>
+        </GlassCard>
+      )}
 
       {/* Finish Button */}
       <TouchableOpacity
@@ -889,6 +1231,7 @@ export default function SalatiScreen() {
         {currentView === 'selection' && renderSelection()}
         {currentView === 'tracking' && renderTracking()}
         {currentView === 'completed' && renderCompleted()}
+        {renderTemporaryPrayerModal()}
       </View>
     </BackgroundWrapper>
   );
@@ -1065,10 +1408,6 @@ const _styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
   },
-  prayerRowCenter: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
   selectionStartButton: {
     marginTop: 32,
     marginBottom: 8,
@@ -1131,6 +1470,14 @@ const _styles = StyleSheet.create({
   prayerCardText: {
     fontSize: 16,
     fontFamily: fontSemiBold(),
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  otherPrayerHint: {
+    fontSize: 11,
+    fontFamily: fontMedium(),
+    marginTop: -4,
+    textAlign: 'center',
     includeFontPadding: false,
   },
   selectionErrorText: {
@@ -1139,6 +1486,149 @@ const _styles = StyleSheet.create({
     fontFamily: fontMedium(),
     lineHeight: 22,
     includeFontPadding: false,
+  },
+
+  // Temporary Prayer Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: fontBold(),
+    includeFontPadding: false,
+  },
+  modalCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSectionLabel: {
+    fontSize: 15,
+    fontFamily: fontSemiBold(),
+    marginBottom: 10,
+    includeFontPadding: false,
+  },
+  presetGrid: {
+    width: '100%',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    marginBottom: 16,
+  },
+  presetChip: {
+    width: '48%',
+    minHeight: 86,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  presetChipText: {
+    fontSize: 14,
+    fontFamily: fontSemiBold(),
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  presetChipMeta: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    includeFontPadding: false,
+  },
+  customPrayerButton: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  customPrayerTextWrap: {
+    flex: 1,
+    gap: 3,
+  },
+  customPrayerTitle: {
+    fontSize: 15,
+    fontFamily: fontSemiBold(),
+    includeFontPadding: false,
+  },
+  customPrayerHint: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    includeFontPadding: false,
+  },
+  inputLabel: {
+    fontSize: 15,
+    fontFamily: fontSemiBold(),
+    marginBottom: 8,
+    includeFontPadding: false,
+  },
+  textInput: {
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    fontFamily: fontMedium(),
+    marginBottom: 14,
+    includeFontPadding: false,
+  },
+  stepperRow: {
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  stepperButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperInput: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    fontSize: 18,
+    fontFamily: fontBold(),
+    includeFontPadding: false,
+  },
+  rangeHint: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    marginBottom: 16,
+    includeFontPadding: false,
+  },
+  modalPrimaryButton: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT_GREEN,
+    paddingHorizontal: 24,
+    paddingVertical: 15,
+    borderRadius: 14,
+    width: '100%',
+    gap: 8,
   },
 
   // Tracking View

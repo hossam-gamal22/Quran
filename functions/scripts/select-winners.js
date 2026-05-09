@@ -43,7 +43,7 @@ async function selectMonthlyWinners() {
     .collection('users')
     .where('monthlyEngagement.month', '==', monthKey)
     .orderBy('monthlyEngagement.score', 'desc')
-    .limit(winnersCount)
+    .limit(Math.max(winnersCount * 5, 20))
     .get();
 
   if (snapshot.empty) {
@@ -51,15 +51,31 @@ async function selectMonthlyWinners() {
     return;
   }
 
-  const winners = snapshot.docs.map((doc, index) => ({
-    userId: doc.id,
-    rank: index + 1,
-    score: doc.data().monthlyEngagement?.score || 0,
-    displayName: doc.data().displayName || 'مستخدم',
-    fcmToken: doc.data().fcmToken,
-  }));
+  const winners = snapshot.docs
+    .filter((doc) => {
+      const data = doc.data();
+      const displayName = String(data.displayName || '').trim();
+      const score = data.monthlyEngagement?.score || 0;
+      return displayName && score > 0 && !data.hiddenFromLeaderboard && !data.placeholder;
+    })
+    .slice(0, winnersCount)
+    .map((doc, index) => {
+      const data = doc.data();
+      return {
+        userId: doc.id,
+        rank: index + 1,
+        score: data.monthlyEngagement?.score || 0,
+        displayName: String(data.displayName || '').trim(),
+        fcmToken: data.fcmToken,
+      };
+    });
 
   console.log(`Found ${winners.length} winners`);
+
+  if (winners.length === 0) {
+    console.log('No eligible winners found for previous month');
+    return;
+  }
 
   // Grant premium to each winner (30 days)
   const expiresAt = new Date();

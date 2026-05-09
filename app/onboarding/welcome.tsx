@@ -30,6 +30,7 @@ import Animated, {
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { tOnboarding } from '@/constants/onboarding-translations';
 import { t, isRTL as isRTLCheck } from '@/lib/i18n';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 
@@ -41,7 +42,7 @@ const { width, height } = Dimensions.get('window');
 
 const DEFAULT_FEATURES = [
   { icon: 'book-open-variant', labelKey: 'featureQuran', color: '#3a7ca5' },
-  { icon: 'hands-pray', labelKey: 'featureAdhkar', color: '#0d8e62' },
+  { icon: '🤲', labelKey: 'featureAdhkar', color: '#0d8e62' },
   { icon: 'mosque', labelKey: 'featurePrayer', color: '#c17f59' },
   { icon: 'compass', labelKey: 'featureQibla', color: '#4a3d73' },
 ];
@@ -149,7 +150,7 @@ export default function WelcomeScreen() {
                 style={styles.featureItem}
               >
                 <View style={styles.featureIcon}>
-                  <MaterialCommunityIcons name={feature.icon as any} size={24} color={feature.color} />
+                  <AppIcon name={feature.icon} size={24} color={feature.color} />
                 </View>
                 <Text style={styles.featureLabel}>{tOnboarding(feature.labelKey)}</Text>
               </Animated.View>

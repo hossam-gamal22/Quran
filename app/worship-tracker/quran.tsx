@@ -33,7 +33,7 @@ import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
-import { getAllQuranRecords, DailyQuranRecord } from '@/lib/worship-storage';
+import { getAllQuranRecords, DailyQuranRecord, getTodayDate } from '@/lib/worship-storage';
 import { Colors, DarkColors } from '@/constants/theme';
 import { t, getDateLocale } from '@/lib/i18n';
 
@@ -470,7 +470,7 @@ export default function QuranTrackerScreen() {
                 const dayName = dateObj.toLocaleDateString(getDateLocale(), { weekday: 'short' });
                 const dateStr = dateObj.toLocaleDateString(getDateLocale(), { day: 'numeric', month: 'short' });
                 const barWidth = Math.min((entry.pages / Math.max(dailyGoal, 1)) * 100, 100);
-                const isToday = entry.date === new Date().toISOString().split('T')[0];
+                const isToday = entry.date === getTodayDate();
                 return (
                   <View key={entry.date} style={[historyStyles.row, idx < readingHistory.length - 1 && historyStyles.rowBorder]}>
                     <View style={historyStyles.dateCol}>

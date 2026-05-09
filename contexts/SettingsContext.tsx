@@ -207,6 +207,8 @@ export interface DisplaySettings {
   showTransliteration: boolean;
   translationEdition: string;
   highlightTajweed: boolean;
+  /** Mushaf reading mode: 'tarteel' = monochrome (default), 'tajweed' = colored COLRv1 fonts */
+  quranReadingMode?: 'tarteel' | 'tajweed';
   appBackground: AppBackgroundKey;
   appBackgroundUrl?: string; // For dynamic/remote backgrounds
   appBackgroundTextColor?: 'white' | 'black'; // Text color for dynamic backgrounds
@@ -377,6 +379,7 @@ const defaultDisplay: DisplaySettings = {
   showTransliteration: false,
   translationEdition: 'en.sahih',
   highlightTajweed: true,
+  quranReadingMode: 'tarteel',
   appBackground: 'background3',
   backgroundOpacity: 1,
   quranBackground: 'quranbg1',

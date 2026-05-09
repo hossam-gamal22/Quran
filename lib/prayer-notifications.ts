@@ -527,7 +527,6 @@ export async function schedulePrayerNotifications(
                   categoryIdentifier: DID_YOU_PRAY_CATEGORY,
                   // Android-only branch — iOS uses inline action buttons on the prayer notification itself.
                   ...(Platform.OS === 'android' && { channelId: didYouPrayChannelId }),
-                  ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
                 },
                 trigger: {
                   type: Notifications.SchedulableTriggerInputTypes.DATE,

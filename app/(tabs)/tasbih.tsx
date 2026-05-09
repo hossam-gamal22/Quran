@@ -48,6 +48,8 @@ import { Share } from 'react-native';
 import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
 import { trackTasbih } from '@/lib/firebase-analytics';
 import { fetchTasbihPresets } from '@/lib/admin-data-api';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -291,6 +293,8 @@ export default function TasbihScreen() {
   const selectedIdRef = useRef(DEFAULT_PRESET_TASBIHAT[0].id);
   const dailyStatsRef = useRef<Record<string, number>>({});
   const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const typeStatsRef = useRef<Record<string, Record<string, number>>>({});
+  const rewardsSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Per-tasbih count memory: remembers count for each tasbih when switching
   const perTasbihCountsRef = useRef<Record<number | string, number>>({});
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -345,6 +349,26 @@ export default function TasbihScreen() {
   useEffect(() => { totalCountRef.current = totalCount; }, [totalCount]);
   useEffect(() => { roundsRef.current = rounds; }, [rounds]);
   useEffect(() => { selectedIdRef.current = selectedTasbih.id; }, [selectedTasbih.id]);
+  useEffect(() => { typeStatsRef.current = typeStats; }, [typeStats]);
+
+  const scheduleRewardsSync = useCallback(() => {
+    if (rewardsSyncDebounceRef.current) {
+      clearTimeout(rewardsSyncDebounceRef.current);
+    }
+    rewardsSyncDebounceRef.current = setTimeout(() => {
+      getUserId()
+        .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+        .catch(() => {});
+    }, 1500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rewardsSyncDebounceRef.current) {
+        clearTimeout(rewardsSyncDebounceRef.current);
+      }
+    };
+  }, []);
 
   // Track slider content width for RTL scroll calculation
   const sliderContentWidth = useRef(0);
@@ -562,7 +586,11 @@ export default function TasbihScreen() {
         } catch {}
       }
       if (typeStatsRaw) {
-        try { setTypeStats(JSON.parse(typeStatsRaw)); } catch {} 
+        try {
+          const parsed = JSON.parse(typeStatsRaw);
+          typeStatsRef.current = parsed;
+          setTypeStats(parsed);
+        } catch {} 
       }
 
       // Show reset toast after state is settled
@@ -609,13 +637,14 @@ export default function TasbihScreen() {
   const trackTypeIncrement = useCallback(async (tasbihText: string) => {
     try {
       const today = getTodayISO();
-      const updated = { ...typeStats };
-      if (!updated[today]) updated[today] = {};
+      const updated = { ...typeStatsRef.current };
+      updated[today] = { ...(updated[today] || {}) };
       updated[today][tasbihText] = (updated[today][tasbihText] || 0) + 1;
+      typeStatsRef.current = updated;
       setTypeStats(updated);
       await AsyncStorage.setItem(STORAGE_KEYS.typeStats, JSON.stringify(updated));
     } catch (e) { console.error(e); }
-  }, [typeStats]);
+  }, []);
 
   // ===== HANDLERS =====
   const handlePress = useCallback(async () => {
@@ -631,7 +660,8 @@ export default function TasbihScreen() {
 
     const newCount = count + 1;
     const newTotal = totalCount + 1;
-    trackTypeIncrement(selectedTasbih.text);
+    await trackTypeIncrement(selectedTasbih.text);
+    scheduleRewardsSync();
 
     if (newCount >= selectedTasbih.target) {
       if (vibrationEnabled) {
@@ -700,7 +730,7 @@ export default function TasbihScreen() {
       setTotalCount(newTotal);
       saveProgress(newCount, newTotal, rounds);
     }
-  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, customTasbihat, completedTasbihat, saveProgress, trackTypeIncrement]);
+  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, customTasbihat, completedTasbihat, saveProgress, trackTypeIncrement, scheduleRewardsSync]);
 
   const handleReset = () => {
     Alert.alert(t('tasbih.reset'), t('tasbih.resetConfirm'), [
@@ -1210,7 +1240,7 @@ export default function TasbihScreen() {
         <View style={s.modalOverlay}>
           <View style={[s.modalSheet, {
             height: 'auto',
-            backgroundColor: isDarkMode ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.88)',
+            backgroundColor: isDarkMode ? '#0f1a14' : 'rgba(255,255,255,0.97)',
             borderWidth: 0.5,
             borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
             paddingBottom: Math.max(insets.bottom, 16) + 16,
@@ -1547,7 +1577,7 @@ const _s = StyleSheet.create({
 
   // Modal
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end',
   },
   modalSheet: {
     borderTopLeftRadius: 24, borderTopRightRadius: 24,

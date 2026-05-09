@@ -27,6 +27,7 @@ import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { useFavorite } from '@/hooks/use-favorite';
 import { getDhikrOfTheDay, getRandomDhikr, type DailyDhikr } from '@/lib/daily-dhikr';
@@ -225,7 +226,7 @@ export default function DailyDhikrScreen() {
           {/* Icon */}
           <View style={styles.iconContainer}>
             <View style={[styles.iconCircle, { backgroundColor: ACCENT + '20' }]}>
-              <MaterialCommunityIcons name="hands-pray" size={40} color={ACCENT} />
+              <AppIcon name="🤲" size={40} color={ACCENT} />
             </View>
           </View>
 

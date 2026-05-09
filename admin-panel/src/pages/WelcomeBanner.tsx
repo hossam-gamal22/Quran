@@ -23,9 +23,11 @@ import {
   X,
   Calendar,
   Clock,
+  Upload,
 } from 'lucide-react';
-import { db } from '../firebase';
+import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { Styled } from '../components/Styled';
 import TranslateButton from '../components/TranslateButton';
@@ -192,6 +194,40 @@ export default function WelcomeBanner() {
       return;
     }
     updateBanner(field, value);
+  };
+
+  // Upload image directly from device → Firebase Storage → save URL
+  const [uploadingField, setUploadingField] = useState<'backgroundImage' | 'backgroundImageNonAr' | null>(null);
+  const handleImageUpload = async (
+    field: 'backgroundImage' | 'backgroundImageNonAr',
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('⚠️ يجب اختيار ملف صورة (JPG / PNG / WebP)');
+      if (e.target) e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('⚠️ حجم الصورة أكبر من 5 MB. اختر صورة أصغر.');
+      if (e.target) e.target.value = '';
+      return;
+    }
+    setUploadingField(field);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `uploads/welcome-banner/${field}_${Date.now()}_${safeName}`;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, file);
+      const url = await getDownloadURL(ref);
+      updateBanner(field, url);
+    } catch (err) {
+      alert(`❌ فشل الرفع: ${(err as Error).message}`);
+    } finally {
+      setUploadingField(null);
+      if (e.target) e.target.value = '';
+    }
   };
 
   // تحديث عنوان بلغة معينة
@@ -493,10 +529,19 @@ export default function WelcomeBanner() {
                     value={banner.backgroundImage}
                     onChange={(e) => handleImageUrlChange('backgroundImage', e.target.value)}
                     className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors font-mono text-sm"
-                    placeholder="رابط صورة مباشر (Imgur, imgbb, etc.)"
+                    placeholder="رابط صورة مباشر أو ارفع من جهازك ←"
                     aria-label="رابط صورة الخلفية للعربية"
                     dir="ltr"
                   />
+                  <label className={`p-3 rounded-xl border border-admin-border bg-accent/20 text-accent-light hover:bg-accent/30 cursor-pointer transition-colors flex items-center gap-2 ${uploadingField === 'backgroundImage' ? 'opacity-60 pointer-events-none' : ''}`} title="رفع صورة من الجهاز">
+                    {uploadingField === 'backgroundImage' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    <span className="text-xs whitespace-nowrap">رفع</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('backgroundImage', e)} />
+                  </label>
 
                   {banner.backgroundImage && (
                     <button onClick={() => updateBanner('backgroundImage', '')} className="p-3 rounded-xl border border-admin-border bg-admin-surface-light text-red-400 hover:bg-red-500/10" title="إزالة">
@@ -538,10 +583,19 @@ export default function WelcomeBanner() {
                     value={banner.backgroundImageNonAr || ''}
                     onChange={(e) => handleImageUrlChange('backgroundImageNonAr', e.target.value)}
                     className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors font-mono text-sm"
-                    placeholder="رابط صورة مباشر (Imgur, imgbb, etc.)"
+                    placeholder="رابط صورة مباشر أو ارفع من جهازك ←"
                     aria-label="رابط صورة الخلفية لغير العربية"
                     dir="ltr"
                   />
+                  <label className={`p-3 rounded-xl border border-admin-border bg-accent/20 text-accent-light hover:bg-accent/30 cursor-pointer transition-colors flex items-center gap-2 ${uploadingField === 'backgroundImageNonAr' ? 'opacity-60 pointer-events-none' : ''}`} title="رفع صورة من الجهاز">
+                    {uploadingField === 'backgroundImageNonAr' ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    <span className="text-xs whitespace-nowrap">رفع</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('backgroundImageNonAr', e)} />
+                  </label>
 
                   {banner.backgroundImageNonAr && (
                     <button onClick={() => updateBanner('backgroundImageNonAr', '')} className="p-3 rounded-xl border border-admin-border bg-admin-surface-light text-red-400 hover:bg-red-500/10" title="إزالة">
@@ -571,7 +625,7 @@ export default function WelcomeBanner() {
                 )}
               </div>
 
-              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 1200×343 أو نسبة 3.5:1 — استخدم رابط صورة مباشر من Imgur أو imgbb. ⚠️ روابط Google Drive لا تعمل!</p>
+              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 1200×343 أو نسبة 3.5:1 — اضغط زرّ <strong className="text-accent-light">رفع</strong> لرفع صورة مباشرة من جهازك (حتى 5MB)، أو الصق رابط مباشر من Imgur / imgbb. ⚠️ روابط Google Drive لا تعمل.</p>
             </div>
           )}
 

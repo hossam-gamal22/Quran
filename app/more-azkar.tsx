@@ -25,6 +25,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -154,11 +155,7 @@ export default function MoreAzkarScreen() {
         >
           <GlassCard intensity={80} borderRadius={16} style={styles.gridCardGlass}>
             <View style={[styles.iconContainer, { backgroundColor: `${category.color}20` }]}>
-              <MaterialCommunityIcons
-                name={(category.icon || 'book-open-variant') as any}
-                size={26}
-                color={category.color}
-              />
+              <AppIcon name={category.icon || 'book-open-variant'} size={26} color={category.color} />
             </View>
             <Text
               style={[styles.categoryName, { color: colors.text, textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
@@ -213,11 +210,7 @@ export default function MoreAzkarScreen() {
         >
           <GlassCard intensity={20} borderRadius={16} style={{ ...styles.listCardGlass, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
             <View style={styles.listIconContainer}>
-              <MaterialCommunityIcons
-                name={(category.icon || 'book-open-variant') as any}
-                size={24}
-                color={category.color}
-              />
+              <AppIcon name={category.icon || 'book-open-variant'} size={24} color={category.color} />
             </View>
             <View style={styles.listContent}>
               <Text

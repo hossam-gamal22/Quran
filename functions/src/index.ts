@@ -111,7 +111,7 @@ export const selectMonthlyWinners = onSchedule(
       const snapshot = await db.collection('users')
         .where('monthlyEngagement.month', '==', monthKey)
         .orderBy('monthlyEngagement.score', 'desc')
-        .limit(winnersCount)
+        .limit(Math.max(winnersCount * 5, 20))
         .get();
 
       const winners: Array<{ userId: string; displayName: string; score: number; rewardedAt: string; notified: boolean; premiumExpiresAt: string }> = [];
@@ -121,10 +121,18 @@ export const selectMonthlyWinners = onSchedule(
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const engagement = data.monthlyEngagement;
-        if (engagement && engagement.score > 0) {
+        const displayName = String(data.displayName || '').trim();
+        if (
+          winners.length < winnersCount &&
+          engagement &&
+          engagement.score > 0 &&
+          displayName &&
+          !data.hiddenFromLeaderboard &&
+          !data.placeholder
+        ) {
           winners.push({
             userId: docSnap.id,
-            displayName: data.displayName || docSnap.id.slice(0, 8),
+            displayName,
             score: engagement.score,
             rewardedAt: new Date().toISOString(),
             notified: false,
@@ -539,4 +547,3 @@ export const cleanupFcmPrayerDedupe = onSchedule(
     }
   },
 );
-

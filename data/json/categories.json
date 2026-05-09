@@ -352,7 +352,7 @@
         "ru": "Заговоры для того, кто надел новую одежду",
         "fr": "Invocations pour quelqu'un qui a mis de nouveaux vêtements"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 17,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_005.mp3"
@@ -394,7 +394,7 @@
         "bn": "নামাযের শুরুর জন্য আহ্বান",
         "ru": "Призывы к началу молитвы"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 19,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_017.mp3"
@@ -415,7 +415,7 @@
         "bn": "রুকির সময় দোয়া (নামাজে রুকু)",
         "ru": "Призывы во время Руки (молитвенный поклон)"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 20,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_018.mp3"
@@ -436,7 +436,7 @@
         "bn": "রুকি থেকে উঠার জন্য আহ্বান",
         "ru": "Призывы для подъема из Руки'"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 21,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_019.mp3"
@@ -457,7 +457,7 @@
         "bn": "সুজূদের সময় দোয়া",
         "ru": "Призывы во время Суджуда"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 22,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_020.mp3"
@@ -478,7 +478,7 @@
         "bn": "দুই সিজদার মাঝখানে বসা জন্য দোয়া",
         "ru": "Заклинания для сидения между двумя простираниями"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 23,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_021.mp3"
@@ -499,7 +499,7 @@
         "bn": "কোরআন তেলাওয়াতের কারণে সেজদা করার জন্য দোয়া",
         "ru": "Молитвы о земном поклоне из-за чтения Корана"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 24,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_022.mp3"
@@ -520,7 +520,7 @@
         "bn": "আত-তাশাহহুদের জন্য দোয়া (নামাজে বসা)",
         "ru": "Призыв к Ат-Ташахуду (сидению в молитве)"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 25,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_023.mp3"
@@ -541,7 +541,7 @@
         "bn": "কিভাবে তাশাহহুদের পর নবীজির উপর দরূদ পাঠ করবেন",
         "ru": "Как произносить благословения Пророку после Ташаххуда"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 26,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_024.mp3"
@@ -562,7 +562,7 @@
         "bn": "শেষ তাশ-আহহুদের পরে এবং নামায শেষ করার আগে দোয়া",
         "ru": "Заклинания после заключительного Таш-Ахуда и перед окончанием молитвы"
       },
-      "icon": "hands-pray",
+      "icon": "🤲",
       "color": "#F97316",
       "order": 27,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_025.mp3"
@@ -583,7 +583,7 @@
         "bn": "নামায শেষ করে কি বলবেন",
         "ru": "Что говорить после совершения молитвы"
       },
-      "icon": "hands-pray",
+      "icon": "🤲",
       "color": "#EC4899",
       "order": 28,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_026.mp3"
@@ -625,7 +625,7 @@
         "bn": "রাতে নাড়া দিলে আবাহন বলতে হয়",
         "ru": "Призыв сказать, если ты пошевелишься ночью"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 30,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_030.mp3"
@@ -646,7 +646,7 @@
         "bn": "আপনি যদি ঘুমাতে ভয় পান বা একাকী এবং বিষণ্ণ বোধ করেন তবে কী বলবেন",
         "ru": "Что сказать, если вы боитесь заснуть или чувствуете себя одиноким и подавленным?"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 31,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_031.mp3"
@@ -688,7 +688,7 @@
         "bn": "বিতরের নামাযে কুনুতের দোয়া",
         "ru": "Призывы к Кунуту в молитве Витр"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 33,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_033.mp3"
@@ -730,7 +730,7 @@
         "bn": "দুশ্চিন্তা ও দুঃখের সময়ে আহ্বান",
         "ru": "Призывы во времена беспокойства и горя"
       },
-      "icon": "hands-pray",
+      "icon": "🤲",
       "color": "#F97316",
       "order": 35,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_035.mp3"
@@ -751,7 +751,7 @@
         "bn": "যন্ত্রণার জন্য আহ্বান",
         "ru": "Призывы от тоски"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 36,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_036.mp3"
@@ -772,7 +772,7 @@
         "bn": "আপনি যখন একজন প্রতিপক্ষ বা শক্তিশালী শাসকের সাথে দেখা করেন তার জন্য আহ্বান।",
         "ru": "Призывы на случай встречи с противником или могущественным правителем."
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 37,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_037.mp3"
@@ -793,7 +793,7 @@
         "bn": "শাসকদের অত্যাচারের বিরুদ্ধে আহ্বান",
         "ru": "Призывы против притеснения правителей"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 38,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_038.mp3"
@@ -814,7 +814,7 @@
         "bn": "শত্রুর বিরুদ্ধে আহ্বান",
         "ru": "Призыв против врага"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 39,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_039.mp3"
@@ -856,7 +856,7 @@
         "ru": "Призывы, если вы пошатнулись в своей вере",
         "fr": "Invocations pour si vous êtes frappé dans votre foi"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 41,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_041.mp3"
@@ -877,7 +877,7 @@
         "bn": "একটি ঋণ সেটিং জন্য আহ্বান",
         "ru": "Призывы к погашению долга"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 42,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_042.mp3"
@@ -898,7 +898,7 @@
         "bn": "নামায ও কুরআন তেলাওয়াতের সময় শয়তানের বিক্ষিপ্ততার বিরুদ্ধে আহ্বান",
         "ru": "Призыв против отвлечений сатаны во время молитвы и чтения Корана"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 43,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_043.mp3"
@@ -919,7 +919,7 @@
         "bn": "যখন আপনি কিছু আপনার জন্য কঠিন হয়ে উঠছে তার জন্য আহ্বান",
         "ru": "Призыв, когда вы обнаружите, что что-то становится для вас трудным"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 44,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_044.mp3"
@@ -961,7 +961,7 @@
         "bn": "শয়তান এবং তার প্ররোচনার বিরুদ্ধে আহ্বান",
         "ru": "Призывы против Дьявола и его побуждений"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 46,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_046.mp3"
@@ -982,7 +982,7 @@
         "bn": "আপনার অপছন্দের কিছু ঘটলে বা যখন আপনি যা করার চেষ্টা করেন তা অর্জন করতে ব্যর্থ হন তার জন্য আহ্বান",
         "ru": "Призывание, когда происходит что-то, что вам не нравится, или когда вам не удается достичь того, что вы пытаетесь сделать."
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 47,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_047.mp3"
@@ -1045,7 +1045,7 @@
         "ru": "Заговоры для посещения больных",
         "fr": "Invocations pour visiter les malades"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 50,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_050.mp3"
@@ -1087,7 +1087,7 @@
         "bn": "টার্মিনাল অসুস্থ এর আহ্বান",
         "ru": "Вызовы терминала Ill"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 52,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_052.mp3"
@@ -1129,7 +1129,7 @@
         "bn": "ট্র্যাজেডি স্ট্রাইক যখন জন্য আহ্বান",
         "ru": "Призыв, когда случается трагедия"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 54,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_054.mp3"
@@ -1150,7 +1150,7 @@
         "bn": "মৃতদের চোখ বন্ধ করার জন্য আহ্বান",
         "ru": "Заклинание закрыть глаза мертвым"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 55,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_055.mp3"
@@ -1171,7 +1171,7 @@
         "bn": "জানাজায় মৃতদের জন্য দোয়া",
         "ru": "Обращения к усопшим в заупокойном молебне"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 56,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_056.mp3"
@@ -1192,7 +1192,7 @@
         "ru": "Заговоры на ребенка в Заупокойной молитве",
         "fr": "Invocations pour un enfant dans la prière funéraire"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 57,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_057.mp3"
@@ -1213,7 +1213,7 @@
         "ru": "Призыв к скорбящим",
         "fr": "Invocation pour les personnes endeuillées"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 58,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_058.mp3"
@@ -1234,7 +1234,7 @@
         "bn": "মৃতকে কবরে রাখার সময় দুআ করা",
         "ru": "Заклинание, которое следует произносить при помещении умершего в могилу"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 59,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_059.mp3"
@@ -1255,7 +1255,7 @@
         "bn": "মৃতকে দাফন করার পর দোয়া করতে হবে",
         "ru": "Заклинание, которое следует читать после похорон умершего"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 60,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_060.mp3"
@@ -1276,7 +1276,7 @@
         "bn": "কবর যিয়ারতের জন্য দোয়া",
         "ru": "Призыв к посещению могил"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 61,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_061.mp3"
@@ -1297,7 +1297,7 @@
         "bn": "যখন বাতাস প্রবাহিত হয় তার জন্য আহ্বান",
         "ru": "Заговоры, когда дует ветер"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 62,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_062.mp3"
@@ -1318,7 +1318,7 @@
         "bn": "যখন এটি বজ্রপাত জন্য আহ্বান",
         "ru": "Призыв, когда грянет гром"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 63,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_063.mp3"
@@ -1360,7 +1360,7 @@
         "bn": "যখন বৃষ্টি হয় তার জন্য আমন্ত্রণ",
         "ru": "Призыв, когда идет дождь"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 65,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_065.mp3"
@@ -1423,7 +1423,7 @@
         "bn": "নতুন চাঁদ দেখার আমন্ত্রণ",
         "ru": "Призыв к встрече новолуния"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 68,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_068.mp3"
@@ -1444,7 +1444,7 @@
         "bn": "রোজা ভঙ্গের জন্য দাওয়াত",
         "ru": "Призывы к нарушению поста"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 69,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_069.mp3"
@@ -1465,7 +1465,7 @@
         "bn": "খাওয়ার আগে আমন্ত্রণ",
         "ru": "Заклинания перед едой"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 70,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_070.mp3"
@@ -1486,7 +1486,7 @@
         "bn": "খাওয়ার পর আমন্ত্রণ",
         "ru": "Призывы после еды"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 71,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_071.mp3"
@@ -1507,7 +1507,7 @@
         "bn": "তার হোস্টের জন্য একটি নৈশভোজে অতিথির আমন্ত্রণ",
         "ru": "Обращение гостя на ужине к хозяину"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 72,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_072.mp3"
@@ -1528,7 +1528,7 @@
         "bn": "যে আপনাকে পানীয় দেয় বা আপনাকে এটি অফার করে তার জন্য আমন্ত্রণ",
         "ru": "Обращение к тому, кто напоит вас или предложит его вам"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 73,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_073.mp3"
@@ -1549,7 +1549,7 @@
         "bn": "একটি পরিবারের জন্য আমন্ত্রণ যারা আপনাকে তাদের সাথে আপনার রোজা ভাঙার জন্য আমন্ত্রণ জানায়",
         "ru": "Обращение к семье, которая приглашает вас разговеться вместе с ними."
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 74,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_074.mp3"
@@ -1570,7 +1570,7 @@
         "bn": "এমন একজনের জন্য আমন্ত্রণ যিনি আপনাকে উপবাসের সময় খাবার সরবরাহ করেন, যা আপনি প্রত্যাখ্যান করেন",
         "ru": "Обращение к тому, кто предлагает вам еду, когда вы поститесь, от чего вы отказываетесь"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 75,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_075.mp3"
@@ -1612,7 +1612,7 @@
         "bn": "আপনি যখন ঋতুর প্রথম তারিখগুলি দেখতে পান তার জন্য আহ্বান৷",
         "ru": "Призыв, когда вы увидите первые свидания сезона"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 77,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_077.mp3"
@@ -1633,7 +1633,7 @@
         "bn": "হাঁচির জন্য আহ্বান",
         "ru": "Призыв от чихания"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 78,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_078.mp3"
@@ -1675,7 +1675,7 @@
         "bn": "বরের জন্য আমন্ত্রণ",
         "ru": "Призыв для жениха"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 80,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_080.mp3"
@@ -1696,7 +1696,7 @@
         "id": "Doa mempelai pria pada malam pernikahan atau saat membeli hewan",
         "ms": "Doa pengantin lelaki pada malam perkahwinan atau ketika membeli haiwan"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 81,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_081.mp3"
@@ -1717,7 +1717,7 @@
         "bn": "সহবাসের পূর্বে আমন্ত্রণ পাঠ করতে হবে",
         "ru": "Призыв, который следует произносить перед половым актом"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 82,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_082.mp3"
@@ -1738,7 +1738,7 @@
         "bn": "রাগের জন্য আহ্বান",
         "ru": "Призыв к гневу"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 83,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_083.mp3"
@@ -1759,7 +1759,7 @@
         "bn": "কাউকে দুর্ভাগা দেখে কি বলবে",
         "ru": "Что сказать, если вы видите человека, постигнутого несчастьем"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 84,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_084.mp3"
@@ -1821,7 +1821,7 @@
         "bn": "যে বলে: আল্লাহ তোমাকে ক্ষমা করুন",
         "ru": "призвание для того, кто говорит: Да простит тебя Аллах"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 87,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_087.mp3"
@@ -1842,7 +1842,7 @@
         "bn": "যে আপনার ভাল করে তার জন্য আমন্ত্রণ",
         "ru": "Обращение к тому, кто делает вам добро"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 88,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_088.mp3"
@@ -1884,7 +1884,7 @@
         "bn": "এমন একজনের জন্য দো‘আ যে তোমাকে বলে আমি তোমাকে আল্লাহর সন্তুষ্টির জন্য ভালোবাসি",
         "ru": "Обращение к тому, кто говорит тебе, что я люблю тебя ради Аллаха"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 90,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_090.mp3"
@@ -1905,7 +1905,7 @@
         "ru": "Обращение к тому, кто предлагает вам долю своего богатства",
         "fr": "Invocation pour quelqu'un qui vous offre une part de sa richesse"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 91,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_091.mp3"
@@ -1926,7 +1926,7 @@
         "bn": "যে আপনাকে টাকা ধার দেয় তার জন্য আমন্ত্রণ (ঋণ প্রাপ্তির পরে)",
         "ru": "Призыв (при получении кредита) к тому, кто одалживает вам деньги"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 92,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_091.mp3"
@@ -1947,7 +1947,7 @@
         "bn": "শিরকের ভয়ে দাওয়াত",
         "ru": "Заклинание от страха перед ширком"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 93,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_092.mp3"
@@ -1968,7 +1968,7 @@
         "bn": "এমন একজনের জন্য আমন্ত্রণ যে আপনাকে বলে: আল্লাহ আপনাকে আশীর্বাদ করুন",
         "ru": "Обращение к тому, кто говорит вам: Да благословит вас Аллах"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 94,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_094.mp3"
@@ -1989,7 +1989,7 @@
         "bn": "মন্দ ইঙ্গিত বিরুদ্ধে আহ্বান",
         "ru": "Призыв против дурного предзнаменования"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 95,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_095.mp3"
@@ -2010,7 +2010,7 @@
         "bn": "যানবাহনে বা পশুতে চড়ার জন্য আহ্বান",
         "ru": "Призыв на езду в транспортном средстве или на животном"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 96,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_096.mp3"
@@ -2052,7 +2052,7 @@
         "bn": "একটি শহর বা শহরে প্রবেশের জন্য আহ্বান",
         "ru": "Призыв для входа в город или город"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 98,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_098.mp3"
@@ -2073,7 +2073,7 @@
         "bn": "একটি বাজারে প্রবেশের জন্য আহ্বান",
         "ru": "Призыв для входа на рынок"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 99,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_099.mp3"
@@ -2094,7 +2094,7 @@
         "bn": "যখন আপনার গাড়ি বা মাউন্ট ব্যর্থ হতে শুরু করে তার জন্য আহ্বান",
         "ru": "Призыв, когда ваше транспортное средство или ездовое животное начинает выходить из строя"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 100,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_100.mp3"
@@ -2115,7 +2115,7 @@
         "bn": "যাকে সে রেখে যায় তার জন্য ভ্রমণকারীর আহ্বান",
         "ru": "Обращение путешественника к тому, кого он оставляет позади"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 101,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_101.mp3"
@@ -2136,7 +2136,7 @@
         "ru": "Обращения резидента к путешественнику",
         "fr": "Les invocations du résident pour le voyageur"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 102,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_102.mp3"
@@ -2178,7 +2178,7 @@
         "bn": "ভোরে পথিকের আবাহন",
         "ru": "Обращение путешественника на рассвете"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 104,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_104.mp3"
@@ -2199,7 +2199,7 @@
         "bn": "যাত্রায় লেওভারের জন্য আহ্বান (পথে থামানো)",
         "ru": "Призыв к остановке (остановке в пути) в пути"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 105,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_105.mp3"
@@ -2262,7 +2262,7 @@
         "bn": "মহানবী (সাঃ) এর উপর আল্লাহর কাছে দোয়া চাওয়ার শ্রেষ্ঠত্ব",
         "ru": "Превосходство просить благословения Аллаха на Пророка, мир ему и благословение Аллаха"
       },
-      "icon": "hands-pray",
+      "icon": "🤲",
       "color": "#EC4899",
       "order": 108,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_108.mp3"
@@ -2346,7 +2346,7 @@
         "id": "Doa saat mendengar anjing menggonggong di malam hari",
         "ms": "Doa apabila mendengar anjing menyalak pada waktu malam"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 112,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_112.mp3"
@@ -2367,7 +2367,7 @@
         "bn": "আপনি যার সাথে খারাপ কথা বলেছেন তার জন্য আমন্ত্রণ",
         "ru": "Обращение к тому, кому вы сказали плохо"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 113,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_113.mp3"
@@ -2472,7 +2472,7 @@
         "bn": "ইয়েমেনাইট কর্নার এবং কালো পাথরের মধ্যে তিলাওয়াত করা",
         "ru": "Призыв, который следует произнести между Йеменским углом и Черным камнем."
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 118,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_118.mp3"
@@ -2493,7 +2493,7 @@
         "ru": "Призыв, который следует читать, стоя в Сафе и Марве.",
         "fr": "Invocation à réciter debout à Safa et Marwah"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 119,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_119.mp3"
@@ -2514,7 +2514,7 @@
         "bn": "আরাফাতের দিনে দো‘আ পাঠ করা",
         "ru": "Призыв, который следует читать в День Арафата"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 120,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_120.mp3"
@@ -2577,7 +2577,7 @@
         "bn": "অবাক বা চমকে গেলে কি বলবে",
         "ru": "Что сказать, если вы удивлены или испуганы"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 123,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_123.mp3"
@@ -2640,7 +2640,7 @@
         "bn": "যখন আপনি ভয় পান যে আপনি খারাপ নজর দিয়ে কিছু কষ্ট পেতে পারেন তখন কী বলবেন",
         "ru": "Что говорить, если боишься сглазить кого-нибудь?"
       },
-      "icon": "hands-pray",
+      "icon": "hand-heart",
       "color": "#F97316",
       "order": 126,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_126.mp3"
@@ -2724,7 +2724,7 @@
         "bn": "অনুতপ্ত হওয়া এবং ক্ষমা চাওয়া",
         "ru": "Покаяние и поиск прощения"
       },
-      "icon": "heart",
+      "icon": "🤲",
       "color": "#8B5CF6",
       "order": 130,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_130.mp3"

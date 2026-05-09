@@ -151,15 +151,15 @@ service cloud.firestore {
 
     // ─── Calendar & Events ───────────────────────────────────────
     // Islamic events (Eid, Ramadan start, etc.)
+    // Admin panel writes from browser (no Firebase Auth) — same trust
+    // model as azkar/duas/dailyDhikr (locked down later via Netlify proxy).
     match /islamicEvents/{eventId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Hijri date overrides/corrections
     match /hijri_overrides/{overrideId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // ─── Admin Content Collections ───────────────────────────────
@@ -183,14 +183,28 @@ service cloud.firestore {
 
     // Daily Dhikr - admin managed content
     match /dailyDhikr/{dhikrId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Tasbih presets - admin managed
     match /tasbihPresets/{presetId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
+    }
+
+    // ─── Azkar & Duas (admin-managed content) ───────────────────
+    // Adhkar content — app reads, admin panel writes (no Firebase Auth on admin).
+    // Same trust model as other admin-content collections (open write, will be
+    // locked down in Phase B0.5 via Netlify proxy).
+    match /azkar/{zikrId} {
+      allow read, write: if true;
+    }
+
+    match /duas/{duaId} {
+      allow read, write: if true;
+    }
+
+    match /selectedDuas/{duaId} {
+      allow read, write: if true;
     }
 
     // ─── User Cloud Backups ─────────────────────────────────

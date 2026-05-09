@@ -12,12 +12,14 @@ import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { Platform } from 'react-native';
 import { QCF_FONT_MAP, TOTAL_QURAN_PAGES, isValidPage } from './qcf-font-map';
+import { QCF_COLOR_FONT_MAP, hasColorFontForPage } from './qcf-color-font-map';
 
 // Re-export for backward compatibility
-export { TOTAL_QURAN_PAGES, isValidPage };
+export { TOTAL_QURAN_PAGES, isValidPage, hasColorFontForPage };
 
 // Track which pages are loaded in memory
 const loadedPages = new Map<number, boolean>(); // page -> darkMode used
+const loadedColorPages = new Set<number>();
 const loadingPromises = new Map<string, Promise<void>>();
 
 async function resolveFontSource(fontSource: any): Promise<any> {
@@ -34,10 +36,67 @@ async function resolveFontSource(fontSource: any): Promise<any> {
 }
 
 /** Font family for a given page (1-based). Use darkMode param for mode-specific names. */
-export function getPageFontFamily(page: number, darkMode?: boolean): string {
+export function getPageFontFamily(page: number, darkMode?: boolean, colored?: boolean): string {
+  if (colored) return `QCF4p${page}c`;
   if (darkMode === true) return `QCF4p${page}d`;
   if (darkMode === false) return `QCF4p${page}l`;
   return `QCF4_page${page}`;
+}
+
+/** Whether the colored (tajweed) font for this page is loaded in memory. */
+export function isColorPageFontLoaded(page: number): boolean {
+  try {
+    const familyName = getPageFontFamily(page, undefined, true);
+    if (Font.isLoaded(familyName)) {
+      loadedColorPages.add(page);
+      return true;
+    }
+  } catch {
+    // expo-font not ready
+  }
+  return loadedColorPages.has(page);
+}
+
+/**
+ * Load the colored (COLRv1) tajweed font for a specific page.
+ * Returns false silently if no colored font is bundled for this page
+ * — callers should fall back to the monochrome family.
+ */
+export async function loadColorPageFont(page: number): Promise<boolean> {
+  if (!isValidPage(page)) return false;
+  if (!hasColorFontForPage(page)) return false;
+  if (loadedColorPages.has(page)) return true;
+
+  const promiseKey = `c_${page}`;
+  const existing = loadingPromises.get(promiseKey);
+  if (existing) {
+    await existing;
+    return loadedColorPages.has(page);
+  }
+
+  const promise = (async () => {
+    try {
+      const familyName = getPageFontFamily(page, undefined, true);
+      const fontSource = QCF_COLOR_FONT_MAP[page];
+      if (!fontSource) {
+        console.warn(`[QCF4-color] No color font bundled for page ${page}`);
+        return;
+      }
+      console.log(`[QCF4-color] Loading colored font ${familyName} for page ${page}…`);
+      const resolvedFontSource = await resolveFontSource(fontSource);
+      await Font.loadAsync({ [familyName]: resolvedFontSource });
+      loadedColorPages.add(page);
+      console.log(`[QCF4-color] ✅ Loaded ${familyName}`);
+    } catch (err) {
+      console.warn(`[QCF4-color] ❌ Failed to load color font for page ${page}:`, err);
+    } finally {
+      loadingPromises.delete(promiseKey);
+    }
+  })();
+
+  loadingPromises.set(promiseKey, promise);
+  await promise;
+  return loadedColorPages.has(page);
 }
 
 /** Whether the font for this page is already loaded in memory (optionally for a specific mode) */

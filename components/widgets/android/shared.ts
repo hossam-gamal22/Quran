@@ -259,6 +259,14 @@ export function resolveColorScheme(
 export const FONT = {
   amiri: 'Amiri',
   amiriBold: 'AmiriBold',
+  /** Headings/titles for new Ritual widgets — single decorative font for both Arabic + Latin */
+  widget: 'WidgetFont',
+  /** Body/secondary text in Ritual widgets */
+  rubik: 'Rubik-Regular',
+  rubikMedium: 'Rubik-Medium',
+  rubikBold: 'Rubik-Bold',
+  /** Quranic verses — must remain Mushaf script */
+  uthmanic: 'KFGQPC-Uthmanic-Script',
 } as const;
 
 export const BRANDING = {

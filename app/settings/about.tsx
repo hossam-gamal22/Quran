@@ -29,6 +29,7 @@ import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
 // ========================================
@@ -42,7 +43,7 @@ const APP_INFO = {
 
 const FEATURES = [
   { icon: 'book-open-variant', titleKey: 'aboutApp.holyQuran', descKey: 'aboutApp.holyQuranDesc' },
-  { icon: 'hands-pray', titleKey: 'aboutApp.adhkarAndDuas', descKey: 'aboutApp.adhkarAndDuasDesc' },
+  { icon: '🤲', titleKey: 'aboutApp.adhkarAndDuas', descKey: 'aboutApp.adhkarAndDuasDesc' },
   { icon: 'mosque', titleKey: 'aboutApp.prayerTimesFeature', descKey: 'aboutApp.prayerTimesFeatureDesc' },
   { icon: 'calendar-check', titleKey: 'aboutApp.worshipTrackerFeature', descKey: 'aboutApp.worshipTrackerFeatureDesc' },
   { icon: 'bookmark-multiple', titleKey: 'aboutApp.khatmaSystem', descKey: 'aboutApp.khatmaSystemDesc' },
@@ -56,7 +57,7 @@ const FEATURES = [
 // ========================================
 
 interface LinkItemProps {
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  icon: string;
   iconColor: string;
   title: string;
   subtitle?: string;
@@ -85,7 +86,7 @@ const LinkItem: React.FC<LinkItemProps> = ({
       activeOpacity={0.7}
     >
       <View style={styles.linkIconBg}>
-        <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
+        <AppIcon name={icon} size={22} color={iconColor} />
       </View>
       <View style={[styles.linkContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
         <Text style={[styles.linkTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>
@@ -99,7 +100,7 @@ const LinkItem: React.FC<LinkItemProps> = ({
 };
 
 interface FeatureItemProps {
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  icon: string;
   title: string;
   desc: string;
   index: number;
@@ -116,7 +117,7 @@ const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, desc, index, isD
       style={[styles.featureItem, { borderBottomColor: colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
     >
       <View style={styles.featureIcon}>
-        <MaterialCommunityIcons name={icon} size={24} color="#0d8e62" />
+        <AppIcon name={icon} size={24} color="#0d8e62" />
       </View>
       <View style={[styles.featureContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
         <Text style={[styles.featureTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>

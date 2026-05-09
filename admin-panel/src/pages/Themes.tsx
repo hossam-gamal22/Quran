@@ -402,6 +402,7 @@ const ThemesPage: React.FC = () => {
           onClick={handleSave}
           disabled={isSaving}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg transition-colors"
+          title="يحفظ جميع التغييرات في كل التبويبات (الثيمات + الخلفيات + الموسمية + الخطوط)"
         >
           {isSaving ? (
             <>
@@ -411,7 +412,9 @@ const ThemesPage: React.FC = () => {
           ) : (
             <>
               <Save size={18} />
-              <span>حفظ التغييرات</span>
+              <span>
+                حفظ {activeTab === 'themes' ? 'الثيمات' : activeTab === 'backgrounds' ? 'الخلفيات' : activeTab === 'seasonal' ? 'الموسمية' : 'الخطوط'}
+              </span>
             </>
           )}
         </button>

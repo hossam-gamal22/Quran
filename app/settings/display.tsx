@@ -36,7 +36,7 @@ import { Spacing, Colors, DarkColors } from '@/constants/theme';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
 import { FREE_PEXELS_BACKGROUNDS, PREMIUM_PEXELS_BACKGROUNDS, BACKGROUND_CATEGORIES, type PexelsBackground } from '@/constants/pexels-backgrounds';
-import { fetchPhotoBackgrounds } from '@/lib/photo-backgrounds-api';
+import { fetchPhotoBackgrounds, fetchPhotoBackgroundCategories, type PhotoBackgroundCategory } from '@/lib/photo-backgrounds-api';
 import { cacheBackground, getCachedBackgroundUri } from '@/lib/background-cache';
 
 const FONT_SIZES: { value: FontSize; labelKey: string; sample: number }[] = [
@@ -64,6 +64,7 @@ export default function DisplaySettingsScreen() {
   const [premiumPreviewPhoto, setPremiumPreviewPhoto] = useState<PexelsBackground | null>(null);
   const [freePexels, setFreePexels] = useState<PexelsBackground[]>(FREE_PEXELS_BACKGROUNDS);
   const [premiumPexels, setPremiumPexels] = useState<PexelsBackground[]>(PREMIUM_PEXELS_BACKGROUNDS);
+  const [adminCategories, setAdminCategories] = useState<PhotoBackgroundCategory[]>([]);
 
   useEffect(() => {
     // Show all built-in backgrounds by default (7 color backgrounds)
@@ -72,6 +73,10 @@ export default function DisplaySettingsScreen() {
     fetchPhotoBackgrounds().then(({ free, premium }) => {
       setFreePexels(free);
       setPremiumPexels(premium);
+    }).catch(() => { /* keep hardcoded defaults */ });
+    // Fetch admin-managed categories (falls back to hardcoded BACKGROUND_CATEGORIES)
+    fetchPhotoBackgroundCategories().then((cats) => {
+      if (cats.length > 0) setAdminCategories(cats);
     }).catch(() => { /* keep hardcoded defaults */ });
   }, []);
 
@@ -518,8 +523,19 @@ export default function DisplaySettingsScreen() {
                         {settings.language === 'ar' ? 'الكل' : 'All'}
                       </Text>
                     </TouchableOpacity>
-                    {/* Category tabs */}
-                    {BACKGROUND_CATEGORIES.map((cat) => (
+                    {/* Category tabs — admin override falls back to hardcoded */}
+                    {(adminCategories.length > 0
+                      ? adminCategories.map((ac) => {
+                          const fallback = BACKGROUND_CATEGORIES.find((b) => b.key === ac.id);
+                          return {
+                            key: ac.id,
+                            labelAr: ac.name_ar,
+                            labelEn: fallback?.labelEn ?? ac.name_ar,
+                            icon: fallback?.icon ?? 'image',
+                          };
+                        })
+                      : BACKGROUND_CATEGORIES
+                    ).map((cat) => (
                       <TouchableOpacity
                         key={cat.key}
                         onPress={() => {
@@ -794,7 +810,7 @@ const _styles = StyleSheet.create({
   bgPremiumBadge: {
     position: 'absolute',
     top: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     borderRadius: 8,
     padding: 2,
   },
@@ -858,7 +874,7 @@ const _styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,

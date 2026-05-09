@@ -30,6 +30,7 @@ import Animated, {
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { isRTL as checkIsRTL } from '@/lib/i18n';
 import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 
@@ -38,7 +39,7 @@ const { width } = Dimensions.get('window');
 const ENGAGEMENT_CATEGORIES = [
   { icon: 'mosque' as const, labelKey: 'prayer', color: '#c17f59' },
   { icon: 'book-open-variant' as const, labelKey: 'quran', color: '#3a7ca5' },
-  { icon: 'hands-pray' as const, labelKey: 'azkar', color: '#0d8e62' },
+  { icon: '🤲' as const, labelKey: 'azkar', color: '#0d8e62' },
   { icon: 'counter' as const, labelKey: 'tasbih', color: '#4a3d73' },
 ];
 
@@ -162,7 +163,7 @@ export default function PrizeScreen() {
                     style={styles.categoryItem}
                   >
                     <View style={[styles.categoryIcon, { backgroundColor: `${cat.color}30` }]}>
-                      <MaterialCommunityIcons name={cat.icon} size={28} color={cat.color} />
+                      <AppIcon name={cat.icon} size={28} color={cat.color} />
                     </View>
                     <Text style={styles.categoryLabel}>{tOnboarding(cat.labelKey)}</Text>
                   </Animated.View>

@@ -2,7 +2,7 @@
 // صفحة إدارة المكافآت الشهرية — أفضل المستخدمين نشاطاً
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Trophy, Save, Loader2, Settings, History, Users, Gift, Bell, AlertTriangle } from 'lucide-react';
 import { sendPrizeNotification } from '../services/pushNotifications';
@@ -14,6 +14,7 @@ interface ScoreWeights {
   prayer: number;
   tasbih: number;
   khatma: number;
+  fasting: number;
 }
 
 interface Winner {
@@ -73,6 +74,7 @@ const DEFAULT_CONFIG: RewardsConfig = {
     prayer: 5,
     tasbih: 1,
     khatma: 5,
+    fasting: 4,
   },
   currentMonth: '',
   currentWinners: [],
@@ -86,11 +88,27 @@ const WEIGHT_LABELS: Record<string, string> = {
   prayer: 'الصلاة',
   tasbih: 'التسبيح',
   khatma: 'الختمة',
+  fasting: 'الصيام',
 };
 
 const getCurrentMonth = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
+};
+
+const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsConfig => ({
+  ...DEFAULT_CONFIG,
+  ...(raw || {}),
+  scoreWeights: {
+    ...DEFAULT_CONFIG.scoreWeights,
+    ...((raw as any)?.scoreWeights || {}),
+  },
+  currentWinners: raw?.currentWinners || [],
+  history: raw?.history || [],
+});
+
+const isWinnerEligible = (user: LeaderboardUser): boolean => {
+  return !user.hidden && !!user.displayName?.trim();
 };
 
 export default function Rewards() {
@@ -131,7 +149,7 @@ export default function Rewards() {
     try {
       const snap = await getDoc(doc(db, 'config', 'rewards-settings'));
       if (snap.exists()) {
-        setConfig({ ...DEFAULT_CONFIG, ...snap.data() } as RewardsConfig);
+        setConfig(normalizeRewardsConfig(snap.data() as Partial<RewardsConfig>));
       }
     } catch (err) {
       console.error('Error loading rewards config:', err);
@@ -146,7 +164,12 @@ export default function Rewards() {
     try {
       const currentMonth = getCurrentMonth();
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('monthlyEngagement.score', 'desc'), limit(50));
+      const q = query(
+        usersRef,
+        where('monthlyEngagement.month', '==', currentMonth),
+        orderBy('monthlyEngagement.score', 'desc'),
+        limit(50)
+      );
       const snapshot = await getDocs(q);
 
       const users: LeaderboardUser[] = [];
@@ -155,10 +178,11 @@ export default function Rewards() {
         // Only skip placeholders — admin sees ALL real users
         if (data.placeholder) return;
         const engagement = data.monthlyEngagement;
-        if (engagement && engagement.month === currentMonth && engagement.score > 0) {
+        if (engagement && engagement.score > 0) {
+          const displayName = String(data.displayName || data.name || '').trim();
           users.push({
             id: docSnap.id,
-            displayName: data.displayName || data.name || docSnap.id.slice(0, 8),
+            displayName,
             email: data.email,
             platform: data.platform,
             score: engagement.score,
@@ -195,16 +219,18 @@ export default function Rewards() {
   };
 
   const autoSelectWinners = () => {
-    const updated = leaderboard.map((u, i) => ({
-      ...u,
-      selected: i < config.winnersCount,
-    }));
+    let selectedCount = 0;
+    const updated = leaderboard.map((u) => {
+      const selected = isWinnerEligible(u) && selectedCount < config.winnersCount;
+      if (selected) selectedCount++;
+      return { ...u, selected };
+    });
     setLeaderboard(updated);
   };
 
   const toggleUserSelection = (userId: string) => {
     setLeaderboard(prev =>
-      prev.map(u => (u.id === userId ? { ...u, selected: !u.selected } : u))
+      prev.map(u => (u.id === userId ? { ...u, selected: isWinnerEligible(u) ? !u.selected : false } : u))
     );
   };
 
@@ -294,8 +320,11 @@ export default function Rewards() {
   };
 
   const confirmWinners = async () => {
-    const selected = leaderboard.filter(u => u.selected);
-    if (selected.length === 0) return;
+    const selected = leaderboard.filter(u => u.selected && isWinnerEligible(u));
+    if (selected.length === 0) {
+      alert('لا يوجد فائزون مؤهلون: يجب أن يكون المستخدم ظاهراً وله اسم عرض.');
+      return;
+    }
 
     const currentMonth = getCurrentMonth();
     const expiresAt = new Date();

@@ -65,6 +65,8 @@ import {
 } from '@/lib/worship-storage';
 import { applyAutoMissed, extractScheduledTimes, type PrayerTimesMap } from '@/lib/prayer-availability';
 import { getCachedPrayerTimes } from '@/lib/prayer-times';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 
 // ========================================
@@ -321,6 +323,19 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     setWeekPrayers(prayers);
   }, []);
 
+  const syncRewardsAfterWorshipChange = useCallback(async () => {
+    try {
+      const userId = await getUserId();
+      if (userId) {
+        await syncMonthlyEngagementFromLocalWorship(userId);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[WorshipContext] rewards sync failed:', error);
+      }
+    }
+  }, []);
+
   // ========================================
   // دوال الصلاة
   // ========================================
@@ -345,7 +360,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     if (status === 'prayed' || status === 'late') {
       try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayer}`); } catch {}
     }
-  }, [loadWeekPrayers, refreshStats]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [loadWeekPrayers, refreshStats, syncRewardsAfterWorshipChange]);
 
   const updatePrayerWithTime = useCallback(async (prayer: PrayerName, status: PrayerStatus, scheduledTime?: string) => {
     const today = getTodayDate();
@@ -366,7 +382,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     if (status === 'prayed' || status === 'late') {
       try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayer}`); } catch {}
     }
-  }, [loadWeekPrayers, refreshStats]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [loadWeekPrayers, refreshStats, syncRewardsAfterWorshipChange]);
 
   const saveDayTimes = useCallback(async (date: string, times: { fajr?: string; dhuhr?: string; asr?: string; maghrib?: string; isha?: string }) => {
     await saveDayScheduledTimes(date, times);
@@ -393,7 +410,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
         return { ...prev, [prayer]: status };
       });
     }
-  }, [loadWeekPrayers, refreshStats]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [loadWeekPrayers, refreshStats, syncRewardsAfterWorshipChange]);
 
   const getPrayerForDate = useCallback(async (date: string) => {
     return await getPrayerRecord(date);
@@ -421,9 +439,10 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     
     // تحديث الإحصائيات
     await refreshStats();
+    syncRewardsAfterWorshipChange().catch(() => {});
     
     return result;
-  }, [refreshStats]);
+  }, [refreshStats, syncRewardsAfterWorshipChange]);
 
   const toggleFastingForDate = useCallback(async (date: string, type?: DailyFastingRecord['type']) => {
     const result = await toggleFasting(date, type);
@@ -433,8 +452,9 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
       const newRecord = await getFastingRecord(date);
       setTodayFasting(newRecord);
     }
+    syncRewardsAfterWorshipChange().catch(() => {});
     return result;
-  }, [refreshStats]);
+  }, [refreshStats, syncRewardsAfterWorshipChange]);
 
   const getFastingForDate = useCallback(async (date: string) => {
     return await getFastingRecord(date);
@@ -454,7 +474,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     
     // تحديث الإحصائيات
     await refreshStats();
-  }, [refreshStats]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [refreshStats, syncRewardsAfterWorshipChange]);
 
   const updateQuranRecord = useCallback(async (updates: Partial<DailyQuranRecord>) => {
     const today = getTodayDate();
@@ -475,7 +496,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     
     // تحديث الإحصائيات
     await refreshStats();
-  }, [refreshStats]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [refreshStats, syncRewardsAfterWorshipChange]);
 
   const getQuranForDate = useCallback(async (date: string) => {
     return await getQuranRecord(date);
@@ -495,9 +517,10 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     
     // تحديث الإحصائيات
     await refreshStats();
+    syncRewardsAfterWorshipChange().catch(() => {});
     
     return result;
-  }, [refreshStats]);
+  }, [refreshStats, syncRewardsAfterWorshipChange]);
 
   const getAzkarForDate = useCallback(async (date: string) => {
     return await getAzkarRecord(date);
@@ -510,7 +533,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     const newRecord = await getAzkarRecord(today);
     setTodayAzkar(newRecord || { ...defaultAzkarRecord, date: today });
     await refreshStats();
-  }, [refreshStats]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [refreshStats, syncRewardsAfterWorshipChange]);
 
   // ========================================
   // دوال عامة
@@ -526,7 +550,8 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     setTodayAzkar({ ...defaultAzkarRecord, date: todayDate });
     setWeekPrayers([]);
     setStats(defaultStats);
-  }, [todayDate]);
+    syncRewardsAfterWorshipChange().catch(() => {});
+  }, [todayDate, syncRewardsAfterWorshipChange]);
 
   // ========================================
   // القيمة المقدمة

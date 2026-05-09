@@ -1,6 +1,6 @@
 // lib/rtl-utils.ts
 // أدوات RTL - لعكس الاتجاه بناءً على اللغة
-import { ViewStyle } from 'react-native';
+import type { TextStyle, ViewStyle } from 'react-native';
 
 /**
  * Returns RTL-aware flexDirection style
@@ -28,6 +28,14 @@ export const rtlRowReverse = (isRTL: boolean): ViewStyle => ({
 export const rtlTextAlign = (isRTL: boolean): ViewStyle => ({
   textAlign: isRTL ? 'right' : 'left',
 } as any);
+
+/**
+ * Returns RTL-aware text direction and alignment together.
+ */
+export const rtlText = (isRTL: boolean): TextStyle => ({
+  textAlign: isRTL ? 'right' : 'left',
+  writingDirection: isRTL ? 'rtl' : 'ltr',
+});
 
 /**
  * Returns RTL-aware alignItems for flex-end/flex-start
@@ -92,3 +100,19 @@ export const rtlChevronBack = (isRTL: boolean): string =>
  */
 export const rtlArrowBack = (isRTL: boolean): string =>
   isRTL ? 'arrow-right' : 'arrow-left';
+
+const RTL_ISOLATE = '\u2067';
+const LTR_ISOLATE = '\u2066';
+const POP_ISOLATE = '\u2069';
+
+export function isolateDirection(value: string | number, isRTL: boolean): string {
+  return `${isRTL ? RTL_ISOLATE : LTR_ISOLATE}${value}${POP_ISOLATE}`;
+}
+
+export function isolateRTL(value: string | number): string {
+  return `${RTL_ISOLATE}${value}${POP_ISOLATE}`;
+}
+
+export function formatQuranAyahMarker(value: string | number): string {
+  return isolateRTL(`﴿${value}﴾`);
+}

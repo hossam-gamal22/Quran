@@ -104,8 +104,8 @@ const WIDGET_PREVIEW_SIZE = {
   medium: { width: SCREEN_WIDTH - 80, height: 160 },
 };
 
-// Free widgets available to all users
-const FREE_WIDGET_IDS = ['prayer'];
+// Free widgets available to all users — only ayah and azkar are premium
+const FREE_WIDGET_IDS = ['prayer', 'dhikr', 'hijri'];
 
 // Theme gradient context — lets preview components use the user's widget theme
 const GalleryThemeContext = React.createContext<[string, string, ...string[]] | null>(null);

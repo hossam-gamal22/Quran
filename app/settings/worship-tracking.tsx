@@ -268,8 +268,8 @@ export default function WorshipTrackingSettingsScreen() {
               iconColor="#0d8e62"
               title={t('worship.prayerLoggingReminder')}
               subtitle={t('worship.prayerLoggingReminderDesc')}
-              value={settings.notifications.worshipPrayerLogging}
-              onValueChange={(val) => updateNotifications({ worshipPrayerLogging: val })}
+              value={settings.notifications.didYouPrayReminder !== false}
+              onValueChange={(val) => updateNotifications({ didYouPrayReminder: val })}
               isDarkMode={isDarkMode}
               disabled={!isEnabled}
               isRTL={isRTL}

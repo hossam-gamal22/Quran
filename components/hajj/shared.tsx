@@ -21,6 +21,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 import { localizeNumber } from '@/lib/format-number';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 
 function stripTashkeel(text: string): string {
@@ -257,7 +258,7 @@ export const GlassSection: React.FC<{
             {section.duas.length > 0 && (
               <View style={[s.duasContainer, { borderTopColor: ACCENT_BORDER }]}>
                 <View style={[s.duasHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="hands-pray" size={16} color={ACCENT} />
+                  <AppIcon name="🤲" size={16} color={ACCENT} />
                   <Text style={[s.duasHeaderText, { color: ACCENT }]}>{t('hajjUmrah.duas')}</Text>
                 </View>
                 {section.duas.map((dua, i) => (

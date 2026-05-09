@@ -1,5 +1,5 @@
 // lib/azkar-audio-cache.ts
-// Manages downloading and caching azkar audio files from GitHub.
+// Manages downloading and caching azkar audio files from GitHub/Firebase URLs.
 // Files are cached permanently in documentDirectory so they survive app updates.
 
 import * as FileSystem from 'expo-file-system/legacy';
@@ -16,6 +16,48 @@ const CURRENT_CACHE_VERSION = '2'; // Bump when audio files change on CDN
 
 // In-memory set of files known to be cached (avoids repeated filesystem reads)
 let _cachedSet: Set<string> | null = null;
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+export function isCacheableAzkarAudio(value?: string | null): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^(quran:|file:|asset:|content:|data:)/i.test(trimmed)) return false;
+  return true;
+}
+
+function stableHash(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) + hash) ^ value.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function getAudioExtension(value: string): string {
+  const rawPath = (() => {
+    if (isHttpUrl(value)) {
+      try {
+        return decodeURIComponent(new URL(value).pathname);
+      } catch {
+        return value.split('?')[0] || value;
+      }
+    }
+    return value.split('?')[0] || value;
+  })();
+  const ext = rawPath.match(/\.([a-zA-Z0-9]{1,5})$/)?.[1]?.toLowerCase();
+  return ext ? `.${ext}` : '.m4a';
+}
+
+function getCacheFilename(input: string): string {
+  if (isHttpUrl(input)) {
+    return `remote_${stableHash(input)}${getAudioExtension(input)}`;
+  }
+  return input;
+}
 
 /**
  * Clears cached audio if the CDN files have been updated (version mismatch).
@@ -34,12 +76,13 @@ export async function invalidateAzkarCacheIfNeeded(): Promise<void> {
   }
 }
 
-function getRemoteUrl(filename: string): string {
-  return `${GITHUB_BASE}${encodeURIComponent(filename)}`;
+function getRemoteUrl(input: string): string {
+  if (isHttpUrl(input)) return input;
+  return `${GITHUB_BASE}${encodeURIComponent(input)}`;
 }
 
-function getLocalPath(filename: string): string {
-  return CACHE_DIR + filename;
+function getLocalPath(input: string): string {
+  return CACHE_DIR + getCacheFilename(input);
 }
 
 async function ensureCacheDir(): Promise<void> {
@@ -62,6 +105,7 @@ async function ensureCacheDir(): Promise<void> {
  */
 export async function getAzkarAudioUri(filename: string): Promise<string> {
   if (!filename) return '';
+  if (!isCacheableAzkarAudio(filename)) return filename;
 
   const localPath = getLocalPath(filename);
 
@@ -107,6 +151,7 @@ export async function getAzkarAudioUri(filename: string): Promise<string> {
  * Check if a specific file is cached locally.
  */
 export async function isAzkarCached(filename: string): Promise<boolean> {
+  if (!isCacheableAzkarAudio(filename)) return false;
   if (_cachedSet?.has(filename)) return true;
   try {
     const info = await FileSystem.getInfoAsync(getLocalPath(filename));
@@ -130,7 +175,7 @@ export async function prefetchAzkarFiles(
 
   const pending: string[] = [];
   for (const f of filenames) {
-    if (!f) continue;
+    if (!isCacheableAzkarAudio(f)) continue;
     if (!(await isAzkarCached(f))) pending.push(f);
   }
   if (pending.length === 0) return;
@@ -145,6 +190,7 @@ export async function prefetchAzkarFiles(
  * Download a single file to the cache directory.
  */
 async function downloadSingleFile(filename: string): Promise<void> {
+  if (!isCacheableAzkarAudio(filename)) return;
   await ensureCacheDir();
   const localPath = getLocalPath(filename);
   const url = getRemoteUrl(filename);

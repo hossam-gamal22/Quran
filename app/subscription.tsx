@@ -48,7 +48,7 @@ export default function SubscriptionScreen() {
   const { isDarkMode } = colors;
   const isRTL = useIsRTL();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const {
     isPremium,
     currentPlan,
@@ -154,7 +154,7 @@ export default function SubscriptionScreen() {
     );
   }
 
-  const isArabic = (t('app.language') || 'ar') === 'ar' || t('tabs.home') === 'الرئيسية';
+  const isArabic = language === 'ar';
   const productsMissing = products.length === 0;
 
   const allPlanCards: { plan: SubscriptionPlan; badge?: string; popular?: boolean }[] = [

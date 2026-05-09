@@ -16,9 +16,11 @@ import {
   Search,
   X,
   Plus,
+  Upload,
 } from 'lucide-react';
-import { db } from '../firebase';
+import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // ==================== Types ====================
 
@@ -156,8 +158,10 @@ export default function SoundManager() {
   const [newSoundUrl, setNewSoundUrl] = useState('');
   const [newSoundName, setNewSoundName] = useState('');
   const [newSoundCategory, setNewSoundCategory] = useState<SoundCategory>('notification');
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ==================== Load Data ====================
 
@@ -228,12 +232,74 @@ export default function SoundManager() {
     }
   };
 
+  // ==================== Upload from Device ====================
+
+  const handleFilePick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // reset so re-picking same file works
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/')) {
+      alert('الملف يجب أن يكون صوتي (MP3, WAV, OGG, M4A...)');
+      return;
+    }
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB matches storage rules
+    if (file.size > MAX_SIZE) {
+      alert(`حجم الملف كبير جداً (${(file.size / 1024 / 1024).toFixed(1)}MB) — الحد الأقصى 10MB`);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress('جاري الرفع...');
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `uploads/sounds/${newSoundCategory}/${Date.now()}_${safeName}`;
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file, { contentType: file.type });
+      const url = await getDownloadURL(fileRef);
+
+      const baseName = newSoundName.trim() || file.name.replace(/\.[^.]+$/, '');
+      const soundDoc: Omit<SoundFile, 'id'> = {
+        name: baseName,
+        category: newSoundCategory,
+        url,
+        storagePath: path,
+        uploadedAt: new Date().toISOString(),
+        fileSize: file.size,
+      };
+      const docRef = await addDoc(collection(db, FIRESTORE_SOUNDS_COLLECTION), soundDoc);
+      setSounds(prev => [...prev, { id: docRef.id, ...soundDoc }]);
+      setNewSoundName('');
+      setUploadProgress('✅ تم الرفع بنجاح');
+      setTimeout(() => setUploadProgress(null), 2000);
+    } catch (err: any) {
+      console.error('Error uploading sound:', err);
+      alert('فشل الرفع — تحقق من صلاحيات Firebase Storage أو الاتصال\n\n' + (err?.message || ''));
+      setUploadProgress(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // ==================== Delete ====================
 
   const handleDelete = async (sound: SoundFile) => {
     try {
       // Remove from Firestore
       await deleteDoc(doc(db, FIRESTORE_SOUNDS_COLLECTION, sound.id));
+
+      // If file was uploaded to Storage, also delete the blob (best-effort)
+      if (sound.storagePath) {
+        try {
+          await deleteObject(storageRef(storage, sound.storagePath));
+        } catch (storageErr) {
+          console.warn('Could not delete storage file (may not exist):', storageErr);
+        }
+      }
 
       // Clear any assignments referencing this sound
       setAssignments(prev => {
@@ -312,10 +378,13 @@ export default function SoundManager() {
     setIsSaving(true);
     setSaveStatus('idle');
     try {
+      // CRITICAL: use merge:true so we don't wipe out bundledSounds[]
+      // (managed by BundledSoundsManager) or any other fields in the doc.
       await setDoc(doc(db, FIRESTORE_ASSIGNMENTS_DOC), {
-        ...assignments,
+        notifications: assignments.notifications,
+        pageEvents: assignments.pageEvents,
         updatedAt: new Date().toISOString(),
-      });
+      }, { merge: true });
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err) {
@@ -474,8 +543,28 @@ export default function SoundManager() {
                 )}
                 {isUploading ? 'جاري الإضافة...' : 'إضافة'}
               </button>
+              <button
+                onClick={handleFilePick}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all disabled:opacity-50"
+                title="ارفع ملف صوتي مباشرة من جهازك (حتى 10MB)"
+              >
+                <Upload className="w-5 h-5" />
+                رفع من الجهاز
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleFileUpload}
+                className="hidden"
+                aria-label="اختيار ملف صوتي"
+              />
             </div>
-            <p className="text-slate-500 text-xs">الصق رابط مباشر لملف MP3 من أي CDN أو موقع استضافة</p>
+            {uploadProgress && (
+              <p className="text-accent-light text-sm font-medium">{uploadProgress}</p>
+            )}
+            <p className="text-slate-500 text-xs">الصق رابط مباشر لملف MP3 أو ارفع ملف صوتي من جهازك (MP3, WAV, OGG, M4A — حتى 10MB)</p>
             <details className="mt-2">
               <summary className="text-xs text-accent-light cursor-pointer hover:underline">🌐 مواقع مجانية لرفع الملفات الصوتية</summary>
               <ul className="mt-2 text-xs text-slate-400 space-y-1 pr-4 list-disc">

@@ -31,8 +31,8 @@ import { getLanguage, t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
-import { safeIcon } from '@/lib/safe-icon';
 import { getCachedPrayerTimes, getNextPrayer } from '@/lib/prayer-times';
+import { AppIcon } from '@/components/ui/AppIcon';
 const STORY_CACHE_KEY = 'story_of_day_cache';
 const HIGHLIGHTS_ORDER_KEY = '@highlights_order';
 const STORY_THUMBNAIL_KEY = '@story_thumbnail_cache';
@@ -284,7 +284,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     {
       id: 'azkar-adhkar',
       title: t('azkar.dailyAzkar'),
-      icon: 'hands-pray',
+      icon: '🤲',
       color: '#be123c',
       route: '/daily-dhikr',
     },
@@ -478,11 +478,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                 />
               ) : (
                 <View style={[styles.circleInner, { backgroundColor: h.color }]}>
-                  <MaterialCommunityIcons
-                    name={safeIcon(h.icon) as any}
-                    size={28}
-                    color="#fff"
-                  />
+                  <AppIcon name={h.icon} size={28} color="#fff" />
                 </View>
               )}
             </View>
@@ -576,7 +572,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                     >
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                         <View style={[styles.reorderItemIcon, { backgroundColor: item.color }]}>
-                          <MaterialCommunityIcons name={item.icon as any} size={18} color="#fff" />
+                          <AppIcon name={item.icon} size={18} color="#fff" />
                         </View>
                         <Text style={[
                           styles.reorderItemLabel,

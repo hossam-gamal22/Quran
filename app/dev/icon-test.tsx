@@ -40,7 +40,7 @@ const MATERIAL_ICONS = [
   // Quran & Islamic
   'book-open-variant', 'book-open-page-variant', 'book-outline', 'bookmark', 'bookmark-outline',
   'mosque', 'star-crescent',
-  'hands-pray', 'hand-heart', 'meditation',
+  'human-handsup', 'hand-heart', 'meditation',
   
   // Prayer
   'weather-sunset-up', 'weather-sunset-down', 'weather-sunny', 'white-balance-sunny',

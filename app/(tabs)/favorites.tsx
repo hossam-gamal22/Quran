@@ -25,6 +25,7 @@ import { getDateLocale } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { getBookmarks, removeBookmark, Bookmark, updateBookmarkNote } from '@/lib/storage';
 import { getSurahName } from '@/lib/quran-api';
@@ -1104,7 +1105,7 @@ export default function FavoritesScreen() {
             contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
             ListEmptyComponent={
               <View style={s.emptyWrap}>
-                <MaterialCommunityIcons name="hands-pray" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
+                <AppIcon name="🤲" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
                 <Text style={s.emptyTitle}>{t('favorites.noAzkarFavorites')}</Text>
                 <Text style={s.emptyText}>
                   {t('favorites.addAzkarHint')}
@@ -1199,7 +1200,7 @@ export default function FavoritesScreen() {
                           <Text style={{ fontFamily: fontBold(), fontSize: 16, color: colors.foreground }}>
                             {t(cat.labelKey)} ({items.length})
                           </Text>
-                          <MaterialCommunityIcons name={cat.icon as any} size={20} color={accent} />
+                          <AppIcon name={cat.icon} size={20} color={accent} />
                         </View>
                       </TouchableOpacity>
                       {!isCollapsed && items.map((item, idx) => (

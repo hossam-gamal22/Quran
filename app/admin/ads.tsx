@@ -20,6 +20,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { AdsConfig, DEFAULT_ADS_CONFIG, PRODUCTION_AD_IDS, AdScreenKey } from '@/lib/ads-config';
 import { db } from '@/lib/firebase-config';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { AppIcon } from '@/components/ui/AppIcon';
 
 const FIRESTORE_PATH = 'config';
 const FIRESTORE_DOC = 'ads-settings';
@@ -27,7 +28,7 @@ const FIRESTORE_DOC = 'ads-settings';
 const BANNER_SCREENS: { key: AdScreenKey; label: string; icon: string }[] = [
   { key: 'home', label: 'الرئيسية', icon: 'home' },
   { key: 'quran', label: 'القرآن', icon: 'book-open-variant' },
-  { key: 'azkar', label: 'الأذكار', icon: 'hands-pray' },
+  { key: 'azkar', label: 'الأذكار', icon: '🤲' },
   { key: 'prayer', label: 'الصلاة', icon: 'mosque' },
   { key: 'tasbih', label: 'التسبيح', icon: 'counter' },
   { key: 'names', label: 'الأسماء الحسنى', icon: 'star-crescent' },
@@ -252,7 +253,7 @@ export default function AdsSettingsScreen() {
           {BANNER_SCREENS.map(({ key, label, icon }) => (
             <View key={key} style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.screenLabel, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name={icon as any} size={18} color={Colors.textMuted} />
+                <AppIcon name={icon} size={18} color={Colors.textMuted} />
                 <Text style={styles.switchLabel}>{label}</Text>
               </View>
               <Switch

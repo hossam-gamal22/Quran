@@ -34,6 +34,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import GlassCard from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getLanguage } from '@/lib/i18n';
 import TranslatedText from '@/components/ui/TranslatedText';
@@ -311,7 +312,7 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
         activeOpacity={0.8}
       >
         <View style={styles.duaIconContainer}>
-          <MaterialCommunityIcons name="hands-pray" size={24} color={RAMADAN_COLOR} />
+          <AppIcon name="🤲" size={24} color={RAMADAN_COLOR} />
         </View>
         <Text style={[styles.duaTitle, { color: colors.text, textAlign: 'center' }]}>{t(dua.titleKey)}</Text>
         {isArabicLang ? (
@@ -1042,7 +1043,7 @@ const _styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

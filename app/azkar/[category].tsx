@@ -47,10 +47,14 @@ import {
   removeFromFavorites,
   isFavorite,
   getFavorites,
+  onAzkarChange,
+  resolveCategoryId,
 } from '@/lib/azkar-api';
 import { fetchSelectedDuas, getDailySelectedDuas, duaToZikr } from '@/lib/duas-api';
-import { markAzkarCompleted, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
+import { markAzkarCompleted, incrementAzkarZikrCount, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
 import { trackAzkarRead } from '@/lib/firebase-analytics';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 import { t } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio, type AudioTrack } from '@/contexts/GlobalAudioContext';
@@ -68,9 +72,9 @@ import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
 import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
-import { stripBasmalaPrefix, stripVerseNumbers, stripAzkarBrackets } from '@/lib/basmala-utils';
+import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
-import { prefetchAzkarFiles, isAzkarCached } from '@/lib/azkar-audio-cache';
+import { prefetchAzkarFiles, isAzkarCached, isCacheableAzkarAudio } from '@/lib/azkar-audio-cache';
 import NetInfo from '@react-native-community/netinfo';
 import { hasQuranRefs } from '@/lib/azkar-quran-refs';
 import AzkarQcfVerse from '@/components/AzkarQcfVerse';
@@ -80,9 +84,16 @@ import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { useQuran } from '@/contexts/QuranContext';
 import { getAyahAudioUrl } from '@/lib/quran-cache';
 import { expandQuranAudioMarker, getSurahArabicName } from '@/lib/azkar-quran-audio';
+import { expandAudioTracksForRepeat, getEffectiveZikrRepeatCount } from '@/lib/azkar-repeat';
+import { getAzkarDisplayParts } from '@/lib/azkar-display';
 
 // Map azkar category IDs → worship tracker keys
 const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>>> = {
+  '1': 'morning',
+  '1b': 'evening',
+  '2': 'sleep',
+  '3': 'wakeup',
+  '27': 'afterPrayer',
   morning: 'morning',
   evening: 'evening',
   sleep: 'sleep',
@@ -102,6 +113,16 @@ interface CustomDhikr {
 }
 
 const getCustomDhikrKey = (cat: string) => `@custom_dhikr_${cat}`;
+const AUDIO_REPEAT_DELAY_KEY = '@azkar_audio_repeat_delay_seconds';
+const DEFAULT_AUDIO_REPEAT_DELAY_SECONDS = 2;
+
+const LISTEN_BACKGROUND_CATEGORY_MAP: Record<string, string> = {
+  '1': 'morning',
+  '1b': 'evening',
+  '2': 'sleep',
+  '3': 'wakeup',
+  '27': 'after_prayer',
+};
 
 // After-prayer subcategory tabs
 const AFTER_PRAYER_TABS: Record<string, Record<string, string>> = {
@@ -135,6 +156,23 @@ export default function CategoryAzkarScreen() {
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
   const { showCelebration } = useCelebration();
+  const requestedCategory = String(category || '');
+  const resolvedCategory = React.useMemo(
+    () => resolveCategoryId(requestedCategory),
+    [requestedCategory],
+  );
+  const audioRoute = React.useMemo(
+    () => `/azkar/${resolvedCategory}`,
+    [resolvedCategory],
+  );
+  const isSunnahDuasRoute = requestedCategory === 'sunnah_duas';
+  const isAfterPrayer = resolvedCategory === '27';
+  const isMorningOrEvening = resolvedCategory === '1' || resolvedCategory === '1b';
+  const lockCategoryKey = resolvedCategory === '1'
+    ? 'morning'
+    : resolvedCategory === '1b'
+      ? 'evening'
+      : resolvedCategory;
 
   // Block all ads during azkar session
   useSacredContext('azkar_session');
@@ -155,20 +193,20 @@ export default function CategoryAzkarScreen() {
   const globalAudio = useGlobalAudio();
 
   const [audioPlaying, setAudioPlaying] = useState(() => {
-    return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === `/azkar/${category}` && globalAudio.state.isPlaying;
+    return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === audioRoute && globalAudio.state.isPlaying;
   });
   const [audioLoading, setAudioLoading] = useState(() => {
-    return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === `/azkar/${category}` && globalAudio.state.isLoading;
+    return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === audioRoute && globalAudio.state.isLoading;
   });
+  const [audioRepeatDelaySeconds, setAudioRepeatDelaySeconds] = useState(DEFAULT_AUDIO_REPEAT_DELAY_SECONDS);
   const [categoryLocked, setCategoryLocked] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState('general');
   const [loadError, setLoadError] = useState(false);
-  const isAfterPrayer = category === 'after_prayer';
 
   // Audio listen-all mode — restore if audio is already playing for this category
   const [listenMode, setListenMode] = useState(() => {
     return globalAudio.state.source === 'azkar' && 
-           globalAudio.state.sourceRoute === `/azkar/${category}` &&
+           globalAudio.state.sourceRoute === audioRoute &&
            (globalAudio.state.isPlaying || globalAudio.state.isLoading);
   });
 
@@ -198,11 +236,38 @@ export default function CategoryAzkarScreen() {
   // Toast for loop-back
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countsRef = useRef<Record<number, number>>({});
+  const visibleAzkarRef = useRef<Zikr[]>([]);
+  const currentIndexRef = useRef(0);
 
   // الأنيميشن
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    countsRef.current = counts;
+  }, [counts]);
+
+  useEffect(() => {
+    visibleAzkarRef.current = azkar;
+  }, [azkar]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(AUDIO_REPEAT_DELAY_KEY)
+      .then(value => {
+        if (value === null) return;
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          setAudioRepeatDelaySeconds(Math.max(0, Math.min(10, Math.round(parsed))));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const triggerFeedback = useCallback((type: 'light' | 'medium' | 'success' = 'light') => {
     if (Platform.OS === 'web') return;
@@ -227,14 +292,14 @@ export default function CategoryAzkarScreen() {
   // ===================================
 
   const loadData = useCallback(async () => {
-    if (!category) return;
+    if (!requestedCategory) return;
 
     try {
       // 1. تحميل الفئة والأذكار أولاً
-      const catInfo = getCategoryById(category);
+      const catInfo = getCategoryById(resolvedCategory);
 
       let categoryAzkar: Zikr[];
-      if (category === 'sunnah_duas') {
+      if (isSunnahDuasRoute) {
         // Try Firestore curated duas first, fallback to local
         try {
           const remoteDuas = await fetchSelectedDuas();
@@ -248,7 +313,7 @@ export default function CategoryAzkarScreen() {
           categoryAzkar = getDailySunnahDuas(10);
         }
       } else {
-        categoryAzkar = getAzkarByCategory(category);
+        categoryAzkar = getAzkarByCategory(resolvedCategory);
       }
 
       if (!catInfo || categoryAzkar.length === 0) {
@@ -261,12 +326,26 @@ export default function CategoryAzkarScreen() {
       setAllAzkar(categoryAzkar);
 
       // For after_prayer, filter by subcategory; otherwise show all
-      if (category === 'after_prayer') {
-        const filtered = categoryAzkar.filter(z => z.subcategory === 'general' || !z.subcategory);
-        setAzkar(filtered);
-      } else {
-        setAzkar(categoryAzkar);
+      let visibleAzkar = categoryAzkar;
+      if (isAfterPrayer) {
+        if (selectedSubcategory === 'general') {
+          visibleAzkar = categoryAzkar.filter(z => z.subcategory === 'general' || !z.subcategory);
+        } else if (selectedSubcategory === 'after_fajr') {
+          visibleAzkar = categoryAzkar.filter(z => z.subcategory === 'after_fajr' || z.subcategory === 'after_fajr_maghrib');
+        } else if (selectedSubcategory === 'after_maghrib') {
+          visibleAzkar = categoryAzkar.filter(z => z.subcategory === 'after_fajr_maghrib');
+        }
       }
+      const previousVisible = visibleAzkarRef.current;
+      const previousZikrId = previousVisible[currentIndexRef.current]?.id;
+      setAzkar(visibleAzkar);
+      setCurrentIndex(prev => {
+        if (visibleAzkar.length === 0) return 0;
+        const preservedIndex = previousZikrId !== undefined
+          ? visibleAzkar.findIndex(z => z.id === previousZikrId)
+          : -1;
+        return preservedIndex >= 0 ? preservedIndex : Math.min(prev, visibleAzkar.length - 1);
+      });
 
       // 2. تحميل الإعدادات (غير حرجة)
       try {
@@ -286,22 +365,23 @@ export default function CategoryAzkarScreen() {
         const favoriteIds = await getFavorites();
         const favoriteSet = new Set(favoriteIds);
         for (const zikr of categoryAzkar) {
-          initialCounts[zikr.id] = 0;
+          initialCounts[zikr.id] = countsRef.current[zikr.id] || 0;
           initialFavorites[zikr.id] = favoriteSet.has(zikr.id);
         }
       } catch {
         for (const zikr of categoryAzkar) {
-          initialCounts[zikr.id] = 0;
+          initialCounts[zikr.id] = countsRef.current[zikr.id] || 0;
           initialFavorites[zikr.id] = false;
         }
       }
+      countsRef.current = initialCounts;
       setCounts(initialCounts);
       setFavorites(initialFavorites);
 
       // 4. التحقق من حالة القفل (صباح/مساء)
-      if (category === 'morning' || category === 'evening') {
+      if (isMorningOrEvening) {
         try {
-          const lockKey = `azkar_lock_${category}`;
+          const lockKey = `azkar_lock_${lockCategoryKey}`;
           const lockData = await AsyncStorage.getItem(lockKey);
           if (lockData) {
             const { until } = JSON.parse(lockData);
@@ -309,9 +389,14 @@ export default function CategoryAzkarScreen() {
               setCategoryLocked(true);
             } else {
               await AsyncStorage.removeItem(lockKey);
+              setCategoryLocked(false);
             }
+          } else {
+            setCategoryLocked(false);
           }
         } catch { /* lock check failed - ignore */ }
+      } else {
+        setCategoryLocked(false);
       }
 
       // 5. تشغيل الأنيميشن
@@ -325,10 +410,29 @@ export default function CategoryAzkarScreen() {
       setLoadError(true);
       showOfflineModal();
     }
-  }, [category, fadeAnim]);
+  }, [
+    fadeAnim,
+    isAfterPrayer,
+    isMorningOrEvening,
+    isSunnahDuasRoute,
+    lockCategoryKey,
+    requestedCategory,
+    resolvedCategory,
+    selectedSubcategory,
+  ]);
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // Re-run loadData whenever the admin updates the azkar collection in Firestore
+  // (live snapshot subscription is wired in app/_layout.tsx). This keeps the
+  // currently-open category in sync without needing the user to navigate away.
+  useEffect(() => {
+    const unsub = onAzkarChange(() => {
+      loadData();
+    });
+    return unsub;
   }, [loadData]);
 
   // ===================================
@@ -336,20 +440,20 @@ export default function CategoryAzkarScreen() {
   // ===================================
 
   const loadCustomAzkar = useCallback(async () => {
-    if (!category) return;
+    if (!resolvedCategory) return;
     try {
-      const stored = await AsyncStorage.getItem(getCustomDhikrKey(category));
+      const stored = await AsyncStorage.getItem(getCustomDhikrKey(resolvedCategory));
       if (stored) setCustomAzkar(JSON.parse(stored));
     } catch { /* ignore */ }
-  }, [category]);
+  }, [resolvedCategory]);
 
   useEffect(() => {
     loadCustomAzkar();
   }, [loadCustomAzkar]);
 
   const saveCustomAzkar = async (items: CustomDhikr[]) => {
-    if (!category) return;
-    await AsyncStorage.setItem(getCustomDhikrKey(category), JSON.stringify(items));
+    if (!resolvedCategory) return;
+    await AsyncStorage.setItem(getCustomDhikrKey(resolvedCategory), JSON.stringify(items));
     setCustomAzkar(items);
   };
 
@@ -421,17 +525,17 @@ export default function CategoryAzkarScreen() {
 
   const handleCategoryCompleted = useCallback(async () => {
     // تسجيل في تتبع العبادات
-    if (category) {
-      const worshipKey = WORSHIP_AZKAR_MAP[category];
+    if (resolvedCategory) {
+      const worshipKey = WORSHIP_AZKAR_MAP[resolvedCategory];
       if (worshipKey) {
         await markAzkarCompleted(getTodayDate(), worshipKey);
       }
 
       // قفل أذكار الصباح والمساء حتى وقت التجديد
-      if (category === 'morning' || category === 'evening') {
+      if (isMorningOrEvening) {
         const now = new Date();
         let unlockTime: Date;
-        if (category === 'morning') {
+        if (resolvedCategory === '1') {
           // يتجدد عند آذان المغرب (تقريباً الساعة 6 مساءً)
           unlockTime = new Date(now);
           unlockTime.setHours(18, 0, 0, 0);
@@ -446,7 +550,7 @@ export default function CategoryAzkarScreen() {
           unlockTime.setDate(unlockTime.getDate() + 1);
           unlockTime.setHours(4, 0, 0, 0);
         }
-        const lockKey = `azkar_lock_${category}`;
+        const lockKey = `azkar_lock_${lockCategoryKey}`;
         await AsyncStorage.setItem(lockKey, JSON.stringify({ until: unlockTime.getTime() }));
         setCategoryLocked(true);
       }
@@ -459,18 +563,81 @@ export default function CategoryAzkarScreen() {
       subtitle: t('azkar.mayAllahAccept'),
       onDismiss: () => router.back(),
     });
-  }, [category, showCelebration, router, categoryInfo, language]);
+  }, [categoryInfo, isMorningOrEvening, language, lockCategoryKey, resolvedCategory, router, showCelebration]);
+
+  const getZikrRequiredCount = useCallback((zikr: Zikr) => {
+    return getEffectiveZikrRepeatCount(zikr);
+  }, []);
 
   const checkAllCompleted = useCallback((updatedCounts: Record<number, number>) => {
-    return azkar.every(z => (updatedCounts[z.id] || 0) >= z.count);
-  }, [azkar]);
+    return azkar.every(z => (updatedCounts[z.id] || 0) >= getZikrRequiredCount(z));
+  }, [azkar, getZikrRequiredCount]);
+
+  const recordCompletedZikr = useCallback(async (zikr: Zikr) => {
+    const today = getTodayDate();
+    await incrementAzkarZikrCount(today);
+
+    if (resolvedCategory) {
+      await trackAzkarRead(zikr.id, resolvedCategory, settings.language).catch(() => {});
+    }
+    getUserId()
+      .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+      .catch(() => {});
+  }, [resolvedCategory, settings.language]);
+
+  const completeAudioRepeat = useCallback((track: AudioTrack) => {
+    if (categoryLocked || track.zikrId === undefined) return;
+    const zikr = azkar.find(item => item.id === track.zikrId);
+    if (!zikr) return;
+
+    const requiredCount = getZikrRequiredCount(zikr);
+    const currentCount = countsRef.current[zikr.id] || 0;
+    if (currentCount >= requiredCount) return;
+
+    const newCount = currentCount + 1;
+    const updatedCounts = { ...countsRef.current, [zikr.id]: newCount };
+    countsRef.current = updatedCounts;
+    setCounts(updatedCounts);
+
+    if (resolvedCategory) {
+      updateZikrProgress(resolvedCategory, zikr.id, newCount).catch(() => {});
+    }
+
+    if (newCount >= requiredCount) {
+      recordCompletedZikr(zikr).catch(() => {});
+      if (checkAllCompleted(updatedCounts)) {
+        setTimeout(() => handleCategoryCompleted(), 500);
+      }
+    }
+  }, [
+    azkar,
+    categoryLocked,
+    checkAllCompleted,
+    getZikrRequiredCount,
+    handleCategoryCompleted,
+    recordCompletedZikr,
+    resolvedCategory,
+  ]);
+
+  const audioPlaybackOptions = React.useMemo(() => ({
+    onTrackComplete: completeAudioRepeat,
+    repeatDelayMs: audioRepeatDelaySeconds * 1000,
+  }), [audioRepeatDelaySeconds, completeAudioRepeat]);
+
+  const updateAudioRepeatDelay = useCallback((seconds: number) => {
+    const next = Math.max(0, Math.min(10, Math.round(seconds)));
+    setAudioRepeatDelaySeconds(next);
+    AsyncStorage.setItem(AUDIO_REPEAT_DELAY_KEY, String(next)).catch(() => {});
+    triggerFeedback('light');
+  }, [triggerFeedback]);
 
   const handleCount = async (zikr: Zikr) => {
     if (categoryLocked) return;
     
+    const requiredCount = getZikrRequiredCount(zikr);
     const currentCount = counts[zikr.id] || 0;
     
-    if (currentCount >= zikr.count) {
+    if (currentCount >= requiredCount) {
       // انتهى العداد - انتقل للذكر التالي
       if (currentIndex < azkar.length - 1) {
         goToNext();
@@ -481,7 +648,9 @@ export default function CategoryAzkarScreen() {
     const newCount = currentCount + 1;
     
     // تحديث العداد
-    setCounts(prev => ({ ...prev, [zikr.id]: newCount }));
+    const nextCounts = { ...counts, [zikr.id]: newCount };
+    countsRef.current = nextCounts;
+    setCounts(nextCounts);
     
     // الاهتزاز
     if (Platform.OS === 'ios') {
@@ -505,16 +674,13 @@ export default function CategoryAzkarScreen() {
     ]).start();
 
     // تحديث التقدم في AsyncStorage
-    if (category) {
-      await updateZikrProgress(category, zikr.id, newCount);
+    if (resolvedCategory) {
+      await updateZikrProgress(resolvedCategory, zikr.id, newCount);
     }
 
     // إذا اكتمل العداد
-    if (newCount >= zikr.count) {
-      // تسجيل إحصائيات القراءة في Firebase
-      if (category) {
-        trackAzkarRead(zikr.id, category, settings.language).catch(() => {});
-      }
+    if (newCount >= requiredCount) {
+      await recordCompletedZikr(zikr);
 
       if (Platform.OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -522,10 +688,8 @@ export default function CategoryAzkarScreen() {
         Vibration.vibrate([0, 100, 50, 100]);
       }
 
-      const updatedCounts = { ...counts, [zikr.id]: newCount };
-      
       // التحقق من اكتمال جميع الأذكار
-      if (checkAllCompleted(updatedCounts)) {
+      if (checkAllCompleted(nextCounts)) {
         setTimeout(() => handleCategoryCompleted(), 500);
       } else {
         // انتقال تلقائي بعد ثانية
@@ -653,7 +817,7 @@ export default function CategoryAzkarScreen() {
     if (audioQueue.length === 0) return;
     const filenames = audioQueue
       .map(item => item.zikr.audio)
-      .filter((f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:|quran:)/i.test(f));
+      .filter((f): f is string => !!f && isCacheableAzkarAudio(f));
     if (filenames.length === 0) return;
     prefetchAzkarFiles(filenames).catch(err =>
       console.warn('[azkar] prefetch failed:', err),
@@ -664,7 +828,7 @@ export default function CategoryAzkarScreen() {
   // Shows an alert and returns false if offline + uncached.
   const ensureAudioReachable = useCallback(async (filenames: (string | undefined)[]): Promise<boolean> => {
     const needed = filenames.filter(
-      (f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:|quran:)/i.test(f),
+      (f): f is string => !!f && isCacheableAzkarAudio(f),
     );
     if (needed.length === 0) return true;
     // If any needed file is missing from cache, we require network
@@ -692,10 +856,11 @@ export default function CategoryAzkarScreen() {
   const { currentReciter } = useQuran();
   const audioTracks: AudioTrack[] = React.useMemo(() => {
     const subtitle = categoryInfo ? getCategoryName(categoryInfo, language) : '';
-    const categoryId = String(categoryInfo?.id || category);
+    const categoryId = String(categoryInfo?.id || resolvedCategory);
     const result: AudioTrack[] = [];
     audioQueue.forEach((item, index) => {
       const audio = item.zikr.audio || '';
+      const repeatCount = getZikrRequiredCount(item.zikr);
       if (audio.startsWith('quran:')) {
         // Parse surah for the title; default Arabic surah name.
         const parts = audio.split(':');
@@ -709,46 +874,73 @@ export default function CategoryAzkarScreen() {
           categoryId,
         );
         if (expanded.length > 0) {
-          result.push(...expanded);
+          result.push(...expandAudioTracksForRepeat(expanded, {
+            zikrId: item.zikr.id,
+            baseIndex: index,
+            repeatCount,
+          }));
           return;
         }
         // Fall through to skip (no playable URL)
         return;
       }
-      result.push({
-        id: String(item.zikr.id),
-        title: item.zikr.arabic?.substring(0, 60) || (category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })),
-        subtitle,
-        url: audio,
-        localSource: getAzkarAudioSource(audio) ?? undefined,
-        categoryId,
-      });
+      result.push(...expandAudioTracksForRepeat([
+        {
+          id: String(item.zikr.id),
+          title: getAzkarDisplayParts(item.zikr).text || (isSunnahDuasRoute ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })),
+          subtitle,
+          url: audio,
+          localSource: getAzkarAudioSource(audio) ?? undefined,
+          categoryId,
+        },
+      ], {
+        zikrId: item.zikr.id,
+        baseIndex: index,
+        repeatCount,
+      }));
     });
     return result;
-  }, [audioQueue, categoryInfo, category, currentReciter, language]);
+  }, [audioQueue, categoryInfo, currentReciter, getZikrRequiredCount, isSunnahDuasRoute, language, resolvedCategory]);
+
+  const audioTrackStartByBaseIndex = React.useMemo(() => {
+    const starts: Record<number, number> = {};
+    audioTracks.forEach((track, index) => {
+      if (track.baseIndex !== undefined && starts[track.baseIndex] === undefined) {
+        starts[track.baseIndex] = index;
+      }
+    });
+    return starts;
+  }, [audioTracks]);
 
   // Play a single zikr from its index in the full azkar array
   const handlePlayZikrAudio = useCallback(async (zikr: Zikr) => {
     if (!zikr.audio) return;
     const queueIdx = audioQueue.findIndex(q => q.zikr.id === zikr.id);
     if (queueIdx < 0) return;
-    const isCurrentAzkarQueuePlaying = globalAudio.state.source === 'azkar';
-    const currentQueueIndex = isCurrentAzkarQueuePlaying ? globalAudio.state.queueIndex : -1;
-    if (isCurrentAzkarQueuePlaying && currentQueueIndex === queueIdx) {
+    const startIndex = audioTrackStartByBaseIndex[queueIdx];
+    if (startIndex === undefined) return;
+    const isCurrentAzkarQueuePlaying =
+      globalAudio.state.source === 'azkar' &&
+      globalAudio.state.sourceRoute === audioRoute;
+    const currentTrack = isCurrentAzkarQueuePlaying ? audioTracks[globalAudio.state.queueIndex] : undefined;
+    if (isCurrentAzkarQueuePlaying && currentTrack?.baseIndex === queueIdx) {
       await globalAudio.togglePlayPause();
     } else {
       const ok = await ensureAudioReachable([zikr.audio]);
       if (!ok) return;
-      await globalAudio.playAzkarQueue(audioTracks, queueIdx, `/azkar/${category}`);
+      await globalAudio.playAzkarQueue(audioTracks, startIndex, audioRoute, audioPlaybackOptions);
       setAudioPlaying(true);
     }
-  }, [audioQueue, audioTracks, globalAudio, category]);
+  }, [audioPlaybackOptions, audioQueue, audioRoute, audioTrackStartByBaseIndex, audioTracks, globalAudio, ensureAudioReachable]);
 
   const hasAudio = audioQueue.length > 0;
 
   // Derive playback state from global audio context
-  const isGlobalAzkarPlaying = globalAudio.state.source === 'azkar';
+  const isGlobalAzkarPlaying = globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === audioRoute;
   const audioQueueIndex = isGlobalAzkarPlaying ? globalAudio.state.queueIndex : -1;
+  const currentAudioTrack = audioQueueIndex >= 0 ? audioTracks[audioQueueIndex] : undefined;
+  const currentAudioBaseIndex = currentAudioTrack?.baseIndex ?? (audioQueueIndex >= 0 ? audioQueueIndex : -1);
+  const currentAudioQueueItem = currentAudioBaseIndex >= 0 ? audioQueue[currentAudioBaseIndex] : undefined;
   const audioPaused = isGlobalAzkarPlaying && !globalAudio.state.isPlaying && !globalAudio.state.isLoading;
   const audioPosition = isGlobalAzkarPlaying ? globalAudio.state.position : 0;
   const audioDuration = isGlobalAzkarPlaying ? globalAudio.state.duration : 0;
@@ -768,7 +960,10 @@ export default function CategoryAzkarScreen() {
   }, [isGlobalAzkarPlaying, globalAudio.state.isPlaying, globalAudio.state.isLoading]);
 
   const handleListenAll = useCallback(async () => {
-    if (audioPlaying) {
+    const isThisAzkarAudioActive =
+      globalAudio.state.source === 'azkar' &&
+      globalAudio.state.sourceRoute === audioRoute;
+    if (isThisAzkarAudioActive && (globalAudio.state.isPlaying || globalAudio.state.isLoading || audioPaused)) {
       // Toggle pause/resume via global context
       await globalAudio.togglePlayPause();
       return;
@@ -782,8 +977,8 @@ export default function CategoryAzkarScreen() {
     // Start from beginning
     setListenMode(true);
     setAudioPlaying(true);
-    await globalAudio.playAzkarQueue(audioTracks, 0, `/azkar/${category}`);
-  }, [audioPlaying, audioTracks, audioQueue, globalAudio, category]);
+    await globalAudio.playAzkarQueue(audioTracks, 0, audioRoute, audioPlaybackOptions);
+  }, [audioPaused, audioPlaybackOptions, audioRoute, audioTracks, audioQueue, globalAudio, ensureAudioReachable]);
 
   const handleStopListening = useCallback(async () => {
     await globalAudio.stop();
@@ -792,13 +987,39 @@ export default function CategoryAzkarScreen() {
     setListenMode(false);
   }, [globalAudio]);
 
+  const playLogicalAudioBase = useCallback(async (baseIndex: number) => {
+    if (baseIndex < 0 || baseIndex >= audioQueue.length) return;
+    const startIndex = audioTrackStartByBaseIndex[baseIndex];
+    if (startIndex === undefined) return;
+    const ok = await ensureAudioReachable([audioQueue[baseIndex]?.zikr.audio || undefined]);
+    if (!ok) return;
+    await globalAudio.playAzkarQueue(audioTracks, startIndex, audioRoute, audioPlaybackOptions);
+    setAudioPlaying(true);
+  }, [
+    audioPlaybackOptions,
+    audioQueue,
+    audioRoute,
+    audioTrackStartByBaseIndex,
+    audioTracks,
+    ensureAudioReachable,
+    globalAudio,
+  ]);
+
   const handleNextTrack = useCallback(async () => {
+    if (isGlobalAzkarPlaying && currentAudioBaseIndex >= 0) {
+      await playLogicalAudioBase(currentAudioBaseIndex + 1);
+      return;
+    }
     await globalAudio.next();
-  }, [globalAudio]);
+  }, [currentAudioBaseIndex, globalAudio, isGlobalAzkarPlaying, playLogicalAudioBase]);
 
   const handlePrevTrack = useCallback(async () => {
+    if (isGlobalAzkarPlaying && currentAudioBaseIndex >= 0) {
+      await playLogicalAudioBase(currentAudioBaseIndex - 1);
+      return;
+    }
     await globalAudio.previous();
-  }, [globalAudio]);
+  }, [currentAudioBaseIndex, globalAudio, isGlobalAzkarPlaying, playLogicalAudioBase]);
 
   const handleSeek = useCallback(async (value: number) => {
     await globalAudio.seekTo(value);
@@ -821,21 +1042,46 @@ export default function CategoryAzkarScreen() {
   };
 
   // Currently playing zikr id for highlighting
-  const currentlyPlayingZikrId = audioQueueIndex >= 0 && audioQueueIndex < audioQueue.length
-    ? audioQueue[audioQueueIndex].zikr.id
-    : null;
+  const currentlyPlayingZikrId = currentAudioQueueItem?.zikr.id ?? null;
+
+  useEffect(() => {
+    if (!isGlobalAzkarPlaying || !currentAudioQueueItem) return;
+    const nextIndex = currentAudioQueueItem.originalIndex;
+    if (nextIndex < 0 || nextIndex >= azkar.length || nextIndex === currentIndex) return;
+
+    setCurrentIndex(nextIndex);
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+
+    const zikr = azkar[nextIndex];
+    const current = zikr ? countsRef.current[zikr.id] || 0 : 0;
+    const required = zikr ? getZikrRequiredCount(zikr) : 1;
+    Animated.timing(progressAnim, {
+      toValue: (nextIndex + Math.min(1, current / Math.max(1, required))) / Math.max(1, azkar.length),
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [
+    azkar,
+    currentAudioQueueItem,
+    currentIndex,
+    getZikrRequiredCount,
+    isGlobalAzkarPlaying,
+    progressAnim,
+  ]);
 
   // Audio continues playing when leaving page — GlobalAudioBar handles it
   // Stop only handled by explicit user action (close button / stop)
 
   // Use curated backgrounds for listen mode (no live API calls)
   useEffect(() => {
-    if (!listenMode || !category) return;
-    const photos = getListenModeBackgrounds(category);
+    if (!listenMode || !resolvedCategory) return;
+    const photos = getListenModeBackgrounds(
+      LISTEN_BACKGROUND_CATEGORY_MAP[resolvedCategory] || requestedCategory || resolvedCategory,
+    );
     if (photos.length > 0) {
       setListenPhotos(photos);
     }
-  }, [listenMode, category]);
+  }, [listenMode, requestedCategory, resolvedCategory]);
 
   // Animate listen mode image — subtle slow zoom
   useEffect(() => {
@@ -856,7 +1102,7 @@ export default function CategoryAzkarScreen() {
   // Change photo on track change
   useEffect(() => {
     if (!listenMode || listenPhotos.length === 0) return;
-    const newIndex = audioQueueIndex >= 0 ? audioQueueIndex % listenPhotos.length : 0;
+    const newIndex = currentAudioBaseIndex >= 0 ? currentAudioBaseIndex % listenPhotos.length : 0;
     if (newIndex !== currentPhotoIndex) {
       Animated.timing(listenImageOpacity, {
         toValue: 0,
@@ -871,7 +1117,7 @@ export default function CategoryAzkarScreen() {
         }).start();
       });
     }
-  }, [audioQueueIndex, listenMode]);
+  }, [currentAudioBaseIndex, listenMode, listenPhotos.length, currentPhotoIndex, listenImageOpacity]);
 
   // ===================================
   // إعادة تعيين العداد
@@ -879,8 +1125,8 @@ export default function CategoryAzkarScreen() {
 
   const resetCount = (zikrId: number) => {
     setCounts(prev => ({ ...prev, [zikrId]: 0 }));
-    if (category) {
-      updateZikrProgress(category, zikrId, 0);
+    if (resolvedCategory) {
+      updateZikrProgress(resolvedCategory, zikrId, 0);
     }
   };
 
@@ -918,8 +1164,9 @@ export default function CategoryAzkarScreen() {
 
   const currentZikr = azkar[currentIndex];
   const currentCount = counts[currentZikr.id] || 0;
-  const isCompleted = currentCount >= currentZikr.count;
-  const currentItemProgress = Math.min(1, currentCount / Math.max(1, currentZikr.count));
+  const currentZikrRequiredCount = getZikrRequiredCount(currentZikr);
+  const isCompleted = currentCount >= currentZikrRequiredCount;
+  const currentItemProgress = Math.min(1, currentCount / Math.max(1, currentZikrRequiredCount));
   const progress = (currentIndex + currentItemProgress) / azkar.length;
   const progressPercent = Math.round(progress * 100);
 
@@ -948,7 +1195,7 @@ export default function CategoryAzkarScreen() {
             
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', flex: 1, gap: 4 }}>
               <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
-                {category === 'sunnah_duas' ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language)}
+                {isSunnahDuasRoute ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language)}
               </Text>
               <SectionInfoButton sectionKey="azkar" />
             </View>
@@ -1120,10 +1367,9 @@ export default function CategoryAzkarScreen() {
                     writingDirection: isRTL ? 'rtl' : 'ltr',
                     lineHeight: 34,
                   }}
-                  numberOfLines={2}
                 >
-                  {audioQueueIndex >= 0 && audioQueueIndex < audioQueue.length
-                    ? (audioQueue[audioQueueIndex].zikr.arabic?.substring(0, 60) || getCategoryName(categoryInfo, language))
+                  {currentAudioQueueItem
+                    ? (getAzkarDisplayParts(currentAudioQueueItem.zikr).text || getCategoryName(categoryInfo, language))
                     : getCategoryName(categoryInfo, language)}
                 </Text>
                 <Text
@@ -1148,7 +1394,13 @@ export default function CategoryAzkarScreen() {
                     marginTop: 2,
                   }}
                 >
-                  {audioQueueIndex >= 0 ? audioQueueIndex + 1 : 0} / {audioQueue.length}
+                  {currentAudioBaseIndex >= 0 ? currentAudioBaseIndex + 1 : 0} / {audioQueue.length}
+                  {currentAudioTrack?.repeatTotal && currentAudioTrack.repeatTotal > 1
+                    ? ` • ${t('azkar.repeatProgress', {
+                        current: String(currentAudioTrack.repeatIndex || 1),
+                        total: String(currentAudioTrack.repeatTotal),
+                      })}`
+                    : ''}
                 </Text>
               </View>
 
@@ -1172,6 +1424,29 @@ export default function CategoryAzkarScreen() {
                     {formatTime(audioDuration)}
                   </Text>
                 </View>
+              </View>
+
+              {/* Repeat delay */}
+              <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 }}>
+                  <Text style={{ fontSize: 13, fontFamily: fontSemiBold(), color: darkMode ? '#D1D5DB' : '#4B5563', textAlign: isRTL ? 'right' : 'left' }}>
+                    {t('azkar.repeatDelay')}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: fontSemiBold(), color: categoryInfo.color, fontVariant: ['tabular-nums'] }}>
+                    {t('azkar.repeatDelaySeconds', { seconds: String(audioRepeatDelaySeconds) })}
+                  </Text>
+                </View>
+                <Slider
+                  style={{ width: '100%', height: 28 }}
+                  value={audioRepeatDelaySeconds}
+                  minimumValue={0}
+                  maximumValue={10}
+                  step={1}
+                  minimumTrackTintColor={categoryInfo.color}
+                  maximumTrackTintColor={darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
+                  thumbTintColor={categoryInfo.color}
+                  onSlidingComplete={updateAudioRepeatDelay}
+                />
               </View>
 
               {/* Controls */}
@@ -1202,8 +1477,8 @@ export default function CategoryAzkarScreen() {
                 {/* Previous */}
                 <TouchableOpacity
                   onPress={handlePrevTrack}
-                  disabled={audioQueueIndex <= 0}
-                  style={{ opacity: audioQueueIndex <= 0 ? 0.3 : 1, padding: 8 }}
+                  disabled={currentAudioBaseIndex <= 0}
+                  style={{ opacity: currentAudioBaseIndex <= 0 ? 0.3 : 1, padding: 8 }}
                 >
                   <MaterialCommunityIcons name="skip-previous" size={36} color={darkMode ? '#E5E7EB' : '#374151'} />
                 </TouchableOpacity>
@@ -1239,8 +1514,8 @@ export default function CategoryAzkarScreen() {
                 {/* Next */}
                 <TouchableOpacity
                   onPress={handleNextTrack}
-                  disabled={audioQueueIndex >= audioQueue.length - 1}
-                  style={{ opacity: audioQueueIndex >= audioQueue.length - 1 ? 0.3 : 1, padding: 8 }}
+                  disabled={currentAudioBaseIndex >= audioQueue.length - 1}
+                  style={{ opacity: currentAudioBaseIndex >= audioQueue.length - 1 ? 0.3 : 1, padding: 8 }}
                 >
                   <MaterialCommunityIcons name="skip-next" size={36} color={darkMode ? '#E5E7EB' : '#374151'} />
                 </TouchableOpacity>
@@ -1268,12 +1543,16 @@ export default function CategoryAzkarScreen() {
                   {t('azkar.playlist')}
                 </Text>
                 {audioQueue.map((item, index) => {
-                  const isCurrentTrack = index === audioQueueIndex;
+                  const isCurrentTrack = index === currentAudioBaseIndex;
                   return (
                     <TouchableOpacity
                       key={item.zikr.id}
                       onPress={async () => {
-                        await globalAudio.playAzkarQueue(audioTracks, index, `/azkar/${category}`);
+                        const startIndex = audioTrackStartByBaseIndex[index];
+                        if (startIndex === undefined) return;
+                        const ok = await ensureAudioReachable([item.zikr.audio || undefined]);
+                        if (!ok) return;
+                        await globalAudio.playAzkarQueue(audioTracks, startIndex, audioRoute, audioPlaybackOptions);
                         setAudioPlaying(true);
                       }}
                       style={{
@@ -1321,7 +1600,7 @@ export default function CategoryAzkarScreen() {
                           }}
                           numberOfLines={1}
                         >
-                          {item.zikr.arabic?.substring(0, 50) || (category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) }))}
+                          {getAzkarDisplayParts(item.zikr).text || (isSunnahDuasRoute ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) }))}
                         </Text>
                       </View>
                       <View style={{
@@ -1409,15 +1688,8 @@ export default function CategoryAzkarScreen() {
                     {/* Main dhikr text: Arabic for Arabic users, translation for others */}
                     {/* Use QCF Mushaf font for mapped Quran verses, KFGQPCUthmanic fallback for others */}
                     {(() => {
-                      const useQcf = hasQuranRefs(currentZikr.id);
-                      const knownQuranIds = [48, 481, 482, 49];
-                      const hasVerseBrackets = currentZikr.arabic?.includes('﴿') || currentZikr.arabic?.includes('﴾');
-                      const isQuranSurah = useQcf || knownQuranIds.includes(currentZikr.id) || hasVerseBrackets;
-                      const { stripped, hadBasmala } = stripBasmalaPrefix(currentZikr.arabic);
-                      const rawDisplay = hadBasmala ? stripped : currentZikr.arabic;
-                      const cleanedDisplay = stripAzkarBrackets(rawDisplay);
-                      const displayText = isQuranSurah ? stripVerseNumbers(cleanedDisplay) : cleanedDisplay;
-                      const quranFontStyle = (!useQcf && isQuranSurah) ? {
+                      const display = getAzkarDisplayParts(currentZikr);
+                      const quranFontStyle = display.useFallbackQuranFont ? {
                         fontFamily: 'KFGQPCUthmanic',
                         fontSize: 30,
                         lineHeight: 62,
@@ -1438,14 +1710,14 @@ export default function CategoryAzkarScreen() {
                           }}
                           delayLongPress={400}
                         >
-                          {hadBasmala && !useQcf && (
+                          {display.hadBasmala && !display.useQcf && (
                             <BasmalaHeader tintColor={darkMode ? '#D4A574' : '#C9A84C'} />
                           )}
-                          {useQcf && isArabic ? (
+                          {display.useQcf && isArabic ? (
                             <AzkarQcfVerse
                               azkarId={currentZikr.id}
                               textColor={isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === currentZikr.id ? categoryInfo.color : (darkMode ? '#F9FAFB' : '#1F2937')}
-                              fallbackText={currentZikr.arabic}
+                              fallbackText={display.text || currentZikr.arabic}
                             />
                           ) : isArabic ? (
                             <Text style={[
@@ -1454,7 +1726,7 @@ export default function CategoryAzkarScreen() {
                               isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
                               quranFontStyle,
                             ]}>
-                              {displayText}
+                              {display.text}
                             </Text>
                           ) : (
                             <Text style={[
@@ -1585,7 +1857,7 @@ export default function CategoryAzkarScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.counterText}>
-                  {isCompleted ? '✓' : `${currentCount}/${currentZikr.count}`}
+                  {isCompleted ? '✓' : `${currentCount}/${currentZikrRequiredCount}`}
                 </Text>
               </TouchableOpacity>
 
@@ -1611,14 +1883,13 @@ export default function CategoryAzkarScreen() {
           >
             {azkar.map((zikr, idx) => {
               const zCount = counts[zikr.id] || 0;
-              const zDone = zCount >= zikr.count;
+              const zRequiredCount = getZikrRequiredCount(zikr);
+              const zDone = zCount >= zRequiredCount;
               const isExpanded = expandedItems.has(zikr.id);
-              const { stripped: rawListText, hadBasmala: listItemHasBasmala } = stripBasmalaPrefix(zikr.arabic);
-              const isQuranItem = [48, 481, 482, 49].includes(zikr.id) || zikr.arabic?.includes('﴿') || zikr.arabic?.includes('﴾');
-              const listDisplayText = isQuranItem ? stripVerseNumbers(rawListText) : rawListText;
+              const listDisplay = getAzkarDisplayParts(zikr);
               return (
                 <View key={zikr.id} style={{ marginBottom: 10 }}>
-                  {listItemHasBasmala && (
+                  {listDisplay.hadBasmala && !listDisplay.useQcf && (
                     <BasmalaHeader tintColor={darkMode ? '#D4A574' : '#C9A84C'} style={{ marginBottom: 4 }} />
                   )}
                   <GlassCard intensity={40} style={[
@@ -1648,15 +1919,15 @@ export default function CategoryAzkarScreen() {
                           styles.arabicText,
                           { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 18, marginBottom: 0, flex: 1, textAlign: isArabic ? 'right' : (isRTL ? 'right' : 'left'), writingDirection: isArabic ? 'rtl' : (isRTL ? 'rtl' : 'ltr') },
                           isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === zikr.id && { color: categoryInfo.color },
-                          (!hasQuranRefs(zikr.id) && ([48, 481, 482, 49].includes(zikr.id) || zikr.arabic?.includes('﴿') || zikr.arabic?.includes('﴾'))) && { fontFamily: 'KFGQPCUthmanic', fontSize: 22, lineHeight: 44 },
+                          listDisplay.useFallbackQuranFont && { fontFamily: 'KFGQPCUthmanic', fontSize: 22, lineHeight: 44 },
                         ]}
                         numberOfLines={isExpanded ? undefined : 2}
                       >
-                        {isArabic ? (hasQuranRefs(zikr.id) ? zikr.arabic : listDisplayText) : getZikrTranslation(zikr, language)}
+                        {isArabic ? listDisplay.text : getZikrTranslation(zikr, language)}
                       </Text>
                       <View style={[styles.listCollapseRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={[styles.listMiniCount, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}>
-                          <Text style={styles.listMiniCountText}>{zDone ? '✓' : `${zCount}/${zikr.count}`}</Text>
+                          <Text style={styles.listMiniCountText}>{zDone ? '✓' : `${zCount}/${zRequiredCount}`}</Text>
                         </View>
                         <MaterialCommunityIcons
                           name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -1716,17 +1987,17 @@ export default function CategoryAzkarScreen() {
                             const next = zCount + 1;
                             setCounts(prev => ({ ...prev, [zikr.id]: next }));
                             triggerFeedback('light');
-                            if (next >= zikr.count) {
+                            if (next >= zRequiredCount) {
                               triggerFeedback('success');
                               const updated = { ...counts, [zikr.id]: next };
                               if (checkAllCompleted(updated)) setTimeout(() => handleCategoryCompleted(), 500);
                             }
-                            if (category) updateZikrProgress(category, zikr.id, next);
+                            if (resolvedCategory) updateZikrProgress(resolvedCategory, zikr.id, next);
                           }}
                           style={[styles.listCounterButton, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.listCounterText}>{zDone ? '✓' : `${zCount}/${zikr.count}`}</Text>
+                          <Text style={styles.listCounterText}>{zDone ? '✓' : `${zCount}/${zRequiredCount}`}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1905,7 +2176,7 @@ export default function CategoryAzkarScreen() {
         const zikrId = zikrObj?.id ?? 0;
         const useQcf = isZikr && hasQuranRefs(zikrId);
         const catLabel = categoryInfo
-          ? (category === 'sunnah_duas' ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language))
+          ? (isSunnahDuasRoute ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language))
           : t('azkar.title');
         const refText = zikrObj?.reference ? transliterateReference(zikrObj.reference, language) : undefined;
         const benefitVal = zikrObj ? getZikrBenefit(zikrObj, language) : undefined;
@@ -2110,7 +2381,7 @@ const styles = StyleSheet.create({
   // Completion Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,

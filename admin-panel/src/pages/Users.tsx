@@ -117,8 +117,8 @@ export default function UsersPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
 
   useEffect(() => {
     loadUsers();
@@ -157,18 +157,29 @@ export default function UsersPage() {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = (user.name || '').includes(searchTerm) || (user.email || '').includes(searchTerm) || (user.phone || '').includes(searchTerm);
-    const matchesPlan = filterPlan === 'all' || user.plan === filterPlan;
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
+    const q = searchTerm.trim().toLowerCase();
+    const matchesSearch = !q
+      || (user.name || '').toLowerCase().includes(q)
+      || (user.email || '').toLowerCase().includes(q)
+      || (user.phone || '').toLowerCase().includes(q);
+    // Treat missing/empty plan as 'free' (matches stats logic + reality:
+    // most app users never wrote a plan field, they're free by default).
+    const userPlan = user.plan || 'free';
+    const matchesPlan = filterPlan === 'all' || userPlan === filterPlan;
+    // Same for status — missing status counts as 'active' since the app
+    // doesn't write a status field for new users.
+    const userStatus = user.status || 'active';
+    const matchesStatus = filterStatus === 'all' || userStatus === filterStatus;
     return matchesSearch && matchesPlan && matchesStatus;
   });
 
   const stats = {
     total: users.length,
-    active: users.filter(u => u.status === 'active').length,
+    // Match filter logic: missing status counts as 'active'.
+    active: users.filter(u => (u.status || 'active') === 'active').length,
     inactive: users.filter(u => u.status === 'inactive').length,
     banned: users.filter(u => u.status === 'banned').length,
-    free: users.filter(u => u.plan === 'free' || !u.plan).length,
+    free: users.filter(u => (u.plan || 'free') === 'free').length,
     premium: users.filter(u => u.plan && u.plan !== 'free').length,
     lifetime: users.filter(u => u.plan === 'lifetime').length,
   };
@@ -233,6 +244,7 @@ export default function UsersPage() {
       invalidateActiveDevicesCache();
       setUsers([]);
       setShowDeleteAllConfirm(false);
+      setDeleteAllConfirmText('');
     } catch (error) {
       console.error('Error deleting all users:', error);
       alert('حدث خطأ أثناء الحذف');
@@ -507,11 +519,25 @@ export default function UsersPage() {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">تحذير! حذف جميع المستخدمين</h3>
               <p className="text-slate-400 mb-2">سيتم حذف <span className="text-red-400 font-bold">{users.length}</span> مستخدم بشكل نهائي.</p>
-              <p className="text-red-400 text-sm mb-6">هذا الإجراء لا يمكن التراجع عنه!</p>
+              <p className="text-red-400 text-sm mb-3">هذا الإجراء لا يمكن التراجع عنه!</p>
+              <div className="mb-4 text-right">
+                <label className="block text-xs text-slate-400 mb-1">
+                  للتأكيد، اكتب: <span className="font-mono text-red-300">حذف الكل</span>
+                </label>
+                <input
+                  type="text"
+                  value={deleteAllConfirmText}
+                  onChange={e => setDeleteAllConfirmText(e.target.value)}
+                  placeholder="حذف الكل"
+                  className="w-full px-3 py-2 bg-admin-bg border border-admin-border rounded-lg text-white placeholder-slate-500 focus:border-red-500 focus:outline-none"
+                  dir="rtl"
+                  aria-label="تأكيد الحذف"
+                />
+              </div>
               <div className="flex gap-3">
                 <button 
                   onClick={handleDeleteAllUsers} 
-                  disabled={deletingAll}
+                  disabled={deletingAll || deleteAllConfirmText.trim() !== 'حذف الكل'}
                   className="flex-1 bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {deletingAll ? (
@@ -525,7 +551,7 @@ export default function UsersPage() {
                   ) : 'نعم، احذف الكل'}
                 </button>
                 <button 
-                  onClick={() => setShowDeleteAllConfirm(false)} 
+                  onClick={() => { setShowDeleteAllConfirm(false); setDeleteAllConfirmText(''); }} 
                   disabled={deletingAll}
                   className="flex-1 border border-admin-border text-slate-300 py-3 rounded-lg hover:bg-admin-surface-light disabled:opacity-50"
                 >

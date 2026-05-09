@@ -10,7 +10,7 @@
  *  3) لو لا، يرجع المفتاح الافتراضي (makkah للأذان، general_reminder لباقي الأنواع)
  */
 
-import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES } from '../../services/notifications/channels';
+import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES } from '../services/notifications/channels';
 import { getCachedInstalledSounds } from './notification-sound-installer';
 
 const DEFAULT_ADHAN_KEY = 'makkah';

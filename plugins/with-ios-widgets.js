@@ -41,6 +41,7 @@ function copyDirectorySync(src, dest) {
 const WIDGET_SWIFT_FILES = [
   'WidgetBundle.swift',
   'NextPrayerWidget.swift',
+  'RitualPrayerViews.swift',
   'QuranAyahWidget.swift',
   'AzkarWidget.swift',
   'DhikrWidget.swift',
@@ -63,10 +64,14 @@ const SHARED_SWIFT_FILES = [
   'SharedActivityAttributes.swift',
 ];
 
-// Font files needed by widgets (HijriDateWidget uses Amiri)
+// Font files needed by widgets (HijriDateWidget uses Amiri, Ritual prayer widgets use WidgetFont)
 const WIDGET_FONT_FILES = [
   'Amiri-Regular.ttf',
   'Amiri-Bold.ttf',
+  'WidgetFont.ttf',
+  'Rubik-Regular.ttf',
+  'Rubik-Medium.ttf',
+  'Rubik-Bold.ttf',
 ];
 
 /**
@@ -178,6 +183,10 @@ const withIOSWidgets = (config) => {
 	<array>
 		<string>Amiri-Regular.ttf</string>
 		<string>Amiri-Bold.ttf</string>
+		<string>WidgetFont.ttf</string>
+		<string>Rubik-Regular.ttf</string>
+		<string>Rubik-Medium.ttf</string>
+		<string>Rubik-Bold.ttf</string>
 	</array>
 	<key>NSExtension</key>
 	<dict>

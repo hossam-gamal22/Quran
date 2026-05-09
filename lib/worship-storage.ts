@@ -152,6 +152,62 @@ export const parseDate = (dateString: string): Date => {
   return new Date(year, month - 1, day);
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const dateKeyToUtcDay = (dateString: string): number => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / DAY_MS);
+};
+
+const differenceInCalendarDays = (newerDate: string, olderDate: string): number => {
+  return dateKeyToUtcDay(newerDate) - dateKeyToUtcDay(olderDate);
+};
+
+const getYesterdayDate = (): string => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return formatDate(yesterday);
+};
+
+const calculateConsecutiveDateStreak = (dates: string[]): { currentStreak: number; bestStreak: number } => {
+  const sortedDates = Array.from(new Set(dates))
+    .filter(Boolean)
+    .sort((a, b) => dateKeyToUtcDay(b) - dateKeyToUtcDay(a));
+
+  if (sortedDates.length === 0) {
+    return { currentStreak: 0, bestStreak: 0 };
+  }
+
+  let bestStreak = 1;
+  let activeRun = 1;
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const gap = differenceInCalendarDays(sortedDates[i - 1], sortedDates[i]);
+    if (gap === 1) {
+      activeRun++;
+    } else {
+      bestStreak = Math.max(bestStreak, activeRun);
+      activeRun = 1;
+    }
+  }
+  bestStreak = Math.max(bestStreak, activeRun);
+
+  const latestDate = sortedDates[0];
+  const currentCanContinue = latestDate === getTodayDate() || latestDate === getYesterdayDate();
+  if (!currentCanContinue) {
+    return { currentStreak: 0, bestStreak };
+  }
+
+  let currentStreak = 1;
+  for (let i = 1; i < sortedDates.length; i++) {
+    const gap = differenceInCalendarDays(sortedDates[i - 1], sortedDates[i]);
+    if (gap !== 1) break;
+    currentStreak++;
+  }
+
+  return { currentStreak, bestStreak };
+};
+
 export const getWeekDates = (startDate: Date = new Date()): string[] => {
   const dates: string[] = [];
   const start = new Date(startDate);
@@ -693,39 +749,14 @@ export const calculatePrayerStats = async (): Promise<PrayerStats> => {
  * حساب سلسلة الصلاة
  */
 const calculatePrayerStreak = (records: DailyPrayerRecord[]): { streak: number; bestStreak: number } => {
-  const sortedRecords = [...records].sort((a, b) => 
-    parseDate(b.date).getTime() - parseDate(a.date).getTime()
-  );
-  
-  let currentStreak = 0;
-  let bestStreak = 0;
-  let streakBroken = false;
-  
   const prayers: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-  
-  let tempStreak = 0;
-  for (const record of sortedRecords) {
-    const allPrayed = prayers.every(p => 
+  const completeDates = records
+    .filter(record => prayers.every(p =>
       record[p] === 'prayed' || record[p] === 'late'
-    );
-    
-    if (allPrayed) {
-      tempStreak++;
-    } else {
-      if (!streakBroken) {
-        currentStreak = tempStreak;
-        streakBroken = true;
-      }
-      bestStreak = Math.max(bestStreak, tempStreak);
-      tempStreak = 0;
-    }
-  }
-  
-  bestStreak = Math.max(bestStreak, tempStreak);
-  if (!streakBroken) {
-    currentStreak = tempStreak;
-  }
-  
+    ))
+    .map(record => record.date);
+
+  const { currentStreak, bestStreak } = calculateConsecutiveDateStreak(completeDates);
   return { streak: currentStreak, bestStreak };
 };
 
@@ -739,35 +770,9 @@ export const calculateFastingStats = async (): Promise<FastingStats> => {
   const ramadanDays = recordsList.filter(r => r.type === 'ramadan').length;
   const voluntaryDays = recordsList.filter(r => r.type !== 'ramadan').length;
   
-  // حساب السلسلة
-  const sortedRecords = [...recordsList].sort((a, b) => 
-    parseDate(b.date).getTime() - parseDate(a.date).getTime()
+  const { currentStreak, bestStreak } = calculateConsecutiveDateStreak(
+    recordsList.map(record => record.date)
   );
-  
-  let currentStreak = 0;
-  let bestStreak = 0;
-  let tempStreak = 0;
-  
-  for (let i = 0; i < sortedRecords.length; i++) {
-    const currentDate = parseDate(sortedRecords[i].date);
-    const nextDate = i < sortedRecords.length - 1 
-      ? parseDate(sortedRecords[i + 1].date) 
-      : null;
-    
-    tempStreak++;
-    
-    if (nextDate) {
-      const diff = (currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (diff > 1) {
-        bestStreak = Math.max(bestStreak, tempStreak);
-        tempStreak = 0;
-      }
-    }
-    
-    if (i === 0) currentStreak = tempStreak;
-  }
-  
-  bestStreak = Math.max(bestStreak, tempStreak);
   
   return {
     totalDays: recordsList.length,
@@ -794,32 +799,10 @@ export const calculateQuranStats = async (): Promise<QuranStats> => {
     ? Math.round((totalPages / daysWithReading) * 10) / 10 
     : 0;
   
-  // حساب السلسلة
-  const sortedRecords = recordsList
+  const readingDates = recordsList
     .filter(r => r.pagesRead > 0)
-    .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
-  
-  let currentStreak = 0;
-  let bestStreak = 0;
-  
-  // مشابه لحساب سلسلة الصيام
-  let tempStreak = 0;
-  for (let i = 0; i < sortedRecords.length; i++) {
-    tempStreak++;
-    if (i === 0) currentStreak = tempStreak;
-    
-    if (i < sortedRecords.length - 1) {
-      const current = parseDate(sortedRecords[i].date);
-      const next = parseDate(sortedRecords[i + 1].date);
-      const diff = (current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24);
-      
-      if (diff > 1) {
-        bestStreak = Math.max(bestStreak, tempStreak);
-        tempStreak = 0;
-      }
-    }
-  }
-  bestStreak = Math.max(bestStreak, tempStreak);
+    .map(record => record.date);
+  const { currentStreak, bestStreak } = calculateConsecutiveDateStreak(readingDates);
   
   return {
     totalPages,
@@ -846,31 +829,10 @@ export const calculateAzkarStats = async (): Promise<AzkarStats> => {
     ? Math.round(((morningCompleted + eveningCompleted) / (totalDays * 2)) * 100)
     : 0;
   
-  // حساب السلسلة (أذكار الصباح والمساء)
-  const sortedRecords = [...recordsList]
+  const completedDates = recordsList
     .filter(r => r.morning && r.evening)
-    .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
-  
-  let currentStreak = 0;
-  let bestStreak = 0;
-  let tempStreak = 0;
-  
-  for (let i = 0; i < sortedRecords.length; i++) {
-    tempStreak++;
-    if (i === 0) currentStreak = tempStreak;
-    
-    if (i < sortedRecords.length - 1) {
-      const current = parseDate(sortedRecords[i].date);
-      const next = parseDate(sortedRecords[i + 1].date);
-      const diff = (current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24);
-      
-      if (diff > 1) {
-        bestStreak = Math.max(bestStreak, tempStreak);
-        tempStreak = 0;
-      }
-    }
-  }
-  bestStreak = Math.max(bestStreak, tempStreak);
+    .map(record => record.date);
+  const { currentStreak, bestStreak } = calculateConsecutiveDateStreak(completedDates);
   
   return {
     morningCompleted,
@@ -1030,6 +992,7 @@ export default {
   saveAzkarRecord,
   toggleAzkar,
   markAzkarCompleted,
+  incrementAzkarZikrCount,
   
   // الإحصائيات
   calculatePrayerStats,
@@ -1057,6 +1020,7 @@ export interface MonthlyActivityStats {
   quranPages: number;
   azkar: number;
   tasbih: number;
+  fasting: number;
 }
 
 /**
@@ -1069,7 +1033,7 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
   const m = month ?? (now.getMonth() + 1);
   const monthPrefix = `${y}-${String(m).padStart(2, '0')}`;
 
-  const stats: MonthlyActivityStats = { prayers: 0, quranPages: 0, azkar: 0, tasbih: 0 };
+  const stats: MonthlyActivityStats = { prayers: 0, quranPages: 0, azkar: 0, tasbih: 0, fasting: 0 };
 
   // 1. Prayers — count individual prayer events (prayed or late)
   try {
@@ -1092,7 +1056,17 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
     }
   } catch {}
 
-  // 3. Tasbih — daily history (previous days) + type stats (today), avoid double-counting
+  // 3. Fasting — count each fasted day once
+  try {
+    const fastingRecords = await getAllFastingRecords();
+    for (const [date, record] of Object.entries(fastingRecords)) {
+      if (date.startsWith(monthPrefix) && record?.fasted) {
+        stats.fasting++;
+      }
+    }
+  } catch {}
+
+  // 4. Tasbih — daily history (previous days) + type stats (today), avoid double-counting
   try {
     const historyRaw = await AsyncStorage.getItem('@tasbih_daily_history');
     if (historyRaw) {
@@ -1122,7 +1096,7 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
     }
   } catch {}
 
-  // 4. Azkar — sum zikrCount for the month
+  // 5. Azkar — sum zikrCount for the month
   try {
     const azkarRecords = await getAllAzkarRecords();
     for (const [date, record] of Object.entries(azkarRecords)) {

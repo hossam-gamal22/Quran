@@ -138,10 +138,11 @@ export async function checkAllPermissions(): Promise<PermissionStatus> {
       const BackgroundTask = await import('expo-background-task');
       if (BackgroundTask.getStatusAsync) {
         const status = await BackgroundTask.getStatusAsync();
-        // 1 = Restricted (Parental controls), 2 = Denied, 3 = Available
-        if (status === 3) result.backgroundRefresh = 'granted';
-        else if (status === 2) result.backgroundRefresh = 'denied';
-        else if (status === 1) result.backgroundRefresh = 'restricted';
+        if (status === BackgroundTask.BackgroundTaskStatus.Available) {
+          result.backgroundRefresh = 'granted';
+        } else if (status === BackgroundTask.BackgroundTaskStatus.Restricted) {
+          result.backgroundRefresh = 'restricted';
+        }
       }
     } catch (e) {
       console.warn('⚠️ [perm-recovery] background refresh check failed:', e);

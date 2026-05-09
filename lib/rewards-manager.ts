@@ -6,6 +6,7 @@ import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncre
 import { db } from './firebase-config';
 import { scheduleLocalNotification } from './push-notifications';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
+import { getMonthlyActivityStats, getTodayDate } from '@/lib/worship-storage';
 
 const CACHE_KEY = '@rewards_config_cache';
 const PENDING_SCORES_KEY = '@pending_monthly_scores';
@@ -36,11 +37,58 @@ const DEFAULT_CONFIG: RewardsConfig = {
 
 let cachedConfig: RewardsConfig | null = null;
 
+const WORSHIP_ACTIVITY_KEYS = new Set<ActivityType>(['azkar', 'quran', 'prayer', 'tasbih', 'fasting']);
+
+type PendingScores = {
+  month: string;
+  totalPoints: number;
+  activities: Record<string, number>;
+};
+
+export type MonthlyEngagementSyncResult = {
+  score: number;
+  month: string;
+  activities: Record<string, number>;
+  mergeBonus?: { activities: Record<string, number>; score: number; mergedFrom?: string };
+  displayName?: string;
+  visibleOnLeaderboard?: boolean;
+};
+
+const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsConfig => ({
+  ...DEFAULT_CONFIG,
+  ...(raw || {}),
+  scoreWeights: {
+    ...DEFAULT_WEIGHTS,
+    ...((raw as any)?.scoreWeights || {}),
+  },
+  currentWinners: raw?.currentWinners || [],
+  history: raw?.history || [],
+});
+
+export const calculateMonthlyScore = (
+  activities: Record<string, number>,
+  weights: ScoreWeights = DEFAULT_WEIGHTS,
+): number => {
+  let score = 0;
+  for (const [key, count] of Object.entries(activities)) {
+    score += (Number(count) || 0) * (weights[key as ActivityType] || 1);
+  }
+  return score;
+};
+
+const getVisibleDisplayName = (data: Record<string, any>): string => {
+  return String(data.displayName || '').trim();
+};
+
+const isEligibleForLeaderboard = (data: Record<string, any>): boolean => {
+  return !data.hiddenFromLeaderboard && !data.placeholder && getVisibleDisplayName(data).length > 0;
+};
+
 /**
  * Get current month string YYYY-MM-v2
  * v2 suffix resets all previous engagement data (clean slate from 2026-03-24)
  */
-const getCurrentMonth = (): string => {
+export const getCurrentMonth = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
 };
@@ -61,7 +109,7 @@ export const fetchRewardsConfig = async (): Promise<RewardsConfig> => {
   try {
     const cached = await AsyncStorage.getItem(CACHE_KEY);
     if (cached) {
-      const parsed = { ...DEFAULT_CONFIG, ...JSON.parse(cached) };
+      const parsed = normalizeRewardsConfig(JSON.parse(cached));
       // If stored cache says disabled, skip it and fetch fresh from Firestore
       if (!parsed.enabled) {
         return refreshRewardsFromFirestore();
@@ -80,13 +128,13 @@ const refreshRewardsFromFirestore = async (): Promise<RewardsConfig> => {
   try {
     const snap = await getDoc(doc(db, 'config', 'rewards-settings'));
     if (snap.exists()) {
-      cachedConfig = { ...DEFAULT_CONFIG, ...snap.data() } as RewardsConfig;
+      cachedConfig = normalizeRewardsConfig(snap.data() as Partial<RewardsConfig>);
     } else {
-      cachedConfig = DEFAULT_CONFIG;
+      cachedConfig = normalizeRewardsConfig(DEFAULT_CONFIG);
     }
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cachedConfig));
   } catch {
-    cachedConfig = cachedConfig || DEFAULT_CONFIG;
+    cachedConfig = cachedConfig || normalizeRewardsConfig(DEFAULT_CONFIG);
   }
   return cachedConfig;
 };
@@ -103,8 +151,8 @@ export function subscribeToRewardsConfig(
       doc(db, 'config', 'rewards-settings'),
       (snap) => {
         const merged: RewardsConfig = snap.exists()
-          ? ({ ...DEFAULT_CONFIG, ...snap.data() } as RewardsConfig)
-          : DEFAULT_CONFIG;
+          ? normalizeRewardsConfig(snap.data() as Partial<RewardsConfig>)
+          : normalizeRewardsConfig(DEFAULT_CONFIG);
         cachedConfig = merged;
         AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(() => {});
         onUpdate(merged);
@@ -132,11 +180,13 @@ export const setMonthlyEngagement = async (
   try {
     const currentMonth = getCurrentMonth();
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      'monthlyEngagement.score': totalScore,
-      'monthlyEngagement.activities': activities,
-      'monthlyEngagement.month': currentMonth,
-    });
+    await setDoc(userRef, {
+      monthlyEngagement: {
+        month: currentMonth,
+        score: totalScore,
+        activities,
+      },
+    }, { merge: true });
   } catch (error) {
     console.log('📴 Failed to set monthly engagement:', error);
   }
@@ -154,7 +204,7 @@ export const updateMonthlyScore = async (
   try {
     // Daily cap for app_open: max 1 point per day (unique days only)
     if (activityType === 'app_open') {
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = getTodayDate();
       const lastDate = await AsyncStorage.getItem(APP_OPEN_LAST_DATE_KEY);
       if (lastDate === today) {
         console.log('📊 app_open already scored today, skipping');
@@ -214,6 +264,7 @@ export const updateMonthlyScore = async (
           'monthlyEngagement.score': firestoreIncrement(points),
           [`monthlyEngagement.activities.${activityType}`]: firestoreIncrement(multiplier),
         });
+        await consumeLocalPendingScore(activityType, points, multiplier, currentMonth);
       }
       console.log(`🏆 Monthly score synced: +${points} pts (${activityType})`);
     } catch (syncError) {
@@ -252,6 +303,40 @@ const saveLocalPendingScore = async (
   } catch {}
 };
 
+const consumeLocalPendingScore = async (
+  activityType: ActivityType,
+  points: number,
+  multiplier: number,
+  month: string
+): Promise<void> => {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SCORES_KEY);
+    if (!raw) return;
+    const pending = JSON.parse(raw) as PendingScores;
+    if (pending.month !== month) return;
+
+    const activities = { ...(pending.activities || {}) };
+    const nextCount = (Number(activities[activityType]) || 0) - multiplier;
+    if (nextCount > 0) {
+      activities[activityType] = nextCount;
+    } else {
+      delete activities[activityType];
+    }
+
+    const totalPoints = Math.max(0, (Number(pending.totalPoints) || 0) - points);
+    if (totalPoints <= 0 || Object.keys(activities).length === 0) {
+      await AsyncStorage.removeItem(PENDING_SCORES_KEY);
+      return;
+    }
+
+    await AsyncStorage.setItem(PENDING_SCORES_KEY, JSON.stringify({
+      month,
+      totalPoints,
+      activities,
+    }));
+  } catch {}
+};
+
 /**
  * Get pending scores WITHOUT clearing (safe read-only)
  */
@@ -269,51 +354,98 @@ const getPendingScores = async (month: string): Promise<{ totalPoints: number; a
 };
 
 /**
- * Sync any pending offline scores to Firestore (call on app startup when online)
+ * Recalculate the current month from local worship storage and merge in
+ * non-worship Firestore/pending activity such as app_open.
  */
-export const syncPendingScores = async (userId: string): Promise<void> => {
+export const syncMonthlyEngagementFromLocalWorship = async (
+  userId: string,
+): Promise<MonthlyEngagementSyncResult | null> => {
   try {
-    const raw = await AsyncStorage.getItem(PENDING_SCORES_KEY);
-    if (!raw) return;
-    const pending = JSON.parse(raw);
-    if (!pending.month || pending.totalPoints <= 0) return;
+    const config = await fetchRewardsConfig();
+    if (!config.enabled) return null;
 
+    const currentMonth = getCurrentMonth();
     const userRef = doc(db, 'users', userId);
     const userSnap = await getDoc(userRef);
     const docExists = userSnap.exists();
     const data = userSnap.data();
     const engagement: MonthlyEngagement = data?.monthlyEngagement || { month: '', score: 0 };
+    const existingActivities = engagement.month === currentMonth
+      ? { ...(engagement.activities || {}) }
+      : {};
+    const pending = await getPendingScores(currentMonth);
+    const worshipStats = await getMonthlyActivityStats();
 
-    if (!docExists || engagement.month !== pending.month) {
-      // Doc doesn't exist or different month — set fresh
-      const engagementData = {
-        monthlyEngagement: {
-          month: pending.month,
-          score: pending.totalPoints,
-          activities: pending.activities,
-        },
-      };
-      if (docExists) {
-        await updateDoc(userRef, engagementData);
-      } else {
-        await setDoc(userRef, engagementData, { merge: true });
+    const activities: Record<string, number> = {};
+
+    for (const [key, count] of Object.entries(existingActivities)) {
+      if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
+        activities[key] = Number(count) || 0;
       }
+    }
+
+    for (const [key, count] of Object.entries(pending.activities || {})) {
+      if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
+        activities[key] = (activities[key] || 0) + (Number(count) || 0);
+      }
+    }
+
+    activities.prayer = worshipStats.prayers;
+    activities.quran = worshipStats.quranPages;
+    activities.azkar = worshipStats.azkar;
+    activities.tasbih = worshipStats.tasbih;
+    activities.fasting = worshipStats.fasting;
+
+    const mergeBonus = data?.mergeBonus || undefined;
+    if (mergeBonus?.activities) {
+      for (const [key, count] of Object.entries(mergeBonus.activities)) {
+        activities[key] = (activities[key] || 0) + (Number(count) || 0);
+      }
+    }
+
+    const score = calculateMonthlyScore(activities, config.scoreWeights || DEFAULT_WEIGHTS);
+
+    const engagementUpdate: Record<string, any> = {
+      monthlyEngagement: {
+        month: currentMonth,
+        score,
+        activities,
+      },
+    };
+    if (docExists && engagement.month && engagement.month !== currentMonth && engagement.score > 0) {
+      engagementUpdate[`engagementHistory.${engagement.month}`] = {
+        score: engagement.score,
+        activities: engagement.activities || {},
+      };
+    }
+
+    if (docExists) {
+      await updateDoc(userRef, engagementUpdate);
     } else {
-      // Same month, doc exists — increment each activity
-      const updates: Record<string, any> = {
-        'monthlyEngagement.score': firestoreIncrement(pending.totalPoints),
-      };
-      for (const [key, count] of Object.entries(pending.activities)) {
-        updates[`monthlyEngagement.activities.${key}`] = firestoreIncrement(count as number);
-      }
-      await updateDoc(userRef, updates);
+      await setDoc(userRef, engagementUpdate, { merge: true });
     }
 
     await AsyncStorage.removeItem(PENDING_SCORES_KEY);
-    console.log('📤 Pending scores synced to Firestore');
-  } catch {
-    // Will try again next time
+    return {
+      score,
+      month: currentMonth,
+      activities,
+      mergeBonus,
+      displayName: getVisibleDisplayName(data || {}),
+      visibleOnLeaderboard: data ? isEligibleForLeaderboard(data) : false,
+    };
+  } catch (error) {
+    console.log('📴 Monthly engagement sync failed:', error);
+    return null;
   }
+};
+
+/**
+ * Legacy entry point kept for callers that still request pending sync.
+ * It now delegates to the unified monthly recalculation to avoid duplicates.
+ */
+export const syncPendingScores = async (userId: string): Promise<void> => {
+  await syncMonthlyEngagementFromLocalWorship(userId);
 };
 
 /**
@@ -365,39 +497,40 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
     const engagement = data?.monthlyEngagement;
     const currentMonth = getCurrentMonth();
 
-    let activities: Record<string, number> = {};
+    const activities: Record<string, number> = {};
 
     if (engagement && engagement.month === currentMonth) {
-      activities = { ...(engagement.activities || {}) };
-    }
-
-    // Merge any local pending scores not yet synced
-    try {
-      const raw = await AsyncStorage.getItem(PENDING_SCORES_KEY);
-      if (raw) {
-        const pending = JSON.parse(raw);
-        if (pending.month === currentMonth && pending.activities) {
-          // Local pending data complements Firestore
-          // (don't double-count — just show local if Firestore is behind)
-          for (const [key, count] of Object.entries(pending.activities)) {
-            const firestoreCount = activities[key] || 0;
-            if ((count as number) > firestoreCount) {
-              activities[key] = count as number;
-            }
-          }
+      for (const [key, count] of Object.entries(engagement.activities || {})) {
+        if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
+          activities[key] = Number(count) || 0;
         }
       }
-    } catch {}
+    }
+
+    const pending = await getPendingScores(currentMonth);
+    for (const [key, count] of Object.entries(pending.activities || {})) {
+      if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
+        activities[key] = (activities[key] || 0) + (Number(count) || 0);
+      }
+    }
+
+    const worshipStats = await getMonthlyActivityStats();
+    activities.prayer = worshipStats.prayers;
+    activities.quran = worshipStats.quranPages;
+    activities.azkar = worshipStats.azkar;
+    activities.tasbih = worshipStats.tasbih;
+    activities.fasting = worshipStats.fasting;
+
+    const mergeBonus = data?.mergeBonus || undefined;
+    if (mergeBonus?.activities) {
+      for (const [key, count] of Object.entries(mergeBonus.activities)) {
+        activities[key] = (activities[key] || 0) + (Number(count) || 0);
+      }
+    }
 
     // Recalculate score from merged activities × weights for consistency
     const weights = config.scoreWeights || DEFAULT_WEIGHTS;
-    let score = 0;
-    for (const [key, count] of Object.entries(activities)) {
-      score += (count as number) * (weights[key as ActivityType] || 1);
-    }
-
-    // Include mergeBonus if present (from admin merge operation)
-    const mergeBonus = data?.mergeBonus || undefined;
+    const score = calculateMonthlyScore(activities, weights);
 
     return { score, month: currentMonth, activities, mergeBonus };
   } catch {
@@ -406,22 +539,26 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
       const config = await fetchRewardsConfig();
       const weights = config.scoreWeights || DEFAULT_WEIGHTS;
       const raw = await AsyncStorage.getItem(PENDING_SCORES_KEY);
+      const currentMonth = getCurrentMonth();
+      const activities: Record<string, number> = {};
       if (raw) {
         const pending = JSON.parse(raw);
-        const currentMonth = getCurrentMonth();
         if (pending.month === currentMonth) {
-          const activities = pending.activities || {};
-          let score = 0;
-          for (const [key, count] of Object.entries(activities)) {
-            score += (count as number) * (weights[key as ActivityType] || 1);
-          }
-          return {
-            score,
-            month: currentMonth,
-            activities,
-          };
+          Object.assign(activities, pending.activities || {});
         }
       }
+      const worshipStats = await getMonthlyActivityStats();
+      activities.prayer = worshipStats.prayers;
+      activities.quran = worshipStats.quranPages;
+      activities.azkar = worshipStats.azkar;
+      activities.tasbih = worshipStats.tasbih;
+      activities.fasting = worshipStats.fasting;
+      const score = calculateMonthlyScore(activities, weights);
+      return {
+        score,
+        month: currentMonth,
+        activities,
+      };
     } catch {}
     return null;
   }
@@ -438,26 +575,29 @@ export const getMonthlyLeaderboard = async (topN: number = 20): Promise<Array<{
   try {
     const currentMonth = getCurrentMonth();
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, orderBy('monthlyEngagement.score', 'desc'), limit(topN));
+    const q = query(
+      usersRef,
+      where('monthlyEngagement.month', '==', currentMonth),
+      orderBy('monthlyEngagement.score', 'desc'),
+      limit(Math.max(topN * 3, topN))
+    );
     const snapshot = await getDocs(q);
 
     const leaderboard: Array<{ userId: string; displayName: string; score: number }> = [];
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const engagement = data.monthlyEngagement;
-      // Skip hidden/placeholder users (admin can hide users from leaderboard)
-      if (data.hiddenFromLeaderboard || data.placeholder) return;
-      // Only include users with a display name and current month data
-      if (engagement && engagement.month === currentMonth && engagement.score > 0 && data.displayName) {
+      const displayName = getVisibleDisplayName(data);
+      if (isEligibleForLeaderboard(data) && engagement?.score > 0) {
         leaderboard.push({
           userId: docSnap.id,
-          displayName: data.displayName,
+          displayName,
           score: engagement.score,
         });
       }
     });
 
-    return leaderboard;
+    return leaderboard.slice(0, topN);
   } catch {
     return [];
   }
@@ -578,7 +718,7 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
       usersRef,
       where('monthlyEngagement.month', '==', previousMonth),
       orderBy('monthlyEngagement.score', 'desc'),
-      limit(config.winnersCount)
+      limit(Math.max(config.winnersCount * 5, 20))
     );
     const snapshot = await getDocs(q);
 
@@ -589,10 +729,11 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const engagement = data.monthlyEngagement;
-      if (engagement && engagement.score > 0) {
+      const displayName = getVisibleDisplayName(data);
+      if (winners.length < config.winnersCount && isEligibleForLeaderboard(data) && engagement?.score > 0) {
         winners.push({
           userId: docSnap.id,
-          displayName: data.displayName || docSnap.id.slice(0, 8),
+          displayName,
           score: engagement.score,
           rewardedAt: new Date().toISOString(),
           notified: false,

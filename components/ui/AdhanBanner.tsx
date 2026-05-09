@@ -55,7 +55,7 @@ export function AdhanBanner() {
   if (!event) return null;
 
   const prayerLabel = t(`prayer.${event.prayer}`);
-  const title = `${t('prayer.adhanTimeFor') || 'حان الآن وقت صلاة'} ${prayerLabel}`;
+  const title = `${t('home.adhanTimeFor') || 'حان الآن وقت صلاة'} ${prayerLabel}`;
 
   return (
     <Animated.View

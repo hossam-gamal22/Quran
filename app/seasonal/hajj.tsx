@@ -27,6 +27,7 @@ import Animated, {
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -70,7 +71,7 @@ const HAJJ_DAYS = [
     isSpecial: true,
     rituals: [
       { id: 'arafah', title: 'الوقوف بعرفة', description: 'الركن الأعظم من أركان الحج', icon: 'map-marker' },
-      { id: 'dua', title: 'الدعاء', description: 'الإكثار من الدعاء والذكر', icon: 'hands-pray' },
+      { id: 'dua', title: 'الدعاء', description: 'الإكثار من الدعاء والذكر', icon: '🤲' },
       { id: 'muzdalifah', title: 'المبيت بمزدلفة', description: 'التوجه إلى مزدلفة بعد الغروب', icon: 'moon-waning-crescent' },
     ],
     duas: [
@@ -273,11 +274,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
           <View style={[styles.ritualsPreview, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {dayInfo.rituals.slice(0, 3).map((ritual) => (
               <View key={ritual.id} style={styles.ritualBadge}>
-                <MaterialCommunityIcons
-                  name={ritual.icon as any}
-                  size={14}
-                  color={dayInfo.isSpecial ? ARAFAH_COLOR : HAJJ_COLOR}
-                />
+                <AppIcon name={ritual.icon} size={14} color={dayInfo.isSpecial ? ARAFAH_COLOR : HAJJ_COLOR} />
               </View>
             ))}
             {dayInfo.rituals.length > 3 && (
@@ -421,7 +418,7 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
         activeOpacity={0.8}
       >
         <View style={styles.duaIcon}>
-          <MaterialCommunityIcons name="hands-pray" size={20} color={HAJJ_COLOR} />
+          <AppIcon name="🤲" size={20} color={HAJJ_COLOR} />
         </View>
         <View style={styles.duaContent}>
           {isArabicLang ? (
@@ -505,7 +502,7 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
                 style={[styles.ritualItem, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
                 <View style={styles.ritualItemIcon}>
-                  <MaterialCommunityIcons name={ritual.icon as any} size={24} color={HAJJ_COLOR} />
+                  <AppIcon name={ritual.icon} size={24} color={HAJJ_COLOR} />
                 </View>
                 <View style={styles.ritualItemContent}>
                   {isArabicLang ? (
@@ -1049,7 +1046,7 @@ const _styles = StyleSheet.create({
   // Modal المناسك
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
   },
   ritualModal: {
@@ -1192,7 +1189,7 @@ const _styles = StyleSheet.create({
   // Modal الدعاء
   duaModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

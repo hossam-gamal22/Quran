@@ -25,6 +25,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t, getLanguage } from '@/lib/i18n';
 import { localizeNumber } from '@/lib/format-number';
 import { TranslatedText } from '@/components/ui/TranslatedText';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { s as _sharedS } from '@/components/hajj/shared';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
@@ -886,7 +887,7 @@ const GlassSection: React.FC<{
             {section.duas.length > 0 && (
               <View style={[s.duasContainer, { borderTopColor: ACCENT_BORDER }]}>
                 <View style={[s.duasHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="hands-pray" size={16} color={colors.text} />
+                  <AppIcon name="🤲" size={16} color={colors.text} />
                   <Text style={[s.duasHeaderText, { color: colors.text }]}>{t('hajjUmrah.duas')}</Text>
                 </View>
                 {section.duas.map((dua, i) => (

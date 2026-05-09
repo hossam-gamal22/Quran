@@ -302,6 +302,31 @@ export async function clearSoundCache(): Promise<void> {
 // ─── Playback: Bundled (require()) ───────────────────────────────────────────
 
 /**
+ * Ensure the iOS audio session is configured for playback that:
+ *   • Ignores the hardware silent switch (playsInSilentModeIOS: true)
+ *   • Stays active in background
+ *   • Does not interrupt other audio (mix policy left to native default)
+ *
+ * MUST be called before every Audio.Sound.createAsync(), because expo-av will
+ * otherwise reset the shared AVAudioSession to SoloAmbient — which silences
+ * subsequent TrackPlayer playback (e.g. adhkar listen mode) when the device
+ * silent switch is on.
+ */
+async function ensurePlaybackAudioMode(): Promise<void> {
+  try {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    });
+  } catch {
+    // Audio session config can fail on web/Expo Go — safe to ignore
+  }
+}
+
+/**
  * Play a sound from a require() source and return the Sound instance.
  * The sound auto-unloads when playback finishes.
  */
@@ -310,6 +335,7 @@ export async function playSound(
 ): Promise<Audio.Sound | null> {
   let sound: Audio.Sound | null = null;
   try {
+    await ensurePlaybackAudioMode();
     ({ sound } = await Audio.Sound.createAsync(soundSource));
     await sound.playAsync();
     sound.setOnPlaybackStatusUpdate((status) => {
@@ -345,6 +371,7 @@ export async function playSoundFromUrl(
 ): Promise<Audio.Sound | null> {
   let sound: Audio.Sound | null = null;
   try {
+    await ensurePlaybackAudioMode();
     const localPath = await getCachedSound(url, category);
     ({ sound } = await Audio.Sound.createAsync({ uri: localPath }));
     await sound.playAsync();
@@ -379,6 +406,7 @@ const ALL_BUNDLED: Record<string, number> = {
  * Resolve an admin-assigned sound ID.
  * - If it matches a bundled sound key, returns { type: 'bundled', source: require() }
  * - Otherwise looks up the `sounds` Firestore collection for a URL
+ * - Otherwise looks up the `uploadedSounds` collection (admin-uploaded mp3s)
  * - Returns null if not found
  */
 async function resolveAdminSoundId(
@@ -391,7 +419,7 @@ async function resolveAdminSoundId(
     return { type: 'bundled', source: ALL_BUNDLED[soundId] };
   }
 
-  // Look up in Firestore sounds collection (uploaded sounds)
+  // Look up in Firestore sounds collection (admin-managed)
   try {
     const { getDoc: getDocFn, doc: docFn } = await import('firebase/firestore');
     const soundDoc = await getDocFn(docFn(db, 'sounds', soundId));
@@ -400,7 +428,27 @@ async function resolveAdminSoundId(
       if (url) return { type: 'url', url };
     }
   } catch (error) {
-    console.warn('Failed to resolve admin sound ID:', soundId, error);
+    console.warn('Failed to resolve admin sound ID from sounds:', soundId, error);
+  }
+
+  // Look up in Firestore uploadedSounds collection (admin-uploaded mp3s, pending bundling)
+  try {
+    const { getDoc: getDocFn, doc: docFn } = await import('firebase/firestore');
+    const uploadedDoc = await getDocFn(docFn(db, 'uploadedSounds', soundId));
+    if (uploadedDoc.exists()) {
+      const data = uploadedDoc.data();
+      // Skip disabled uploads
+      if (data?.status === 'disabled') return null;
+      // If linked to a bundled sound, prefer that (instant playback)
+      if (data?.bundledSoundId && ALL_BUNDLED[data.bundledSoundId] != null) {
+        return { type: 'bundled', source: ALL_BUNDLED[data.bundledSoundId] };
+      }
+      // Otherwise stream from downloadUrl
+      const url = data?.downloadUrl;
+      if (url) return { type: 'url', url };
+    }
+  } catch (error) {
+    console.warn('Failed to resolve admin sound ID from uploadedSounds:', soundId, error);
   }
 
   return null;

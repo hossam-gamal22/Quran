@@ -105,7 +105,14 @@ import {
   getPageFontFamily,
   isPageFontLoaded,
   ensureSharePageFontReady,
+  loadColorPageFont,
+  isColorPageFontLoaded,
+  hasColorFontForPage,
 } from '@/lib/qcf-font-loader';
+import { getColorFontSource } from '@/lib/qcf-color-font-map';
+import { isAllTajweedDownloaded } from '@/lib/qcf-color-font-cache';
+import MushafLineSkia from '@/components/quran/MushafLineSkia';
+import TajweedDownloadModal from '@/components/quran/TajweedDownloadModal';
 // AudioPlayerBar moved to global _layout.tsx
 import {
   getColoredBookmarks,
@@ -256,12 +263,30 @@ const MushafPage = React.memo(function MushafPage({
   page, themeIndex, width, fontSizeAdjust, forceLightText, forcePlainArabicForCapture, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
   translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false,
 }: MushafPageProps) {
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
-  // Use forceLightText (actual background) to determine CPAL mode, not system isDarkMode
-  const needsDarkFont = forceLightText ?? isDarkMode;
+  // Tajweed mode: use COLRv1 colored font for this page if available.
+  // RN <Text> on iOS does not rasterize COLR layers, so tajweed lines render
+  // via Skia (see MushafLineSkia). Pages without a bundled color font
+  // automatically fall back to tarteel rendering.
+  const isTajweedMode = settings?.display?.quranReadingMode === 'tajweed' && hasColorFontForPage(page);
+  // Choose CPAL palette variant from the ACTUAL background being painted,
+  // not the system dark mode flag — users can pick a light/cream theme even
+  // while the app is in dark mode, and vice versa. `forceLightText` (set by
+  // bg images) wins; otherwise inspect the theme's own background luminance.
+  const needsDarkFont = (() => {
+    if (forceLightText !== undefined) return forceLightText;
+    const hex = (QURAN_THEMES[themeIndex]?.background || '#FFF8F0').replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+    return luminance < 128; // dark bg → need light (white-base) font
+  })();
   const shouldForcePlainArabic = !!forcePlainArabicForCapture && Platform.OS === 'android';
-  const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page, needsDarkFont));
+  const [fontLoaded, setFontLoaded] = useState(
+    isTajweedMode ? isColorPageFontLoaded(page) : isPageFontLoaded(page, needsDarkFont),
+  );
   const [fontError, setFontError] = useState(false);
   // Safety fallback: only used for Android share-card capture (when the QCF
   // font would otherwise render as invisible PUA glyphs in viewshot). The
@@ -306,7 +331,10 @@ const MushafPage = React.memo(function MushafPage({
   // the font registers in expo-font's global registry.
   useEffect(() => {
     if (shouldForcePlainArabic) return;
-    if (isPageFontLoaded(page, needsDarkFont)) {
+    // In Tajweed mode, MushafLineSkia loads its own font directly via useFont().
+    // We still load the monochrome page font as a fallback for unsupported lines.
+    const alreadyLoaded = isPageFontLoaded(page, needsDarkFont);
+    if (alreadyLoaded) {
       setFontLoaded(true);
       return;
     }
@@ -322,7 +350,7 @@ const MushafPage = React.memo(function MushafPage({
   }, [page, needsDarkFont, shouldForcePlainArabic]);
 
   const blocks = useMemo(() => buildPageBlocks(page), [page]);
-  const fontFamily = getPageFontFamily(page, needsDarkFont);
+  const fontFamily = getPageFontFamily(page, needsDarkFont, isTajweedMode);
 
   // Page-scoped per-ayah word offset tracker for the plain-Arabic fallback.
   // Reset on every render so word indices are sequential across Mushaf lines
@@ -424,6 +452,59 @@ const MushafPage = React.memo(function MushafPage({
             ? ayahGroups.filter(g => g.parts.some(p => p.isEnd))
             : [];
 
+          // Tajweed mode: render the line via Skia using the COLR font.
+          // RN <Text> on iOS cannot rasterize COLR layers; Skia can.
+          // Bookmark/playing/highlight backgrounds are not painted in this mode
+          // for v1 (acceptable degradation — long-press still bookmarks).
+          if (isTajweedMode && !usePlainArabicMode) {
+            const colorFontSource = getColorFontSource(page, needsDarkFont);
+            if (colorFontSource) {
+              const lineText = ayahGroups
+                .map(g => g.parts.map(p => p.glyph).join(''))
+                .join('');
+              const firstGroup = ayahGroups[0];
+              return (
+                <View key={i}>
+                  <MushafLineSkia
+                    text={lineText}
+                    fontSource={colorFontSource}
+                    fontSize={fontSize}
+                    lineHeight={lineHeight}
+                    width={width - 32}
+                    paddingTop={extraTopPadding}
+                    paddingBottom={extraTopPadding > 0 ? Math.ceil(fontSize * 0.1) : 0}
+                    onLongPress={firstGroup ? () => onAyahLongPress?.(firstGroup.surah, firstGroup.ayah, page) : undefined}
+                  />
+                  {endingAyahs.map((g) => {
+                    const key = `${g.surah}:${g.ayah}`;
+                    const tText = translationMap?.[key];
+                    if (!tText) return null;
+                    const dir = translationIsRTL ? 'rtl' : 'ltr';
+                    const ayahLabel = translationIsRTL ? `﴿${g.ayah}﴾` : `(${g.ayah})`;
+                    return (
+                      <View key={`tr-${key}`} style={{ direction: dir }}>
+                        <Text
+                          style={{
+                            fontSize: translationFontSize,
+                            color: forceLightText ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.6)',
+                            textAlign: translationIsRTL ? 'right' : 'left',
+                            writingDirection: dir,
+                            fontFamily: fontRegular(),
+                            lineHeight: translationFontSize * 1.6,
+                            paddingHorizontal: 12,
+                            paddingVertical: 2,
+                          }}
+                        >
+                          {ayahLabel} {tText}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            }
+          }
+
           return (
             <View key={i}>
               <Text
@@ -512,7 +593,7 @@ const MushafPage = React.memo(function MushafPage({
                       } : undefined}
                     >
                       {group.parts.map((part, pi) => (
-                        <Text key={pi} style={{ color: textColor }}>{part.glyph}</Text>
+                        <Text key={pi} style={isTajweedMode ? undefined : { color: textColor }}>{part.glyph}</Text>
                       ))}
                     </Text>
                   );
@@ -801,6 +882,7 @@ export default function SurahScreen() {
   const [tafsirLocked, setTafsirLocked] = useState(false);
   const [tafsirMinimized, setTafsirMinimized] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTajweedDownload, setShowTajweedDownload] = useState(false);
   const [mushafThemeTab, setMushafThemeTab] = useState<'colors' | 'backgrounds'>('colors');
   const [showLongPressHint, setShowLongPressHint] = useState(false);
   const [isPageFavorited, setIsPageFavorited] = useState(false);
@@ -992,6 +1074,21 @@ export default function SurahScreen() {
     const timer = setTimeout(() => setShowLongPressHint(false), 5000);
     return () => clearTimeout(timer);
   }, [showLongPressHint]);
+
+  // Auto-prompt the bulk Tajweed-fonts download when the user already has
+  // tajweed mode enabled but the full set hasn't been downloaded yet.
+  useEffect(() => {
+    if (settings?.display?.quranReadingMode !== 'tajweed') return;
+    let cancelled = false;
+    isAllTajweedDownloaded().then((downloaded) => {
+      if (!cancelled && !downloaded) {
+        setShowTajweedDownload(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings?.display?.quranReadingMode]);
 
   // ── Page favorites (heart icon in header) ──
   const pageFirstAyah = useMemo(() => getFirstAyahOnPage(currentPage), [currentPage]);
@@ -1964,7 +2061,7 @@ export default function SurahScreen() {
                   style={s.sheetBlur}
                 >
                   <View style={[s.sheetContent, {
-                    backgroundColor: settingsIsLight ? 'rgba(242,242,247,0.62)' : 'rgba(18,18,22,0.55)',
+                    backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.97)' : '#0f1a14',
                     borderTopWidth: StyleSheet.hairlineWidth,
                     borderTopColor: settingsIsLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)',
                   }]}>
@@ -2129,6 +2226,74 @@ export default function SurahScreen() {
                           </View>
                         )}
                       </View>
+
+                      {/* ─── Reading Mode (Tarteel | Tajweed) ─── */}
+                      <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)' }]}>
+                        <View style={[stg.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                          <MaterialCommunityIcons name="format-color-text" size={20} color={goldenColor} />
+                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.readingMode')}</Text>
+                        </View>
+                        <View style={[stg.segmentedRow, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: settingsIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)' }]}>
+                          {(['tarteel', 'tajweed'] as const).map(mode => {
+                            const currentMode = settings?.display?.quranReadingMode || 'tarteel';
+                            const isActive = currentMode === mode;
+                            return (
+                              <TouchableOpacity
+                                key={mode}
+                                style={[
+                                  stg.segmentedTab,
+                                  isActive && { backgroundColor: settingsIsLight ? '#fff' : 'rgba(255,255,255,0.18)' },
+                                ]}
+                                onPress={() => {
+                                  if (mode === 'tajweed') {
+                                    // Intercept: ensure full Tajweed font set is downloaded first.
+                                    void (async () => {
+                                      const downloaded = await isAllTajweedDownloaded();
+                                      if (!downloaded) {
+                                        setShowTajweedDownload(true);
+                                        return;
+                                      }
+                                      updateDisplay({ quranReadingMode: mode });
+                                    })();
+                                  } else {
+                                    updateDisplay({ quranReadingMode: mode });
+                                  }
+                                  if (Platform.OS !== 'web') Haptics.selectionAsync();
+                                }}
+                              >
+                                <Text style={[stg.segmentedLabel, { color: isActive ? goldenColor : (settingsIsLight ? '#666' : '#aaa') }]}>
+                                  {mode === 'tarteel' ? translate('quran.tarteel') : translate('quran.tajweed')}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+
+                      {/* ─── Tajweed Color Legend (only in tajweed mode) ─── */}
+                      {(settings?.display?.quranReadingMode || 'tarteel') === 'tajweed' && (
+                        <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)' }]}>
+                          <View style={[stg.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <MaterialCommunityIcons name="palette" size={20} color={goldenColor} />
+                            <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.tajweedColorLegend')}</Text>
+                          </View>
+                          {[
+                            { color: '#C62828', key: 'tajweedColorRed' as const },
+                            { color: '#1565C0', key: 'tajweedColorBlue' as const },
+                            { color: '#E65100', key: 'tajweedColorOrange' as const },
+                            { color: '#D81B60', key: 'tajweedColorPink' as const },
+                            { color: '#2E7D32', key: 'tajweedColorGreen' as const },
+                          ].map(({ color, key }) => (
+                            <View key={key} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 4, gap: 12 }}>
+                              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: color, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)' }} />
+                              <Text style={{ flex: 1, fontSize: 14, color: settingsIsLight ? '#1a1a2e' : '#eee', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontFamily: fontRegular() }}>
+                                {translate(`quran.${key}`)}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)' }]}>
                         <View style={[stg.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <MaterialCommunityIcons name="format-size" size={20} color={goldenColor} />
@@ -2315,6 +2480,18 @@ export default function SurahScreen() {
             </View>
           </Modal>
 
+          {/* Tajweed first-time bulk download */}
+          <TajweedDownloadModal
+            visible={showTajweedDownload}
+            onComplete={() => {
+              setShowTajweedDownload(false);
+              updateDisplay({ quranReadingMode: 'tajweed' });
+            }}
+            onCancel={() => {
+              setShowTajweedDownload(false);
+            }}
+          />
+
           {/* Islamic Share Card */}
           {shareData && (
             <IslamicShareCard
@@ -2404,7 +2581,7 @@ const _s = StyleSheet.create({
   },
 
   // ── Bottom Sheet ──
-  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
   sheetContainer: { height: '72%', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   sheetBlur: { flex: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   sheetContent: { flex: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 20 },
@@ -2420,7 +2597,7 @@ const _s = StyleSheet.create({
   tafsirMiniBar: { position: 'absolute', left: Spacing.md, right: Spacing.md, bottom: 90, borderRadius: 12, overflow: 'hidden', zIndex: 80 },
 
   // ── Ayah Action Menu ──
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', alignItems: 'center' },
   menuBlur: { borderRadius: 22, overflow: 'hidden' },
   menuCard: {
     width: 280,

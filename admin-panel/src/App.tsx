@@ -19,7 +19,6 @@ import {
   Users,
   CreditCard,
   Megaphone,
-  DollarSign,
   Globe,
   Volume2,
   Image as ImageIcon,
@@ -135,7 +134,6 @@ import QAManager from './pages/QAManager';
 import UserQuestions from './pages/UserQuestions';
 import ThemesPage from './pages/Themes';
 import OnboardingManager from './pages/OnboardingManager';
-import Pricing from './pages/Pricing';
 import RouteGuide from './pages/RouteGuide';
 import AppContentManager from './pages/AppContentManager';
 import MobilePreview from './components/MobilePreview';
@@ -226,11 +224,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'monetization',
-    label: 'الإعلانات والأسعار',
-    icon: DollarSign,
+    label: 'الإعلانات',
+    icon: Megaphone,
     items: [
       { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
-      // { path: '/pricing', icon: DollarSign, label: 'الأسعار الإقليمية' }, // hidden: subscription prices set in App Store / Play Console, no app reader for config/pricing
     ],
   },
   {
@@ -540,7 +537,6 @@ const App: React.FC = () => {
               <Route path="/user-questions" element={<UserQuestions />} />
               <Route path="/themes" element={<ThemesPage />} />
               <Route path="/onboarding" element={<OnboardingManager />} />
-              <Route path="/pricing" element={<Pricing />} />
               <Route path="/route-guide" element={<RouteGuide />} />
               <Route path="/app-content" element={<AppContentManager />} />
               <Route path="*" element={<Navigate to="/" replace />} />

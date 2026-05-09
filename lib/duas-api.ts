@@ -110,6 +110,7 @@ export function duaToZikr(dua: SelectedDua): {
   category: string;
   benefit: Record<string, string> | string;
   translations: Record<string, string>;
+  audio?: string;
 } {
   return {
     id: typeof dua.id === 'string' ? parseInt(dua.id, 10) || 0 : 0,
@@ -119,6 +120,7 @@ export function duaToZikr(dua: SelectedDua): {
     category: 'sunnah_duas',
     benefit: dua.benefit,
     translations: dua.translations,
+    audio: dua.audio || '',
   };
 }
 

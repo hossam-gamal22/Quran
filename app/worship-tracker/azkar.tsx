@@ -23,8 +23,9 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { useAzkarTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { DailyAzkarRecord, getAllAzkarRecords } from '@/lib/worship-storage';
+import { DailyAzkarRecord, getAllAzkarRecords, formatDate } from '@/lib/worship-storage';
 import GlassCard from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
@@ -40,11 +41,11 @@ const { width } = Dimensions.get('window');
 // ========================================
 
 const AZKAR_TYPES: { key: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>; icon: string; color: string; labelKey: string }[] = [
-  { key: 'morning', icon: 'weather-sunset-up', color: '#c07b10', labelKey: 'azkar.morning' },
-  { key: 'evening', icon: 'weather-sunset-down', color: '#4a3d73', labelKey: 'azkar.evening' },
-  { key: 'sleep', icon: 'weather-night', color: '#1a237e', labelKey: 'azkar.sleep' },
-  { key: 'wakeup', icon: 'white-balance-sunny', color: '#e65100', labelKey: 'azkar.wakeup' },
-  { key: 'afterPrayer', icon: 'mosque', color: '#0d8e62', labelKey: 'azkar.afterPrayer' },
+  { key: 'morning', icon: 'weather-sunset-up', color: '#F59E0B', labelKey: 'azkar.morning' },
+  { key: 'evening', icon: 'weather-night', color: '#6366F1', labelKey: 'azkar.evening' },
+  { key: 'sleep', icon: 'weather-night', color: '#3B82F6', labelKey: 'azkar.sleep' },
+  { key: 'wakeup', icon: 'white-balance-sunny', color: '#10B981', labelKey: 'azkar.wakeup' },
+  { key: 'afterPrayer', icon: '🤲', color: '#EC4899', labelKey: 'azkar.afterPrayer' },
 ];
 
 // ========================================
@@ -167,7 +168,7 @@ export default function AzkarTrackerScreen() {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = formatDate(d);
       const entry = history.find(h => h.date === dateStr);
       const dayName = d.toLocaleDateString(locale, { weekday: 'short' });
       days.push({ label: dayName, completed: entry?.completed ?? 0 });
@@ -255,7 +256,7 @@ export default function AzkarTrackerScreen() {
                   )}
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                   <View style={[styles.azkarIcon, { backgroundColor: azkar.color + '22' }]}>
-                    <MaterialCommunityIcons name={azkar.icon as any} size={24} color={azkar.color} />
+                    <AppIcon name={azkar.icon} size={24} color={azkar.color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[

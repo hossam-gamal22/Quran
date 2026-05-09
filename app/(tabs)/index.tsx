@@ -48,6 +48,7 @@ import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { ColoredButton } from '@/components/ui/colored-button';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { Dimensions } from 'react-native';
 import { getCachedPrayerTimes, getNextPrayer, getTimeRemaining, getPrayerNameAr, timeStringToDate, type PrayerTimes, type PrayerName } from '@/lib/prayer-times';
@@ -78,7 +79,7 @@ const getAzkarCategoryData = (categoryId: AzkarCategoryType) => {
 // These should match the ACCENT colors used inside each page
 // ========================================
 const PAGE_CONFIGS = {
-  daily_dua: { icon: 'hands-pray', color: '#7c3aed' }, // matches daily-dua.tsx ACCENT
+  daily_dua: { icon: '🤲', color: '#7c3aed' }, // matches daily-dua.tsx ACCENT
   question_answer: { icon: 'frequently-asked-questions', color: '#0d8e62' }, // matches question-answer.tsx ACCENT
   names: { icon: 'star-crescent', color: '#0d8e62' }, // matches names.tsx green theme
   ayat_universe: { icon: 'creation', color: '#3a7ca5' }, // cosmos theme - matches page
@@ -182,7 +183,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
       { id: '2', labelKey: 'home.sleepAzkar', ...getAzkarCategoryData('2'), route: '/azkar/2' },
       { id: '3', labelKey: 'home.wakeupAzkar', ...getAzkarCategoryData('3'), route: '/azkar/3' },
       { id: '27', labelKey: 'azkar.afterPrayer', ...getAzkarCategoryData('27'), route: '/azkar/27' },
-      { id: 'more_azkar', labelKey: 'home.moreAzkar', icon: 'book-open-page-variant', color: '#0d8e62', route: '/more-azkar' },
+      { id: 'more_azkar', labelKey: 'home.moreAzkar', icon: 'book-open-variant', color: '#0d8e62', route: '/more-azkar' },
     ],
   },
   {
@@ -202,7 +203,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     color: '#0D9488',
     items: [
       { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: 'mosque', color: '#0D9488', route: '/hajj' },
-      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: 'hands-pray', color: '#0d8e62', route: '/umrah' },
+      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: '🤲', color: '#0d8e62', route: '/umrah' },
     ],
   },
   {
@@ -222,7 +223,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
   {
     id: 'duas_hadith',
     titleKey: 'home.duasHadithSection',
-    icon: 'hands-pray',
+    icon: '🤲',
     color: getAzkarCategoryData('34').color,
     items: [
       { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), route: '/sunnah-dua-daily' },
@@ -285,7 +286,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
       { id: 'sleep_azkar', labelKey: 'home.sleepAzkar', ...getAzkarCategoryData('2'), route: '/azkar/2' },
       { id: 'wakeup_azkar', labelKey: 'home.wakeupAzkar', ...getAzkarCategoryData('3'), route: '/azkar/3' },
       { id: 'after_prayer_azkar', labelKey: 'azkar.afterPrayer', ...getAzkarCategoryData('27'), route: '/azkar/27' },
-      { id: 'more_azkar', labelKey: 'home.moreAzkar', icon: 'book-open-page-variant', color: '#0d8e62', route: '/more-azkar' },
+      { id: 'more_azkar', labelKey: 'home.moreAzkar', icon: 'book-open-variant', color: '#0d8e62', route: '/more-azkar' },
     ],
   },
   {
@@ -299,7 +300,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
     id: 'cat_hajj', titleKey: 'home.hajjUmrahSection', icon: 'star-crescent', color: '#0D9488',
     items: [
       { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: 'mosque', color: '#0D9488', route: '/hajj' },
-      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: 'hands-pray', color: '#0d8e62', route: '/umrah' },
+      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: '🤲', color: '#0d8e62', route: '/umrah' },
     ],
   },
   {
@@ -314,7 +315,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
     ],
   },
   {
-    id: 'cat_duas', titleKey: 'home.duasHadithSection', icon: 'hands-pray', color: getAzkarCategoryData('34').color,
+    id: 'cat_duas', titleKey: 'home.duasHadithSection', icon: '🤲', color: getAzkarCategoryData('34').color,
     items: [
       { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), route: '/sunnah-dua-daily' },
       { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, route: '/daily-dua' },
@@ -402,7 +403,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMo
               },
             ]}>
               <View style={styles.gridCardIcon}> 
-                <MaterialCommunityIcons name={category.icon as any} size={28} color={category.color} />
+                <AppIcon name={category.icon} size={28} color={category.color} />
               </View>
               <Text style={[styles.gridCardLabel, { color: colors.text, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {t(category.nameKey)}
@@ -443,7 +444,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMo
             },
           ]}>
             <View style={styles.listCardIcon}> 
-              <MaterialCommunityIcons name={category.icon as any} size={22} color={category.color} />
+              <AppIcon name={category.icon} size={22} color={category.color} />
             </View>
             <Text style={[styles.listCardLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {t(category.nameKey)}
@@ -504,7 +505,7 @@ const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDark
           justifyContent: 'center',
           marginBottom: 8,
         }}>
-           <MaterialCommunityIcons name={safeIcon(item.icon) as any} size={30} color={colors.getTextColor(item.color)} />
+           <AppIcon name={item.icon} size={30} color={colors.getTextColor(item.color)} />
         </View>
         <Text style={[styles.quickAccessName, { color: colors.text, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
           {getItemName()}
@@ -544,7 +545,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }} style={[collapsibleStyles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} activeOpacity={0.7}>
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
-          {icon && <MaterialCommunityIcons name={icon as any} size={20} color={iconColor || colors.primary} />}
+          {icon && <AppIcon name={icon} size={20} color={iconColor || colors.primary} />}
           <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', color: colors.text }]}>{title}</Text>
           {infoKey && <SectionInfoButton sectionKey={infoKey} />}
         </View>
@@ -1679,7 +1680,7 @@ export default function HomeScreen() {
                           {isGrid ? (
                             <>
                               <View style={styles.gridCardIcon}>
-                                <MaterialCommunityIcons name={item.icon as any} size={28} color={item.color} />
+                                <AppIcon name={item.icon} size={28} color={item.color} />
                               </View>
                               <Text style={[styles.gridCardLabel, { color: colors.text, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                                 {t(item.labelKey)}
@@ -1689,7 +1690,7 @@ export default function HomeScreen() {
                             <>
                               <View style={[styles.listCardLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 <View style={[styles.listCardIcon, { backgroundColor: `${item.color}18` }]}>
-                                  <MaterialCommunityIcons name={item.icon as any} size={24} color={item.color} />
+                                  <AppIcon name={item.icon} size={24} color={item.color} />
                                 </View>
                                 <Text style={[styles.listCardLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                                   {t(item.labelKey)}
@@ -1739,8 +1740,8 @@ export default function HomeScreen() {
               styles.modalContent,
               {
                 backgroundColor: isDarkMode
-                  ? 'rgba(30,30,32,0.55)'
-                  : 'rgba(255,255,255,0.7)',
+                  ? '#0f1a14'
+                  : 'rgba(255,255,255,0.97)',
                 borderWidth: 0.5,
                 borderColor: 'rgba(255,255,255,0.2)',
               },
@@ -1816,7 +1817,7 @@ export default function HomeScreen() {
                           >
                             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                               <View style={[styles.modalItemIcon, { backgroundColor: `${category.color}20` }]}>
-                                <MaterialCommunityIcons name={category.icon as any} size={20} color={category.color} />
+                                <AppIcon name={category.icon} size={20} color={category.color} />
                               </View>
                               <Text style={[styles.modalCategoryTitle, { color: colors.text }]}>
                                 {t(category.titleKey)}
@@ -1842,7 +1843,7 @@ export default function HomeScreen() {
                               >
                                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                   <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}15`, width: 32, height: 32, borderRadius: 16 }]}>
-                                    <MaterialCommunityIcons name={item.icon as any} size={18} color={item.color} />
+                                    <AppIcon name={item.icon} size={18} color={item.color} />
                                   </View>
                                   <Text style={[styles.modalItemLabel, { color: colors.text }]}>{t(item.labelKey)}</Text>
                                 </View>
@@ -1888,7 +1889,7 @@ export default function HomeScreen() {
                     return (
                       <TouchableOpacity key={page.id} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, alreadyAdded && { opacity: 0.5 }]} activeOpacity={0.7} disabled={alreadyAdded} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPendingCustomItems(prev => [...prev, page]); setPendingIds(prev => [...prev, page.id]); setAddOtherMode(null); }}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                          <View style={[styles.modalItemIcon, { backgroundColor: `${page.color}20` }]}><MaterialCommunityIcons name={page.icon as any} size={20} color={page.color} /></View>
+                          <View style={[styles.modalItemIcon, { backgroundColor: `${page.color}20` }]}><AppIcon name={page.icon} size={20} color={page.color} /></View>
                           <Text style={[styles.modalItemLabel, { color: colors.text }]}>{page.nameKey ? t(page.nameKey) : page.label}</Text>
                         </View>
                         {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#0d8e62" />}
@@ -1935,7 +1936,7 @@ export default function HomeScreen() {
                     return (
                       <View key={id} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                          <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}><MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} /></View>
+                          <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}><AppIcon name={item.icon} size={20} color={item.color} /></View>
                           <Text style={[styles.modalItemLabel, { color: colors.text }]}>
                             {(item as any).nameAr || (item as any).nameEn 
                               ? ((settings.language === 'ar' || settings.language === 'ur') 
@@ -2525,7 +2526,7 @@ const _styles = StyleSheet.create({
   // Quick Access Customize Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     paddingHorizontal: 16,
     paddingVertical: 50,
   },
@@ -2713,7 +2714,7 @@ const _styles = StyleSheet.create({
   // Next Prayer Bottom Sheet
   nextPrayerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
   },
   nextPrayerSheet: {

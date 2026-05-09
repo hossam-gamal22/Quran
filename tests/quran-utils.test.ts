@@ -1,5 +1,24 @@
 // @ts-ignore
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+const { storage } = vi.hoisted(() => ({
+  storage: new Map<string, string>(),
+}));
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: vi.fn((key: string) => Promise.resolve(storage.get(key) ?? null)),
+    setItem: vi.fn((key: string, value: string) => {
+      storage.set(key, value);
+      return Promise.resolve();
+    }),
+    removeItem: vi.fn((key: string) => {
+      storage.delete(key);
+      return Promise.resolve();
+    }),
+  },
+}));
+
 import { SURAH_NAMES_AR, getSurahName, RECITERS, TRANSLATION_EDITIONS, getAyahAudioUrl, getSurahAudioUrl } from '../lib/quran-api';
 import { getNextPrayer, CALCULATION_METHODS } from '../lib/prayer-api';
 

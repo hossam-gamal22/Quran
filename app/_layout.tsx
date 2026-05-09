@@ -28,6 +28,7 @@ import { useColors } from '@/hooks/use-colors';
 import { QuranProvider } from '@/contexts/QuranContext';
 import { KhatmaProvider } from '@/contexts/KhatmaContext';
 import { WorshipProvider } from '@/contexts/WorshipContext';
+import { MemorizationProvider } from '@/contexts/MemorizationContext';
 import { SeasonalProvider } from '@/contexts/SeasonalContext';
 import { ThemeConfigProvider } from '@/contexts/ThemeConfigContext';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
@@ -47,7 +48,7 @@ import {
   trackAppOpen, 
   syncLocalStats 
 } from '@/lib/firebase-analytics';
-import { autoSelectMonthlyWinners, syncPendingScores } from '@/lib/rewards-manager';
+import { autoSelectMonthlyWinners, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
 import { GlobalAudioProvider, markTrackPlayerReady } from '@/contexts/GlobalAudioContext';
@@ -58,7 +59,12 @@ import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { ensureFirebaseUser } from '@/config/firebase';
 import { initTranslationOverrides } from '@/lib/auto-translate';
-import { hydrateAzkarFromFirestore } from '@/lib/azkar-api';
+import { subscribeToSoundSettings, refreshSoundSettings } from '@/lib/sound-manager';
+import {
+  hydrateAzkarFromFirestore,
+  refreshAzkarFromFirestore,
+  subscribeToAzkarFromFirestore,
+} from '@/lib/azkar-api';
 import { hydrateFontSettings } from '@/hooks/use-font-config';
 import { hydrateDailyDuasFromFirestore } from '@/data/daily-duas';
 import { hydrateFamousDuasFromFirestore } from '@/data/famous-duas';
@@ -539,6 +545,7 @@ export default function RootLayout() {
     'KFGQPCUthmanic': require('../assets/fonts/KFGQPC-Uthmanic-Script.ttf'),
     'Orbitron-Bold': require('../assets/fonts/Orbitron-Bold.ttf'),
     'Orbitron-Regular': require('../assets/fonts/Orbitron-Regular.ttf'),
+    'WidgetFont': require('../assets/fonts/WidgetFont.ttf'),
     // NOTE: vector-icon fonts (MaterialCommunityIcons, Ionicons) are NOT
     // preloaded here — `@expo/vector-icons` lazy-loads them when an Icon
     // component mounts. Preloading via useFonts() spread breaks in Expo Go
@@ -685,10 +692,25 @@ export default function RootLayout() {
             async () => {
               try {
                 const TrackPlayer = require('react-native-track-player').default;
-                const { Capability, RepeatMode } = require('react-native-track-player');
+                const {
+                  Capability,
+                  RepeatMode,
+                  IOSCategory,
+                  AndroidAudioContentType,
+                } = require('react-native-track-player');
                 await TrackPlayer.setupPlayer({
                   autoUpdateMetadata: true,
+                  // Force the Playback audio category so playback ignores the
+                  // iPhone hardware silent switch and stays audible in foreground
+                  // and background. We intentionally do NOT set iosCategoryMode
+                  // or iosCategoryOptions — the framework defaults work best
+                  // for general media playback. SpokenAudio mode + MixWithOthers
+                  // option together caused inaudible playback on some devices.
+                  iosCategory: IOSCategory?.Playback,
+                  androidAudioContentType: AndroidAudioContentType?.Music,
                 });
+                // Some devices restore volume = 0 on cold start; force max.
+                try { await TrackPlayer.setVolume(1.0); } catch {}
                 await TrackPlayer.updateOptions({
                   capabilities: [
                     Capability.Play,
@@ -722,6 +744,33 @@ export default function RootLayout() {
             5000
           )
         : Promise.resolve();
+
+      // Configure shared iOS AVAudioSession early so any later expo-av calls
+      // (sound-manager effects, notification previews, etc.) don't reset the
+      // session to SoloAmbient — which would silence TrackPlayer playback
+      // (e.g. adhkar listen mode) when the iPhone hardware silent switch is on.
+      await initWithTimeout(
+        async () => {
+          try {
+            const { Audio, InterruptionModeIOS, InterruptionModeAndroid } = require('expo-av');
+            await Audio.setAudioModeAsync({
+              allowsRecordingIOS: false,
+              playsInSilentModeIOS: true,
+              staysActiveInBackground: true,
+              // مهم على الـ Simulator: من غير interruptionMode صريح، iOS بيستخدم
+              // AVAudioSessionCategoryAmbient أحيانًا ويبقى الصوت متقطّع/مكتوم.
+              interruptionModeIOS: InterruptionModeIOS?.DoNotMix ?? 1,
+              interruptionModeAndroid: InterruptionModeAndroid?.DuckOthers ?? 2,
+              shouldDuckAndroid: true,
+              playThroughEarpieceAndroid: false,
+            });
+          } catch {
+            // ignore — expo-av may be unavailable on web
+          }
+        },
+        'Audio session init',
+        2000
+      );
 
       // Load installed sounds cache BEFORE any parallel init
       // This must complete before notification scheduling uses getNotificationSoundValueSync()
@@ -762,10 +811,10 @@ export default function RootLayout() {
         ),
         initWithTimeout(
           async () => {
-            // Track app open FIRST (saves score locally), then sync all pending to Firestore
+            // Track app open FIRST (saves score locally), then sync monthly truth to Firestore
             await trackAppOpen();
             const uid = await getUserId();
-            if (uid) await syncPendingScores(uid);
+            if (uid) await syncMonthlyEngagementFromLocalWorship(uid);
           },
           'Track app open + sync scores',
           10000
@@ -913,8 +962,18 @@ export default function RootLayout() {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         updateLastActive().catch((e) => console.warn('⚠️ [AppResume] updateLastActive:', e?.message));
+        getUserId()
+          .then(uid => (uid ? syncMonthlyEngagementFromLocalWorship(uid) : null))
+          .catch((e) => console.warn('⚠️ [AppResume] syncMonthlyEngagement:', e?.message));
         syncWidgetDataToNative().catch((e) => console.warn('⚠️ [AppResume] syncWidgetDataToNative:', e?.message));
         refreshLiveActivityIfEnabled().catch((e) => console.warn('⚠️ [AppResume] refreshLiveActivity:', e?.message));
+        // Force-refresh sound settings from Firestore so admin sound assignment
+        // changes propagate immediately when user returns to the app (instead
+        // of waiting up to 24h for the local cache to expire).
+        refreshSoundSettings().catch((e) => console.warn('⚠️ [AppResume] refreshSoundSettings:', e?.message));
+        // Force-refresh azkar overrides (admin edits to text/audio/benefit)
+        // so changes show without needing to reinstall or wait for cache TTL.
+        refreshAzkarFromFirestore().catch((e) => console.warn('⚠️ [AppResume] refreshAzkar:', e?.message));
         // Check for a pending deep link from Control Center / Spotlight shortcut
         consumePendingDeepLink(router);
         // Verify prayer notifications exist; if none, force reschedule.
@@ -943,6 +1002,16 @@ export default function RootLayout() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
+    // Subscribe to admin sound settings changes from Firestore so notifications,
+    // adhan, and effect sounds always reflect the latest admin assignments
+    // without waiting for the 24h cache TTL.
+    const unsubscribeSoundSettings = subscribeToSoundSettings();
+
+    // Subscribe to live admin edits of the azkar collection (text, audio,
+    // benefit, translations). Updates the in-memory override and notifies
+    // any listening screens to re-render.
+    const unsubscribeAzkar = subscribeToAzkarFromFirestore();
+
     const activityInterval = setInterval(() => {
       updateLastActive().catch(() => {});
     }, 5 * 60 * 1000);
@@ -970,6 +1039,8 @@ export default function RootLayout() {
       clearInterval(prayerCheckInterval);
       clearInterval(ratingCheckInterval);
       cleanupMidnight();
+      unsubscribeSoundSettings();
+      unsubscribeAzkar();
       saveSessionTime().catch(() => {});
     };
   }, []);
@@ -1006,6 +1077,16 @@ export default function RootLayout() {
         preloadAllPagesInBackground(true);
       } catch (err) {
         console.warn('⚠️ QCF background preload failed to start:', err);
+      }
+      // Scan the on-disk Tajweed color font cache so hasColorFontForPage() / getColorFontSource()
+      // return correct results without an extra round-trip when the user enters a Mushaf page.
+      try {
+        const { loadCachedColorFontIndex } = require('@/lib/qcf-color-font-cache');
+        loadCachedColorFontIndex().catch((e: any) =>
+          console.warn('⚠️ Tajweed cache index scan failed:', e?.message ?? e)
+        );
+      } catch (err) {
+        console.warn('⚠️ Tajweed cache index module failed to load:', err);
       }
     }
   }, [fontsLoaded, fontError]);
@@ -1130,6 +1211,7 @@ export default function RootLayout() {
                   <QuranProvider>
                   <GlobalAudioProvider>
                     <KhatmaProvider>
+                      <MemorizationProvider>
                       <WorshipProvider>
                         <SeasonalProvider>
                           <OnboardingProvider>
@@ -1172,6 +1254,9 @@ export default function RootLayout() {
                           <Stack.Screen name="daily-dua" />
                           <Stack.Screen name="daily-ayah" />
                           <Stack.Screen name="companions" />
+                          <Stack.Screen name="question-answer" />
+                          <Stack.Screen name="memorization" />
+                          <Stack.Screen name="temp-page/[id]" />
                           <Stack.Screen name="sdui/[screenId]" />
                         </Stack>
                         {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
@@ -1180,6 +1265,7 @@ export default function RootLayout() {
                           </OnboardingProvider>
                         </SeasonalProvider>
                       </WorshipProvider>
+                      </MemorizationProvider>
                     </KhatmaProvider>
                   </GlobalAudioProvider>
                   </QuranProvider>

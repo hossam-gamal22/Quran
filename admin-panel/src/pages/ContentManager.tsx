@@ -1028,8 +1028,14 @@ export default function ContentManager() {
       });
       setSeasonal(seasonalData);
     } catch (err) {
-      console.error('Failed to load CMS content:', err);
-      setStatus({ type: 'error', message: 'فشل تحميل المحتوى' });
+      // Firestore unreachable / permissions issue — fall back to bundled defaults
+      // silently so the admin can still edit + push content. Avoids the noisy
+      // red "فشل تحميل المحتوى" banner that blocked the whole CMS.
+      console.warn('CMS content load failed; using bundled defaults instead.', err);
+      setHajjUmrah(getDefaultHajjUmrahContent() as unknown as HajjUmrahContent);
+      setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
+      setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
+      setSeasonal({ ramadan: null, hajj: null, mawlid: null, ashura: null });
     } finally {
       setLoading(false);
     }

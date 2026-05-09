@@ -1482,7 +1482,7 @@ const _styles = StyleSheet.create({
   longPressHint: { alignItems: 'center', marginHorizontal: 16, marginTop: 8, marginBottom: 4, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, overflow: 'hidden', gap: 8, borderWidth: 1, borderColor: 'rgba(192,123,16,0.32)' },
   longPressHintText: { flex: 1, fontSize: 13, fontFamily: fontMedium(), lineHeight: 20, includeFontPadding: false },
   // Status modal (long-press → choose status)
-  statusModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  statusModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
   statusModalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
   statusModalHandle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, marginBottom: 14, opacity: 0.6 },
   statusModalTitle: { fontSize: 17, fontFamily: fontBold(), marginBottom: 16 },
@@ -1560,7 +1560,7 @@ const _styles = StyleSheet.create({
 });
 
 const settingsStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
   content: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderRadius: 0, height: '75%', padding: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   title: { fontSize: 20, fontFamily: fontBold(), lineHeight: 34, includeFontPadding: false },

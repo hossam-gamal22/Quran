@@ -8,6 +8,8 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -16,7 +18,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { GlassCard } from '@/components/ui';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncPendingScores, setMonthlyEngagement, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS } from '@/lib/rewards-manager';
+import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncMonthlyEngagementFromLocalWorship, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS } from '@/lib/rewards-manager';
 import { getUserId, getDisplayName } from '@/lib/firebase-user';
 import type { RewardsConfig } from '@/types/rewards';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -27,14 +29,15 @@ import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import NetInfo from '@react-native-community/netinfo';
-import { getMonthPrayerRecords, getAllQuranRecords, getAllAzkarRecords, formatDate, getMonthlyActivityStats } from '@/lib/worship-storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MEDAL_STYLES = (isDark: boolean) => [
   { icon: 'trophy' as const, color: isDark ? '#FFD700' : '#B8860B', bg: isDark ? 'rgba(255,215,0,0.15)' : 'rgba(184,134,11,0.15)' },
   { icon: 'medal' as const, color: '#C0C0C0', bg: 'rgba(192,192,192,0.15)' },
   { icon: 'medal' as const, color: '#CD7F32', bg: 'rgba(205,127,50,0.15)' },
 ];
+
+const LEADERBOARD_PREVIEW_COUNT = 5;
+const LEADERBOARD_MAX_VISIBLE_COUNT = 50;
 
 export default function HonorBoard() {
   const colors = useColors();
@@ -55,25 +58,12 @@ export default function HonorBoard() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [hasDisplayName, setHasDisplayName] = useState(true);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const isArabic = (settings.language || 'ar') === 'ar';
 
   useEffect(() => {
     loadData();
   }, []);
-
-  /**
-   * Compute actual activities from worship storage (source of truth)
-   * This supplements the rewards tracking pipeline which can miss activities
-   */
-  const getActualActivitiesFromWorship = async (): Promise<Record<string, number>> => {
-    const stats = await getMonthlyActivityStats();
-    return {
-      prayer: stats.prayers,
-      quran: stats.quranPages,
-      tasbih: stats.tasbih,
-      azkar: stats.azkar,
-    };
-  };
 
   const loadData = async () => {
     // Wrap Firestore work with a hard timeout so the screen never hangs
@@ -93,68 +83,42 @@ export default function HonorBoard() {
       ]));
       setConfig(rewardsConfig);
 
-      // Sync any pending local scores to Firestore before reading
-      if (userId) {
-        await syncPendingScores(userId).catch(() => {});
-      }
-
-      // Fetch leaderboard (now includes just-synced scores)
-      const board = await withTimeout(getMonthlyLeaderboard(20));
-      setLeaderboard(board);
-
+      let syncedInfo: Awaited<ReturnType<typeof syncMonthlyEngagementFromLocalWorship>> = null;
       if (userId) {
         setCurrentUserId(userId);
-        const [info, worshipActivities, userName] = await Promise.all([
+        syncedInfo = await syncMonthlyEngagementFromLocalWorship(userId).catch(() => null);
+      }
+
+      let board = await withTimeout(getMonthlyLeaderboard(LEADERBOARD_MAX_VISIBLE_COUNT));
+
+      if (userId) {
+        const [info, userName] = await Promise.all([
           getUserMonthlyInfo(userId),
-          getActualActivitiesFromWorship(),
           getDisplayName(),
         ]);
         setHasDisplayName(!!userName && userName.trim().length > 0);
 
-        // Worship storage is the SINGLE SOURCE OF TRUTH for all activities
-        // Firestore tracking only used for activities without worship storage (app_open)
-        const tracked = info?.activities || {};
-        const merged: Record<string, number> = {};
+        const effectiveInfo = syncedInfo || info;
+        const monthly = effectiveInfo?.activities || {};
+        const totalScore = effectiveInfo?.score || 0;
 
-        // Start with Firestore data for non-worship activities (app_open, khatma)
-        for (const [key, count] of Object.entries(tracked)) {
-          if (!(key in worshipActivities)) {
-            merged[key] = count;
-          }
-        }
-
-        // Override with worship storage data (source of truth)
-        for (const [key, worshipCount] of Object.entries(worshipActivities)) {
-          merged[key] = worshipCount;
-        }
-
-        // Add merge bonus from admin merge (preserves merged user's points)
-        const mergeBonus = info?.mergeBonus;
-        if (mergeBonus?.activities) {
-          for (const [key, bonusCount] of Object.entries(mergeBonus.activities)) {
-            merged[key] = (merged[key] || 0) + (bonusCount as number);
-          }
-        }
-
-        // Recalculate score from merged activities
-        const weights = rewardsConfig.scoreWeights || DEFAULT_WEIGHTS;
-        let totalScore = 0;
-        for (const [key, count] of Object.entries(merged)) {
-          totalScore += count * (weights[key as keyof typeof weights] || 1);
-        }
-
-        setMonthlyActivities(merged);
+        setMonthlyActivities(monthly);
         setUserScore(totalScore);
 
-        // Overwrite Firestore with recalculated truth so leaderboard matches
-        setMonthlyEngagement(userId, merged, totalScore).then(() => {
-          // Patch local leaderboard state so UI is consistent immediately
-          setLeaderboard(prev => prev.map(u =>
-            u.userId === userId ? { ...u, score: totalScore } : u
-          ));
-        }).catch(() => {});
+        const displayName = (syncedInfo?.displayName || userName || '').trim();
+        const canShowCurrentUser = !!displayName && totalScore > 0 && syncedInfo?.visibleOnLeaderboard === true;
+        if (canShowCurrentUser) {
+          const withoutCurrentUser = board.filter(u => u.userId !== userId);
+          board = [
+            ...withoutCurrentUser,
+            { userId, displayName, score: totalScore },
+          ]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, LEADERBOARD_MAX_VISIBLE_COUNT);
+        }
+        setLeaderboard(board);
 
-        if (info) {
+        if (effectiveInfo) {
           // Calculate rank from leaderboard
           const rankIndex = board.findIndex(u => u.userId === userId);
           if (rankIndex >= 0) {
@@ -185,6 +149,9 @@ export default function HonorBoard() {
           }
         }
       }
+      if (!userId) {
+        setLeaderboard(board);
+      }
     } catch {
       setLoadError(true);
       const netState = await NetInfo.fetch().catch(() => ({ isConnected: null, isInternetReachable: null }));
@@ -203,6 +170,7 @@ export default function HonorBoard() {
   };
 
   const bgColor = settings.display.appBackground !== 'none' ? 'transparent' : colors.background;
+  const displayedLeaderboard = leaderboard.slice(0, LEADERBOARD_PREVIEW_COUNT);
 
   if (loading) {
     return (
@@ -329,6 +297,7 @@ export default function HonorBoard() {
                 { key: 'prayer', icon: 'mosque' as const, labelAr: 'الصلوات', labelEn: 'Prayers', weightKey: 'prayer' as const },
                 { key: 'azkar', icon: 'hand-heart' as const, labelAr: 'الأذكار', labelEn: 'Adhkar', weightKey: 'azkar' as const },
                 { key: 'tasbih', icon: 'counter' as const, labelAr: 'التسبيح', labelEn: 'Tasbih', weightKey: 'tasbih' as const },
+                { key: 'fasting', icon: 'food-off' as const, labelAr: 'الصيام', labelEn: 'Fasting', weightKey: 'fasting' as const },
                 { key: 'app_open', icon: 'cellphone' as const, labelAr: 'فتح التطبيق', labelEn: 'App Opens', weightKey: 'app_open' as const },
               ];
               const weights = config?.scoreWeights || DEFAULT_WEIGHTS;
@@ -379,7 +348,8 @@ export default function HonorBoard() {
               { icon: 'book-open-variant' as const, labelAr: 'قراءة صفحة قرآن', labelEn: 'Read a Quran page', weightKey: 'quran' as const },
               { icon: 'mosque' as const, labelAr: 'تسجيل صلاة', labelEn: 'Log a prayer', weightKey: 'prayer' as const },
               { icon: 'hand-heart' as const, labelAr: 'قراءة ذكر', labelEn: 'Read a dhikr', weightKey: 'azkar' as const },
-              { icon: 'counter' as const, labelAr: 'جولة تسبيح', labelEn: 'Tasbih round', weightKey: 'tasbih' as const },
+              { icon: 'counter' as const, labelAr: 'تسبيحة واحدة', labelEn: 'Tasbih count', weightKey: 'tasbih' as const },
+              { icon: 'food-off' as const, labelAr: 'تسجيل يوم صيام', labelEn: 'Log a fasting day', weightKey: 'fasting' as const },
               { icon: 'cellphone' as const, labelAr: 'فتح التطبيق يومياً', labelEn: 'Open app daily', weightKey: 'app_open' as const },
             ].map((item, i, arr) => {
               const weight = (config?.scoreWeights || DEFAULT_WEIGHTS)[item.weightKey] || DEFAULT_WEIGHTS[item.weightKey] || 1;
@@ -439,7 +409,7 @@ export default function HonorBoard() {
 
           {leaderboard.length > 0 ? (
             <GlassCard style={styles.activitiesCard}>
-              {leaderboard.map((user, i) => {
+              {displayedLeaderboard.map((user, i) => {
                 const isCurrentUser = user.userId === currentUserId;
                 const medals = MEDAL_STYLES(isDarkMode);
                 const isTop3 = i < 3;
@@ -483,10 +453,28 @@ export default function HonorBoard() {
                         </Text>
                       </View>
                     </View>
-                    {i < leaderboard.length - 1 && <View style={[styles.faqSeparator, { backgroundColor: colors.border }]} />}
+                    {i < displayedLeaderboard.length - 1 && <View style={[styles.faqSeparator, { backgroundColor: colors.border }]} />}
                   </View>
                 );
               })}
+              {leaderboard.length > LEADERBOARD_PREVIEW_COUNT && (
+                <>
+                  <View style={[styles.faqSeparator, { backgroundColor: colors.border }]} />
+                  <Text
+                    onPress={() => setShowLeaderboardModal(true)}
+                    style={[
+                      styles.showAllButton,
+                      {
+                        color: isDarkMode ? '#f59e0b' : '#B57200',
+                        textAlign: 'center',
+                        writingDirection: isRTL ? 'rtl' : 'ltr',
+                      },
+                    ]}
+                  >
+                    {isArabic ? 'عرض الكل' : 'Show all'}
+                  </Text>
+                </>
+              )}
             </GlassCard>
           ) : (
             <GlassCard style={styles.emptyWinnersCard}>
@@ -546,6 +534,91 @@ export default function HonorBoard() {
       </View>
     </ScrollView>
     </SafeAreaView>
+    <Modal
+      visible={showLeaderboardModal}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setShowLeaderboardModal(false)}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={[
+          styles.modalSheet,
+          {
+            backgroundColor: isDarkMode ? '#0f1a14' : '#ffffff',
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+          },
+        ]}>
+          <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.modalTitle, { color: isDarkMode ? '#ffffff' : colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {isArabic ? 'كل المتسابقين' : 'All Competitors'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowLeaderboardModal(false)}
+              style={[
+                styles.modalCloseButton,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(13,142,98,0.18)' : 'rgba(13,142,98,0.10)',
+                  borderColor: isDarkMode ? 'rgba(13,142,98,0.38)' : 'rgba(13,142,98,0.22)',
+                },
+              ]}
+              activeOpacity={0.75}
+            >
+              <MaterialCommunityIcons name="close" size={20} color={isDarkMode ? '#4ADE80' : '#0d8e62'} />
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.modalHeaderDivider, { backgroundColor: isDarkMode ? 'rgba(13,142,98,0.28)' : 'rgba(13,142,98,0.16)' }]} />
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalListContent}>
+            {leaderboard.map((user, i) => {
+              const isCurrentUser = user.userId === currentUserId;
+              const medals = MEDAL_STYLES(isDarkMode);
+              const isTop3 = i < 3;
+              return (
+                <View key={user.userId}>
+                  <View style={[
+                    styles.leaderboardRow,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    isCurrentUser && { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.08)' : 'rgba(181,114,0,0.05)', borderRadius: 12, marginHorizontal: -8, paddingHorizontal: 8 },
+                  ]}>
+                    {isTop3 ? (
+                      <View style={[styles.medalCircle, { backgroundColor: medals[i].bg }]}>
+                        <MaterialCommunityIcons name={medals[i].icon} size={20} color={medals[i].color} />
+                      </View>
+                    ) : (
+                      <View style={[styles.rankCircle, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                        <Text style={[styles.rankNumber, { color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.muted }]}>#{i + 1}</Text>
+                      </View>
+                    )}
+                    <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.leaderboardName, { color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                          {user.displayName}
+                        </Text>
+                        {isCurrentUser && isPremium && (
+                          <MaterialCommunityIcons name="crown" size={16} color={isDarkMode ? '#FFD700' : '#B8860B'} />
+                        )}
+                        {isCurrentUser && (
+                          <Text style={[styles.youBadge, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
+                            {isArabic ? '(أنت)' : '(You)'}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <View style={[styles.activityPointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
+                      <Text style={[styles.activityPointsText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
+                        {user.score}
+                      </Text>
+                    </View>
+                  </View>
+                  {i < leaderboard.length - 1 && <View style={[styles.faqSeparator, { backgroundColor: colors.border }]} />}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
     </BackgroundWrapper>
   );
 }
@@ -722,6 +795,64 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
     lineHeight: 20,
     includeFontPadding: false,
+  },
+  showAllButton: {
+    fontSize: 14,
+    fontFamily: fontSemiBold(),
+    lineHeight: 24,
+    paddingVertical: 12,
+    includeFontPadding: false,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+  },
+  modalSheet: {
+    width: '100%',
+    maxHeight: '82%',
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 42,
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 19,
+    fontFamily: fontBold(),
+    lineHeight: 30,
+    includeFontPadding: false,
+  },
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  modalListContent: {
+    paddingTop: 2,
+    paddingBottom: 6,
   },
   faqDetail: {
     borderRadius: 12,

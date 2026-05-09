@@ -211,7 +211,7 @@ export default function DailySummaryScreen() {
 
   // Listening time display
   const listeningDisplay = listeningMinutes >= 60
-    ? `${localizeNumber(Math.floor(listeningMinutes / 60))}h ${localizeNumber(listeningMinutes % 60)}m`
+    ? `${localizeNumber(Math.floor(listeningMinutes / 60))} ${t('common.hour')} ${localizeNumber(listeningMinutes % 60)} ${t('common.minute')}`
     : `${localizeNumber(listeningMinutes)} ${t('common.minutes') || 'د'}`;
 
   return (
@@ -237,7 +237,7 @@ export default function DailySummaryScreen() {
           icon="mosque"
           iconColor="#c17f59"
           title={t('tabs.prayer') || 'الصلاة'}
-          value={`${localizeNumber(prayedCount)}/٥`}
+          value={`${localizeNumber(prayedCount)}/${localizeNumber(5)}`}
           subtitle={prayedCount === 5 ? (t('worship.allPrayersDone') || 'ما شاء الله! أتممت جميع الصلوات') : undefined}
           details={prayerDetails}
           delay={100}

@@ -25,6 +25,23 @@ const EMPTY_EVENT: Omit<IslamicEvent, 'id'> = {
   name: '', nameAr: '', hijriMonth: 1, hijriDay: 1, description: '', descriptionAr: '',
 };
 
+// Default 13 Islamic events bundled into the mobile app (mirrors lib/hijri-date.ts)
+const DEFAULT_ISLAMIC_EVENTS: IslamicEvent[] = [
+  { id: 'event_new_year', name: 'Islamic New Year', nameAr: 'رأس السنة الهجرية', hijriMonth: 1, hijriDay: 1, description: 'First day of the Islamic calendar year', descriptionAr: 'بداية العام الهجري الجديد' },
+  { id: 'event_ashura', name: 'Day of Ashura', nameAr: 'يوم عاشوراء', hijriMonth: 1, hijriDay: 10, description: 'A significant day in Islamic history. Recommended to fast.', descriptionAr: 'يوم من أهم الأيام في التاريخ الإسلامي. يستحب صيامه' },
+  { id: 'event_mawlid', name: 'Mawlid al-Nabi', nameAr: 'المولد النبوي الشريف', hijriMonth: 3, hijriDay: 12, description: 'Birth of Prophet Muhammad ﷺ', descriptionAr: 'ذكرى مولد النبي ﷺ' },
+  { id: 'event_isra_miraj', name: 'Isra and Miraj', nameAr: 'الإسراء والمعراج', hijriMonth: 7, hijriDay: 27, description: 'The night journey of the Prophet ﷺ', descriptionAr: 'ذكرى رحلة الإسراء والمعراج' },
+  { id: 'event_shaban_15', name: 'Half of Shaban', nameAr: 'ليلة النصف من شعبان', hijriMonth: 8, hijriDay: 15, description: 'A blessed night with spiritual significance', descriptionAr: 'ليلة مباركة ذات أهمية روحية خاصة' },
+  { id: 'event_ramadan', name: 'First Day of Ramadan', nameAr: 'أول رمضان', hijriMonth: 9, hijriDay: 1, description: 'Beginning of the holy month of fasting', descriptionAr: 'بداية شهر رمضان المبارك' },
+  { id: 'event_badr', name: 'Battle of Badr', nameAr: 'غزوة بدر', hijriMonth: 9, hijriDay: 17, description: 'The first major victory in Islam', descriptionAr: 'أول انتصار عظيم في الإسلام' },
+  { id: 'event_last_ten', name: 'Last Ten Nights', nameAr: 'العشر الأواخر', hijriMonth: 9, hijriDay: 21, description: 'The blessed last ten nights of Ramadan', descriptionAr: 'العشر الأواخر المباركة من رمضان' },
+  { id: 'event_eid_fitr', name: 'Eid al-Fitr', nameAr: 'عيد الفطر المبارك', hijriMonth: 10, hijriDay: 1, description: 'Festival of Breaking the Fast', descriptionAr: 'عيد الفطر' },
+  { id: 'event_tarwiyah', name: 'Day of Tarwiyah', nameAr: 'يوم التروية', hijriMonth: 12, hijriDay: 8, description: 'Beginning of Hajj season', descriptionAr: 'بداية مناسك الحج' },
+  { id: 'event_arafah', name: 'Day of Arafah', nameAr: 'يوم عرفة', hijriMonth: 12, hijriDay: 9, description: 'The greatest day of Hajj', descriptionAr: 'أعظم أيام الحج' },
+  { id: 'event_eid_adha', name: 'Eid al-Adha', nameAr: 'عيد الأضحى المبارك', hijriMonth: 12, hijriDay: 10, description: 'Festival of Sacrifice', descriptionAr: 'عيد الأضحى' },
+  { id: 'event_tashreeq', name: 'Days of Tashreeq', nameAr: 'أيام التشريق', hijriMonth: 12, hijriDay: 11, description: 'The three days following Eid al-Adha', descriptionAr: 'الأيام الثلاثة بعد عيد الأضحى' },
+];
+
 const IslamicEventsManager: React.FC = () => {
   const [events, setEvents] = useState<IslamicEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +98,30 @@ const IslamicEventsManager: React.FC = () => {
         </div>
         <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-xl hover:bg-emerald-700 transition-colors">
           <Plus size={18} /> إضافة مناسبة
+        </button>
+        <button
+          className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
+          onClick={async () => {
+            const msg = events.length === 0
+              ? `هل تريد استيراد ${DEFAULT_ISLAMIC_EVENTS.length} مناسبة افتراضية من التطبيق؟`
+              : `يوجد ${events.length} مناسبة بالفعل. سيتم تخطي المكرر. متابعة؟`;
+            if (!confirm(msg)) return;
+            try {
+              const existingIds = new Set(events.map(e => e.id));
+              let added = 0;
+              for (const ev of DEFAULT_ISLAMIC_EVENTS) {
+                if (existingIds.has(ev.id)) continue;
+                await setDoc(doc(db, 'islamicEvents', ev.id), ev);
+                added++;
+              }
+              await loadEvents();
+              setSaveMsg(`✅ تم استيراد ${added} مناسبة جديدة`);
+            } catch (e) {
+              alert(`❌ ${(e as Error).message}`);
+            }
+          }}
+        >
+          📥 استيراد الافتراضي
         </button>
       </div>
       {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-accent-light' : 'text-red-400'}`}>{saveMsg}</p>}

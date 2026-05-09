@@ -390,7 +390,7 @@ export default function RecitationsScreen() {
     nowPlayingReciter: { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     controlBtn: { padding: 8 },
     sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
-    modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
     modalBackdrop: { ...StyleSheet.absoluteFillObject },
     modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, height: '90%', flexDirection: 'column' },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10 },

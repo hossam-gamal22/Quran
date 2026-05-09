@@ -51,5 +51,6 @@ export interface MonthlyEngagement {
     prayer?: number;
     tasbih?: number;
     khatma?: number;
+    fasting?: number;
   };
 }

@@ -100,3 +100,73 @@ export async function clearPhotoBackgroundsCache(): Promise<void> {
     await AsyncStorage.removeItem(CACHE_KEY);
   } catch { /* non-critical */ }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Categories — admin-managed, with hardcoded fallback
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface PhotoBackgroundCategory {
+  id: string;        // category key, e.g. 'islamic'
+  name_ar: string;   // Arabic display name
+  is_active: boolean;
+  order_index: number;
+}
+
+const CATEGORIES_CACHE_KEY = '@photo_background_categories_cache';
+const CATEGORIES_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+interface CachedCategories {
+  categories: PhotoBackgroundCategory[];
+  timestamp: number;
+}
+
+/**
+ * Fetch active photo background categories from Firestore.
+ * Returns sorted, active-only categories.
+ * Returns empty array if Firestore is empty or fetch fails — caller falls back to hardcoded BACKGROUND_CATEGORIES.
+ */
+export async function fetchPhotoBackgroundCategories(skipCache = false): Promise<PhotoBackgroundCategory[]> {
+  // 1. Local cache
+  if (!skipCache) {
+    try {
+      const raw = await AsyncStorage.getItem(CATEGORIES_CACHE_KEY);
+      if (raw) {
+        const entry: CachedCategories = JSON.parse(raw);
+        if (Date.now() - entry.timestamp < CATEGORIES_CACHE_TTL) {
+          return entry.categories;
+        }
+      }
+    } catch { /* skip corrupted cache */ }
+  }
+
+  // 2. Firestore
+  try {
+    const snap = await getDocs(collection(db, 'photoBackgroundCategories'));
+    if (snap.empty) return [];
+
+    const cats: PhotoBackgroundCategory[] = snap.docs
+      .map(d => d.data() as PhotoBackgroundCategory)
+      .filter(c => c.is_active !== false)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    // Persist cache
+    try {
+      await AsyncStorage.setItem(
+        CATEGORIES_CACHE_KEY,
+        JSON.stringify({ categories: cats, timestamp: Date.now() } as CachedCategories),
+      );
+    } catch { /* non-critical */ }
+
+    return cats;
+  } catch (error) {
+    console.warn('⚠️ Failed to fetch photo background categories:', error);
+    return [];
+  }
+}
+
+/** Clear cached categories so next fetch pulls fresh data */
+export async function clearPhotoBackgroundCategoriesCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(CATEGORIES_CACHE_KEY);
+  } catch { /* non-critical */ }
+}

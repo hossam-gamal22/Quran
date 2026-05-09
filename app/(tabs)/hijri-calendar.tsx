@@ -366,7 +366,7 @@ export default function HijriCalendarScreen() {
     },
     upcomingDiffText: { fontSize: 12, fontWeight: '700', color: '#fff' },
     // Event modal
-    modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
     modalCard: {
       backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28,
       padding: 24, paddingBottom: Math.max(insets.bottom, 16) + 16,

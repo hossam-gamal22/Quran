@@ -222,9 +222,10 @@ export default function DailyAyahVideoScreen() {
   const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
   const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
   const [overrideAyah, setOverrideAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
+  const [randomAyah, setRandomAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
 
-  const currentAyah = overrideAyah || DAILY_AYAHS[ayahIdx];
+  const currentAyah = randomAyah || overrideAyah || DAILY_AYAHS[ayahIdx];
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
@@ -334,6 +335,25 @@ export default function DailyAyahVideoScreen() {
     ).start();
   }, []);
 
+  const handleRandomAyah = useCallback(() => {
+    if (DAILY_AYAHS.length === 0) return;
+    if (Platform.OS !== 'web') Haptics.selectionAsync();
+    setTafsirText(null);
+
+    const currentIndex = DAILY_AYAHS.findIndex(
+      ayah => ayah.surah === currentAyah.surah && ayah.ayah === currentAyah.ayah,
+    );
+    const randomPoolSize = currentIndex >= 0 ? DAILY_AYAHS.length - 1 : DAILY_AYAHS.length;
+    if (randomPoolSize <= 0) {
+      setRandomAyah(DAILY_AYAHS[0]);
+      return;
+    }
+
+    let nextIndex = Math.floor(Math.random() * randomPoolSize);
+    if (currentIndex >= 0 && nextIndex >= currentIndex) nextIndex += 1;
+    setRandomAyah(DAILY_AYAHS[nextIndex]);
+  }, [currentAyah.ayah, currentAyah.surah]);
+
   const handleSaveImage = useCallback(async () => {
     if (!cardRef.current) return;
     setExporting(true);
@@ -388,9 +408,9 @@ export default function DailyAyahVideoScreen() {
     chipTextActive: { color: '#fff' },
     cardWrap: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 },
     previewCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' },
-    actionsRow: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: 16, marginBottom: 16 },
-    actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, justifyContent: 'center', gap: Spacing.sm },
-    actionBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+    actionsRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: 16, marginBottom: 16 },
+    actionBtn: { flex: 1, minWidth: 0, paddingVertical: 14, paddingHorizontal: 8, borderRadius: 16, alignItems: 'center', flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, justifyContent: 'center', gap: Spacing.xs },
+    actionBtnText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: '#fff' },
     styleRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: 16, marginBottom: 12 },
     styleCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
     toggleRow: { flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
@@ -450,9 +470,18 @@ export default function DailyAyahVideoScreen() {
               ? <ActivityIndicator color="#fff" size="small" />
               : <>
                   <MaterialCommunityIcons name="download" size={18} color="#fff" />
-                  <Text style={s.actionBtnText}>{t('common.download')}</Text>
+                  <Text style={s.actionBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>{t('common.download')}</Text>
                 </>
             }
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.actionBtn, { backgroundColor: '#0D9488' }]}
+            onPress={handleRandomAyah}
+            disabled={exporting}
+            accessibilityLabel={t('common.change')}
+          >
+            <MaterialCommunityIcons name="shuffle-variant" size={18} color="#fff" />
+            <Text style={s.actionBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>{t('common.change')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.actionBtn, { backgroundColor: '#2563EB' }]}
@@ -460,7 +489,7 @@ export default function DailyAyahVideoScreen() {
             disabled={exporting}
           >
             <MaterialCommunityIcons name="share-variant" size={18} color="#fff" />
-            <Text style={s.actionBtnText}>{t('common.share')}</Text>
+            <Text style={s.actionBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>{t('common.share')}</Text>
           </TouchableOpacity>
         </View>
 

@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 export type SalatiPrayerType = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+export type TemporaryPrayerPresetKey = 'qiyam' | 'witr' | 'duha' | 'nafl';
 
 export interface PrayerInfo {
   key: SalatiPrayerType;
@@ -23,6 +24,15 @@ export interface TrackerState {
   sujoodCount: number;
   totalRakats: number;
   isCompleted: boolean;
+}
+
+export interface TemporaryPrayerPreset {
+  key: TemporaryPrayerPresetKey;
+  nameAr: string;
+  nameEn: string;
+  rakats: number;
+  icon: string;
+  iconColor: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +84,44 @@ export const PRAYER_CONFIG: Record<SalatiPrayerType, PrayerInfo> = {
 
 // Prayer order for display
 export const PRAYER_ORDER: SalatiPrayerType[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+export const TEMPORARY_PRAYER_MIN_RAKATS = 1;
+export const TEMPORARY_PRAYER_MAX_RAKATS = 20;
+
+export const TEMPORARY_PRAYER_PRESETS: TemporaryPrayerPreset[] = [
+  {
+    key: 'qiyam',
+    nameAr: 'قيام الليل',
+    nameEn: 'Night Prayer',
+    rakats: 2,
+    icon: 'weather-night',
+    iconColor: '#6B7FD7',
+  },
+  {
+    key: 'witr',
+    nameAr: 'الوتر',
+    nameEn: 'Witr',
+    rakats: 1,
+    icon: 'moon-waning-crescent',
+    iconColor: '#8E7CC3',
+  },
+  {
+    key: 'duha',
+    nameAr: 'الشروق',
+    nameEn: 'Sunrise',
+    rakats: 2,
+    icon: 'weather-sunset-up',
+    iconColor: '#F5A623',
+  },
+  {
+    key: 'nafl',
+    nameAr: 'سنة/نافلة',
+    nameEn: 'Sunnah/Nafl',
+    rakats: 2,
+    icon: 'star-crescent',
+    iconColor: '#0d8e62',
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Utility Functions

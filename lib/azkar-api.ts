@@ -6,9 +6,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import azkarData from '@/data/json/azkar.json';
 import categoriesData from '@/data/json/categories.json';
 import shortNamesData from '@/data/json/azkar-short-names.json';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { translateBenefit } from '@/lib/benefit-translations';
+import { getEffectiveZikrRepeatCount } from '@/lib/azkar-repeat';
 
 // ===================================================
 // الأنواع (Types)
@@ -23,6 +24,7 @@ export interface Zikr {
   id: number;
   category: AzkarCategoryType;
   subcategory?: string;
+  sortOrder?: number;
   arabic: string;
   transliteration: string;
   translation?: Record<Language, string>;
@@ -82,8 +84,38 @@ const DEFAULT_LANGUAGE: Language = 'ar';
 // ===================================================
 
 const AZKAR_CACHE_KEY = '@azkar_firestore_cache';
-const AZKAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const AZKAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h (used as a soft TTL — we always background-revalidate)
 let _azkarOverride: Zikr[] | null = null;
+const _azkarChangeListeners = new Set<() => void>();
+
+const getSortOrder = (zikr: Zikr): number => {
+  const sortOrder = Number(zikr.sortOrder);
+  return Number.isFinite(sortOrder) ? sortOrder : Number.POSITIVE_INFINITY;
+};
+
+export const compareAzkarItems = (a: Zikr, b: Zikr): number => {
+  const aOrder = getSortOrder(a);
+  const bOrder = getSortOrder(b);
+  if (aOrder !== bOrder) return aOrder - bOrder;
+  return (a.id ?? 0) - (b.id ?? 0);
+};
+
+export const sortAzkarItems = (items: Zikr[]): Zikr[] => {
+  return [...items].sort(compareAzkarItems);
+};
+
+/** Notify React components/screens that azkar data changed (e.g. admin updated audio). */
+const notifyAzkarChanged = () => {
+  _azkarChangeListeners.forEach((cb) => {
+    try { cb(); } catch {}
+  });
+};
+
+/** Subscribe to azkar override changes (fired after Firestore refresh). Returns unsubscribe. */
+export const onAzkarChange = (cb: () => void): (() => void) => {
+  _azkarChangeListeners.add(cb);
+  return () => { _azkarChangeListeners.delete(cb); };
+};
 
 interface AzkarCacheEnvelope {
   ts: number;
@@ -93,20 +125,21 @@ interface AzkarCacheEnvelope {
 /**
  * Loads admin-managed adhkar from Firestore (or AsyncStorage cache).
  * Safe to call at app startup. Failures fall back silently to bundled JSON.
+ *
+ * Behavior:
+ *  • Cache is shown immediately (instant cold start)
+ *  • Firestore is ALWAYS fetched in the background — admin edits propagate
+ *    on next app launch even if the local cache hasn't expired.
  */
 export const hydrateAzkarFromFirestore = async (): Promise<void> => {
-  // 1) Try cache first (instant, avoids network on cold start)
+  // 1) Try cache first (instant, avoids gating on network on cold start)
   try {
     const cached = await AsyncStorage.getItem(AZKAR_CACHE_KEY);
     if (cached) {
       try {
         const env = JSON.parse(cached) as AzkarCacheEnvelope;
-        if (env?.data?.length && Date.now() - env.ts < AZKAR_CACHE_TTL_MS) {
-          _azkarOverride = env.data;
-          return; // fresh cache, skip network
-        }
         if (env?.data?.length) {
-          _azkarOverride = env.data; // stale but usable while we revalidate
+          _azkarOverride = sortAzkarItems(env.data);
         }
       } catch {
         // corrupted cache — ignore, refetch
@@ -116,23 +149,101 @@ export const hydrateAzkarFromFirestore = async (): Promise<void> => {
     // AsyncStorage unavailable — ignore
   }
 
-  // 2) Fetch from Firestore in the background
+  // 2) ALWAYS refresh from Firestore in background so admin edits show on
+  //    next launch (even if soft TTL hasn't elapsed). Don't await — let
+  //    it run while UI shows cached data.
+  refreshAzkarFromFirestore().catch(() => {});
+};
+
+/** Compute a lightweight signature for change detection across all editable fields. */
+export const computeAzkarSignature = (items: Zikr[]): string => {
+  // Sort by id to make the signature order-independent
+  const sorted = [...items].sort((a, b) => a.id - b.id);
+  return JSON.stringify(
+    sorted.map((z) => [
+      z.id,
+      z.category,
+      z.subcategory || '',
+      Number.isFinite(Number(z.sortOrder)) ? Number(z.sortOrder) : '',
+      z.audio || '',
+      z.arabic || '',
+      z.transliteration || '',
+      z.count || 0,
+      z.reference || '',
+      typeof z.benefit === 'string' ? z.benefit : JSON.stringify(z.benefit || {}),
+      JSON.stringify(z.translations || z.translation || {}),
+    ]),
+  );
+};
+
+/** Force-refresh the azkar override from Firestore. Used on app foreground. */
+export const refreshAzkarFromFirestore = async (): Promise<void> => {
   try {
     const snap = await getDocs(collection(db, 'azkar'));
     if (snap.empty) return; // collection empty — keep bundled fallback
-    const items: Zikr[] = snap.docs.map(d => d.data() as Zikr).filter(z => z && typeof z.id === 'number');
+    const items: Zikr[] = snap.docs
+      .map((d) => d.data() as Zikr)
+      .filter((z) => z && typeof z.id === 'number')
+      // Sort by admin-managed order first, then numeric id for backward compatibility.
+      // Firestore returns docs alphabetically by string id ("10" before "2").
+      .sort(compareAzkarItems);
     if (!items.length) return;
+    // Detect change against current override using a full-content signature
+    // (text, audio, benefit, translations, count, reference). Without this,
+    // text-only edits from the admin panel would silently update memory but
+    // never trigger a UI re-render.
+    const newSig = computeAzkarSignature(items);
+    const oldSig = _azkarOverride ? computeAzkarSignature(_azkarOverride) : '';
+    const changed = newSig !== oldSig;
     _azkarOverride = items;
     try {
       await AsyncStorage.setItem(
         AZKAR_CACHE_KEY,
-        JSON.stringify({ ts: Date.now(), data: items } as AzkarCacheEnvelope)
+        JSON.stringify({ ts: Date.now(), data: items } as AzkarCacheEnvelope),
       );
     } catch {
       // ignore cache write failure
     }
+    if (changed) notifyAzkarChanged();
   } catch (err) {
-    console.warn('[azkar-api] hydrateAzkarFromFirestore failed, using bundled JSON:', err);
+    console.warn('[azkar-api] refreshAzkarFromFirestore failed, keeping current data:', err);
+  }
+};
+
+/**
+ * Subscribe to live Firestore updates of the azkar collection.
+ * Returns an unsubscribe function. Call once at app startup.
+ */
+export const subscribeToAzkarFromFirestore = (): (() => void) => {
+  try {
+    const unsub = onSnapshot(
+      collection(db, 'azkar'),
+      (snap) => {
+        if (snap.empty) return;
+        const items: Zikr[] = snap.docs
+          .map((d) => d.data() as Zikr)
+          .filter((z) => z && typeof z.id === 'number')
+          // Same canonical admin-order sort as refreshAzkarFromFirestore.
+          .sort(compareAzkarItems);
+        if (!items.length) return;
+        const newSig = computeAzkarSignature(items);
+        const oldSig = _azkarOverride ? computeAzkarSignature(_azkarOverride) : '';
+        const changed = newSig !== oldSig;
+        _azkarOverride = items;
+        AsyncStorage.setItem(
+          AZKAR_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), data: items } as AzkarCacheEnvelope),
+        ).catch(() => {});
+        if (changed) notifyAzkarChanged();
+      },
+      (err) => {
+        console.warn('[azkar-api] subscribeToAzkarFromFirestore error:', err);
+      },
+    );
+    return unsub;
+  } catch (err) {
+    console.warn('[azkar-api] subscribeToAzkarFromFirestore failed:', err);
+    return () => {};
   }
 };
 
@@ -169,10 +280,16 @@ export const getAllCategories = (): AzkarCategory[] => {
 };
 
 /**
+/**
  * الحصول على الأذكار حسب الفئة
+ * Always sorted by numeric id ascending so Morning + Evening (and every other
+ * category) follow the exact same canonical order shown in the admin panel.
+ * Firestore returns docs alphabetically by document id ("10" before "2"),
+ * so we MUST sort here — otherwise the on-device order diverges from admin.
  */
 export const getAzkarByCategory = (category: AzkarCategoryType): Zikr[] => {
-  return getAllAzkar().filter(zikr => zikr.category === category);
+  const resolvedCategory = resolveCategoryId(category);
+  return sortAzkarItems(getAllAzkar().filter((zikr) => zikr.category === resolvedCategory));
 };
 
 /**
@@ -361,7 +478,7 @@ export const updateZikrProgress = async (
       zikrProgress.currentCount = currentCount;
       zikrProgress.lastRead = new Date().toISOString();
       
-      if (zikr && currentCount >= zikr.count) {
+      if (zikr && currentCount >= getEffectiveZikrRepeatCount(zikr)) {
         zikrProgress.completed = true;
       }
       
@@ -594,7 +711,7 @@ export const fetchAzkarFromFirestore = async (): Promise<Zikr[]> => {
     const snap = await getDocs(collection(db, 'azkar'));
     if (!snap.empty) {
       const items = snap.docs.map(d => d.data() as Zikr);
-      items.sort((a, b) => a.id - b.id);
+      items.sort(compareAzkarItems);
       firestoreAzkarCache = items;
       await AsyncStorage.setItem(FIRESTORE_AZKAR_CACHE_KEY, JSON.stringify({ data: items, timestamp: Date.now() }));
       return items;

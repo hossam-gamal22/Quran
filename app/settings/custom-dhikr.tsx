@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -32,7 +33,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 const ICONS = [
   'hand-heart', 'star-crescent', 'heart', 'moon-waning-crescent',
   'book-open-variant', 'circle-multiple', 'leaf', 'water',
-  'flower', 'candelabra', 'hands-pray', 'shield-cross',
+  'flower', 'candelabra', '🤲', 'shield-cross',
 ];
 
 const STORAGE_KEY = 'custom_adhkar';
@@ -129,8 +130,8 @@ export default function CustomDhikrScreen() {
                     setSelectedIcon(icon);
                   }}
                 >
-                  <MaterialCommunityIcons
-                    name={icon as any}
+                  <AppIcon
+                    name={icon}
                     size={24}
                     color={selectedIcon === icon ? '#0d8e62' : colors.glassTextLight}
                   />

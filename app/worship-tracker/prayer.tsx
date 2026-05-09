@@ -29,7 +29,7 @@ import Animated, {
 
 import { usePrayerTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { PrayerStatus, PrayerName, DailyPrayerRecord } from '@/lib/worship-storage';
+import { PrayerStatus, PrayerName, DailyPrayerRecord, formatDate, getTodayDate } from '@/lib/worship-storage';
 import {
   getCachedPrayerTimes,
   formatPrayerTime,
@@ -370,13 +370,13 @@ export default function PrayerTrackerScreen() {
   }, [selectedDate]);
 
   const selectedDateStr = useMemo(() => {
-    return selectedDate.toISOString().split('T')[0];
+    return formatDate(selectedDate);
   }, [selectedDate]);
 
   // جلب مواقيت الصلاة الحقيقية من الكاش + سجل الفجر التاريخي
   useEffect(() => {
     const loadTimes = async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDate();
       const cached = await getCachedPrayerTimes(today);
       if (cached) setPrayerTimes(cached);
       
@@ -487,7 +487,7 @@ export default function PrayerTrackerScreen() {
 
   // البحث عن سجل يوم معين
   const getRecordForDate = (date: Date): DailyPrayerRecord | undefined => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDate(date);
     return weekPrayers.find(r => r.date === dateStr);
   };
 

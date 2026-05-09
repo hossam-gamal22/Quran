@@ -88,7 +88,7 @@ const SEASON_TYPES: { value: SeasonType; labelAr: string; labelEn: string; icon:
 const CONTENT_TYPES: { value: ContentType; labelAr: string; icon: string }[] = [
   { value: 'greeting', labelAr: 'تحية', icon: '👋' },
   { value: 'azkar', labelAr: 'أذكار', icon: '📿' },
-  { value: 'dua', labelAr: 'دعاء', icon: '🤲' },
+  { value: 'dua', labelAr: 'دعاء', icon: 'hand-heart' },
   { value: 'reminder', labelAr: 'تذكير', icon: '🔔' },
   { value: 'challenge', labelAr: 'تحدي', icon: '🎯' },
   { value: 'fact', labelAr: 'معلومة', icon: '💡' },

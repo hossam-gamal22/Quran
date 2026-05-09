@@ -234,16 +234,16 @@ const CATEGORY_ICONS = {
   'دعاء دخول المسجد': { icon: 'mosque', color: '#6366F1' },
   'دعاء الخروج من المسجد': { icon: 'mosque', color: '#6366F1' },
   'أذكار الأذان': { icon: 'bullhorn', color: '#EC4899' },
-  'دعاء الاستفتاح': { icon: 'hands-pray', color: '#F97316' },
-  'دعاء الركوع': { icon: 'hands-pray', color: '#F97316' },
-  'دعاء الرفع من الركوع': { icon: 'hands-pray', color: '#F97316' },
-  'دعاء السجود': { icon: 'hands-pray', color: '#F97316' },
-  'دعاء الجلسة بين السجدتين': { icon: 'hands-pray', color: '#F97316' },
-  'دعاء سجود التلاوة': { icon: 'hands-pray', color: '#F97316' },
-  'التشهد': { icon: 'hands-pray', color: '#F97316' },
+  'دعاء الاستفتاح': { icon: 'hand-heart', color: '#F97316' },
+  'دعاء الركوع': { icon: 'hand-heart', color: '#F97316' },
+  'دعاء الرفع من الركوع': { icon: 'hand-heart', color: '#F97316' },
+  'دعاء السجود': { icon: 'hand-heart', color: '#F97316' },
+  'دعاء الجلسة بين السجدتين': { icon: 'hand-heart', color: '#F97316' },
+  'دعاء سجود التلاوة': { icon: 'hand-heart', color: '#F97316' },
+  'التشهد': { icon: 'hand-heart', color: '#F97316' },
   'الصلاة على النبي بعد التشهد': { icon: 'star-crescent', color: '#E91E63' },
-  'الدعاء بعد التشهد الأخير قبل السلام': { icon: 'hands-pray', color: '#F97316' },
-  'الأذكار بعد السلام من الصلاة': { icon: 'hands-pray', color: '#EC4899' },
+  'الدعاء بعد التشهد الأخير قبل السلام': { icon: 'hand-heart', color: '#F97316' },
+  'الأذكار بعد السلام من الصلاة': { icon: 'hand-heart', color: '#EC4899' },
   'دعاء صلاة الاستخارة': { icon: 'compass', color: '#14B8A6' },
   'أذكار الطعام': { icon: 'food', color: '#F97316' },
   'دعاء السفر': { icon: 'airplane', color: '#06B6D4' },
@@ -259,9 +259,9 @@ function getCategoryMeta(arabicName) {
     if (arabicSimilarity(arabicName, key) >= 0.7) return val;
   }
   // Default based on content keywords
-  if (arabicName.includes('دعاء')) return { icon: 'hands-pray', color: '#F97316' };
+  if (arabicName.includes('دعاء')) return { icon: 'hand-heart', color: '#F97316' };
   if (arabicName.includes('أذكار')) return { icon: 'book-open-variant', color: '#10B981' };
-  if (arabicName.includes('صلاة') || arabicName.includes('الصلاة')) return { icon: 'hands-pray', color: '#EC4899' };
+  if (arabicName.includes('صلاة') || arabicName.includes('الصلاة')) return { icon: 'hand-heart', color: '#EC4899' };
   if (arabicName.includes('المسجد')) return { icon: 'mosque', color: '#6366F1' };
   if (arabicName.includes('السفر')) return { icon: 'airplane', color: '#06B6D4' };
   if (arabicName.includes('المنزل') || arabicName.includes('البيت')) return { icon: 'home', color: '#8B5CF6' };

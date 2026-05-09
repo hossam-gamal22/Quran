@@ -66,7 +66,7 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', alignItems: 'center' }}
         activeOpacity={1}
         onPress={onClose}
       >

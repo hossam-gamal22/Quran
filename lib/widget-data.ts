@@ -119,6 +119,10 @@ export interface WidgetSettings {
     showCompletion: boolean;
     colorScheme: 'auto' | 'light' | 'dark';
     accentColor: string;
+    /** Visual style for the medium (4×2) prayer widget. */
+    style?: 'pair' | 'table' | 'banner';
+    /** Visual style for the small (2×2) prayer widget. */
+    smallStyle?: 'compact' | 'simple';
   };
   azkarWidget: {
     enabled: boolean;
@@ -166,6 +170,8 @@ export const defaultWidgetSettings: WidgetSettings = {
     showCompletion: true,
     colorScheme: 'auto',
     accentColor: '#0d8e62',
+    style: 'pair',
+    smallStyle: 'compact',
   },
   azkarWidget: {
     enabled: true,

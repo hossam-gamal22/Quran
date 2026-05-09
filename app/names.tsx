@@ -1521,7 +1521,7 @@ const _styles = StyleSheet.create({
   // نافذة التفاصيل
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
   },
   detailsModal: {
@@ -1695,7 +1695,7 @@ const _styles = StyleSheet.create({
   // نافذة المشاركة
   shareModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
   },
   shareModalContent: {

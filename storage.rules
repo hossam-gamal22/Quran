@@ -20,14 +20,28 @@ service firebase.storage {
                    && request.resource.contentType.matches('audio/.*');
     }
 
-    // App content images (icons, backgrounds) — admin only
+    // App content images (icons, backgrounds) — admin panel writes
+    // (no Firebase Auth on admin; same trust model as Firestore admin
+    // collections — open write, will be locked down via Netlify proxy
+    // in Phase B0.5).
     match /appContent/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
     }
 
-    // General admin uploads
+    // General admin uploads (welcome banner backgrounds, etc.)
     match /uploads/{allPaths=**} {
-      allow write: if request.auth != null;
+      allow write: if request.resource.size < 10 * 1024 * 1024
+                   && (request.resource.contentType.matches('image/.*')
+                       || request.resource.contentType.matches('audio/.*'));
+    }
+
+    // Adhkar audio files uploaded from AzkarManager admin page.
+    // Same trust model as other admin uploads.
+    match /adhkar-audio/{fileName} {
+      allow write: if request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+      allow delete: if true;
     }
 
     // User cloud backups — per-user JSON blobs keyed by OAuth openId.

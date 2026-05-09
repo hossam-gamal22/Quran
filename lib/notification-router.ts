@@ -83,9 +83,16 @@ export function handleNotificationNavigation(
       return { navigated: true };
 
     // ─── Daily Ayah ───
-    case 'daily_ayah':
+    case 'daily_ayah': {
+      const surah = Number(data.surah);
+      const ayah = Number(data.ayah);
+      if (Number.isFinite(surah) && Number.isFinite(ayah) && surah > 0 && ayah > 0) {
+        router.push(`/surah/${surah}?ayah=${ayah}` as any);
+        return { navigated: true };
+      }
       router.push('/daily-ayah' as any);
       return { navigated: true };
+    }
 
     // ─── Salawat (dedicated screen) ───
     case 'salawat':

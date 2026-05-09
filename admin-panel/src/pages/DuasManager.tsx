@@ -213,11 +213,14 @@ export default function DuasManager() {
           >
             + إضافة دعاء
           </button>
-          {duas.length === 0 && (
+          {(
             <button
               className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
               onClick={async () => {
-                if (!confirm('هل تريد استيراد الأدعية الافتراضية من التطبيق؟')) return;
+                const msg = duas.length === 0
+                  ? 'هل تريد استيراد الأدعية الافتراضية من التطبيق؟'
+                  : `يوجد ${duas.length} دعاء بالفعل. هل تريد إضافة الأدعية الافتراضية أيضاً؟`;
+                if (!confirm(msg)) return;
                 try {
                   const defaults = getDefaultDuas();
                   const batch = writeBatch(db);
@@ -244,6 +247,7 @@ export default function DuasManager() {
               📥 استيراد الافتراضي
             </button>
           )}
+          {/* end import-default button */}
           <button
             onClick={handleExportJSON}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -478,7 +482,7 @@ export default function DuasManager() {
 
           {filteredDuas.length === 0 && (
             <div className="text-center py-12 text-gray-400">
-              <p className="text-4xl mb-3">🤲</p>
+              <p className="text-4xl mb-3">hand-heart</p>
               <p>لا توجد أدعية {searchQuery ? 'مطابقة للبحث' : 'بعد'}</p>
             </div>
           )}

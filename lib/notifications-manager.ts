@@ -369,7 +369,7 @@ export async function scheduleDailyAyahNotification(
         title: dirText(t('settings.dailyAyahTitle')),
         body: dirText(ayahData.text),
         sound: resolveNotificationSound(verseSound, true),
-        data: { type: 'daily_ayah', soundType: verseSound, iconType: 'quran' },
+        data: { type: 'daily_ayah', surah: ayahData.surah, ayah: ayahData.ayah, soundType: verseSound, iconType: 'quran' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && quranAttachments && { attachments: quranAttachments }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
@@ -1083,7 +1083,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           title: dailyAyahText.title,
           body: dailyAyahText.body,
           sound: resolveNotificationSound(notifSettings.dailyVerseSoundType || 'notif_verse', notifSettings.sound),
-          data: { type: 'daily_ayah', soundType: notifSettings.dailyVerseSoundType || 'notif_verse', iconType: 'quran' },
+          data: { type: 'daily_ayah', surah: ayahData.surah, ayah: ayahData.ayah, soundType: notifSettings.dailyVerseSoundType || 'notif_verse', iconType: 'quran' },
         },
         dailyTimes,
         notifSettings.dailyVerseDays,
@@ -1277,7 +1277,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Weekly report (every Friday — schedule next 4 Fridays as DATE triggers)
     if (notifSettings.worshipWeeklyReport) {
-      const weeklyTime = parseTime(notifSettings.worshipDailySummaryTime || '23:00');
+      const weeklyTime = parseTime(notifSettings.worshipWeeklyReportTime || notifSettings.worshipDailySummaryTime || '21:00');
       const worshipWeeklyChannelId = 'general'; // device default sound
       const worshipWeeklyAttachments = await getNotificationIconAttachment('reminder');
       const now = new Date();

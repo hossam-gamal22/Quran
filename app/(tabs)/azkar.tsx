@@ -28,6 +28,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { NativeTabs } from '@/components/ui/NativeTabs';
@@ -209,7 +210,7 @@ export default function AzkarScreen() {
   const renderIcon = (categoryId: string, size: number, color: string) => {
     const cat = categories.find(c => c.id === categoryId);
     const iconName = cat?.icon || 'book-open-variant';
-    return <MaterialCommunityIcons name={iconName as any} size={size} color={color} />;
+    return <AppIcon name={iconName} size={size} color={color} />;
   };
 
   // =========================================

@@ -1047,6 +1047,16 @@ export default function QuranScreen() {
                 accentColor="#7C3AED"
               />
             </View>
+            <View style={[styles.quickActionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <GlassActionButton
+                icon="brain"
+                label="حفظ القرآن"
+                onPress={() => router.push('/memorization' as any)}
+                isLightBg={isLightBg}
+                primaryColor={colors.primary}
+                accentColor="#0d8e62"
+              />
+            </View>
           </View>
         )}
 
@@ -1123,8 +1133,8 @@ export default function QuranScreen() {
                     styles.modalContent,
                     {
                       backgroundColor: isLightBg
-                        ? 'rgba(255,255,255,0.60)'
-                        : 'rgba(28,28,30,0.20)',
+                        ? 'rgba(255,255,255,0.97)'
+                        : '#0f1a14',
                     },
                   ]}
                 >
@@ -1209,7 +1219,7 @@ export default function QuranScreen() {
                 tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
                 style={StyleSheet.absoluteFill}
               />
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.60)' : 'rgba(30,30,30,0.40)', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)' }]} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.97)' : '#0f1a14', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)' }]} />
               <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: Spacing.xl + 20 }}>
               <View style={[styles.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Text style={[styles.settingsTitle, { color: colors.text }]}>{t('quran.quranSettings')}</Text>
@@ -1712,7 +1722,7 @@ const _styles = StyleSheet.create({
   // Modal - Glass
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -1799,7 +1809,7 @@ const _styles = StyleSheet.create({
   // Quran Settings Modal
   settingsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
   },
   settingsContent: {
