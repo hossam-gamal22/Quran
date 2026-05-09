@@ -3,15 +3,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Search, Save, X, Eye, Upload, Download, Edit2, Globe, Image, Copy,
-  Type, Filter, ChevronDown, CheckCircle, AlertCircle, RefreshCw,
-  Smartphone,
+  Search, X, Eye, Upload, Download, Edit2, Globe, Image, Copy,
+  Type, CheckCircle, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
 import { db, storage } from '../firebase';
 import {
-  collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
+  collection, getDocs, doc, setDoc,
   query, orderBy, writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -71,6 +70,222 @@ const DEFAULT_CONTENT_ITEMS: Omit<AppContentItem, 'id' | 'updatedAt'>[] = [
   { key: 'prayer_title', type: 'text', screen: 'prayer', translations: { ar: 'مواقيت الصلاة', en: 'Prayer Times', fr: 'Heures de prière', tr: 'Namaz Vakitleri', ur: 'نماز کے اوقات', id: 'Waktu Shalat', bn: 'নামাজের সময়', de: 'Gebetszeiten', es: 'Horarios de oración', ru: 'Время молитвы', fa: 'اوقات نماز', ms: 'Waktu Solat' } },
   { key: 'prayer_qibla', type: 'text', screen: 'prayer', translations: { ar: 'القبلة', en: 'Qibla', fr: 'Qibla', tr: 'Kıble', ur: 'قبلہ', id: 'Kiblat', bn: 'কিবলা', de: 'Qibla', es: 'Qibla', ru: 'Кибла', fa: 'قبله', ms: 'Kiblat' } },
 ];
+
+// ========================================
+// EditModal — defined outside the parent so React preserves
+// its identity across re-renders (otherwise local state resets every render).
+// ========================================
+
+interface EditModalProps {
+  item: AppContentItem;
+  onClose: () => void;
+  onSave: (item: AppContentItem) => Promise<void>;
+  onUploadIcon: (file: File, itemKey: string) => Promise<string | null>;
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error';
+  previewLang: LangCode;
+  setPreviewLang: (l: LangCode) => void;
+}
+
+const EditModal: React.FC<EditModalProps> = ({
+  item,
+  onClose,
+  onSave,
+  onUploadIcon,
+  saveStatus,
+  previewLang,
+  setPreviewLang,
+}) => {
+  const [localItem, setLocalItem] = useState<AppContentItem>(item);
+
+  // Sync local state when the parent opens a different item
+  useEffect(() => {
+    setLocalItem(item);
+  }, [item]);
+
+  const updateTranslation = (lang: LangCode, value: string) => {
+    setLocalItem(prev => ({
+      ...prev,
+      translations: { ...prev.translations, [lang]: value },
+    }));
+  };
+
+  const handleIconChange = async (file: File) => {
+    const url = await onUploadIcon(file, localItem.key);
+    if (url) {
+      const updated = { ...localItem, iconUrl: url };
+      setLocalItem(updated);
+      await onSave(updated);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+      <div className="bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-700">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-700 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-white">تعديل: {localItem.key}</h3>
+            <p className="text-sm text-slate-400 mt-1">الشاشة: {localItem.screen} | النوع: {localItem.type}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400" aria-label="إغلاق" title="إغلاق">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex">
+          {/* Translations */}
+          <div className="flex-1 p-6 overflow-y-auto max-h-[70vh]">
+            <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+              <Globe className="w-4 h-4" /> الترجمات (12 لغة)
+            </h4>
+
+            {/* Auto-translate */}
+            <AutoTranslateField
+              label="ترجمة تلقائية"
+              fieldName="translations"
+              contentType="ui"
+              initialValues={localItem.translations}
+              onSave={(translations) => {
+                Object.entries(translations).forEach(([code, text]) => {
+                  if (text) updateTranslation(code as LangCode, text);
+                });
+              }}
+            />
+
+            <div className="mt-2">
+              <TranslateButton
+                sourceText={localItem.translations.ar || ''}
+                sourceLang="ar"
+                contentType="ui"
+                compact
+                label="🌐 ترجمة سريعة لكل اللغات"
+                onTranslated={(translations) => {
+                  Object.entries(translations).forEach(([code, text]) => {
+                    if (text) updateTranslation(code as LangCode, text);
+                  });
+                }}
+              />
+            </div>
+
+            <div className="space-y-3 mt-4">
+              {SUPPORTED_LANGUAGES.map(lang => (
+                <div key={lang.code} className="flex items-center gap-3">
+                  <span className="text-lg w-8">{lang.flag}</span>
+                  <span className="text-xs text-slate-400 w-16">{lang.code.toUpperCase()}</span>
+                  <input
+                    type="text"
+                    value={localItem.translations[lang.code] || ''}
+                    onChange={(e) => updateTranslation(lang.code, e.target.value)}
+                    dir={lang.rtl ? 'rtl' : 'ltr'}
+                    className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                    placeholder={`${lang.name}...`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Icon Upload (if type is icon) */}
+            {localItem.type === 'icon' && (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                  <Image className="w-4 h-4" /> الأيقونة
+                </h4>
+                <div className="flex items-center gap-4">
+                  {localItem.iconUrl && (
+                    <img src={localItem.iconUrl} alt="Icon" className="w-12 h-12 rounded-lg bg-slate-700 p-1" />
+                  )}
+                  <label className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-white cursor-pointer transition">
+                    <Upload className="w-4 h-4 inline mr-2" />
+                    رفع أيقونة
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleIconChange(file);
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Live Preview */}
+          <div className="w-72 bg-slate-900 border-l border-slate-700 p-6">
+            <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+              <Eye className="w-4 h-4" /> معاينة حية
+            </h4>
+
+            {/* Language selector for preview */}
+            <div className="flex flex-wrap gap-1 mb-4">
+              {SUPPORTED_LANGUAGES.map(lang => (
+                <button
+                  key={lang.code}
+                  onClick={() => setPreviewLang(lang.code)}
+                  className={`text-lg p-1 rounded ${previewLang === lang.code ? 'bg-emerald-600/30 ring-1 ring-emerald-500' : 'hover:bg-slate-700'}`}
+                  title={lang.name}
+                >
+                  {lang.flag}
+                </button>
+              ))}
+            </div>
+
+            {/* Mock phone preview */}
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4 min-h-[200px]">
+              <div className="bg-slate-700/50 rounded-xl p-3 mb-3">
+                {localItem.iconUrl && (
+                  <img src={localItem.iconUrl} alt="" className="w-8 h-8 mx-auto mb-2" />
+                )}
+                <p
+                  className={`text-center text-white font-medium ${SUPPORTED_LANGUAGES.find(l => l.code === previewLang)?.rtl ? 'text-right' : 'text-left'}`}
+                  dir={SUPPORTED_LANGUAGES.find(l => l.code === previewLang)?.rtl ? 'rtl' : 'ltr'}
+                >
+                  {localItem.translations[previewLang] || `[${previewLang}]`}
+                </p>
+              </div>
+              <p className="text-xs text-slate-500 text-center">
+                {SUPPORTED_LANGUAGES.find(l => l.code === previewLang)?.name}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {saveStatus === 'saved' && (
+              <span className="text-emerald-400 text-sm flex items-center gap-1">
+                <CheckCircle className="w-4 h-4" /> تم الحفظ
+              </span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="text-red-400 text-sm flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" /> خطأ في الحفظ
+              </span>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-slate-300 hover:text-white transition"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={() => onSave(localItem)}
+              disabled={saveStatus === 'saving'}
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm text-white font-medium transition disabled:opacity-50"
+            >
+              {saveStatus === 'saving' ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ========================================
 // Component
@@ -154,20 +369,19 @@ const AppContentManager: React.FC = () => {
     }
   };
 
-  // Upload icon
-  const handleIconUpload = async (file: File, item: AppContentItem) => {
+  // Upload icon — returns the public URL or null on failure.
+  // The modal applies the URL to its local state and triggers a save.
+  const uploadIcon = async (file: File, itemKey: string): Promise<string | null> => {
     try {
       const pngBlob = await convertToPng(file);
       const isSvg = file.type === 'image/svg+xml';
       const ext = isSvg ? 'svg' : 'png';
-      const storageRef = ref(storage, `app-content/icons/${item.key}_${Date.now()}.${ext}`);
+      const storageRef = ref(storage, `app-content/icons/${itemKey}_${Date.now()}.${ext}`);
       await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
-      const url = await getDownloadURL(storageRef);
-      const updated = { ...item, iconUrl: url };
-      setEditingItem(updated);
-      await saveItem(updated);
+      return await getDownloadURL(storageRef);
     } catch (error) {
       console.error('Error uploading icon:', error);
+      return null;
     }
   };
 
@@ -199,187 +413,6 @@ const AppContentManager: React.FC = () => {
     } catch (error) {
       console.error('Error importing content:', error);
     }
-  };
-
-  // ========================================
-  // Edit Modal
-  // ========================================
-  const EditModal = () => {
-    if (!editingItem) return null;
-    const [localItem, setLocalItem] = useState<AppContentItem>(editingItem);
-
-    const updateTranslation = (lang: LangCode, value: string) => {
-      setLocalItem(prev => ({
-        ...prev,
-        translations: { ...prev.translations, [lang]: value },
-      }));
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-        <div className="bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-700">
-          {/* Header */}
-          <div className="p-6 border-b border-slate-700 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-white">تعديل: {localItem.key}</h3>
-              <p className="text-sm text-slate-400 mt-1">الشاشة: {localItem.screen} | النوع: {localItem.type}</p>
-            </div>
-            <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400" aria-label="إغلاق" title="إغلاق">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex">
-            {/* Translations */}
-            <div className="flex-1 p-6 overflow-y-auto max-h-[70vh]">
-              <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-                <Globe className="w-4 h-4" /> الترجمات (12 لغة)
-              </h4>
-
-              {/* Auto-translate */}
-              <AutoTranslateField
-                label="ترجمة تلقائية"
-                fieldName="translations"
-                contentType="ui"
-                initialValues={localItem.translations}
-                onSave={(translations) => {
-                  Object.entries(translations).forEach(([code, text]) => {
-                    if (text) updateTranslation(code as LangCode, text);
-                  });
-                }}
-              />
-
-              <div className="mt-2">
-                <TranslateButton
-                  sourceText={localItem.translations.ar || ''}
-                  sourceLang="ar"
-                  contentType="ui"
-                  compact
-                  label="🌐 ترجمة سريعة لكل اللغات"
-                  onTranslated={(translations) => {
-                    Object.entries(translations).forEach(([code, text]) => {
-                      if (text) updateTranslation(code as LangCode, text);
-                    });
-                  }}
-                />
-              </div>
-
-              <div className="space-y-3 mt-4">
-                {SUPPORTED_LANGUAGES.map(lang => (
-                  <div key={lang.code} className="flex items-center gap-3">
-                    <span className="text-lg w-8">{lang.flag}</span>
-                    <span className="text-xs text-slate-400 w-16">{lang.code.toUpperCase()}</span>
-                    <input
-                      type="text"
-                      value={localItem.translations[lang.code] || ''}
-                      onChange={(e) => updateTranslation(lang.code, e.target.value)}
-                      dir={lang.rtl ? 'rtl' : 'ltr'}
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                      placeholder={`${lang.name}...`}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Icon Upload (if type is icon) */}
-              {localItem.type === 'icon' && (
-                <div className="mt-6">
-                  <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                    <Image className="w-4 h-4" /> الأيقونة
-                  </h4>
-                  <div className="flex items-center gap-4">
-                    {localItem.iconUrl && (
-                      <img src={localItem.iconUrl} alt="Icon" className="w-12 h-12 rounded-lg bg-slate-700 p-1" />
-                    )}
-                    <label className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-white cursor-pointer transition">
-                      <Upload className="w-4 h-4 inline mr-2" />
-                      رفع أيقونة
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleIconUpload(file, localItem);
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Live Preview */}
-            <div className="w-72 bg-slate-900 border-l border-slate-700 p-6">
-              <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-                <Eye className="w-4 h-4" /> معاينة حية
-              </h4>
-              
-              {/* Language selector for preview */}
-              <div className="flex flex-wrap gap-1 mb-4">
-                {SUPPORTED_LANGUAGES.map(lang => (
-                  <button
-                    key={lang.code}
-                    onClick={() => setPreviewLang(lang.code)}
-                    className={`text-lg p-1 rounded ${previewLang === lang.code ? 'bg-emerald-600/30 ring-1 ring-emerald-500' : 'hover:bg-slate-700'}`}
-                    title={lang.name}
-                  >
-                    {lang.flag}
-                  </button>
-                ))}
-              </div>
-
-              {/* Mock phone preview */}
-              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4 min-h-[200px]">
-                <div className="bg-slate-700/50 rounded-xl p-3 mb-3">
-                  {localItem.iconUrl && (
-                    <img src={localItem.iconUrl} alt="" className="w-8 h-8 mx-auto mb-2" />
-                  )}
-                  <p className={`text-center text-white font-medium ${SUPPORTED_LANGUAGES.find(l => l.code === previewLang)?.rtl ? 'text-right' : 'text-left'}`}
-                     dir={SUPPORTED_LANGUAGES.find(l => l.code === previewLang)?.rtl ? 'rtl' : 'ltr'}>
-                    {localItem.translations[previewLang] || `[${previewLang}]`}
-                  </p>
-                </div>
-                <p className="text-xs text-slate-500 text-center">
-                  {SUPPORTED_LANGUAGES.find(l => l.code === previewLang)?.name}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-slate-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {saveStatus === 'saved' && (
-                <span className="text-emerald-400 text-sm flex items-center gap-1">
-                  <CheckCircle className="w-4 h-4" /> تم الحفظ
-                </span>
-              )}
-              {saveStatus === 'error' && (
-                <span className="text-red-400 text-sm flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" /> خطأ في الحفظ
-                </span>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setEditingItem(null)}
-                className="px-4 py-2 text-sm text-slate-300 hover:text-white transition"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={() => saveItem(localItem)}
-                disabled={saveStatus === 'saving'}
-                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm text-white font-medium transition disabled:opacity-50"
-              >
-                {saveStatus === 'saving' ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   // ========================================
@@ -544,8 +577,18 @@ const AppContentManager: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
-      <EditModal />
+      {/* Edit Modal — gated at parent so the modal Hooks always run in the same order */}
+      {editingItem && (
+        <EditModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSave={saveItem}
+          onUploadIcon={uploadIcon}
+          saveStatus={saveStatus}
+          previewLang={previewLang}
+          setPreviewLang={setPreviewLang}
+        />
+      )}
     </div>
   );
 };

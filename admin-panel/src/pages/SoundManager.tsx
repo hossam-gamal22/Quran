@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Link,
   Play,
   Pause,
   Trash2,
@@ -403,10 +402,6 @@ export default function SoundManager() {
     const matchesCategory = categoryFilter === 'all' || s.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
-
-  const getSoundName = (soundId: string): string => {
-    return sounds.find(s => s.id === soundId)?.name || 'غير محدد';
-  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;

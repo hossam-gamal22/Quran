@@ -33,8 +33,11 @@ export const DEEP_LINK_ROUTES = {
   moreAzkar: `${URL_SCHEME}://more-azkar`,
 
   // In-app navigation
-  widgetsGallery: `${URL_SCHEME}://widgets-gallery`,
-  widgetSettings: `${URL_SCHEME}://widget-settings`,
+  widget: `${URL_SCHEME}://widget`,
+  /** @deprecated use `widget` */
+  widgetsGallery: `${URL_SCHEME}://widget`,
+  /** @deprecated use `widget` */
+  widgetSettings: `${URL_SCHEME}://widget`,
   tasbih: `${URL_SCHEME}://tasbih`,
   names: `${URL_SCHEME}://names`,
   ruqya: `${URL_SCHEME}://ruqya`,
@@ -72,8 +75,7 @@ export const LINKING_CONFIG = {
       'azkar/[category]': 'azkar/:category',
       'quran-bookmarks': 'quran-bookmarks',
       'more-azkar': 'more-azkar',
-      'widget-settings': 'widget-settings',
-      'widgets-gallery': 'widgets-gallery',
+      widget: ['widget', 'widget-settings', 'widgets-gallery'],
       names: 'names',
       ruqya: 'ruqya',
     },

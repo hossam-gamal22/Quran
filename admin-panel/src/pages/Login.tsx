@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Moon, Lock } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 const Login: React.FC = () => {
   const { login } = useAuth();

@@ -21,6 +21,7 @@ import {
   type TranslationResult,
   type AllTranslations,
 } from '@app-lib/unifiedTranslator';
+import { Styled } from './Styled';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,6 @@ const LANG_FLAGS: Record<LangCode, string> = {
 
 export default function AutoTranslateField({
   label,
-  fieldName,
   contentType,
   arabicText,
   surahNumber,
@@ -134,6 +134,8 @@ export default function AutoTranslateField({
           value={inputLang}
           onChange={e => setInputLang(e.target.value as 'ar' | 'en')}
           className="border border-slate-600 rounded-lg px-2 py-2 text-sm bg-slate-800 text-white"
+          aria-label="لغة النص الأصلي"
+          title="لغة النص الأصلي"
         >
           <option value="ar">عربي</option>
           <option value="en">English</option>
@@ -148,6 +150,8 @@ export default function AutoTranslateField({
           rows={inputRows}
           placeholder={inputLang === 'ar' ? 'اكتب النص هنا...' : 'Type text here...'}
           dir={inputLang === 'ar' ? 'rtl' : 'ltr'}
+          aria-label={inputLang === 'ar' ? 'النص العربي للترجمة' : 'Source text to translate'}
+          title={inputLang === 'ar' ? 'النص العربي للترجمة' : 'Source text to translate'}
         />
 
         <button
@@ -164,9 +168,9 @@ export default function AutoTranslateField({
       {/* Progress bar */}
       {loading && (
         <div className="w-full bg-slate-700 rounded-full h-2">
-          <div
+          <Styled
             className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
+            css={{ width: `${progress}%` }}
           />
         </div>
       )}
@@ -201,6 +205,8 @@ export default function AutoTranslateField({
                   }`}
                   rows={2}
                   dir={lang.rtl ? 'rtl' : 'ltr'}
+                  aria-label={`نص الترجمة - ${lang.name}`}
+                  title={`نص الترجمة - ${lang.name}`}
                 />
 
                 {/* Source badge */}

@@ -1,13 +1,15 @@
 // app/onboarding/complete.tsx
 // شاشة اكتمال الإعداد - روح المسلم
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Modal,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
@@ -43,7 +45,10 @@ export default function CompleteScreen() {
   const isRTL = useIsRTL();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
-  
+
+  // Pre-ATT explainer modal state (iOS only)
+  const [attModalVisible, setAttModalVisible] = useState(false);
+
   // أنيميشن النجمة
   const starScale = useSharedValue(0);
   const checkScale = useSharedValue(0);
@@ -79,8 +84,36 @@ export default function CompleteScreen() {
     transform: [{ scale: checkScale.value }],
   }));
 
-  const handleStart = () => {
+  const handleStart = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+    // On iOS, show Pre-ATT explainer modal before the system permission prompt.
+    // This significantly increases opt-in rate (industry data: ~25% → ~50%+).
+    if (Platform.OS === 'ios') {
+      try {
+        const { hasAttBeenAsked } = require('@/lib/att-prompt');
+        const alreadyAsked = await hasAttBeenAsked();
+        if (!alreadyAsked) {
+          setAttModalVisible(true);
+          return;
+        }
+      } catch {
+        // ATT module unavailable — fall through to completion.
+      }
+    }
+
+    completeOnboarding();
+  };
+
+  const handleAttContinue = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAttModalVisible(false);
+    try {
+      const { requestTrackingPermission } = require('@/lib/att-prompt');
+      await requestTrackingPermission();
+    } catch {
+      // Ignore failures — SDK already initialized in non-personalized mode.
+    }
     completeOnboarding();
   };
 
@@ -198,6 +231,36 @@ export default function CompleteScreen() {
           </Animated.View>
         </SafeAreaView>
       </View>
+
+      {/* Pre-ATT explainer modal (iOS only) */}
+      <Modal
+        visible={attModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+        statusBarTranslucent
+      >
+        <View style={styles.attBackdrop}>
+          <View style={styles.attCard}>
+            <View style={styles.attIconWrap}>
+              <MaterialCommunityIcons name="shield-check" size={44} color="#0d8e62" />
+            </View>
+            <Text style={[styles.attTitle, { writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {tOnboarding('attTitle')}
+            </Text>
+            <Text style={[styles.attBody, { writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {tOnboarding('attDescription')}
+            </Text>
+            <TouchableOpacity
+              style={styles.attButton}
+              onPress={handleAttContinue}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.attButtonText}>{tOnboarding('attContinue')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -331,5 +394,65 @@ const _styles = StyleSheet.create({
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.5)',
     marginTop: 20,
+  },
+
+  // Pre-ATT modal
+  attBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  attCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  attIconWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(13,142,98,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  attTitle: {
+    fontSize: 18,
+    fontFamily: fontBold(),
+    color: '#1a1a2e',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  attBody: {
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    color: '#444',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 22,
+  },
+  attButton: {
+    width: '100%',
+    backgroundColor: '#0d8e62',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  attButtonText: {
+    fontSize: 16,
+    fontFamily: fontBold(),
+    color: '#fff',
   },
 });

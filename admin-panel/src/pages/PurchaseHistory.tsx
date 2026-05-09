@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   CreditCard,
@@ -153,7 +153,7 @@ export default function PurchaseHistory() {
   // ==================== Filtering & Sorting ====================
 
   const filtered = useMemo(() => {
-    let result = purchases.filter((p) => {
+    const result = purchases.filter((p) => {
       const matchesSearch =
         !searchTerm ||
         p.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -350,15 +350,19 @@ export async function schedulePrayerNotifications(
     //
     // Android safety-net design (Layer 2):
     //   - Visual notification ALWAYS uses the regular adhan_<sound> channel WITH sound.
-    //   - This guarantees the user hears at least the short adhan (~30s) even if the
-    //     AlarmManager-driven foreground service path fails for ANY reason
-    //     (FullAdhanModule missing, SCHEDULE_EXACT_ALARM revoked, OEM battery kill,
-    //      Doze edge-cases, MediaPlayer prepare failure, etc.).
-    //   - When the service does start successfully, both audio streams play briefly
-    //     in parallel (system notification on STREAM_NOTIFICATION + service on
-    //     STREAM_ALARM) for the first ~30s. Acceptable trade-off vs. silent failure.
+    //   - This guarantees the user hears at least the short adhan clip (~15s, see
+    //     `assets/sounds/<key>.mp3`) even if the AlarmManager-driven foreground
+    //     service path fails for ANY reason (FullAdhanModule missing,
+    //     SCHEDULE_EXACT_ALARM revoked, OEM battery kill, Doze edge-cases,
+    //     MediaPlayer prepare failure, etc.).
+    //   - When the service does start successfully, both audio streams play in
+    //     parallel for ~15s (channel sound on STREAM_NOTIFICATION ends at 15s,
+    //     service continues on STREAM_ALARM until 35s). Acceptable trade-off vs.
+    //     silent failure. Documented in assets/sounds/adhan_full/README.md.
     //
-    // iOS: full adhan plays via attached audio file, system cuts it at ~29s anyway.
+    // iOS: full adhan plays via attached audio file, system cuts it at ~29-30s
+    // (Apple UNNotificationSound hard cap). Files are encoded at 35s but only
+    // the first ~30s is audible — matches user expectations.
     const shouldUseFullAdhan =
       adhanSoundEnabled &&
       effectiveSoundType !== 'silent' &&

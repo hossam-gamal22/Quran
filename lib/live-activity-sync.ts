@@ -124,8 +124,9 @@ export async function refreshLiveActivityIfEnabled(): Promise<boolean> {
     const hijriStr = hijri ? `${hijri.day} ${hijri.monthName} ${hijri.year}` : '';
 
     const widgetSettings = await getWidgetSettings();
-    const accentColor = widgetSettings.prayerWidget?.accentColor || '#0d8e62';
-    const colorScheme = widgetSettings.prayerWidget?.colorScheme || 'auto';
+    void widgetSettings;
+    const accentColor = '#0d8e62';
+    const colorScheme = 'auto';
     const language = getLanguage();
 
     const data: LiveActivityData = {

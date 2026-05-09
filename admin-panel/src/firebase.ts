@@ -27,7 +27,7 @@ export const initAnalytics = async () => {
     if (await isSupported()) {
       return getAnalytics(app);
     }
-  } catch (e) {
+  } catch {
     console.log('Analytics not supported');
   }
   return null;

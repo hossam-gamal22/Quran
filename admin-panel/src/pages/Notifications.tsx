@@ -15,7 +15,6 @@ import {
   CheckCircle,
   AlertCircle,
   X,
-  Target,
   Zap,
   RefreshCw,
   Smartphone,
@@ -47,7 +46,6 @@ import {
   NotificationTranslations,
   UserStats
 } from '../services/pushNotifications';
-import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
 
 // ========================================
@@ -532,7 +530,9 @@ const NotificationsPage: React.FC = () => {
       try {
         const tpSnapshot = await getDocs(collection(db, 'tempPages'));
         setTempPages(tpSnapshot.docs.map(d => ({ id: d.id, title: (d.data() as { title?: string }).title || d.id })));
-      } catch {}
+      } catch {
+        // Optional temp pages collection may not exist yet.
+      }
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -582,7 +582,7 @@ const NotificationsPage: React.FC = () => {
   };
 
   const getFilledLanguagesCount = (): number => {
-    return Object.entries(translations).filter(([_, t]) => t?.title && t?.body).length;
+    return Object.values(translations).filter(t => t?.title && t?.body).length;
   };
 
   // ========================================
@@ -1480,7 +1480,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="flex items-center gap-2 text-sm">
                   <Globe size={14} className="text-purple-400" />
                   <span className="text-slate-400">
-                    {Object.entries(editingTexts).filter(([_, t]) => t?.title && t?.body).length} / 12 لغة
+                    {Object.values(editingTexts).filter(t => t?.title && t?.body).length} / 12 لغة
                   </span>
                 </div>
               </div>
@@ -1528,7 +1528,7 @@ const NotificationsPage: React.FC = () => {
             {/* Footer */}
             <div className="flex justify-between items-center gap-3 p-4 border-t border-admin-border">
               <div className="text-sm text-slate-400">
-                {Object.entries(editingTexts).filter(([_, t]) => t?.title && t?.body).length} لغة مملوءة
+                {Object.values(editingTexts).filter(t => t?.title && t?.body).length} لغة مملوءة
               </div>
               <div className="flex gap-3">
                 <button
@@ -1679,7 +1679,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="flex items-center gap-2 text-sm">
                   <Globe size={14} className="text-purple-400" />
                   <span className="text-slate-400">
-                    {Object.entries(editingTexts).filter(([_, t]) => t?.title && t?.body).length} / 12 لغة
+                    {Object.values(editingTexts).filter(t => t?.title && t?.body).length} / 12 لغة
                   </span>
                 </div>
               </div>
@@ -1727,7 +1727,7 @@ const NotificationsPage: React.FC = () => {
             {/* Footer */}
             <div className="flex justify-between items-center gap-3 p-4 border-t border-admin-border">
               <div className="text-sm text-slate-400">
-                {Object.entries(editingTexts).filter(([_, t]) => t?.title && t?.body).length} لغة مملوءة
+                {Object.values(editingTexts).filter(t => t?.title && t?.body).length} لغة مملوءة
               </div>
               <div className="flex gap-3">
                 <button

@@ -9,7 +9,6 @@ import {
   Calendar,
   BarChart3,
   Settings,
-  Sparkles,
   Menu,
   X,
   Moon,
@@ -32,7 +31,6 @@ import {
   LayoutGrid,
   Heart,
   Languages,
-  Radio,
   ChevronDown,
   Music,
   MessageSquare,
@@ -94,7 +92,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/useAuth';
 import Login from './pages/Login';
 
 // استيراد الصفحات

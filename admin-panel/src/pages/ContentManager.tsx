@@ -231,9 +231,10 @@ function IconUploadField({
         contentType = 'image/svg+xml';
         ext = 'svg';
       } else {
-        uploadBlob = await processImage(file);
-        contentType = 'image/png';
-        ext = 'png';
+        const processed = await processImage(file);
+        uploadBlob = processed.blob;
+        contentType = processed.contentType;
+        ext = processed.ext;
       }
 
       const fileName = `icon_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '')}.${ext}`;

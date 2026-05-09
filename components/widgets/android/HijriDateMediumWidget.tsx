@@ -1,30 +1,53 @@
 // components/widgets/android/HijriDateMediumWidget.tsx
-// 4×2 widget: Hijri + Gregorian date
+// 4×2 — Date display: primary + secondary line. Respects per-type monthCalendar.
 
 import React from 'react';
-import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
+import { GLASS, FONT, resolveIsArabic, paletteFor, applyNumerals, widgetFontFamily } from './shared';
+
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function resolveCalendar(pref: string | undefined, isArabic: boolean): 'gregorian' | 'hijri' {
+  if (pref === 'gregorian') return 'gregorian';
+  if (pref === 'hijri') return 'hijri';
+  return isArabic ? 'hijri' : 'gregorian';
+}
 
 export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
-  const { prayer } = data;
-  const hijriParts = (prayer.hijriDate || '').split(' ');
-  const day = hijriParts[0] || '';
-  const monthYear = hijriParts.slice(1).join(' ');
-  const gregorian = prayer.gregorianDate || '';
-  const theme = getWidgetTheme(data.settings?.widgetTheme);
-  const { colors: sc, gradient } = resolveColorScheme(undefined, 'hijri');
+  const isAr = resolveIsArabic(data.widgetLanguage, data.language);
+  const p = paletteFor(data.widgetTheme);
+  const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
+  const cal = resolveCalendar(data.widgetMonthCalendar ?? data.widgetCalendar, isAr);
+  const family = widgetFontFamily(data.widgetFontVariant);
+  const faintColor = p.isLight ? '#99000000' : '#80FFFFFF';
 
-  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
-  const bg = useTheme ? theme.gradient : gradient;
-  const textColor = useTheme ? theme.textColor : sc.white;
-  const dayColor = useTheme ? theme.badgeText : sc.gold;
-  const accent = useTheme ? theme.accentColor : sc.tealLight;
-  const grayColor = useTheme ? theme.mutedColor : sc.gray;
-  const grayDarkColor = useTheme ? theme.mutedColor : sc.grayDark;
-  const cardBg = useTheme ? theme.badgeBg : sc.cardBg;
-  const dividerColor = useTheme ? theme.mutedColor : sc.divider;
-  const brandColor = useTheme ? theme.accentColor : sc.teal;
+  let dayStr: string;
+  let monthStr: string;
+  let yearStr: string;
+  let secondaryLine: string;
+
+  if (cal === 'hijri') {
+    const day = data.prayer.hijriDay || 1;
+    const monthAr = data.prayer.hijriMonth || 'محرم';
+    const monthEn = data.prayer.hijriMonthEn || '';
+    dayStr = applyNumerals(day, numerals, isAr);
+    monthStr = isAr ? monthAr : monthEn || monthAr;
+    yearStr = `${applyNumerals(data.prayer.hijriYear || 1446, numerals, isAr)} ${isAr ? 'هـ' : 'AH'}`;
+    secondaryLine = data.prayer.gregorianDate || '';
+  } else {
+    const today = new Date();
+    dayStr = applyNumerals(today.getDate(), numerals, isAr);
+    monthStr = isAr ? MONTHS_AR[today.getMonth()] : MONTHS_EN[today.getMonth()];
+    yearStr = `${applyNumerals(today.getFullYear(), numerals, isAr)} ${isAr ? 'م' : ''}`.trim();
+    const hijriDay = data.prayer.hijriDay || 1;
+    const hijriMonthAr = data.prayer.hijriMonth || '';
+    const hijriYear = data.prayer.hijriYear || 1446;
+    secondaryLine = hijriMonthAr
+      ? `${applyNumerals(hijriDay, numerals, isAr)} ${hijriMonthAr} ${applyNumerals(hijriYear, numerals, isAr)} ${isAr ? 'هـ' : 'AH'}`
+      : '';
+  }
 
   return (
     <FlexWidget
@@ -32,136 +55,35 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        backgroundGradient: bg,
-        borderRadius: 20,
-        padding: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: p.bg,
+        borderRadius: GLASS.radius,
+        padding: GLASS.padding,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://hijri' }}
     >
-      {/* Header */}
-      <FlexWidget
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: 'match_parent',
-          marginBottom: 6,
-        }}
-      >
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <ImageWidget
-            image={APP_ICON}
-            imageWidth={ICON_SIZE.header}
-            imageHeight={ICON_SIZE.header}
-            radius={6}
-          />
-          <TextWidget
-            text="التقويم الهجري"
-            style={{
-              fontSize: 13,
-              color: accent,
-              fontFamily: FONT.amiriBold,
-              marginLeft: 6,
-            }}
-          />
-        </FlexWidget>
+      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
         <TextWidget
-          text={BRANDING.name}
-          style={{
-            fontSize: BRANDING.fontSize,
-            color: brandColor,
-            fontFamily: FONT.amiri,
-          }}
+          text={monthStr}
+          style={{ fontSize: 30, color: p.text, fontFamily: family, marginRight: 10 }}
+        />
+        <TextWidget
+          text={dayStr}
+          style={{ fontSize: 44, color: p.text, fontFamily: family }}
         />
       </FlexWidget>
-
-      {/* Content row */}
-      <FlexWidget
-        style={{
-          flexDirection: 'row',
-          flex: 1,
-          width: 'match_parent',
-        }}
-      >
-        {/* Left: large day number */}
-        <FlexWidget
-          style={{
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: 80,
-          }}
-        >
-          <TextWidget
-            text={day}
-            style={{
-              fontSize: 40,
-              color: dayColor,
-              fontFamily: FONT.amiriBold,
-            }}
-          />
-        </FlexWidget>
-
-        {/* Divider */}
-        <FlexWidget
-          style={{
-            width: 1,
-            height: 'match_parent',
-            backgroundColor: dividerColor,
-            marginHorizontal: 10,
-          }}
+      <TextWidget
+        text={yearStr}
+        style={{ fontSize: 13, color: p.muted, fontFamily: FONT.rubikMedium, marginTop: 4 }}
+      />
+      {secondaryLine ? (
+        <TextWidget
+          text={secondaryLine}
+          style={{ fontSize: 12, color: faintColor, fontFamily: FONT.rubik, marginTop: 4 }}
         />
-
-        {/* Right: month + gregorian */}
-        <FlexWidget
-          style={{
-            flexDirection: 'column',
-            justifyContent: 'center',
-            flex: 1,
-          }}
-        >
-          <TextWidget
-            text={monthYear}
-            style={{
-              fontSize: 17,
-              color: textColor,
-              fontFamily: FONT.amiriBold,
-            }}
-          />
-          {(data.settings?.hijriWidget?.showGregorian ?? true) && (
-            <FlexWidget
-              style={{
-                backgroundColor: cardBg,
-                borderRadius: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 3,
-                marginTop: 6,
-              }}
-            >
-              <TextWidget
-                text={gregorian}
-                style={{
-                  fontSize: 13,
-                  color: grayColor,
-                  fontFamily: FONT.amiri,
-                }}
-              />
-            </FlexWidget>
-          )}
-          {prayer.location ? (
-            <TextWidget
-              text={prayer.location}
-              style={{
-                fontSize: 11,
-                color: grayDarkColor,
-                fontFamily: FONT.amiri,
-                marginTop: 4,
-              }}
-            />
-          ) : null}
-        </FlexWidget>
-      </FlexWidget>
+      ) : null}
     </FlexWidget>
   );
 }

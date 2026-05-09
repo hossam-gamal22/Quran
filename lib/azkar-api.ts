@@ -88,6 +88,15 @@ const AZKAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h (used as a soft TTL — w
 let _azkarOverride: Zikr[] | null = null;
 const _azkarChangeListeners = new Set<() => void>();
 
+// ===================================================
+// Custom Categories override (admin-managed)
+// Admin panel writes to top-level `azkar_categories/{id}` collection.
+// These are MERGED with the bundled default categories — defaults stay
+// immutable; only custom ones can be edited/deleted from admin.
+// ===================================================
+const CUSTOM_CATEGORIES_CACHE_KEY = '@azkar_categories_cache';
+let _customCategoriesOverride: AzkarCategory[] = [];
+
 const getSortOrder = (zikr: Zikr): number => {
   const sortOrder = Number(zikr.sortOrder);
   return Number.isFinite(sortOrder) ? sortOrder : Number.POSITIVE_INFINITY;
@@ -268,15 +277,92 @@ export const getAllAzkar = (): Zikr[] => {
 
 /**
  * الحصول على جميع الفئات
+ * Defaults (bundled JSON) + custom categories from Firestore (admin-managed).
+ * Custom categories appear ONLY in the mobile app's "أذكار أخرى" page —
+ * the Home page filters them out via its hardcoded MAIN_IDS list.
  */
 export const getAllCategories = (): AzkarCategory[] => {
-  // التحقق من بنية البيانات
+  let defaults: AzkarCategory[];
   if (Array.isArray(categoriesData)) {
-    return (categoriesData as AzkarCategory[]).sort((a, b) => a.order - b.order);
+    defaults = categoriesData as AzkarCategory[];
+  } else {
+    const data = categoriesData as { categories?: AzkarCategory[] };
+    defaults = data.categories || [];
   }
-  // إذا كانت البيانات في شكل { categories: [...] }
-  const data = categoriesData as { categories?: AzkarCategory[] };
-  return (data.categories || []).sort((a, b) => a.order - b.order);
+  const merged = [...defaults, ..._customCategoriesOverride];
+  return merged.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+};
+
+/**
+ * Hydrate custom categories from Firestore. Loads cache first for instant
+ * cold start, then refreshes in the background so admin edits propagate.
+ */
+export const hydrateCustomCategoriesFromFirestore = async (): Promise<void> => {
+  // 1) Try cache for instant render
+  try {
+    const cached = await AsyncStorage.getItem(CUSTOM_CATEGORIES_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as AzkarCategory[];
+        if (Array.isArray(parsed)) _customCategoriesOverride = parsed;
+      } catch {
+        // corrupted cache — ignore
+      }
+    }
+  } catch {
+    // AsyncStorage unavailable
+  }
+  // 2) Always background-refresh so admin edits show up on next launch
+  refreshCustomCategoriesFromFirestore().catch(() => {});
+};
+
+/** Force refresh custom categories from Firestore. */
+export const refreshCustomCategoriesFromFirestore = async (): Promise<void> => {
+  try {
+    const snap = await getDocs(collection(db, 'azkar_categories'));
+    const items: AzkarCategory[] = snap.docs
+      .map((d) => d.data() as AzkarCategory)
+      .filter((c) => c && typeof c.id === 'string');
+    _customCategoriesOverride = items;
+    try {
+      await AsyncStorage.setItem(CUSTOM_CATEGORIES_CACHE_KEY, JSON.stringify(items));
+    } catch {
+      // ignore cache write failure
+    }
+    notifyAzkarChanged();
+  } catch (err) {
+    console.warn('[azkar-api] refreshCustomCategoriesFromFirestore failed:', err);
+  }
+};
+
+/** Live subscribe to custom categories changes. Returns unsubscribe. */
+export const subscribeToCustomCategoriesFromFirestore = (): (() => void) => {
+  try {
+    const unsub = onSnapshot(
+      collection(db, 'azkar_categories'),
+      async (snap) => {
+        try {
+          const items: AzkarCategory[] = snap.docs
+            .map((d) => d.data() as AzkarCategory)
+            .filter((c) => c && typeof c.id === 'string');
+          _customCategoriesOverride = items;
+          try {
+            await AsyncStorage.setItem(CUSTOM_CATEGORIES_CACHE_KEY, JSON.stringify(items));
+          } catch {
+            // ignore cache write failure
+          }
+          notifyAzkarChanged();
+        } catch (err) {
+          console.warn('[azkar-api] custom categories snapshot handler error:', err);
+        }
+      },
+      (err) => console.warn('[azkar-api] subscribeToCustomCategoriesFromFirestore error:', err),
+    );
+    return unsub;
+  } catch (err) {
+    console.warn('[azkar-api] subscribeToCustomCategoriesFromFirestore failed:', err);
+    return () => {};
+  }
 };
 
 /**

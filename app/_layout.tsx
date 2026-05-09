@@ -64,6 +64,8 @@ import {
   hydrateAzkarFromFirestore,
   refreshAzkarFromFirestore,
   subscribeToAzkarFromFirestore,
+  hydrateCustomCategoriesFromFirestore,
+  subscribeToCustomCategoriesFromFirestore,
 } from '@/lib/azkar-api';
 import { hydrateFontSettings } from '@/hooks/use-font-config';
 import { hydrateDailyDuasFromFirestore } from '@/data/daily-duas';
@@ -546,6 +548,7 @@ export default function RootLayout() {
     'Orbitron-Bold': require('../assets/fonts/Orbitron-Bold.ttf'),
     'Orbitron-Regular': require('../assets/fonts/Orbitron-Regular.ttf'),
     'WidgetFont': require('../assets/fonts/WidgetFont.ttf'),
+    'WidgetFont2': require('../assets/fonts/WidgetFont2.ttf'),
     // NOTE: vector-icon fonts (MaterialCommunityIcons, Ionicons) are NOT
     // preloaded here — `@expo/vector-icons` lazy-loads them when an Icon
     // component mounts. Preloading via useFonts() spread breaks in Expo Go
@@ -558,9 +561,10 @@ export default function RootLayout() {
         const { TurboModuleRegistry } = require('react-native');
         TurboModuleRegistry.getEnforcing('RNGoogleMobileAdsModule');
 
-        // Request ATT permission BEFORE initializing ads (iOS 14+ requirement)
-        const { requestTrackingPermission } = require('@/lib/att-prompt');
-        await requestTrackingPermission();
+        // Note: ATT permission is requested from the onboarding completion screen
+        // (app/onboarding/complete.tsx) AFTER showing a Pre-ATT explainer modal.
+        // The SDK initializes here without ATT — initial ads will be non-personalized
+        // until the user grants permission, then subsequent requests are personalized.
 
         const ads = require('react-native-google-mobile-ads');
         await ads.default().initialize();
@@ -852,6 +856,14 @@ export default function RootLayout() {
       prefetchNatureImages(NATURE_BG_URLS).catch(() => {});
     };
 
+    // Sync widget data immediately before long Firebase/background hydration starts.
+    // This prevents newly added widgets from rendering blank/--:-- on first launch.
+    initWithTimeout(
+      () => syncWidgetDataToNative(),
+      'Early widget sync',
+      5000
+    );
+
     initFirebase();
 
     // B3: hydrate adhkar from Firestore admin overrides (background, with cache)
@@ -859,6 +871,13 @@ export default function RootLayout() {
       () => hydrateAzkarFromFirestore(),
       'Azkar Firestore hydrate',
       6000
+    );
+
+    // Hydrate admin-managed custom adhkar categories (background, with cache)
+    initWithTimeout(
+      () => hydrateCustomCategoriesFromFirestore(),
+      'Custom adhkar categories hydrate',
+      5000
     );
 
     // B9: hydrate admin-managed font settings (background, with cache)
@@ -1012,6 +1031,9 @@ export default function RootLayout() {
     // any listening screens to re-render.
     const unsubscribeAzkar = subscribeToAzkarFromFirestore();
 
+    // Subscribe to live admin edits of custom adhkar categories.
+    const unsubscribeCustomCategories = subscribeToCustomCategoriesFromFirestore();
+
     const activityInterval = setInterval(() => {
       updateLastActive().catch(() => {});
     }, 5 * 60 * 1000);
@@ -1041,6 +1063,7 @@ export default function RootLayout() {
       cleanupMidnight();
       unsubscribeSoundSettings();
       unsubscribeAzkar();
+      unsubscribeCustomCategories();
       saveSessionTime().catch(() => {});
     };
   }, []);
@@ -1246,8 +1269,7 @@ export default function RootLayout() {
                           <Stack.Screen name="night-reading" />
                           <Stack.Screen name="azkar-search" />
                           <Stack.Screen name="azkar-reminder" />
-                          <Stack.Screen name="widgets-gallery" />
-                          <Stack.Screen name="widget-settings" />
+                          <Stack.Screen name="widget" />
                           <Stack.Screen name="browse-tafsir" />
                           <Stack.Screen name="all-favorites" />
                           <Stack.Screen name="quran-reminder" />

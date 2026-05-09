@@ -6,7 +6,6 @@ import {
   Palette,
   Sun,
   Moon,
-  Smartphone,
   Save,
   RefreshCw,
   Eye,
@@ -14,14 +13,11 @@ import {
   X,
   Plus,
   Trash2,
-  Edit2,
   Copy,
   Upload,
   Image,
   Type,
-  Layout,
   Sparkles,
-  Star,
   Calendar,
   ImagePlus,
 } from 'lucide-react';
@@ -187,8 +183,6 @@ const ThemesPage: React.FC = () => {
     headingScale: 1.25,
   });
   const [activeTab, setActiveTab] = useState<'themes' | 'seasonal' | 'backgrounds' | 'fonts'>('themes');
-  const [editingTheme, setEditingTheme] = useState<AppTheme | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
   const [loadingBGs, setLoadingBGs] = useState(false);

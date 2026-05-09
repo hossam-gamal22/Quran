@@ -32,3 +32,20 @@ export async function requestTrackingPermission(): Promise<boolean> {
     return true;
   }
 }
+
+/**
+ * Check if the ATT prompt has already been answered (granted or denied) by the user.
+ * Returns false on non-iOS platforms or when status is 'undetermined'.
+ * Used to decide whether to show our Pre-ATT explainer modal.
+ */
+export async function hasAttBeenAsked(): Promise<boolean> {
+  if (Platform.OS !== 'ios') return true;
+
+  try {
+    const { getTrackingPermissionsAsync } = require('expo-tracking-transparency');
+    const { status } = await getTrackingPermissionsAsync();
+    return status === 'granted' || status === 'denied';
+  } catch {
+    return true;
+  }
+}

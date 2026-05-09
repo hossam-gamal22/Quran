@@ -63,6 +63,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
@@ -2002,6 +2003,10 @@ export default function CategoryAzkarScreen() {
                       </View>
                     )}
                   </GlassCard>
+                  {/* Inline MREC ad: after every 7 adhkar (and not last item) */}
+                  {(idx + 1) % 7 === 0 && idx < azkar.length - 1 && (
+                    <InlineMrecAd screen="azkar" darkMode={darkMode} />
+                  )}
                 </View>
               );
             })}

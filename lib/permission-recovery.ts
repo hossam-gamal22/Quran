@@ -101,13 +101,46 @@ export async function checkAllPermissions(): Promise<PermissionStatus> {
       console.warn('⚠️ [perm-recovery] battery optimization check failed:', e);
     }
 
-    // كشف OEM (Phase 1.C) — بعض الشركات تقتل الخدمات حتى بعد استثناء البطارية
+    // كشف OEM (Phase 1.C) — بعض الشركات تقتل الخدمات حتى بعد استثناء البطارية.
+    // القائمة موسعة لتغطي معظم الـ OEMs العدوانية حول العالم:
+    //  - Transsion (Tecno/Infinix/itel) — مهيمنة في مصر/أفريقيا/الشرق الأوسط، HiOS/XOS
+    //    عدوانية للغاية مع الخدمات الخلفية (Phone Master).
+    //  - Samsung — One UI Smart Manager / Device Care يوقف التطبيقات بعد ٣ أيام صمت.
+    //  - Asus — ZenUI Mobile Manager.
+    //  - OnePlus — OxygenOS Battery Optimizer.
+    //  - Meizu — Flyme OS.
+    //  - Lenovo / Motorola — ZUI / MotoCare على بعض الإصدارات.
+    //  - HMD / Nokia — Android One عادةً قياسي، لكن Nokia Pure / Evolve لها قاتل خلفية.
+    //  - Lava / Micromax / Karbonn — هندية شائعة، Battery Manager المخصص.
+    //  - Ulefone / Doogee / Blackview / Cubot — Rugged phones صينية.
+    //  - ZTE / Nubia — MyOS.
+    //  - Wiko / Gionee / Coolpad — لاتينية/أفريقية/صينية.
+    //
+    // الفائدة من تضمينها: حتى لو ما عنّاش deep-link مخصص، البانر يظهر وينبّه
+    // المستخدم على Battery Optimization القياسي (الـ fallback في الـ plugin).
     try {
       const FullAdhan = (NativeModules as any).FullAdhanModule;
       if (FullAdhan?.getDeviceManufacturer) {
         const m = (await FullAdhan.getDeviceManufacturer()) as string;
         result.manufacturer = m || 'unknown';
-        const aggressiveOems = ['xiaomi', 'redmi', 'poco', 'oppo', 'realme', 'vivo', 'iqoo', 'huawei', 'honor'];
+        const aggressiveOems = [
+          'xiaomi', 'redmi', 'poco',
+          'oppo', 'realme',
+          'vivo', 'iqoo',
+          'huawei', 'honor',
+          'tecno', 'infinix', 'itel', 'transsion',
+          'samsung',
+          'asus',
+          'oneplus',
+          'meizu',
+          'lenovo', 'motorola', 'moto',
+          'nokia', 'hmd',
+          'lava', 'micromax', 'karbonn',
+          'ulefone', 'doogee', 'blackview', 'cubot',
+          'zte', 'nubia',
+          'wiko', 'gionee', 'coolpad',
+          'leeco', 'letv',
+        ];
         if (aggressiveOems.some((o) => m.includes(o))) {
           result.oemAutoStart = 'aggressive';
         }
@@ -409,6 +442,27 @@ function getOemNameAr(manufacturer: string): string {
   if (m.includes('huawei')) return 'Huawei';
   if (m.includes('honor')) return 'Honor';
   if (m.includes('samsung')) return 'Samsung';
+  if (m.includes('tecno')) return 'Tecno';
+  if (m.includes('infinix')) return 'Infinix';
+  if (m.includes('itel') || m.includes('transsion')) return 'itel/Transsion';
+  if (m.includes('asus')) return 'Asus';
+  if (m.includes('oneplus')) return 'OnePlus';
+  if (m.includes('meizu')) return 'Meizu';
+  if (m.includes('lenovo')) return 'Lenovo';
+  if (m.includes('motorola') || m.includes('moto')) return 'Motorola';
+  if (m.includes('nokia') || m.includes('hmd')) return 'Nokia';
+  if (m.includes('lava')) return 'Lava';
+  if (m.includes('micromax')) return 'Micromax';
+  if (m.includes('karbonn')) return 'Karbonn';
+  if (m.includes('ulefone')) return 'Ulefone';
+  if (m.includes('doogee')) return 'Doogee';
+  if (m.includes('blackview')) return 'Blackview';
+  if (m.includes('cubot')) return 'Cubot';
+  if (m.includes('zte') || m.includes('nubia')) return 'ZTE/Nubia';
+  if (m.includes('wiko')) return 'Wiko';
+  if (m.includes('gionee')) return 'Gionee';
+  if (m.includes('coolpad')) return 'Coolpad';
+  if (m.includes('leeco') || m.includes('letv')) return 'LeEco';
   return 'جهازك';
 }
 /**

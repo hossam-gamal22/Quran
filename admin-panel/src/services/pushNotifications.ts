@@ -468,7 +468,7 @@ export const getUserStats = async (): Promise<UserStats> => {
       active: stats.active,
       byLanguage: stats.byLanguage,
     };
-  } catch (error) {
+  } catch {
     return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0, byLanguage: {} };
   }
 };

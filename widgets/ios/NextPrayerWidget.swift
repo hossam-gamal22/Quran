@@ -57,6 +57,8 @@ struct WidgetSettings: Codable {
         var style: String?
         /// Visual style for the small (2×2) prayer widget: "compact" | "simple".
         var smallStyle: String?
+        /// Visual style for the large (4×4) prayer widget: "serene" | "classic".
+        var largeStyle: String?
     }
 }
 
@@ -257,7 +259,26 @@ struct MediumPrayerWidgetView: View {
 struct LargePrayerWidgetView: View {
     let entry: PrayerWidgetEntry
     let theme: IOSWidgetTheme
-    
+
+    var body: some View {
+        let style = entry.settings?.prayerWidget.largeStyle ?? "serene"
+        switch style {
+        case "classic":
+            LargeClassicPrayerView(entry: entry, theme: theme)
+        default:
+            RitualPrayerSerene(entry: entry)
+        }
+    }
+}
+
+// ========================================
+// الواجهة الكلاسيكية للويدجت الكبير (الإصدار السابق)
+// ========================================
+
+struct LargeClassicPrayerView: View {
+    let entry: PrayerWidgetEntry
+    let theme: IOSWidgetTheme
+
     var body: some View {
         ZStack {
             ThemedWidgetBackground(theme: theme)

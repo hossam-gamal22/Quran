@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Trophy, Save, Loader2, Settings, History, Users, Gift, Bell, AlertTriangle } from 'lucide-react';
+import { Trophy, Save, Loader2, Settings, History, Users, Gift, AlertTriangle } from 'lucide-react';
 import { sendPrizeNotification } from '../services/pushNotifications';
 
 interface ScoreWeights {
@@ -127,6 +127,8 @@ export default function Rewards() {
 
   useEffect(() => {
     loadConfig();
+    // Initial rewards config load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -567,6 +569,9 @@ export default function Rewards() {
                                   className="border rounded px-2 py-1 text-sm w-32 text-right"
                                   autoFocus
                                   dir="auto"
+                                  aria-label="تعديل اسم المستخدم"
+                                  placeholder="اسم المستخدم"
+                                  title="تعديل اسم المستخدم"
                                 />
                                 <button
                                   onClick={() => saveUserName(user.id)}

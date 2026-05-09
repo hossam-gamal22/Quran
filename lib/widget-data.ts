@@ -110,19 +110,12 @@ export interface PrayerCompletionData {
 
 export interface WidgetSettings {
   enabled: boolean;
-  widgetTheme?: string; // Theme ID from WIDGET_THEMES
   prayerWidget: {
     enabled: boolean;
     showAllPrayers: boolean;
     showHijriDate: boolean;
     showLocation: boolean;
     showCompletion: boolean;
-    colorScheme: 'auto' | 'light' | 'dark';
-    accentColor: string;
-    /** Visual style for the medium (4×2) prayer widget. */
-    style?: 'pair' | 'table' | 'banner';
-    /** Visual style for the small (2×2) prayer widget. */
-    smallStyle?: 'compact' | 'simple';
   };
   azkarWidget: {
     enabled: boolean;
@@ -136,7 +129,6 @@ export interface WidgetSettings {
   verseWidget: {
     enabled: boolean;
     showTranslation: boolean;
-    colorScheme: 'auto' | 'light' | 'dark';
   };
   dhikrWidget: {
     enabled: boolean;
@@ -153,6 +145,15 @@ export interface SharedWidgetData {
   prayerCompletion: PrayerCompletionData;
   settings: WidgetSettings;
   language?: string;
+  /** User-selected default Arabic widget font for Date/Prayer variants. Adhkar widgets always use WidgetFont2. */
+  widgetFontVariant?: 'widget1' | 'widget2';
+  widgetCalendar?: string;
+  widgetDayCalendar?: string;
+  widgetMonthCalendar?: string;
+  widgetNumerals?: string;
+  widgetTheme?: string;
+  widgetLanguage?: string;
+  widgetDateFormat?: string;
 }
 
 // ========================================
@@ -161,17 +162,12 @@ export interface SharedWidgetData {
 
 export const defaultWidgetSettings: WidgetSettings = {
   enabled: true,
-  widgetTheme: 'default_dark',
   prayerWidget: {
     enabled: true,
     showAllPrayers: true,
     showHijriDate: true,
     showLocation: true,
     showCompletion: true,
-    colorScheme: 'auto',
-    accentColor: '#0d8e62',
-    style: 'pair',
-    smallStyle: 'compact',
   },
   azkarWidget: {
     enabled: true,
@@ -185,7 +181,6 @@ export const defaultWidgetSettings: WidgetSettings = {
   verseWidget: {
     enabled: true,
     showTranslation: false,
-    colorScheme: 'auto',
   },
   dhikrWidget: {
     enabled: true,
@@ -415,9 +410,12 @@ function getDhikrCategoryName(category: string): string {
 
 /**
  * تحضير بيانات آية اليوم للويدجت
+ *
+ * Fetches the Arabic Uthmani text and an English Sahih translation in parallel
+ * so non-Arabic widgets can render an English subtitle (Glassify "Quotes Aayat" style).
  */
 export const prepareVerseWidgetData = async (
-  language: string = 'ar',
+  _language: string = 'ar',
   options?: { showTranslation?: boolean }
 ): Promise<VerseWidgetData> => {
   const todayDate = new Date().toISOString().split('T')[0]!;
@@ -436,8 +434,18 @@ export const prepareVerseWidgetData = async (
   try {
     const ayah = await getTodayAyah();
     if (ayah) {
+      // Fetch English translation in parallel — best effort, never blocks
+      let translation: string | undefined;
+      if (options?.showTranslation !== false) {
+        try {
+          const tr = await fetch(`https://api.alquran.cloud/v1/ayah/${ayah.number}/en.sahih`).then(r => r.ok ? r.json() : null);
+          const trText: unknown = tr?.data?.text;
+          if (typeof trText === 'string' && trText.length > 0) translation = trText;
+        } catch {}
+      }
       const verseData: VerseWidgetData = {
         arabic: ayah.text,
+        translation,
         surahName: ayah.surah.name,
         surahNameEn: ayah.surah.englishName,
         ayahNumber: ayah.number,
@@ -456,6 +464,7 @@ export const prepareVerseWidgetData = async (
   // Fallback: Al-Fatiha first verse
   return {
     arabic: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+    translation: 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
     surahName: 'سورة الفاتحة',
     surahNameEn: 'Al-Fatiha',
     ayahNumber: 1,

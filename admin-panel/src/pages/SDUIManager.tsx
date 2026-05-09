@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import {
   LayoutGrid, Plus, Save, Trash2, GripVertical, Eye, EyeOff,
-  ChevronDown, ChevronUp, Settings, Type, Minus,
+  ChevronDown, ChevronUp, Settings, Type, Minus, Layers,
 } from 'lucide-react';
 
 type SDUISectionType = 'html_block' | 'spacer';

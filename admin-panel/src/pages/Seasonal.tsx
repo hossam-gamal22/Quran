@@ -6,25 +6,13 @@ import {
   Edit2,
   Trash2,
   Save,
-  Moon,
-  Sun,
-  Star,
-  Gift,
-  Heart,
-  BookOpen,
   Clock,
-  Users,
   Eye,
   EyeOff,
   Copy,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
   Loader2,
   RefreshCw,
-  Check,
   X,
-  Bell
 } from 'lucide-react';
 import { collection, doc, getDocs, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -93,15 +81,6 @@ const CONTENT_TYPES: { value: ContentType; labelAr: string; icon: string }[] = [
   { value: 'challenge', labelAr: 'تحدي', icon: '🎯' },
   { value: 'fact', labelAr: 'معلومة', icon: '💡' },
   { value: 'quote', labelAr: 'اقتباس', icon: '💬' },
-];
-
-const APP_SCREENS = [
-  { value: 'home', label: 'الرئيسية' },
-  { value: 'azkar', label: 'الأذكار' },
-  { value: 'quran', label: 'القرآن' },
-  { value: 'prayer', label: 'الصلاة' },
-  { value: 'qibla', label: 'القبلة' },
-  { value: 'dua', label: 'الأدعية' },
 ];
 
 // ==================== البيانات التجريبية ====================

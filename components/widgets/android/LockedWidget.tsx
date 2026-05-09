@@ -1,29 +1,15 @@
 // components/widgets/android/LockedWidget.tsx
-// Locked widget shown to non-premium users for premium widget types.
-// Displays app branding + lock message + upgrade prompt.
+// Locked widget shown to non-premium users — pure glass shell.
 
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
-import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, GRADIENTS } from './shared';
+import { GLASS, FONT, APP_ICON } from './shared';
 
 interface LockedWidgetProps {
   widgetName: string;
 }
 
-/** Map widget names to their gradient key */
-function getGradientKey(widgetName: string): string {
-  if (widgetName.startsWith('PrayerTimes')) return 'prayer';
-  if (widgetName.startsWith('DailyVerse')) return 'verse';
-  if (widgetName.startsWith('DailyDhikr')) return 'dhikr';
-  if (widgetName.startsWith('AzkarProgress')) return 'azkar';
-  if (widgetName.startsWith('HijriDate')) return 'hijri';
-  return 'prayer';
-}
-
-export function LockedWidget({ widgetName }: LockedWidgetProps) {
-  const gradientKey = getGradientKey(widgetName);
-  const gradient = GRADIENTS[gradientKey] || GRADIENTS.prayer;
-
+export function LockedWidget({ widgetName: _widgetName }: LockedWidgetProps) {
   return (
     <FlexWidget
       style={{
@@ -32,51 +18,20 @@ export function LockedWidget({ widgetName }: LockedWidgetProps) {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundGradient: gradient,
-        borderRadius: 20,
-        padding: 16,
+        backgroundColor: GLASS.bg,
+        borderRadius: GLASS.radius,
+        padding: GLASS.padding,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://subscription' }}
     >
-      {/* App Icon */}
-      <ImageWidget
-        image={APP_ICON}
-        imageWidth={ICON_SIZE.small}
-        imageHeight={ICON_SIZE.small}
-        radius={7}
-      />
-
-      {/* Lock icon text */}
-      <TextWidget
-        text="🔒"
-        style={{
-          fontSize: 28,
-          color: COLORS.white,
-          marginTop: 8,
-        }}
-      />
-
-      {/* Upgrade message */}
+      <ImageWidget image={APP_ICON} imageWidth={32} imageHeight={32} radius={8} />
+      <TextWidget text="🔒" style={{ fontSize: 26, color: GLASS.text, marginTop: 8 }} />
       <TextWidget
         text="اشترك للحصول على هذه الودجت"
-        style={{
-          fontSize: 13,
-          color: COLORS.whiteMuted,
-          fontFamily: FONT.amiri,
-          marginTop: 6,
-        }}
-      />
-
-      {/* App branding */}
-      <TextWidget
-        text={BRANDING.name}
-        style={{
-          fontSize: BRANDING.fontSize,
-          color: COLORS.teal,
-          fontFamily: FONT.amiri,
-          marginTop: 8,
-        }}
+        style={{ fontSize: 12, color: GLASS.textMuted, fontFamily: FONT.amiri, marginTop: 6, textAlign: 'center' }}
+        maxLines={2}
+        truncate="END"
       />
     </FlexWidget>
   );

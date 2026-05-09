@@ -17,15 +17,11 @@ import {
   Palette,
   BookOpen,
   Star,
-  Settings2,
-  ToggleLeft,
-  ToggleRight,
   Zap,
   ExternalLink,
   ChevronDown,
   ChevronUp,
   Plus,
-  Trash2,
   X,
   Link as LinkIcon,
 } from 'lucide-react';
@@ -136,7 +132,7 @@ const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
   // صفحات إضافية يمكن إضافتها للوصول السريع
   { id: 'page_browse_tafsir', nameAr: 'استعراض التفسير', nameEn: 'Browse Tafsir', icon: 'book-search', color: '#3a7ca5', enabled: false, order: 14, route: '/browse-tafsir' },
   { id: 'page_hijri', nameAr: 'التقويم الهجري', nameEn: 'Hijri Calendar', icon: 'calendar-month', color: '#0D9488', enabled: false, order: 15, route: '/hijri' },
-  { id: 'page_widget_settings', nameAr: 'إعدادات الودجات', nameEn: 'Widget Settings', icon: 'widgets', color: '#6366F1', enabled: false, order: 16, route: '/widget-settings' },
+  { id: 'page_widget_settings', nameAr: 'الودجات', nameEn: 'Widgets', icon: 'widgets', color: '#6366F1', enabled: false, order: 16, route: '/widget' },
   { id: 'page_daily_dua', nameAr: 'دعاء اليوم', nameEn: 'Daily Dua', icon: 'hands-pray', color: '#c17f59', enabled: false, order: 17, route: '/daily-dua' },
   { id: 'page_ruqya', nameAr: 'الرقية الشرعية', nameEn: 'Ruqya', icon: 'shield-check', color: '#e91e63', enabled: false, order: 18, route: '/ruqya' },
   { id: 'page_companions', nameAr: 'قصص الصحابة', nameEn: 'Companions', icon: 'account-group', color: '#2f7659', enabled: false, order: 19, route: '/companions' },
@@ -543,8 +539,11 @@ export default function HomePageManager() {
                               }`}
                             >
                               <div className="absolute -top-2 -right-2 w-5 h-5 bg-admin-surface-light rounded-full flex items-center justify-center text-[10px] text-white font-bold">{index + 1}</div>
-                              <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: item.color + '30' }}>
-                                <span className="text-2xl" style={{ color: item.color }}>
+                              <Styled
+                                className="w-12 h-12 rounded-full flex items-center justify-center mb-2"
+                                css={{ backgroundColor: item.color + '30' }}
+                              >
+                                <Styled as="span" className="text-2xl" css={{ color: item.color }}>
                                   {item.icon === 'compass' && '🧭'}
                                   {item.icon === 'heart' && '❤️'}
                                   {item.icon === 'shield-star' && '⭐'}
@@ -556,8 +555,8 @@ export default function HomePageManager() {
                                   {item.icon === 'book-account' && '📚'}
                                   {item.icon === 'link' && '🔗'}
                                   {!['compass', 'heart', 'shield-star', 'book-open-page-variant', 'star-crescent', 'counter', 'information', 'radio', 'book-account', 'link'].includes(item.icon) && '●'}
-                                </span>
-                              </div>
+                                </Styled>
+                              </Styled>
                               <p className="text-white text-xs font-medium text-center leading-tight line-clamp-2">{item.nameAr}</p>
                               <div className={`absolute top-1 left-1 w-2 h-2 rounded-full ${item.enabled ? 'bg-emerald-400' : 'bg-admin-surface-light'}`} />
                             </div>

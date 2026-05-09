@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Link,
   Play,
   Pause,
   Trash2,

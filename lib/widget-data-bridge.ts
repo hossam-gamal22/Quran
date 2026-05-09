@@ -43,7 +43,8 @@ async function triggerNativeWidgetReload(sharedData?: SharedWidgetData): Promise
       const { requestWidgetUpdate } = require('react-native-android-widget');
 
       const widgetNames = [
-        'PrayerTimesSmall', 'PrayerTimesMedium',
+        'RoohSmall', 'RoohMedium', 'RoohLarge',
+        'PrayerTimesSmall', 'PrayerTimesMedium', 'PrayerTimesLarge',
         'DailyVerseSmall', 'DailyVerseMedium',
         'DailyDhikrSmall', 'DailyDhikrMedium',
         'AzkarProgressSmall', 'AzkarProgressMedium',
@@ -130,8 +131,12 @@ async function writeToSharedStorage(key: string, value: string): Promise<void> {
  * Render the correct widget component for a given widget name using the provided data.
  */
 function renderWidgetByName(widgetName: string, data: SharedWidgetData): React.ReactElement | null {
+  const { RoohSmallWidget } = require('@/components/widgets/android/RoohSmallWidget');
+  const { RoohMediumWidget } = require('@/components/widgets/android/RoohMediumWidget');
+  const { RoohLargeWidget } = require('@/components/widgets/android/RoohLargeWidget');
   const { PrayerTimesSmallWidget } = require('@/components/widgets/android/PrayerTimesSmallWidget');
   const { PrayerTimesMediumWidget } = require('@/components/widgets/android/PrayerTimesMediumWidget');
+  const { PrayerTimesLargeWidget } = require('@/components/widgets/android/PrayerTimesLargeWidget');
   const { DailyVerseSmallWidget } = require('@/components/widgets/android/DailyVerseSmallWidget');
   const { DailyVerseMediumWidget } = require('@/components/widgets/android/DailyVerseMediumWidget');
   const { DailyDhikrSmallWidget } = require('@/components/widgets/android/DailyDhikrSmallWidget');
@@ -142,8 +147,12 @@ function renderWidgetByName(widgetName: string, data: SharedWidgetData): React.R
   const { HijriDateMediumWidget } = require('@/components/widgets/android/HijriDateMediumWidget');
 
   const map: Record<string, React.FC<{ data: SharedWidgetData }>> = {
+    RoohSmall: RoohSmallWidget,
+    RoohMedium: RoohMediumWidget,
+    RoohLarge: RoohLargeWidget,
     PrayerTimesSmall: PrayerTimesSmallWidget,
     PrayerTimesMedium: PrayerTimesMediumWidget,
+    PrayerTimesLarge: PrayerTimesLargeWidget,
     DailyVerseSmall: DailyVerseSmallWidget,
     DailyVerseMedium: DailyVerseMediumWidget,
     DailyDhikrSmall: DailyDhikrSmallWidget,
@@ -180,6 +189,22 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
       } catch {}
     }
 
+    // Last-resort Makkah fallback: never let widgets render "--:--".
+    // The app will replace this with user-location data as soon as location is available.
+    if (!effectivePrayerTimes) {
+      effectivePrayerTimes = {
+        fajr: '04:15',
+        sunrise: '05:39',
+        dhuhr: '12:19',
+        asr: '15:42',
+        maghrib: '18:56',
+        isha: '20:17',
+        midnight: '00:35',
+        lastThird: '02:28',
+      };
+      location = location || 'مكة المكرمة';
+    }
+
     const settledResults = await Promise.allSettled([
       preparePrayerWidgetData(effectivePrayerTimes, location, lang),
       prepareAzkarWidgetData(lang, settings.azkarWidget.categories),
@@ -206,6 +231,33 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
     const dhikrData = (settledResults[3] as PromiseFulfilledResult<any>).value;
     const prayerCompletion = (settledResults[4] as PromiseFulfilledResult<any>).value;
 
+    // Pull user's widget preferences from app_settings.
+    // NOTE: widgetLanguage is intentionally derived from the app's main language —
+    // there is no per-widget language toggle anymore (Arabic UI → Arabic widgets,
+    // otherwise English).
+    let widgetFontVariant: 'widget1' | 'widget2' = 'widget1';
+    let widgetCalendar = 'auto';
+    let widgetDayCalendar = 'auto';
+    let widgetMonthCalendar = 'auto';
+    let widgetNumerals = 'auto';
+    let widgetTheme = 'auto';
+    const widgetLanguage = (lang === 'ar' || lang === 'ur') ? 'ar' : 'en';
+    let widgetDateFormat = 'gregorian-ar';
+    try {
+      const appSettingsRaw = await AsyncStorage.getItem('app_settings');
+      if (appSettingsRaw) {
+        const appSettings = JSON.parse(appSettingsRaw);
+        const d = appSettings?.display;
+        if (d?.widgetFontVariant === 'widget2') widgetFontVariant = 'widget2';
+        if (d?.widgetCalendar) widgetCalendar = d.widgetCalendar;
+        if (d?.widgetDayCalendar) widgetDayCalendar = d.widgetDayCalendar;
+        if (d?.widgetMonthCalendar) widgetMonthCalendar = d.widgetMonthCalendar;
+        if (d?.widgetNumerals) widgetNumerals = d.widgetNumerals;
+        if (d?.widgetTheme) widgetTheme = d.widgetTheme;
+        if (d?.widgetDateFormat) widgetDateFormat = d.widgetDateFormat;
+      }
+    } catch {}
+
     const sharedData: SharedWidgetData = {
       prayer: prayerData,
       azkar: azkarData,
@@ -214,6 +266,14 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
       prayerCompletion,
       settings,
       language: lang,
+      widgetFontVariant,
+      widgetCalendar,
+      widgetDayCalendar,
+      widgetMonthCalendar,
+      widgetNumerals,
+      widgetTheme,
+      widgetLanguage,
+      widgetDateFormat,
     };
 
     const json = JSON.stringify(sharedData);

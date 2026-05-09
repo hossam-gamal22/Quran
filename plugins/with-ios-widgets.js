@@ -13,7 +13,7 @@ const fs = require('fs');
 const WIDGET_EXTENSION_NAME = 'RoohAlMuslimWidgets';
 const WIDGET_BUNDLE_ID = 'com.rooh.almuslim.widgets';
 const APP_GROUP_ID = 'group.com.rooh.almuslim';
-const DEPLOYMENT_TARGET = '16.1';
+const DEPLOYMENT_TARGET = '17.0';
 
 // Recursively copy a directory
 function copyDirectorySync(src, dest) {
@@ -40,12 +40,7 @@ function copyDirectorySync(src, dest) {
 // the main app target (see MAIN_APP_INTENT_FILES below).
 const WIDGET_SWIFT_FILES = [
   'WidgetBundle.swift',
-  'NextPrayerWidget.swift',
-  'RitualPrayerViews.swift',
-  'QuranAyahWidget.swift',
-  'AzkarWidget.swift',
-  'DhikrWidget.swift',
-  'HijriDateWidget.swift',
+  'RoohWidgets.swift',
   'PrayerLiveActivity.swift',
   'AppIntents.swift',
   'ControlWidgets.swift',
@@ -64,14 +59,16 @@ const SHARED_SWIFT_FILES = [
   'SharedActivityAttributes.swift',
 ];
 
-// Font files needed by widgets (HijriDateWidget uses Amiri, Ritual prayer widgets use WidgetFont)
+// Font files needed by widgets (HijriDateWidget uses Amiri, Ritual prayer widgets use WidgetFont/WidgetFont2)
 const WIDGET_FONT_FILES = [
   'Amiri-Regular.ttf',
   'Amiri-Bold.ttf',
   'WidgetFont.ttf',
+  'WidgetFont2.ttf',
   'Rubik-Regular.ttf',
   'Rubik-Medium.ttf',
   'Rubik-Bold.ttf',
+  'KFGQPC-Uthmanic-Script.ttf',
 ];
 
 /**
@@ -184,9 +181,11 @@ const withIOSWidgets = (config) => {
 		<string>Amiri-Regular.ttf</string>
 		<string>Amiri-Bold.ttf</string>
 		<string>WidgetFont.ttf</string>
+		<string>WidgetFont2.ttf</string>
 		<string>Rubik-Regular.ttf</string>
 		<string>Rubik-Medium.ttf</string>
 		<string>Rubik-Bold.ttf</string>
+		<string>KFGQPC-Uthmanic-Script.ttf</string>
 	</array>
 	<key>NSExtension</key>
 	<dict>

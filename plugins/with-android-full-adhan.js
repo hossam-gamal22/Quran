@@ -795,6 +795,79 @@ class FullAdhanModule(reactContext: ReactApplicationContext) :
             "com.asus.mobilemanager.entry.FunctionActivity"
           )))
         }
+        // Transsion family (Tecno / Infinix / itel) → HiOS / XOS Phone Master
+        // مهيمنة في مصر و الشرق الأوسط — قاتل خلفية شرس عبر Phone Master.
+        manufacturer.contains("tecno") ||
+        manufacturer.contains("infinix") ||
+        manufacturer.contains("itel") ||
+        manufacturer.contains("transsion") -> {
+          // App Manager (allow background activity)
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.transsion.phonemaster",
+            "com.transsion.phonemaster.appmanage.AppManagerActivity"
+          )))
+          // Auto-start whitelist
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.transsion.phonemaster",
+            "com.cyin.himgr.autostart.AutoStartActivity"
+          )))
+          // Power saving / battery optimization on HiOS
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.transsion.phonemaster",
+            "com.cyin.himgr.powermanager.PowerManagerActivity"
+          )))
+          // App Freezer (HiOS 12+)
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.transsion.phonemaster",
+            "com.transsion.phonemaster.applocker.activity.AppLockerSetActivity"
+          )))
+          // Notification permissions on HiOS
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.transsion.phonemaster",
+            "com.transsion.phonemaster.notification.NotificationManagerActivity"
+          )))
+        }
+        // OnePlus / OxygenOS battery optimization
+        manufacturer.contains("oneplus") -> {
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.oneplus.security",
+            "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity"
+          )))
+        }
+        // Meizu / Flyme OS Security Center
+        manufacturer.contains("meizu") -> {
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.meizu.safe",
+            "com.meizu.safe.security.SHOW_APPSEC"
+          )))
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.meizu.safe",
+            "com.meizu.safe.permission.SmartBGActivity"
+          )))
+        }
+        // Lenovo / Motorola — most use stock Android, but Lenovo ZUI / Moto Battery
+        // Optimization screens exist on certain regions.
+        manufacturer.contains("lenovo") || manufacturer.contains("motorola") || manufacturer.contains("moto") -> {
+          // ZUI background management
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.lenovo.security",
+            "com.lenovo.security.purebackground.PureBackgroundActivity"
+          )))
+        }
+        // Nubia / ZTE — MyOS
+        manufacturer.contains("nubia") || manufacturer.contains("zte") -> {
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "cn.nubia.security2",
+            "cn.nubia.security2.appmanage.AppManageActivity"
+          )))
+        }
+        // LeEco / LeTV
+        manufacturer.contains("leeco") || manufacturer.contains("letv") -> {
+          candidates.add(Intent().setComponent(android.content.ComponentName(
+            "com.letv.android.letvsafe",
+            "com.letv.android.letvsafe.AutobootManageActivity"
+          )))
+        }
       }
 
       // Try each candidate; fall back to general battery optimization settings

@@ -45,6 +45,7 @@ import DailyHighlights from '@/components/ui/DailyHighlights';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { ColoredButton } from '@/components/ui/colored-button';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -59,6 +60,8 @@ import { safeIcon } from '@/lib/safe-icon';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { PermissionBanner } from '@/components/notifications/PermissionBanner';
+import { getUserId } from '@/lib/firebase-user';
+import { getMonthlyLeaderboard, getUserMonthlyInfo, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -133,7 +136,7 @@ interface CustomQuickAccessItem {
 const EXTRA_APP_PAGES: CustomQuickAccessItem[] = [
   { id: 'page_browse_tafsir', icon: 'book-search', color: '#3a7ca5', label: '', nameKey: 'home.browseTafsir', route: '/browse-tafsir' },
   { id: 'page_hijri', icon: 'calendar-month', color: '#0D9488', label: '', nameKey: 'home.hijriCalendar', route: '/hijri' },
-  { id: 'page_widget_settings', icon: 'widgets', color: '#6366F1', label: '', nameKey: 'home.widgetSettingsLabel', route: '/widget-settings' },
+  { id: 'page_widget_settings', icon: 'widgets', color: '#6366F1', label: '', nameKey: 'home.widgetSettingsLabel', route: '/widget' },
   { id: 'page_daily_dua', ...PAGE_CONFIGS.daily_dua, label: '', nameKey: 'home.dailyDua', route: '/daily-dua' },
   { id: 'page_seerah', icon: 'book-account', color: '#0d8e62', label: '', nameKey: 'home.seerah', route: '/seerah' },
   { id: 'page_names', ...PAGE_CONFIGS.names, label: '', nameKey: 'home.namesOfAllah', route: '/names' },
@@ -596,6 +599,35 @@ export default function HomeScreen() {
     const { getLocalizedFullDate } = require('@/lib/hijri-date');
     const full = getLocalizedFullDate();
     return full.formatted.gregorian;
+  }, []);
+
+  // User rank for honor board
+  const [userRank, setUserRank] = useState<number | null>(null);
+  const [rankLoaded, setRankLoaded] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const userId = await getUserId();
+        if (!userId) { setRankLoaded(true); return; }
+        await syncMonthlyEngagementFromLocalWorship(userId).catch(() => null);
+        const [info, board] = await Promise.all([
+          getUserMonthlyInfo(userId),
+          getMonthlyLeaderboard(200),
+        ]);
+        const userScore = info?.score || 0;
+        if (userScore > 0) {
+          const rankIndex = board.findIndex(u => u.userId === userId);
+          if (rankIndex >= 0) {
+            setUserRank(rankIndex + 1);
+          } else {
+            // User not in top N — calculate their approximate rank
+            const higherCount = board.filter(u => u.score > userScore).length;
+            setUserRank(higherCount + 1);
+          }
+        }
+      } catch {}
+      setRankLoaded(true);
+    })();
   }, []);
   const { getConfig } = useRemoteConfig();
   const logoUrl = getConfig('app_logo_url' as any) as string | undefined;
@@ -1506,6 +1538,22 @@ export default function HomeScreen() {
               {gregorianDateStr}
             </Text>
           </View>
+          {rankLoaded && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/honor-board')}
+              style={[styles.rankBadgeHome, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)' }]}
+            >
+              <MaterialCommunityIcons name={userRank ? 'podium' : 'trophy-outline'} size={14} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+              <Text style={[styles.rankBadgeHomeText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
+                {userRank
+                  ? (settings.language === 'ar' ? `ترتيبك: #${userRank}` : `Your Rank: #${userRank}`)
+                  : t('honor.title')
+                }
+              </Text>
+              <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={14} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+            </TouchableOpacity>
+          )}
         </Animated.View>
 
         {/* Premium Upgrade Banner — fallback only when no other banner is active */}
@@ -1610,8 +1658,8 @@ export default function HomeScreen() {
 
         {/* 7 الأقسام الرئيسية المطوية */}
         {orderedSections.map((section, sectionIndex) => (
+          <React.Fragment key={section.id}>
           <Animated.View
-            key={section.id}
             entering={FadeInDown.delay(200 + sectionIndex * 80).duration(500)}
           >
             <CollapsibleSection
@@ -1711,6 +1759,11 @@ export default function HomeScreen() {
               </View>
             </CollapsibleSection>
           </Animated.View>
+          {/* Inline MREC ad after every 3rd section (and not after the last) */}
+          {(sectionIndex + 1) % 3 === 0 && sectionIndex < orderedSections.length - 1 && (
+            <InlineMrecAd screen="home" darkMode={isDarkMode} />
+          )}
+          </React.Fragment>
         ))}
 
         <View style={{ height: 24 }} />
@@ -2359,6 +2412,21 @@ const _styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontRegular(),
     lineHeight: 24,
+    includeFontPadding: false,
+  },
+  rankBadgeHome: {
+    alignSelf: 'center' as const,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  rankBadgeHomeText: {
+    fontSize: 12,
+    fontFamily: fontSemiBold(),
     includeFontPadding: false,
   },
 

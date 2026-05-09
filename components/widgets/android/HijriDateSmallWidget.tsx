@@ -1,27 +1,44 @@
 // components/widgets/android/HijriDateSmallWidget.tsx
-// 2×2 widget: Hijri date with large day number
+// 2×2 — Date display: Hijri or Gregorian based on user's monthCalendar setting.
 
 import React from 'react';
-import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
+import { GLASS, FONT, resolveIsArabic, paletteFor, applyNumerals, widgetFontFamily } from './shared';
+
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function resolveCalendar(pref: string | undefined, isArabic: boolean): 'gregorian' | 'hijri' {
+  if (pref === 'gregorian') return 'gregorian';
+  if (pref === 'hijri') return 'hijri';
+  return isArabic ? 'hijri' : 'gregorian';
+}
 
 export function HijriDateSmallWidget({ data }: { data: SharedWidgetData }) {
-  const { prayer } = data;
-  const hijriParts = (prayer.hijriDate || '').split(' ');
-  const day = hijriParts[0] || '';
-  const monthYear = hijriParts.slice(1).join(' ');
-  const showGregorian = data.settings?.hijriWidget?.showGregorian ?? true;
-  const theme = getWidgetTheme(data.settings?.widgetTheme);
-  const { colors: sc, gradient } = resolveColorScheme(undefined, 'hijri');
+  const isAr = resolveIsArabic(data.widgetLanguage, data.language);
+  const p = paletteFor(data.widgetTheme);
+  const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
+  const cal = resolveCalendar(data.widgetMonthCalendar ?? data.widgetCalendar, isAr);
+  const family = widgetFontFamily(data.widgetFontVariant);
 
-  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
-  const bg = useTheme ? theme.gradient : gradient;
-  const dayColor = useTheme ? theme.badgeText : sc.gold;
-  const mutedColor = useTheme ? theme.mutedColor : sc.whiteMuted;
-  const cardBg = useTheme ? theme.badgeBg : sc.cardBg;
-  const grayDarkColor = useTheme ? theme.mutedColor : sc.grayDark;
-  const brandColor = useTheme ? theme.accentColor : sc.teal;
+  let dayStr: string;
+  let monthStr: string;
+  let yearStr: string;
+
+  if (cal === 'hijri') {
+    const day = data.prayer.hijriDay || 1;
+    const monthAr = data.prayer.hijriMonth || 'محرم';
+    const monthEn = data.prayer.hijriMonthEn || '';
+    dayStr = applyNumerals(day, numerals, isAr);
+    monthStr = isAr ? monthAr : monthEn || monthAr;
+    yearStr = `${applyNumerals(data.prayer.hijriYear || 1446, numerals, isAr)} ${isAr ? 'هـ' : 'AH'}`;
+  } else {
+    const today = new Date();
+    dayStr = applyNumerals(today.getDate(), numerals, isAr);
+    monthStr = isAr ? MONTHS_AR[today.getMonth()] : MONTHS_EN[today.getMonth()];
+    yearStr = `${applyNumerals(today.getFullYear(), numerals, isAr)} ${isAr ? 'م' : ''}`.trim();
+  }
 
   return (
     <FlexWidget
@@ -29,71 +46,28 @@ export function HijriDateSmallWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
-        backgroundGradient: bg,
-        borderRadius: 20,
-        padding: 12,
+        backgroundColor: p.bg,
+        borderRadius: GLASS.radius,
+        padding: GLASS.padding,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://hijri' }}
     >
-      <ImageWidget
-        image={APP_ICON}
-        imageWidth={ICON_SIZE.small}
-        imageHeight={ICON_SIZE.small}
-        radius={7}
-      />
-
-      <TextWidget
-        text={day}
-        style={{
-          fontSize: 36,
-          color: dayColor,
-          fontFamily: FONT.amiriBold,
-        }}
-      />
-
-      <FlexWidget
-        style={{
-          backgroundColor: cardBg,
-          borderRadius: 10,
-          paddingHorizontal: 10,
-          paddingVertical: 3,
-        }}
-      >
+      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
         <TextWidget
-          text={monthYear}
-          style={{
-            fontSize: 12,
-            color: mutedColor,
-            fontFamily: FONT.amiri,
-            textAlign: 'center',
-          }}
-          maxLines={2}
+          text={monthStr}
+          style={{ fontSize: 26, color: p.text, fontFamily: family, marginRight: 8 }}
+        />
+        <TextWidget
+          text={dayStr}
+          style={{ fontSize: 36, color: p.text, fontFamily: family }}
         />
       </FlexWidget>
-
-      {showGregorian && prayer.gregorianDate ? (
-        <TextWidget
-          text={prayer.gregorianDate}
-          style={{
-            fontSize: 10,
-            color: grayDarkColor,
-            fontFamily: FONT.amiri,
-            textAlign: 'center',
-          }}
-          maxLines={1}
-        />
-      ) : null}
-
       <TextWidget
-        text={BRANDING.name}
-        style={{
-          fontSize: BRANDING.fontSize,
-          color: brandColor,
-          fontFamily: FONT.amiri,
-        }}
+        text={yearStr}
+        style={{ fontSize: 12, color: p.muted, fontFamily: FONT.rubik, marginTop: 6 }}
       />
     </FlexWidget>
   );

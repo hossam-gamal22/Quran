@@ -1224,7 +1224,7 @@ export default function PrayerScreen() {
           )}
         </ScrollView>
 
-        <BannerAdComponent screen="prayer" inTabScreen />
+        {topSelectedKey !== 'qibla' && <BannerAdComponent screen="prayer" inTabScreen />}
 
 
 

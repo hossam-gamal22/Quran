@@ -1,29 +1,18 @@
 // components/widgets/android/DailyDhikrMediumWidget.tsx
-// 4×2 widget: Full dhikr text + category + count
+// 4×2 — dhikr + count chip + benefit (when present). Respects user theme/numerals.
 
 import React from 'react';
-import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
+import { GLASS, FONT, resolveIsArabic, paletteFor, applyNumerals, AZKAR_FONT_FAMILY } from './shared';
 
 export function DailyDhikrMediumWidget({ data }: { data: SharedWidgetData }) {
   const { dhikr } = data;
-  const showBenefit = (data.settings?.dhikrWidget?.showBenefit ?? true);
-  const showTranslation = (data.settings?.dhikrWidget?.showTranslation ?? false);
-  const showExtra = (showBenefit && dhikr.benefit) || (showTranslation && dhikr.translation);
-  const theme = getWidgetTheme(data.settings?.widgetTheme);
-  const { colors: sc, gradient } = resolveColorScheme(undefined, 'dhikr');
-
-  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
-  const bg = useTheme ? theme.gradient : gradient;
-  const textColor = useTheme ? theme.textColor : sc.white;
-  const mutedColor = useTheme ? theme.mutedColor : sc.whiteMuted;
-  const accent = useTheme ? theme.accentColor : sc.tealLight;
-  const grayColor = useTheme ? theme.mutedColor : sc.gray;
-  const cardBg = useTheme ? theme.badgeBg : sc.cardBg;
-  const badgeBg = useTheme ? theme.badgeBg : sc.badgeBg;
-  const badgeText = useTheme ? theme.badgeText : sc.gold;
-  const brandColor = useTheme ? theme.accentColor : sc.teal;
+  const isAr = resolveIsArabic(data.widgetLanguage, data.language);
+  const p = paletteFor(data.widgetTheme);
+  const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
+  const benefit = dhikr.benefit;
+  const showBenefit = !!benefit && benefit.length > 0;
 
   return (
     <FlexWidget
@@ -31,142 +20,54 @@ export function DailyDhikrMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        backgroundGradient: bg,
-        borderRadius: 20,
-        padding: 14,
+        justifyContent: 'center',
+        backgroundColor: p.bg,
+        borderRadius: GLASS.radius,
+        padding: GLASS.padding,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://daily-dhikr' }}
     >
-      {/* Header */}
-      <FlexWidget
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: 'match_parent',
-        }}
-      >
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <ImageWidget
-            image={APP_ICON}
-            imageWidth={ICON_SIZE.header}
-            imageHeight={ICON_SIZE.header}
-            radius={6}
-          />
-          <TextWidget
-            text="ذكر اليوم"
-            style={{
-              fontSize: 13,
-              color: accent,
-              fontFamily: FONT.amiriBold,
-              marginLeft: 6,
-            }}
-          />
-        </FlexWidget>
-        <FlexWidget
-          style={{
-            backgroundColor: cardBg,
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 3,
-          }}
-        >
-          <TextWidget
-            text={dhikr.categoryName}
-            style={{
-              fontSize: 10,
-              color: grayColor,
-              fontFamily: FONT.amiri,
-            }}
-          />
-        </FlexWidget>
-      </FlexWidget>
-
-      {/* Dhikr text */}
-      <TextWidget
-        text={dhikr.arabic}
-        style={{
-          fontSize: 17,
-          color: textColor,
-          fontFamily: FONT.amiri,
-          textAlign: 'center',
-          marginVertical: 4,
-        }}
-        maxLines={showExtra ? 2 : 3}
-        truncate="END"
-      />
-
-      {/* Benefit */}
-      {showBenefit && dhikr.benefit ? (
+      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <TextWidget
-          text={dhikr.benefit}
-          style={{
-            fontSize: 11,
-            color: mutedColor,
-            fontFamily: FONT.amiri,
-            textAlign: 'center',
-          }}
-          maxLines={1}
+          text={dhikr.arabic || '…'}
+          style={{ fontSize: 16, color: p.text, fontFamily: AZKAR_FONT_FAMILY, textAlign: 'right' }}
+          maxLines={2}
           truncate="END"
         />
-      ) : null}
-
-      {/* Translation */}
-      {showTranslation && dhikr.translation ? (
-        <TextWidget
-          text={dhikr.translation}
-          style={{
-            fontSize: 11,
-            color: mutedColor,
-            fontFamily: FONT.amiri,
-            textAlign: 'center',
-          }}
-          maxLines={1}
-          truncate="END"
-        />
-      ) : null}
-
-      {/* Footer: count + branding */}
-      <FlexWidget
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: 'match_parent',
-        }}
-      >
-        {dhikr.count > 0 ? (
+        {dhikr.count > 1 ? (
           <FlexWidget
             style={{
-              backgroundColor: badgeBg,
-              borderRadius: 10,
+              backgroundColor: p.surface,
+              borderRadius: GLASS.radiusInner,
               paddingHorizontal: 10,
-              paddingVertical: 3,
+              paddingVertical: 4,
+              marginLeft: 8,
             }}
           >
             <TextWidget
-              text={`${dhikr.count} ${dhikr.timesLabel || 'مرة'}`}
-              style={{
-                fontSize: 11,
-                color: badgeText,
-                fontFamily: FONT.amiri,
-              }}
+              text={`${applyNumerals(dhikr.count, numerals, isAr)}×`}
+              style={{ fontSize: 12, color: p.text, fontFamily: FONT.rubikBold }}
             />
           </FlexWidget>
-        ) : (
-          <TextWidget text="" style={{ fontSize: 1 }} />
-        )}
-        <TextWidget
-          text={BRANDING.name}
-          style={{
-            fontSize: BRANDING.fontSize,
-            color: brandColor,
-            fontFamily: FONT.amiri,
-          }}
-        />
+        ) : null}
       </FlexWidget>
+      {!isAr && dhikr.translation ? (
+        <TextWidget
+          text={dhikr.translation}
+          style={{ fontSize: 11, color: p.muted, fontFamily: FONT.rubik, textAlign: 'left', marginTop: 4 }}
+          maxLines={1}
+          truncate="END"
+        />
+      ) : null}
+      {showBenefit ? (
+        <TextWidget
+          text={benefit || ''}
+          style={{ fontSize: 11, color: p.muted, fontFamily: FONT.rubik, textAlign: 'right', marginTop: 6 }}
+          maxLines={2}
+          truncate="END"
+        />
+      ) : null}
     </FlexWidget>
   );
 }

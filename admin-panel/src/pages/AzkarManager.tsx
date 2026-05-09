@@ -2,10 +2,11 @@
 // إدارة الأذكار - روح المسلم
 // آخر تحديث: 2026-03-04
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Download, RefreshCw, Play, Square, Search, FileJson, X, Upload, Edit2, Save, Plus, Trash2, Music, Volume2, VolumeX, Copy, ArrowUp, ArrowDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Download, RefreshCw, Play, Square, Search, FileJson, X, Upload, Edit2, Save, Plus, Trash2, Music, Volume2, VolumeX, Copy, ArrowUp, ArrowDown, FolderPlus, Image as ImageIcon } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
+import { Styled } from '../components/Styled';
 import { db, storage } from '../firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -20,11 +21,11 @@ interface Zikr {
   subcategory?: string;
   arabic: string;
   transliteration: string;
-  translations: Record<string, string>;
+  translations: Record<string, string | { text: string; verified?: boolean }>;
   count: number;
   sortOrder?: number;
   reference: string;
-  benefit: string | Record<string, string>;
+  benefit: string | Record<string, string | { text: string; verified?: boolean }>;
   audio: string;
 }
 
@@ -34,6 +35,34 @@ interface AzkarData {
   totalCount: number;
   azkar: Zikr[];
 }
+
+/**
+ * Custom (admin-managed) category. Stored in Firestore collection
+ * `azkar_categories`. Default 21 categories remain hardcoded and cannot be
+ * edited or deleted from here. Custom categories appear ONLY in the mobile
+ * app's "أذكار أخرى" page (not in the Home page main grid).
+ */
+interface CustomCategory {
+  id: string;                            // e.g. 'c_1715180000000'
+  name: Record<string, string>;          // 12 languages (ar required)
+  icon: string;                          // emoji | mci name | 'img:<storage url>'
+  color: string;                         // tailwind class (e.g. 'bg-rose-500')
+  order: number;
+  audioFile?: string | null;
+  iconStoragePath?: string | null;       // for cleanup on delete
+  createdAt?: string;
+}
+
+const COLOR_PALETTE = [
+  'bg-amber-500', 'bg-purple-500', 'bg-blue-500', 'bg-pink-500', 'bg-teal-500',
+  'bg-orange-500', 'bg-indigo-500', 'bg-lime-500', 'bg-cyan-500', 'bg-stone-500',
+  'bg-sky-500', 'bg-green-500', 'bg-violet-500', 'bg-rose-500', 'bg-yellow-600',
+  'bg-red-500', 'bg-emerald-500', 'bg-fuchsia-500',
+];
+
+const CATEGORY_ICONS_STORAGE_PATH = 'category-icons';
+const CATEGORIES_COLLECTION = 'azkar_categories';
+const MAX_CATEGORY_ICON_SIZE_MB = 1;
 
 // ========================================
 // الثوابت
@@ -108,6 +137,25 @@ const compareAzkar = (a: Zikr, b: Zikr): number => {
 
 const sortAzkarList = (items: Zikr[]): Zikr[] => [...items].sort(compareAzkar);
 
+/**
+ * Some Firestore translation/benefit values are stored as { text, verified }
+ * objects instead of plain strings. Rendering an object in React throws
+ * "Objects are not valid as a React child" (Minified error #31). This helper
+ * always returns a renderable string.
+ */
+const resolveText = (value: unknown): string => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.text === 'string') return obj.text;
+    if (typeof obj.ar === 'string') return obj.ar;
+    if (typeof obj.en === 'string') return obj.en;
+  }
+  return '';
+};
+
 // ========================================
 // المكون الرئيسي
 // ========================================
@@ -129,12 +177,41 @@ const AzkarManager: React.FC = () => {
   const [dataSource, setDataSource] = useState<'github' | 'firestore'>('github');
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [activeTab, setActiveTab] = useState<'list' | 'audio'>('list');
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
     show: false,
     message: '',
     type: 'success',
   });
+
+  // ===== Custom Categories state =====
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CustomCategory | null>(null);
+  const [isUploadingCategoryIcon, setIsUploadingCategoryIcon] = useState(false);
+  const categoryIconInputRef = useRef<HTMLInputElement>(null);
+
+  // Merged list (default + custom) for use in filter buttons & zikr edit dropdown.
+  // Default categories keep their hardcoded order; custom categories are appended,
+  // sorted by their `order` field then by createdAt.
+  const allCategories = useMemo(() => {
+    const customSorted = [...customCategories]
+      .sort((a, b) => {
+        const oa = Number(a.order); const ob = Number(b.order);
+        if (Number.isFinite(oa) && Number.isFinite(ob) && oa !== ob) return oa - ob;
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      })
+      .map(c => ({
+        id: c.id,
+        name: c.name?.ar || c.name?.en || c.id,
+        icon: c.icon,
+        color: c.color || 'bg-slate-500',
+        isCustom: true as const,
+      }));
+    return [
+      ...CATEGORIES.map(c => ({ ...c, isCustom: false as const })),
+      ...customSorted,
+    ];
+  }, [customCategories]);
 
   // ========================================
   // تحميل البيانات
@@ -144,10 +221,14 @@ const AzkarManager: React.FC = () => {
     // On mount, prefer Firestore (source of truth for the live app).
     // Falls back to GitHub JSON only if Firestore is empty (first-time bootstrap).
     loadFromFirestoreOrGithub();
+    // Initial load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     filterAzkar();
+    // Derived list depends on the three values above; filterAzkar is kept local for clarity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [azkarList, selectedCategory, searchQuery]);
 
   const filterAzkar = () => {
@@ -163,7 +244,7 @@ const AzkarManager: React.FC = () => {
         z.arabic?.includes(searchQuery) ||
         z.transliteration?.toLowerCase().includes(query) ||
         z.id?.toString() === query ||
-        z.translations?.en?.toLowerCase().includes(query)
+        resolveText(z.translations?.en).toLowerCase().includes(query)
       );
     }
 
@@ -242,6 +323,128 @@ const AzkarManager: React.FC = () => {
     setLoading(false);
     // Firestore empty or unreachable — load bundled JSON
     await loadAzkarFromGitHub();
+  };
+
+  // ========================================
+  // Custom Categories — Firestore CRUD
+  // ========================================
+
+  useEffect(() => {
+    loadCustomCategories();
+  }, []);
+
+  const loadCustomCategories = async () => {
+    try {
+      const snap = await getDocs(collection(db, CATEGORIES_COLLECTION));
+      const items: CustomCategory[] = snap.docs
+        .map(d => d.data() as CustomCategory)
+        .filter(c => c && typeof c.id === 'string');
+      setCustomCategories(items);
+    } catch (err) {
+      console.warn('[AzkarManager] loadCustomCategories failed:', err);
+    }
+  };
+
+  const openNewCategory = () => {
+    const nextOrder = customCategories.reduce((m, c) => Math.max(m, Number(c.order) || 0), 0) + 1;
+    setEditingCategory({
+      id: `c_${Date.now()}`,
+      name: { ar: '' },
+      icon: '🌟',
+      color: 'bg-rose-500',
+      order: nextOrder,
+      audioFile: null,
+      iconStoragePath: null,
+      createdAt: new Date().toISOString(),
+    });
+    setShowCategoryModal(true);
+  };
+
+  const openEditCategory = (cat: CustomCategory) => {
+    setEditingCategory({ ...cat, name: { ...cat.name } });
+    setShowCategoryModal(true);
+  };
+
+  const saveCategory = async () => {
+    if (!editingCategory) return;
+    const name = (editingCategory.name?.ar || '').trim();
+    if (!name) {
+      showNotification('❌ الاسم بالعربية مطلوب', 'error');
+      return;
+    }
+    try {
+      const payload: CustomCategory = {
+        ...editingCategory,
+        name: { ...editingCategory.name, ar: name },
+        order: Number(editingCategory.order) || 0,
+        createdAt: editingCategory.createdAt || new Date().toISOString(),
+      };
+      await setDoc(doc(db, CATEGORIES_COLLECTION, payload.id), payload);
+      setCustomCategories(prev => {
+        const exists = prev.some(c => c.id === payload.id);
+        return exists ? prev.map(c => (c.id === payload.id ? payload : c)) : [...prev, payload];
+      });
+      showNotification('✅ تم حفظ الفئة', 'success');
+      setShowCategoryModal(false);
+      setEditingCategory(null);
+    } catch (err) {
+      showNotification(`❌ ${(err as Error).message}`, 'error');
+    }
+  };
+
+  const deleteCategory = async (cat: CustomCategory) => {
+    const inUse = azkarList.filter(z => z.category === cat.id).length;
+    const message = inUse > 0
+      ? `هذه الفئة مرتبطة بـ ${inUse} ذكر. سيتم الحذف لكن الأذكار ستحتاج لإعادة إسناد. متابعة؟`
+      : 'حذف هذه الفئة المخصصة؟';
+    if (!confirm(message)) return;
+    try {
+      await deleteDoc(doc(db, CATEGORIES_COLLECTION, cat.id));
+      // best-effort delete of uploaded icon
+      if (cat.iconStoragePath) {
+        try { await deleteObject(ref(storage, cat.iconStoragePath)); } catch { /* ignore */ }
+      }
+      setCustomCategories(prev => prev.filter(c => c.id !== cat.id));
+      showNotification('✅ تم حذف الفئة', 'success');
+    } catch (err) {
+      showNotification(`❌ ${(err as Error).message}`, 'error');
+    }
+  };
+
+  const handleCategoryIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingCategory) return;
+    e.target.value = '';
+    if (file.size > MAX_CATEGORY_ICON_SIZE_MB * 1024 * 1024) {
+      showNotification(`❌ حجم الصورة يجب أن يكون أقل من ${MAX_CATEGORY_ICON_SIZE_MB}MB`, 'error');
+      return;
+    }
+    if (!/^image\/(png|jpe?g|svg\+xml|webp)$/i.test(file.type)) {
+      showNotification('❌ صيغة الصورة غير مدعومة (PNG/JPG/SVG/WebP فقط)', 'error');
+      return;
+    }
+    setIsUploadingCategoryIcon(true);
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${CATEGORY_ICONS_STORAGE_PATH}/${editingCategory.id}.${ext}`;
+      // remove old uploaded icon if any
+      if (editingCategory.iconStoragePath && editingCategory.iconStoragePath !== path) {
+        try { await deleteObject(ref(storage, editingCategory.iconStoragePath)); } catch { /* ignore */ }
+      }
+      const fileRef = ref(storage, path);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      setEditingCategory({
+        ...editingCategory,
+        icon: `img:${url}`,
+        iconStoragePath: path,
+      });
+      showNotification('✅ تم رفع الأيقونة', 'success');
+    } catch (err) {
+      showNotification(`❌ ${(err as Error).message}`, 'error');
+    } finally {
+      setIsUploadingCategoryIcon(false);
+    }
   };
 
   // ========================================
@@ -534,34 +737,6 @@ const AzkarManager: React.FC = () => {
     }
   };
 
-  const bulkUpdateAudio = async (category: string, audioBaseUrl: string) => {
-    const filtered = azkarList.filter(z => z.category === category && !z.audio);
-    if (filtered.length === 0) {
-      showNotification('لا توجد أذكار بدون صوت في هذه الفئة', 'error');
-      return;
-    }
-    if (!confirm(`تعيين رابط صوت لـ ${filtered.length} ذكر في هذه الفئة؟`)) return;
-
-    try {
-      const batch = writeBatch(db);
-      const updated: Zikr[] = [];
-      filtered.forEach((z, i) => {
-        const audioUrl = `${audioBaseUrl}/${z.id}.mp3`;
-        const u = { ...z, audio: audioUrl };
-        batch.set(doc(db, 'azkar', String(z.id)), u);
-        updated.push(u);
-      });
-      await batch.commit();
-      setAzkarList(prev => {
-        const map = new Map(updated.map(u => [u.id, u]));
-        return sortAzkarList(prev.map(z => map.get(z.id) || z));
-      });
-      showNotification(`✅ تم تعيين الصوت لـ ${updated.length} ذكر`, 'success');
-    } catch (err) {
-      showNotification(`❌ ${(err as Error).message}`, 'error');
-    }
-  };
-
   const moveZikr = async (zikrId: number, direction: 'up' | 'down') => {
     const target = azkarList.find(z => z.id === zikrId);
     if (!target) return;
@@ -780,7 +955,10 @@ const AzkarManager: React.FC = () => {
                       <span className="text-slate-400 text-sm">{withAudio.length}/{catAzkar.length} ({percentage}%)</span>
                     </div>
                     <div className="w-full bg-admin-surface-light rounded-full h-2">
-                      <div className={`${cat.color} h-2 rounded-full transition-all`} style={{ width: `${percentage}%` }} />
+                      <Styled
+                        className={`${cat.color} h-2 rounded-full transition-all`}
+                        css={{ width: `${percentage}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -896,6 +1074,74 @@ const AzkarManager: React.FC = () => {
       )}
 
       {activeTab === 'list' && (<>
+      {/* Custom Categories Manager */}
+      <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-white font-medium flex items-center gap-2">
+              <FolderPlus className="w-5 h-5 text-accent-light" />
+              الفئات المخصصة
+              <span className="text-slate-400 text-sm">({customCategories.length})</span>
+            </h3>
+            <p className="text-slate-500 text-xs mt-1">
+              فئات إضافية تظهر في صفحة "أذكار أخرى" داخل التطبيق. الفئات الافتراضية الـ {CATEGORIES.length} ثابتة ولا يمكن تعديلها.
+            </p>
+          </div>
+          <button
+            onClick={openNewCategory}
+            className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent-dark transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            فئة جديدة
+          </button>
+        </div>
+        {customCategories.length === 0 ? (
+          <p className="text-slate-500 text-sm text-center py-6">لا توجد فئات مخصصة. اضغط "فئة جديدة" لإضافة واحدة.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {customCategories
+              .slice()
+              .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+              .map(cat => {
+                const inUse = azkarList.filter(z => z.category === cat.id).length;
+                return (
+                  <div key={cat.id} className={`${cat.color || 'bg-slate-500'} rounded-xl p-3 text-white flex items-center gap-3`}>
+                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-2xl overflow-hidden">
+                      {cat.icon?.startsWith('img:') ? (
+                        <img src={cat.icon.slice(4)} alt="" className="w-full h-full object-contain" />
+                      ) : (
+                        <span>{cat.icon || '📿'}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{cat.name?.ar || cat.id}</p>
+                      <p className="text-xs opacity-80">ترتيب {cat.order} • {inUse} ذكر</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => openEditCategory(cat)}
+                        className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg"
+                        aria-label="تعديل"
+                        title="تعديل"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => deleteCategory(cat)}
+                        className="p-1.5 bg-white/20 hover:bg-red-500/60 rounded-lg"
+                        aria-label="حذف"
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
+
       {/* Category Filter */}
       <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50">
         <h3 className="text-white font-medium mb-3">توزيع الأذكار على الفئات</h3>
@@ -913,7 +1159,7 @@ const AzkarManager: React.FC = () => {
               <span className="font-bold">{stats.total}</span>
             </div>
           </button>
-          {CATEGORIES.map(cat => (
+          {allCategories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)}
@@ -924,8 +1170,8 @@ const AzkarManager: React.FC = () => {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span>{cat.icon} {cat.name}</span>
-                <span className="font-bold">{stats.byCategory[cat.id] || 0}</span>
+                <span>{cat.icon?.startsWith('img:') ? '🖼️' : cat.icon} {cat.name}</span>
+                <span className="font-bold">{azkarList.filter(z => z.category === cat.id).length}</span>
               </div>
             </button>
           ))}
@@ -1124,16 +1370,16 @@ const AzkarManager: React.FC = () => {
               <div>
                 <h3 className="text-accent-light font-medium mb-2">النص العربي</h3>
                 <p className="text-white text-xl leading-loose bg-admin-bg p-4 rounded-xl">
-                  {selectedZikr.arabic}
+                  {resolveText(selectedZikr.arabic)}
                 </p>
               </div>
 
               {/* Transliteration */}
-              {selectedZikr.transliteration && (
+              {resolveText(selectedZikr.transliteration) && (
                 <div>
                   <h3 className="text-accent-light font-medium mb-2">النطق</h3>
                   <p className="text-slate-300 bg-admin-bg p-4 rounded-xl italic" dir="ltr">
-                    {selectedZikr.transliteration}
+                    {resolveText(selectedZikr.transliteration)}
                   </p>
                 </div>
               )}
@@ -1142,7 +1388,7 @@ const AzkarManager: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">الفئة</p>
-                  <p className="text-white">{CATEGORIES.find(c => c.id === selectedZikr.category)?.name}</p>
+                  <p className="text-white">{allCategories.find(c => c.id === selectedZikr.category)?.name || selectedZikr.category}</p>
                 </div>
                 <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">التكرار</p>
@@ -1150,7 +1396,7 @@ const AzkarManager: React.FC = () => {
                 </div>
                 <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">المصدر</p>
-                  <p className="text-white text-sm">{selectedZikr.reference || '—'}</p>
+                  <p className="text-white text-sm">{resolveText(selectedZikr.reference) || '—'}</p>
                 </div>
                 <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">صوت</p>
@@ -1159,11 +1405,11 @@ const AzkarManager: React.FC = () => {
               </div>
 
               {/* Benefit */}
-              {selectedZikr.benefit && (
+              {resolveText(selectedZikr.benefit) && (
                 <div>
                   <h3 className="text-accent-light font-medium mb-2">الفائدة</h3>
                   <p className="text-amber-300 bg-admin-bg p-4 rounded-xl">
-                    {typeof selectedZikr.benefit === 'string' ? selectedZikr.benefit : selectedZikr.benefit?.ar || ''}
+                    {resolveText(selectedZikr.benefit)}
                   </p>
                 </div>
               )}
@@ -1202,7 +1448,8 @@ const AzkarManager: React.FC = () => {
                 <div className="space-y-3">
                   {LANGUAGES.map(lang => {
                     const translation = selectedZikr.translations?.[lang.code];
-                    if (!translation) return null;
+                    const text = resolveText(translation);
+                    if (!text) return null;
                     return (
                       <div key={lang.code} className="bg-admin-bg p-4 rounded-xl">
                         <div className="flex items-center gap-2 mb-2">
@@ -1210,7 +1457,7 @@ const AzkarManager: React.FC = () => {
                           <span className="text-slate-400 font-medium">{lang.name}</span>
                         </div>
                         <p className="text-slate-300" dir={lang.code === 'ar' || lang.code === 'ur' ? 'rtl' : 'ltr'}>
-                          {translation}
+                          {text}
                         </p>
                       </div>
                     );
@@ -1246,7 +1493,7 @@ const AzkarManager: React.FC = () => {
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">الفئة</label>
                   <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="الفئة" title="الفئة" value={editingZikr.category} onChange={e => setEditingZikr({ ...editingZikr, category: e.target.value, subcategory: undefined, sortOrder: getNextSortOrder(e.target.value) })}>
-                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {allCategories.map(c => <option key={c.id} value={c.id}>{c.isCustom ? `★ ${c.name}` : c.name}</option>)}
                   </select>
                 </div>
                 {SUBCATEGORIES[editingZikr.category] && (
@@ -1272,12 +1519,12 @@ const AzkarManager: React.FC = () => {
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الفائدة</label>
-                <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} dir="rtl" value={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : (editingZikr.benefit?.ar || '')} onChange={e => setEditingZikr({ ...editingZikr, benefit: e.target.value })} aria-label="الفائدة" placeholder="فائدة الذكر" />
+                <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} dir="rtl" value={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : resolveText(editingZikr.benefit?.ar)} onChange={e => setEditingZikr({ ...editingZikr, benefit: e.target.value })} aria-label="الفائدة" placeholder="فائدة الذكر" />
               </div>
 
               {/* Translate benefit to all languages */}
               <TranslateButton
-                sourceText={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : (editingZikr.benefit?.ar || '')}
+                sourceText={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : resolveText(editingZikr.benefit?.ar)}
                 sourceLang="ar"
                 contentType="adhkar"
                 compact
@@ -1350,7 +1597,9 @@ const AzkarManager: React.FC = () => {
                   fieldName="translations"
                   contentType="adhkar"
                   arabicText={editingZikr.arabic}
-                  initialValues={editingZikr.translations}
+                  initialValues={Object.fromEntries(
+                    Object.entries(editingZikr.translations || {}).map(([k, v]) => [k, resolveText(v)])
+                  )}
                   onSave={(translations) => setEditingZikr({ ...editingZikr, translations: { ...editingZikr.translations, ...translations } })}
                 />
 
@@ -1358,7 +1607,7 @@ const AzkarManager: React.FC = () => {
                   {LANGUAGES.filter(l => l.code !== 'ar').map(lang => (
                     <div key={lang.code}>
                       <label className="text-slate-400 text-xs block mb-1">{lang.flag} {lang.name}</label>
-                      <textarea className="w-full bg-admin-surface text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" rows={2} dir={lang.code === 'ur' ? 'rtl' : 'ltr'} value={editingZikr.translations?.[lang.code] || ''} onChange={e => setEditingZikr({ ...editingZikr, translations: { ...editingZikr.translations, [lang.code]: e.target.value } })} aria-label={`ترجمة ${lang.name}`} placeholder={lang.name} />
+                      <textarea className="w-full bg-admin-surface text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" rows={2} dir={lang.code === 'ur' ? 'rtl' : 'ltr'} value={resolveText(editingZikr.translations?.[lang.code])} onChange={e => setEditingZikr({ ...editingZikr, translations: { ...editingZikr.translations, [lang.code]: e.target.value } })} aria-label={`ترجمة ${lang.name}`} placeholder={lang.name} />
                     </div>
                   ))}
                 </div>
@@ -1370,6 +1619,182 @@ const AzkarManager: React.FC = () => {
                 <Save className="w-4 h-4" /> حفظ
               </button>
               <button onClick={() => setShowEditModal(false)} className="px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Edit Modal */}
+      {showCategoryModal && editingCategory && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-admin-bg rounded-2xl border border-admin-border w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                <FolderPlus className="w-5 h-5 text-accent-light" />
+                {customCategories.some(c => c.id === editingCategory.id) ? 'تعديل فئة مخصصة' : 'فئة مخصصة جديدة'}
+              </h2>
+              <button onClick={() => { setShowCategoryModal(false); setEditingCategory(null); }} className="text-slate-400 hover:text-white" aria-label="إغلاق" title="إغلاق">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Preview */}
+            <div className={`${editingCategory.color || 'bg-slate-500'} rounded-xl p-4 text-white flex items-center gap-3`}>
+              <div className="w-14 h-14 rounded-lg bg-white/20 flex items-center justify-center text-3xl overflow-hidden">
+                {editingCategory.icon?.startsWith('img:') ? (
+                  <img src={editingCategory.icon.slice(4)} alt="" className="w-full h-full object-contain" />
+                ) : (
+                  <span>{editingCategory.icon || '📿'}</span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-lg truncate">{editingCategory.name?.ar || 'اسم الفئة'}</p>
+                <p className="text-xs opacity-80">معاينة الشكل في التطبيق</p>
+              </div>
+            </div>
+
+            {/* Arabic name (required) */}
+            <div>
+              <label className="text-slate-300 text-sm block mb-1">الاسم بالعربية *</label>
+              <input
+                className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border"
+                dir="rtl"
+                value={editingCategory.name?.ar || ''}
+                onChange={e => setEditingCategory({ ...editingCategory, name: { ...editingCategory.name, ar: e.target.value } })}
+                aria-label="الاسم بالعربية"
+                placeholder="مثال: أذكار الجمعة"
+              />
+            </div>
+
+            {/* Auto-translate */}
+            <AutoTranslateField
+              label="ترجمة تلقائية"
+              fieldName="category-name"
+              contentType="adhkar"
+              arabicText={editingCategory.name?.ar || ''}
+              initialValues={editingCategory.name as Record<string, string>}
+              onSave={(translations) => setEditingCategory({ ...editingCategory, name: { ...editingCategory.name, ...translations } })}
+            />
+
+            {/* Manual per-language names */}
+            <div className="grid grid-cols-2 gap-3">
+              {LANGUAGES.filter(l => l.code !== 'ar').map(lang => (
+                <div key={lang.code}>
+                  <label className="text-slate-400 text-xs block mb-1">{lang.flag} {lang.name}</label>
+                  <input
+                    className="w-full bg-admin-surface text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm"
+                    dir={lang.code === 'ur' ? 'rtl' : 'ltr'}
+                    value={editingCategory.name?.[lang.code] || ''}
+                    onChange={e => setEditingCategory({ ...editingCategory, name: { ...editingCategory.name, [lang.code]: e.target.value } })}
+                    aria-label={`اسم ${lang.name}`}
+                    placeholder={lang.name}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Icon section */}
+            <div className="bg-admin-surface/50 rounded-xl p-4 space-y-3 border border-admin-border/50">
+              <h3 className="text-white font-medium flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-accent-light" />
+                الأيقونة
+              </h3>
+
+              {/* Upload image */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${isUploadingCategoryIcon ? 'bg-slate-600 text-slate-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                  <Upload className="w-4 h-4" />
+                  {isUploadingCategoryIcon ? 'جاري الرفع...' : 'رفع صورة'}
+                  <input
+                    ref={categoryIconInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    className="hidden"
+                    onChange={handleCategoryIconUpload}
+                    disabled={isUploadingCategoryIcon}
+                    aria-label="رفع صورة الأيقونة"
+                  />
+                </label>
+                {editingCategory.icon?.startsWith('img:') && (
+                  <button
+                    onClick={async () => {
+                      if (editingCategory.iconStoragePath) {
+                        try { await deleteObject(ref(storage, editingCategory.iconStoragePath)); } catch { /* ignore */ }
+                      }
+                      setEditingCategory({ ...editingCategory, icon: '🌟', iconStoragePath: null });
+                    }}
+                    className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30"
+                  >
+                    إزالة الصورة
+                  </button>
+                )}
+                <span className="text-slate-500 text-xs">PNG/JPG/SVG/WebP — حد أقصى {MAX_CATEGORY_ICON_SIZE_MB}MB</span>
+              </div>
+
+              {/* OR emoji / MCI name */}
+              <div>
+                <label className="text-slate-300 text-sm block mb-1">أو إيموجي / اسم أيقونة MCI</label>
+                <input
+                  className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border"
+                  value={editingCategory.icon?.startsWith('img:') ? '' : (editingCategory.icon || '')}
+                  onChange={e => setEditingCategory({ ...editingCategory, icon: e.target.value, iconStoragePath: editingCategory.icon?.startsWith('img:') ? null : editingCategory.iconStoragePath })}
+                  placeholder="🌙 أو home-variant"
+                  aria-label="أيقونة"
+                  disabled={editingCategory.icon?.startsWith('img:')}
+                />
+                <p className="text-slate-500 text-xs mt-1">
+                  أمثلة: <code className="bg-admin-surface px-1 rounded">🕌</code>{' '}
+                  <code className="bg-admin-surface px-1 rounded">⭐</code>{' '}
+                  <code className="bg-admin-surface px-1 rounded">mci:home-variant</code>
+                </p>
+              </div>
+            </div>
+
+            {/* Color & order */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-slate-300 text-sm block mb-2">اللون</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {COLOR_PALETTE.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditingCategory({ ...editingCategory, color: c })}
+                      className={`${c} h-9 rounded-lg border-2 transition-transform ${editingCategory.color === c ? 'border-white scale-110' : 'border-transparent'}`}
+                      aria-label={`اختر اللون ${c}`}
+                      title={c}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-slate-300 text-sm block mb-2">الترتيب (رقم)</label>
+                <input
+                  type="number"
+                  className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border"
+                  value={editingCategory.order}
+                  onChange={e => setEditingCategory({ ...editingCategory, order: Number(e.target.value) || 0 })}
+                  aria-label="الترتيب"
+                  min={0}
+                />
+                <p className="text-slate-500 text-xs mt-1">الأرقام الأصغر تظهر أولاً في "أذكار أخرى"</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={saveCategory}
+                disabled={isUploadingCategoryIcon}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" /> حفظ
+              </button>
+              <button
+                onClick={() => { setShowCategoryModal(false); setEditingCategory(null); }}
+                className="px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>

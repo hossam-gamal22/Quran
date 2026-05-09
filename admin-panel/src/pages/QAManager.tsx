@@ -162,7 +162,7 @@ export default function QAManager() {
     setData(updated);
   };
 
-  const commitCatEdit = (catId: string) => {
+  const commitCatEdit = () => {
     setEditingCatId(null);
     saveData(data);
   };
@@ -320,8 +320,8 @@ export default function QAManager() {
                     <input
                       value={cat.name[activeLang] || ''}
                       onChange={e => saveCatName(cat.id, activeLang, e.target.value)}
-                      onBlur={() => commitCatEdit(cat.id)}
-                      onKeyDown={e => e.key === 'Enter' && commitCatEdit(cat.id)}
+                      onBlur={commitCatEdit}
+                      onKeyDown={e => e.key === 'Enter' && commitCatEdit()}
                       className="bg-admin-bg rounded px-2 py-1 text-white text-sm border border-emerald-500/50 outline-none w-64"
                       dir={LANGS.find(l => l.code === activeLang)?.rtl ? 'rtl' : 'ltr'}
                       autoFocus

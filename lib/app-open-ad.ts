@@ -25,7 +25,13 @@ let adReady = false;
 let appOpenCount = 0;
 /** Ignore brief inactive flickers (<10s) — not a real backgrounding. */
 const MIN_BACKGROUND_DURATION = 10_000;
+/** Skip ad if previous foreground session was shorter than this (user just bounced). */
+const MIN_PREV_SESSION_DURATION = 30_000;
+/** AsyncStorage key tracking the date of the first foreground transition each day. */
+const FIRST_OPEN_DATE_KEY = '@app_open_ad_first_open_date';
 let lastBackgroundTime = 0;
+let lastActiveStart = 0;
+let lastActiveDuration = Infinity;
 
 export const loadAppOpenAd = async (): Promise<void> => {
   if (!AppOpenAdClass || Platform.OS === 'web') return;
@@ -67,7 +73,10 @@ export const showAppOpenAd = async (): Promise<boolean> => {
   }
 
   // Frequency cap: show once every N app opens (configured from admin panel).
-  const everyN = Math.max(1, adConfig.appOpenFrequency ?? 3);
+  // iOS match rate is currently very low; double the interval on iOS to reduce
+  // wasted requests until mediation is in place.
+  const baseEveryN = Math.max(1, adConfig.appOpenFrequency ?? 3);
+  const everyN = Platform.OS === 'ios' ? baseEveryN * 2 : baseEveryN;
   if (appOpenCount === 0 || appOpenCount % everyN !== 0) return false;
 
   // Global cooldown: at least 2 minutes between ANY two ads (interstitial / app-open / etc.).
@@ -78,6 +87,23 @@ export const showAppOpenAd = async (): Promise<boolean> => {
   if (lastBackgroundTime > 0 && (Date.now() - lastBackgroundTime) < MIN_BACKGROUND_DURATION) {
     return false;
   }
+
+  // Skip if the previous foreground session was very short (user opened the app,
+  // didn't do anything, then left). Showing an ad when they return is intrusive.
+  if (lastActiveDuration < MIN_PREV_SESSION_DURATION) {
+    return false;
+  }
+
+  // Skip the first foreground transition of the day — keep the morning open clean,
+  // which historically improves day-1 retention.
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const storedDate = await AsyncStorage.getItem(FIRST_OPEN_DATE_KEY);
+    if (storedDate !== today) {
+      await AsyncStorage.setItem(FIRST_OPEN_DATE_KEY, today);
+      return false;
+    }
+  } catch {}
 
   // Skip during onboarding
   try {
@@ -116,16 +142,23 @@ export const initializeAppOpenAds = (): (() => void) => {
   loadAppOpenAd();
 
   let appState = AppState.currentState;
+  if (appState === 'active') lastActiveStart = Date.now();
+
   const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
     // Only record background time when leaving FROM active state
     // (prevents overwriting during return transitions like background → inactive → active on iOS)
     if (appState === 'active' && (nextState === 'background' || nextState === 'inactive')) {
       lastBackgroundTime = Date.now();
+      // Capture how long the user was actively engaged before leaving.
+      if (lastActiveStart > 0) {
+        lastActiveDuration = Date.now() - lastActiveStart;
+      }
     }
     // Only trigger ad on genuine background → active transitions
     // (not brief inactive → active from notification shade, phone calls, etc.)
     if (appState === 'background' && nextState === 'active') {
       appOpenCount++;
+      lastActiveStart = Date.now();
       showAppOpenAd();
     }
     appState = nextState;

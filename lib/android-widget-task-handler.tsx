@@ -8,8 +8,12 @@ import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SharedWidgetData } from './widget-data';
 
+import { RoohSmallWidget } from '@/components/widgets/android/RoohSmallWidget';
+import { RoohMediumWidget } from '@/components/widgets/android/RoohMediumWidget';
+import { RoohLargeWidget } from '@/components/widgets/android/RoohLargeWidget';
 import { PrayerTimesSmallWidget } from '@/components/widgets/android/PrayerTimesSmallWidget';
 import { PrayerTimesMediumWidget } from '@/components/widgets/android/PrayerTimesMediumWidget';
+import { PrayerTimesLargeWidget } from '@/components/widgets/android/PrayerTimesLargeWidget';
 import { DailyVerseSmallWidget } from '@/components/widgets/android/DailyVerseSmallWidget';
 import { DailyVerseMediumWidget } from '@/components/widgets/android/DailyVerseMediumWidget';
 import { DailyDhikrSmallWidget } from '@/components/widgets/android/DailyDhikrSmallWidget';
@@ -23,8 +27,19 @@ import { LockedWidget } from '@/components/widgets/android/LockedWidget';
 const WIDGET_DATA_KEY = 'widget_shared_data';
 const SUBSCRIPTION_STATE_KEY = '@subscription_state';
 
-// Widgets available to all users (free tier)
-const FREE_WIDGET_NAMES = ['PrayerTimesSmall', 'PrayerTimesMedium'];
+// Widgets available to all users (free tier), matching app/widget.tsx gallery.
+// Free: Prayer Times (includes Next Prayer) + Hijri Date.
+// Premium: Daily Verse, Daily Dhikr, Azkar Progress.
+const FREE_WIDGET_NAMES = [
+  'RoohSmall',
+  'RoohMedium',
+  'RoohLarge',
+  'PrayerTimesSmall',
+  'PrayerTimesMedium',
+  'PrayerTimesLarge',
+  'HijriDateSmall',
+  'HijriDateMedium',
+];
 
 async function isUserPremium(): Promise<boolean> {
   try {
@@ -147,10 +162,10 @@ function generateFallbackData(): SharedWidgetData {
     },
     settings: {
       enabled: true,
-      prayerWidget: { enabled: true, showAllPrayers: true, showHijriDate: true, showLocation: true, showCompletion: true, colorScheme: 'auto', accentColor: '#0d8e62' },
+      prayerWidget: { enabled: true, showAllPrayers: true, showHijriDate: true, showLocation: true, showCompletion: true },
       azkarWidget: { enabled: true, showTranslation: false, categories: ['morning', 'evening', 'misc'] },
       hijriWidget: { enabled: true, showGregorian: true },
-      verseWidget: { enabled: true, showTranslation: false, colorScheme: 'auto' },
+      verseWidget: { enabled: true, showTranslation: false },
       dhikrWidget: { enabled: true, showTranslation: false, showBenefit: true },
     },
     language: 'ar',
@@ -158,8 +173,12 @@ function generateFallbackData(): SharedWidgetData {
 }
 
 const WIDGET_MAP: Record<string, React.FC<{ data: SharedWidgetData }>> = {
+  RoohSmall: RoohSmallWidget,
+  RoohMedium: RoohMediumWidget,
+  RoohLarge: RoohLargeWidget,
   PrayerTimesSmall: PrayerTimesSmallWidget,
   PrayerTimesMedium: PrayerTimesMediumWidget,
+  PrayerTimesLarge: PrayerTimesLargeWidget,
   DailyVerseSmall: DailyVerseSmallWidget,
   DailyVerseMedium: DailyVerseMediumWidget,
   DailyDhikrSmall: DailyDhikrSmallWidget,

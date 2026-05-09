@@ -272,3 +272,89 @@ struct RitualPrayerSimple: View {
         }
     }
 }
+
+// MARK: - Prayer Serene (4×4 Large)
+// Mirrors the SERENE mockup: a header glass card showing the next prayer
+// (name, big time, countdown, glyph) followed by a glass list of all six
+// prayers with the current row highlighted.
+
+struct RitualPrayerSerene: View {
+    let entry: PrayerWidgetEntry
+    private var isArabic: Bool { (entry.language ?? "ar") == "ar" }
+
+    private let order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
+
+    var body: some View {
+        let arName = entry.data?.nextPrayerNameAr ?? "الظهر"
+        let nextLabel = isArabic ? arName : ritualLabel(arName, isArabic: false)
+        let nextTime = entry.data?.nextPrayerTime ?? "--:--"
+        let countdown = ritualCountdown(entry.data?.timeRemaining ?? "", isArabic: isArabic)
+        let nextHeadline = isArabic ? "الصلاة القادمة \(countdown)" : "Next Prayer \(countdown)"
+        let glyph = ritualGlyph(entry.data?.nextPrayer ?? "")
+
+        let items = (entry.data?.allPrayers ?? [])
+            .filter { order.contains($0.name) }
+            .sorted { (order.firstIndex(of: $0.name) ?? 0) < (order.firstIndex(of: $1.name) ?? 0) }
+
+        VStack(spacing: 8) {
+            // Header card
+            GlassCard {
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(nextLabel)
+                            .font(.custom("WidgetFont", size: 14))
+                            .foregroundColor(.white)
+                        Text(nextTime)
+                            .font(.custom("WidgetFont", size: 30))
+                            .foregroundColor(.white)
+                        Text(nextHeadline)
+                            .font(.custom("Rubik-Regular", size: 11))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    Spacer()
+                    Image(systemName: glyph)
+                        .font(.system(size: 28, weight: .regular))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+
+            // List card
+            GlassCard {
+                VStack(spacing: 1) {
+                    ForEach(items) { p in
+                        HStack {
+                            HStack(spacing: 8) {
+                                Image(systemName: ritualGlyph(p.name))
+                                    .font(.system(size: 12))
+                                    .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white)
+                                Text(isArabic ? p.nameAr : ritualLabel(p.nameAr, isArabic: false))
+                                    .font(.custom("WidgetFont", size: 14))
+                                    .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white)
+                                if !isArabic {
+                                    Text(p.nameAr)
+                                        .font(.custom("WidgetFont", size: 11))
+                                        .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white.opacity(0.7))
+                                }
+                            }
+                            Spacer()
+                            Text(p.time)
+                                .font(.custom("Rubik-Medium", size: 13))
+                                .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white.opacity(0.85))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(p.isNext ? Color.white.opacity(0.15) : Color.clear)
+                        )
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+            }
+        }
+        .padding(6)
+    }
+}

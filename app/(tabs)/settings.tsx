@@ -530,17 +530,10 @@ export default function SettingsScreen() {
         {/* 3. الودجات (Widgets) */}
         <SettingSection title={t('settings.widgets')} index={2} colors={colors}>
           <SettingItem
-            icon="cog"
-            iconColor="#6366F1"
-            title={t('settings.widgetSettings')}
-            onPress={() => router.push('/widget-settings')}
-            colors={colors}
-          />
-          <SettingItem
-            icon="view-grid"
-            iconColor="#c17f59"
-            title={t('settings.widgetGallery')}
-            onPress={() => router.push('/widgets-gallery')}
+            icon="widgets"
+            iconColor="#0d8e62"
+            title={t('settings.widgets')}
+            onPress={() => router.push('/widget')}
             colors={colors}
           />
           {Platform.OS === 'ios' && (

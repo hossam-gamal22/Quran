@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, Activity, Clock, Eye, BookOpen, Moon, TrendingUp, RefreshCw,
-  Sparkles, FileText, Bell, Palette, Calendar, Settings, CheckCircle, Star, Globe, AlertCircle,
-  Heart, HandMetal
+  Users, Activity, Clock, Eye, BookOpen, Moon, RefreshCw,
+  Sparkles, FileText, Bell, Settings, CheckCircle, Star, AlertCircle,
+  Heart,
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
@@ -90,6 +90,8 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadAllData();
+    // Initial dashboard load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadAllData = async () => {
@@ -160,7 +162,7 @@ const Dashboard: React.FC = () => {
           })
           .filter(item => item.type !== 'app_open' && item.description.trim().length > 0)
           .slice(0, 8);
-      } catch (e) {
+      } catch {
         console.log('Activity collection not found or empty');
       }
 

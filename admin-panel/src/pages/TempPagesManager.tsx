@@ -536,7 +536,13 @@ const TempPagesManager: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={editing.placement?.inHighlights ?? true}
-                    onChange={e => setEditing({ ...editing, placement: { ...editing.placement, inHighlights: e.target.checked } })}
+                    onChange={e => setEditing({
+                      ...editing,
+                      placement: {
+                        inHighlights: e.target.checked,
+                        inNavMenu: editing.placement?.inNavMenu ?? false,
+                      },
+                    })}
                     aria-label="عرض في الأبرز"
                     className="w-4 h-4 rounded bg-admin-surface-light border-admin-border text-accent focus:ring-accent"
                   />

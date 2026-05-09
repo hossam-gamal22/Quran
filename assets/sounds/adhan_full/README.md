@@ -78,8 +78,31 @@ If a file is missing for a given muezzin key, `AdhanPlaybackService.kt`
 
 1. `adhan_full_<key>` (preferred — full recording)
 2. `adhan_full_makkah` (Makkah full as universal fallback)
-3. `<key>` (the short ~30s clip from `assets/sounds/`)
+3. `<key>` (the short ~15s clip from `assets/sounds/`)
 4. `R.raw.makkah` (ultimate fallback)
+
+## Layer-2 safety-net audio overlap (Android, by design)
+
+When the full-adhan toggle is **on**, Android plays **two** audio streams
+simultaneously at prayer time:
+
+1. **System notification sound** — short adhan (~15 s) on `STREAM_NOTIFICATION`,
+   played via the regular `adhan_<key>` channel.
+2. **Foreground media service** — full adhan (~35 s) on `STREAM_ALARM`, played
+   by `AdhanPlaybackService` after `AlarmManager` wakes the device.
+
+For the first **~15 seconds** the user hears both clips in parallel (slightly
+louder mix), then only the full adhan continues until ~35 s. This is
+**intentional** — the short clip is a Layer-2 safety net so the user still
+hears something even if the foreground service fails to start (FullAdhanModule
+missing, `SCHEDULE_EXACT_ALARM` revoked, OEM auto-kill, Doze edge-cases,
+MediaPlayer prepare failure, etc.).
+
+Trade-off: 15 s of doubled audio in exchange for **never going silent at
+prayer time**.
+
+iOS plays the bundled `adhan_full_*.mp3` directly through the notification
+sound channel and cuts it at ~29-30 s (Apple `UNNotificationSound` hard cap).
 
 ## In-app preview map
 

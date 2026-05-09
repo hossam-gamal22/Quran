@@ -93,6 +93,11 @@ const translations: Record<string, Record<string, string>> = {
     startNow: 'ابدأ الآن',
     canChangeSettings: 'يمكنك تعديل هذه الإعدادات في أي وقت من صفحة الإعدادات',
 
+    // ATT (App Tracking Transparency) — iOS only
+    attTitle: 'ساعدنا في إبقاء التطبيق مجانياً',
+    attDescription: 'في الشاشة التالية، سيسألك جهازك عن السماح بالتتبع لعرض إعلانات أكثر ملاءمة. اختيارك بـ "السماح" يدعمنا لمواصلة تطوير التطبيق وإبقائه مجانياً للجميع. لا نشارك بياناتك الشخصية.',
+    attContinue: 'متابعة',
+
     // Prize screen
     prizeTitle: 'المكافأة الشهرية',
     prizeHeadline: 'كل شهر، أكثر ٣ مستخدمين نشاطاً يحصلون على جميع المميزات مجاناً!',
@@ -203,6 +208,11 @@ const translations: Record<string, Record<string, string>> = {
     notEnabledF: 'Not Enabled',
     startNow: 'Start Now',
     canChangeSettings: 'You can change these settings anytime from the settings page',
+
+    // ATT (App Tracking Transparency) — iOS only
+    attTitle: 'Help Us Keep the App Free',
+    attDescription: 'On the next screen, your device will ask whether to allow tracking for more relevant ads. Choosing "Allow" supports us in continuing to develop the app and keep it free for everyone. We never share your personal data.',
+    attContinue: 'Continue',
 
     // Prize screen
     prizeTitle: 'Monthly Reward',

@@ -218,6 +218,8 @@ export interface DisplaySettings {
   backgroundOpacity: number;
   quranBackground: QuranBackgroundKey;
   quranThemeIndex: number;
+  /** Default Arabic widget font for Date/Prayer variants. Adhkar widgets are always WidgetFont2. */
+  widgetFontVariant: 'widget1' | 'widget2';
   homeLayout: HomeLayout;
   /** Font size adjustment for Mushaf reader (-4 to +8, default 0) */
   quranFontSizeAdjust: number;
@@ -241,6 +243,20 @@ export interface DisplaySettings {
   dimOpacity: number;
   /** Show section info (ⓘ) buttons across the app */
   showSectionInfo: boolean;
+  /** Widget calendar preference (legacy / global fallback) */
+  widgetCalendar: 'auto' | 'gregorian' | 'hijri';
+  /** Per-widget-type calendar: Day widgets (DaySimple, DayThuluth, DayDigital) */
+  widgetDayCalendar: 'auto' | 'gregorian' | 'hijri';
+  /** Per-widget-type calendar: Month widgets (MonthSimple, MonthThuluth) */
+  widgetMonthCalendar: 'auto' | 'gregorian' | 'hijri';
+  /** Widget numeral style */
+  widgetNumerals: 'auto' | 'arabic' | 'western';
+  /** Widget theme */
+  widgetTheme: 'auto' | 'dark' | 'light' | 'olive' | 'green' | 'blue' | 'desert' | 'slate';
+  /** Widget language override */
+  widgetLanguage: 'auto' | 'ar' | 'en';
+  /** Widget date format (Glassify-style sample values) */
+  widgetDateFormat: 'none' | 'gregorian-ar' | 'hijri-ar' | 'gregorian-en' | 'hijri-en';
 }
 
 export interface PrayerSettings {
@@ -386,6 +402,7 @@ const defaultDisplay: DisplaySettings = {
   quranFontSizeAdjust: 0,
   quranThemeIndex: 0,
   quranUseCdnPages: false,
+  widgetFontVariant: 'widget1',
   homeLayout: 'grid',
   showTafsir: false,
   focusMode: false,
@@ -396,6 +413,13 @@ const defaultDisplay: DisplaySettings = {
   dimEnabled: false,
   dimOpacity: 0.55,
   showSectionInfo: true,
+  widgetCalendar: 'auto',
+  widgetDayCalendar: 'auto',
+  widgetMonthCalendar: 'auto',
+  widgetNumerals: 'auto',
+  widgetTheme: 'auto',
+  widgetLanguage: 'auto',
+  widgetDateFormat: 'gregorian-ar',
 };
 
 const defaultPrayer: PrayerSettings = {

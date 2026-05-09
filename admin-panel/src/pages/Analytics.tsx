@@ -67,7 +67,7 @@ const Analytics: React.FC = () => {
   const [dateRange, setDateRange] = useState('month');
   const [stats, setStats] = useState<AppStats>(DEFAULT_STATS);
   const [topCountries, setTopCountries] = useState<CountryStat[]>([]);
-  const [topAzkar, setTopAzkar] = useState<AzkarStat[]>([]);
+  const [topAzkar] = useState<AzkarStat[]>([]);
   const [platforms, setPlatforms] = useState<PlatformStats>({ ios: 0, android: 0 });
   const [lifetime, setLifetime] = useState<LifetimeEngagement>({ totalAzkar: 0, totalQuran: 0, totalPrayers: 0 });
 

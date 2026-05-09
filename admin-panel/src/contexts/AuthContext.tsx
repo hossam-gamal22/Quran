@@ -1,16 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
+import { AuthContext } from './auth-context';
 
 const SESSION_KEY = 'rooh_admin_session';
 const VERIFY_URL = '/api/verify-admin';
-
-interface AuthContextValue {
-  authenticated: boolean;
-  loading: boolean;
-  login: (password: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function hashPassword(password: string): Promise<string> {
   const encoded = new TextEncoder().encode(password);
@@ -20,13 +12,21 @@ async function hashPassword(password: string): Promise<string> {
     .join('');
 }
 
-async function callVerifyAdmin(payload: object): Promise<{ ok: boolean; data: any; status: number }> {
+interface VerifyAdminResponse {
+  valid?: boolean;
+  sessionToken?: string;
+  expiresInHours?: number;
+  error?: string;
+  detail?: string;
+}
+
+async function callVerifyAdmin(payload: object): Promise<{ ok: boolean; data: VerifyAdminResponse | null; status: number }> {
   const res = await fetch(VERIFY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  let data: any = null;
+  let data: VerifyAdminResponse | null = null;
   try {
     data = await res.json();
   } catch {
@@ -62,7 +62,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (password: string) => {
     const passwordHash = await hashPassword(password);
-    let result: { ok: boolean; data: any; status: number };
+    let result: { ok: boolean; data: VerifyAdminResponse | null; status: number };
     try {
       result = await callVerifyAdmin({ mode: 'login', passwordHash });
     } catch {
@@ -92,10 +92,4 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = (): AuthContextValue => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
-  return ctx;
 };
