@@ -2,11 +2,10 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
-    "jsEngine": "hermes",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
       "assets/fonts/qcf/**",
@@ -26,7 +25,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "96",
+      "buildNumber": "99",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.rooh.almuslim"
@@ -83,7 +82,7 @@
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 74,
+      "versionCode": 76,
       "permissions": [
         "INTERNET",
         "VIBRATE",
@@ -206,7 +205,7 @@
       "expo-asset",
       "expo-localization",
       [
-        "react-native-google-mobile-ads",
+        "react-native-google-mobile-ads/app.plugin.js",
         {
           "androidAppId": "ca-app-pub-3645278220050673~7902167287",
           "iosAppId": "ca-app-pub-3645278220050673~7902167287"
@@ -219,7 +218,6 @@
             "./assets/fonts/Amiri-Regular.ttf",
             "./assets/fonts/Amiri-Bold.ttf",
             "./assets/fonts/WidgetFont.ttf",
-            "./assets/fonts/WidgetFont2.ttf",
             "./assets/fonts/Rubik-Regular.ttf",
             "./assets/fonts/Rubik-Medium.ttf",
             "./assets/fonts/Rubik-Bold.ttf",
@@ -228,30 +226,30 @@
           "widgets": [
             {
               "name": "RoohSmall",
-              "label": "Small Widget",
+              "label": "روح المسلم — صغير",
               "minWidth": "110dp",
               "minHeight": "110dp",
-              "description": "اختر نوع الويدجت بعد الإضافة",
+              "description": "روح المسلم",
               "updatePeriodMillis": 1800000,
-              "previewImage": "./assets/images/icons/icon.png"
+              "previewImage": "./assets/images/widgets/widget-icon.png"
             },
             {
               "name": "RoohMedium",
-              "label": "Medium Widget",
+              "label": "روح المسلم — متوسط",
               "minWidth": "250dp",
               "minHeight": "110dp",
-              "description": "اختر نوع الويدجت بعد الإضافة",
+              "description": "روح المسلم",
               "updatePeriodMillis": 1800000,
-              "previewImage": "./assets/images/icons/icon.png"
+              "previewImage": "./assets/images/widgets/widget-icon.png"
             },
             {
               "name": "RoohLarge",
-              "label": "Large Widget",
+              "label": "روح المسلم — كبير",
               "minWidth": "250dp",
               "minHeight": "250dp",
-              "description": "اختر نوع الويدجت بعد الإضافة",
+              "description": "روح المسلم",
               "updatePeriodMillis": 1800000,
-              "previewImage": "./assets/images/icons/icon.png"
+              "previewImage": "./assets/images/widgets/widget-icon.png"
             }
           ]
         }
@@ -261,6 +259,7 @@
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
       "./plugins/with-android-full-adhan",
+      "./plugins/with-android-widget-pin",
       [
         "./plugins/with-notification-large-icon",
         {
