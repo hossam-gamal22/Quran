@@ -1,12 +1,14 @@
 /**
  * Single Source of Truth (SSOT) for user/device metrics across the admin panel.
  *
- * Unified rule — a user is counted only if ALL of:
- *   1. `!data.placeholder`
- *   2. `installSource` ∈ { 'play_store', 'app_store' }
- *   3. `fcmToken` starts with 'ExponentPushToken'
+ * The returned `users` array is intentionally the actionable subset used by
+ * notifications/leaderboards: store installs with a valid push token + name.
  *
- * Results are always deduplicated via `deduplicateByDevice()`.
+ * `stats` also includes broader raw counters so dashboard/analytics can show
+ * everyone who opened the store app, even if they never granted notifications
+ * or entered a display name.
+ *
+ * The actionable `users` result is always deduplicated via `deduplicateByDevice()`.
  * A 30-second in-memory TTL cache prevents redundant Firestore reads
  * when navigating between admin pages.
  */
@@ -39,14 +41,36 @@ export interface ActiveDevice extends DeviceUser {
 }
 
 export interface ActiveDeviceStats {
+  /** Actionable named users with valid Expo push tokens (legacy meaning). */
   total: number;
-  withTokens: number; // always === total (kept for backward compat)
+  /** Store users with valid Expo push tokens. */
+  withTokens: number;
+  /** All non-placeholder docs in users, including dev/expo installs. */
+  firestoreUsers: number;
+  /** Non-placeholder users whose installSource is play_store/app_store. */
+  storeRegistered: number;
+  /** Store users active in the last 7 days, regardless of token/name. */
+  storeActive: number;
+  /** Store users active in the last 24 hours, regardless of token/name. */
+  storeDaily: number;
+  /** Store users with a displayName/name. */
+  namedUsers: number;
+  /** Store users without a displayName/name. */
+  unnamedUsers: number;
+  /** Store users with no valid Expo push token. */
+  withoutTokens: number;
+  /** Store iOS users, regardless of token/name. */
+  storeIos: number;
+  /** Store Android users, regardless of token/name. */
+  storeAndroid: number;
   ios: number;
   android: number;
   active: number;       // last 7 days
   daily: number;        // last 24 hours
   byLanguage: Record<string, number>;
   byCountry: Record<string, number>;
+  storeByLanguage: Record<string, number>;
+  storeByCountry: Record<string, number>;
   retentionRate: number; // (active / total) * 100
   // Monthly engagement (from user docs — zero extra reads)
   monthlyAzkar: number;
@@ -55,6 +79,9 @@ export interface ActiveDeviceStats {
 }
 
 export interface ActiveDevicesResult {
+  /** All non-placeholder store users. This matches `stats.storeRegistered`. */
+  storeUsers: ActiveDevice[];
+  /** Actionable users: store install + valid Expo push token + name, deduplicated. */
   users: ActiveDevice[];
   stats: ActiveDeviceStats;
   groupMap: Map<string, string[]>;
@@ -64,6 +91,28 @@ export interface ActiveDevicesResult {
 
 const STORE_SOURCES = new Set(['play_store', 'app_store']);
 const CACHE_TTL_MS = 30_000; // 30 seconds
+
+const isStoreSource = (source: unknown): boolean => (
+  typeof source === 'string' && STORE_SOURCES.has(source)
+);
+
+const isValidExpoPushToken = (token: unknown): boolean => (
+  typeof token === 'string' && token.startsWith('ExponentPushToken')
+);
+
+const toDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  try {
+    if (typeof (value as any)?.toDate === 'function') return (value as any).toDate();
+    if (typeof value === 'object' && value !== null && 'seconds' in value) {
+      return new Date((value as { seconds: number }).seconds * 1000);
+    }
+    const date = value instanceof Date ? value : new Date(value as string);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+};
 
 // ── In-memory cache ────────────────────────────────────────────────────────
 
@@ -100,7 +149,22 @@ export async function fetchActiveDevices(
   }
 
   const snapshot = await getDocs(collection(db, 'users'));
+  const storeUsers: ActiveDevice[] = [];
   const rawUsers: ActiveDevice[] = [];
+
+  const now = Date.now();
+  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+  const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+  let firestoreUsers = 0;
+  let storeRegistered = 0;
+  let storeActive = 0;
+  let storeDaily = 0;
+  let namedUsers = 0;
+  let pushReachable = 0;
+  let storeIos = 0;
+  let storeAndroid = 0;
+  const storeByLanguage: Record<string, number> = {};
+  const storeByCountry: Record<string, number> = {};
 
   snapshot.forEach(docSnap => {
     const data = docSnap.data();
@@ -108,16 +172,45 @@ export async function fetchActiveDevices(
     // 1. Skip placeholders
     if (data.placeholder) return;
 
-    // 2. Must be a real store install
-    if (!STORE_SOURCES.has(data.installSource)) return;
-
-    // 3. Must have a valid Expo push token
+    firestoreUsers++;
+    const storeSource = isStoreSource(data.installSource);
     const token: string = data.fcmToken || '';
-    if (!token.startsWith('ExponentPushToken')) return;
-
-    // 4. Must have a display name
+    const validToken = isValidExpoPushToken(token);
     const displayName = data.displayName || data.name || '';
-    if (!displayName) return;
+    const lastActive = toDate(data.lastActive);
+
+    if (storeSource) {
+      storeRegistered++;
+      if (displayName) namedUsers++;
+      if (validToken) pushReachable++;
+      if (lastActive && lastActive > weekAgo) storeActive++;
+      if (lastActive && lastActive > dayAgo) storeDaily++;
+      const platform = String(data.platform || '').toLowerCase();
+      if (platform === 'ios') storeIos++;
+      else if (platform === 'android') storeAndroid++;
+      const lang = data.language || 'ar';
+      const country = data.country || 'unknown';
+      storeByLanguage[lang] = (storeByLanguage[lang] || 0) + 1;
+      storeByCountry[country] = (storeByCountry[country] || 0) + 1;
+
+      storeUsers.push({
+        id: docSnap.id,
+        ...data,
+        fcmToken: token,
+        platform: data.platform || 'unknown',
+        language: data.language || 'ar',
+        country: data.country || '',
+        countrySource: data.countrySource || '',
+        prayerCity: data.prayerCity || '',
+        prayerLatitude: typeof data.prayerLatitude === 'number' ? data.prayerLatitude : undefined,
+        prayerLongitude: typeof data.prayerLongitude === 'number' ? data.prayerLongitude : undefined,
+        lastActive: data.lastActive ?? null,
+        installSource: data.installSource,
+      } as ActiveDevice);
+    }
+
+    // Actionable user list: real store install + valid Expo push token + name.
+    if (!storeSource || !validToken || !displayName) return;
 
     rawUsers.push({
       id: docSnap.id,
@@ -143,9 +236,6 @@ export async function fetchActiveDevices(
   }
 
   // Compute stats
-  const now = Date.now();
-  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-  const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
   const byLanguage: Record<string, number> = {};
   const byCountry: Record<string, number> = {};
   let activeCount = 0;
@@ -179,32 +269,37 @@ export async function fetchActiveDevices(
     }
 
     // Activity
-    if (user.lastActive) {
-      try {
-        const la =
-          typeof (user.lastActive as any).toDate === 'function'
-            ? (user.lastActive as any).toDate()
-            : new Date(user.lastActive as string);
-        if (la > weekAgo) activeCount++;
-        if (la > dayAgo) dailyCount++;
-      } catch { /* skip unparseable */ }
-    }
+    const la = toDate(user.lastActive);
+    if (la && la > weekAgo) activeCount++;
+    if (la && la > dayAgo) dailyCount++;
   }
 
   const total = uniqueUsers.length;
 
   const result: ActiveDevicesResult = {
+    storeUsers,
     users: uniqueUsers,
     stats: {
       total,
-      withTokens: total, // all users have valid tokens by definition
+      withTokens: pushReachable,
+      firestoreUsers,
+      storeRegistered,
+      storeActive,
+      storeDaily,
+      namedUsers,
+      unnamedUsers: Math.max(storeRegistered - namedUsers, 0),
+      withoutTokens: Math.max(storeRegistered - pushReachable, 0),
+      storeIos,
+      storeAndroid,
       ios: iosCount,
       android: androidCount,
       active: activeCount,
       daily: dailyCount,
       byLanguage,
       byCountry,
-      retentionRate: total > 0 ? Math.round((activeCount / total) * 100) : 0,
+      storeByLanguage,
+      storeByCountry,
+      retentionRate: storeRegistered > 0 ? Math.round((storeActive / storeRegistered) * 100) : 0,
       monthlyAzkar,
       monthlyQuran,
       monthlyPrayers,

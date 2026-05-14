@@ -16,11 +16,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as BackgroundTask from 'expo-background-task';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader, NativeTabs } from '@/components/ui';
@@ -33,25 +34,18 @@ import { guardPremiumFeature } from '@/lib/premium-guard';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { t } from '@/lib/i18n';
 import { requestAddWidget } from '@/lib/widget-add-helper';
-import { updateWidgetData } from '@/lib/widget-data-bridge';
-import {
-  DaySimplePreview,
-  DayThuluthPreview,
-  DayDigitalPreview,
-  MonthSimplePreview,
-  MonthThuluthPreview,
-  MonthElegantEnPreview,
-  PrayerSimplePreview,
-  PrayerTablePreview,
-  PrayerNextPrevPreview,
-  VersePreview,
-  AzkarMorningPreview,
-  AzkarEveningPreview,
-  HijriPreview,
-  DailyDhikrPreview,
-} from '@/components/widgets/previews';
+import { updateWidgetData, refreshWidgetsNow } from '@/lib/widget-data-bridge';
 import type { PreviewSize, WidgetDateFormat } from '@/components/widgets/previews/shared';
 import { formatDateSample } from '@/components/widgets/previews/shared';
+import { WidgetPreviewDataContext } from '@/components/widgets/previews/snapshot-capture-context';
+import type { SharedWidgetData } from '@/lib/widget-data';
+import {
+  definitionsForPlatform,
+  isWidgetUnlocked,
+  premiumRequiredForSize,
+  type WidgetCategory,
+  type WidgetDefinition,
+} from '@/lib/widgets/registry';
 
 // ────────────────────────────────────────────────────────
 // Variant catalogue
@@ -68,6 +62,8 @@ interface WidgetVariant {
   isPremium: boolean;
   /** Force a specific render language regardless of app locale (e.g. "Month Elegant (En)" stays English in Arabic UI). */
   forcedLanguage?: 'ar' | 'en';
+  /** Source registry entry. Phase B+ uses this to drive the snapshot pipeline. */
+  definition: WidgetDefinition;
 }
 
 interface WidgetSection {
@@ -77,111 +73,57 @@ interface WidgetSection {
   variants: WidgetVariant[];
 }
 
-// Free tier matches lib/android-widget-task-handler.tsx FREE_WIDGET_NAMES.
-// Prayer + Hijri (and the new generic Rooh tile / time variants) are free.
-// Verse + Dhikr + Azkar are premium.
+// SECTIONS_IOS / SECTIONS_ANDROID are derived from the unified WIDGET_REGISTRY
+// (see lib/widgets/registry.ts). Sections are grouped by category in a stable
+// display order; each definition × size becomes one variant tile.
 
-const SECTIONS_IOS: WidgetSection[] = [
-  {
-    id: 'dateTime',
-    titleAr: 'الوقت والتاريخ',
-    titleEn: 'Time & Date',
-    variants: [
-      { id: 'daySimpleS', androidWidget: null, size: 'small', Preview: DaySimplePreview, labelAr: 'اليوم', labelEn: 'Day Simple', isPremium: false },
-      { id: 'daySimpleM', androidWidget: null, size: 'medium', Preview: DaySimplePreview, labelAr: 'اليوم', labelEn: 'Day Simple', isPremium: false },
-      { id: 'dayThuluthS', androidWidget: null, size: 'small', Preview: DayThuluthPreview, labelAr: 'اليوم - ثلث', labelEn: 'Day Thuluth', isPremium: false, forcedLanguage: 'ar' },
-      { id: 'dayThuluthM', androidWidget: null, size: 'medium', Preview: DayThuluthPreview, labelAr: 'اليوم - ثلث', labelEn: 'Day Thuluth', isPremium: true, forcedLanguage: 'ar' },
-      { id: 'dayDigitalS', androidWidget: null, size: 'small', Preview: DayDigitalPreview, labelAr: 'اليوم - رقمي', labelEn: 'Day Digital', isPremium: false },
-      { id: 'monthSimpleS', androidWidget: null, size: 'small', Preview: MonthSimplePreview, labelAr: 'الشهر', labelEn: 'Month Simple', isPremium: false },
-      { id: 'monthThuluthM', androidWidget: null, size: 'medium', Preview: MonthThuluthPreview, labelAr: 'الشهر - ثلث', labelEn: 'Month Thuluth', isPremium: true, forcedLanguage: 'ar' },
-      { id: 'monthElegantM', androidWidget: null, size: 'medium', Preview: MonthElegantEnPreview, labelAr: 'الشهر - أنيق', labelEn: 'Month Elegant (En)', isPremium: true, forcedLanguage: 'en' },
-    ],
-  },
-  {
-    id: 'prayer',
-    titleAr: 'الصلاة',
-    titleEn: 'Prayer',
-    variants: [
-      { id: 'prayerSimpleS', androidWidget: null, size: 'small', Preview: PrayerSimplePreview, labelAr: 'الصلاة القادمة', labelEn: 'Prayer Simple', isPremium: false },
-      { id: 'prayerTableS', androidWidget: null, size: 'small', Preview: PrayerTablePreview, labelAr: 'جدول الصلاة', labelEn: 'Prayer Table', isPremium: false },
-      { id: 'prayerTableM', androidWidget: null, size: 'medium', Preview: PrayerTablePreview, labelAr: 'جدول الصلاة', labelEn: 'Prayer Table', isPremium: false },
-      { id: 'prayerTableL', androidWidget: null, size: 'large', Preview: PrayerTablePreview, labelAr: 'جدول الصلاة', labelEn: 'Prayer Table', isPremium: false },
-      { id: 'prayerNextPrevM', androidWidget: null, size: 'medium', Preview: PrayerNextPrevPreview, labelAr: 'الصلاة السابقة والقادمة', labelEn: 'Next & Previous', isPremium: false },
-    ],
-  },
-  {
-    id: 'verse',
-    titleAr: 'القرآن',
-    titleEn: 'Quran',
-    variants: [
-      { id: 'verseS', androidWidget: null, size: 'small', Preview: VersePreview, labelAr: 'آية اليوم', labelEn: 'Verse of Day', isPremium: true },
-      { id: 'verseM', androidWidget: null, size: 'medium', Preview: VersePreview, labelAr: 'آية اليوم', labelEn: 'Verse of Day', isPremium: true },
-      { id: 'verseL', androidWidget: null, size: 'large', Preview: VersePreview, labelAr: 'آية اليوم', labelEn: 'Verse of Day', isPremium: true },
-    ],
-  },
-  {
-    id: 'azkar',
-    titleAr: 'الأذكار',
-    titleEn: 'Adhkar',
-    variants: [
-      { id: 'azkarMorningS', androidWidget: null, size: 'small', Preview: AzkarMorningPreview, labelAr: 'أذكار الصباح', labelEn: 'Morning Adhkar', isPremium: true },
-      { id: 'azkarMorningM', androidWidget: null, size: 'medium', Preview: AzkarMorningPreview, labelAr: 'أذكار الصباح', labelEn: 'Morning Adhkar', isPremium: true },
-      { id: 'azkarEveningS', androidWidget: null, size: 'small', Preview: AzkarEveningPreview, labelAr: 'أذكار المساء', labelEn: 'Evening Adhkar', isPremium: true },
-      { id: 'azkarEveningM', androidWidget: null, size: 'medium', Preview: AzkarEveningPreview, labelAr: 'أذكار المساء', labelEn: 'Evening Adhkar', isPremium: true },
-    ],
-  },
-];
+const CATEGORY_ORDER: WidgetCategory[] = ['date', 'prayer', 'quran', 'azkar', 'hijri'];
 
-// On Android, only the variants that map to real registered widgets in
-// lib/android-widget-task-handler.tsx are addable. We map them here.
-const SECTIONS_ANDROID: WidgetSection[] = [
-  {
-    id: 'prayer',
-    titleAr: 'الصلاة',
-    titleEn: 'Prayer',
-    variants: [
-      { id: 'prayerSmall', androidWidget: 'PrayerTimesSmall', size: 'small', Preview: PrayerSimplePreview, labelAr: 'الصلاة القادمة', labelEn: 'Next Prayer', isPremium: false },
-      { id: 'prayerMedium', androidWidget: 'PrayerTimesMedium', size: 'medium', Preview: PrayerSimplePreview, labelAr: 'مواقيت الصلاة', labelEn: 'Prayer Times', isPremium: false },
-      { id: 'prayerLarge', androidWidget: 'PrayerTimesLarge', size: 'large', Preview: PrayerTablePreview, labelAr: 'جدول الصلاة الكامل', labelEn: 'Full Prayer Table', isPremium: false },
-    ],
-  },
-  {
-    id: 'hijri',
-    titleAr: 'التاريخ الهجري',
-    titleEn: 'Hijri Date',
-    variants: [
-      { id: 'hijriSmall', androidWidget: 'HijriDateSmall', size: 'small', Preview: HijriPreview, labelAr: 'الهجري', labelEn: 'Hijri', isPremium: false },
-      { id: 'hijriMedium', androidWidget: 'HijriDateMedium', size: 'medium', Preview: HijriPreview, labelAr: 'الهجري', labelEn: 'Hijri', isPremium: false },
-    ],
-  },
-  {
-    id: 'verse',
-    titleAr: 'آية اليوم',
-    titleEn: 'Verse of Day',
-    variants: [
-      { id: 'verseSmall', androidWidget: 'DailyVerseSmall', size: 'small', Preview: VersePreview, labelAr: 'آية اليوم', labelEn: 'Verse of Day', isPremium: true },
-      { id: 'verseMedium', androidWidget: 'DailyVerseMedium', size: 'medium', Preview: VersePreview, labelAr: 'آية اليوم', labelEn: 'Verse of Day', isPremium: true },
-    ],
-  },
-  {
-    id: 'dhikr',
-    titleAr: 'الذكر اليومي',
-    titleEn: 'Daily Dhikr',
-    variants: [
-      { id: 'dhikrSmall', androidWidget: 'DailyDhikrSmall', size: 'small', Preview: DailyDhikrPreview, labelAr: 'الذكر اليومي', labelEn: 'Daily Dhikr', isPremium: true },
-      { id: 'dhikrMedium', androidWidget: 'DailyDhikrMedium', size: 'medium', Preview: DailyDhikrPreview, labelAr: 'الذكر اليومي', labelEn: 'Daily Dhikr', isPremium: true },
-    ],
-  },
-  {
-    id: 'azkar',
-    titleAr: 'الأذكار',
-    titleEn: 'Adhkar',
-    variants: [
-      { id: 'azkarSmall', androidWidget: 'AzkarProgressSmall', size: 'small', Preview: AzkarMorningPreview, labelAr: 'أذكار', labelEn: 'Adhkar', isPremium: true },
-      { id: 'azkarMedium', androidWidget: 'AzkarProgressMedium', size: 'medium', Preview: AzkarMorningPreview, labelAr: 'أذكار', labelEn: 'Adhkar', isPremium: true },
-    ],
-  },
-];
+const CATEGORY_LABELS: Record<WidgetCategory, { ar: string; en: string }> = {
+  date: { ar: 'الوقت والتاريخ', en: 'Time & Date' },
+  prayer: { ar: 'الصلاة', en: 'Prayer' },
+  quran: { ar: 'القرآن', en: 'Quran' },
+  azkar: { ar: 'الأذكار', en: 'Adhkar' },
+  hijri: { ar: 'التاريخ الهجري', en: 'Hijri Date' },
+};
+
+function buildSections(platform: 'ios' | 'android'): WidgetSection[] {
+  const defs = definitionsForPlatform(platform);
+  const out: WidgetSection[] = [];
+  for (const cat of CATEGORY_ORDER) {
+    const variants: WidgetVariant[] = [];
+    for (const def of defs) {
+      if (def.category !== cat) continue;
+      for (const size of def.sizes) {
+        variants.push({
+          id: `${def.id}_${size}`,
+          // Phase A keeps the existing Android plumbing — legacy provider names map
+          // unchanged. Phase D introduces grouped providers; until then we keep
+          // legacyAndroidProvider to preserve existing add flows.
+          androidWidget: def.legacyAndroidProvider ?? null,
+          size,
+          Preview: def.Preview as React.FC<{ size: PreviewSize; language?: 'ar' | 'en' }>,
+          labelAr: def.titleAr,
+          labelEn: def.titleEn,
+          isPremium: premiumRequiredForSize(def, size),
+          forcedLanguage: def.forcedLanguage,
+          definition: def,
+        });
+      }
+    }
+    if (variants.length === 0) continue;
+    out.push({
+      id: cat,
+      titleAr: CATEGORY_LABELS[cat].ar,
+      titleEn: CATEGORY_LABELS[cat].en,
+      variants,
+    });
+  }
+  return out;
+}
+
+const SECTIONS_IOS: WidgetSection[] = buildSections('ios');
+const SECTIONS_ANDROID: WidgetSection[] = buildSections('android');
 
 // ────────────────────────────────────────────────────────
 // Main screen
@@ -193,6 +135,7 @@ export default function WidgetHubScreen() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
+  // Phase F: real subscription gating restored (see plan §F).
   const { isPremium } = useSubscription();
   const [tab, setTab] = useState<'gallery' | 'settings'>('gallery');
   const [howToOpen, setHowToOpen] = useState(false);
@@ -239,16 +182,23 @@ export default function WidgetHubScreen() {
             isRTL={isRTL}
             isPremium={isPremium}
             onAddWidget={(variant) => {
-              if (variant.isPremium && !isPremium) {
+              if (!isWidgetUnlocked(variant.definition, isPremium, variant.size)) {
                 if (!guardPremiumFeature('premium_widgets', router, isPremium)) return;
               }
-              if (Platform.OS === 'android' && variant.androidWidget) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                requestAddWidget(variant.androidWidget, variant.size === 'large' ? 'medium' : (variant.size as any));
-              } else {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                requestAddWidget(variant.id, 'small');
-              }
+              Haptics.impactAsync(
+                Platform.OS === 'android'
+                  ? Haptics.ImpactFeedbackStyle.Medium
+                  : Haptics.ImpactFeedbackStyle.Light
+              );
+              // Pass the registry definition id so the instruction sheet can
+              // show the localized widget name. Phase G consolidated both
+              // platforms onto the same call shape.
+              requestAddWidget({
+                widgetId: variant.definition.id,
+                labelAr: variant.labelAr,
+                labelEn: variant.labelEn,
+                size: variant.size,
+              });
             }}
           />
         ) : (
@@ -281,16 +231,48 @@ function GalleryTab({
   const styles = useScaledStyles(_styles, colors.fs);
   const sections = Platform.OS === 'android' ? SECTIONS_ANDROID : SECTIONS_IOS;
   const ar = isRTL;
+  const [widgetPreviewData, setWidgetPreviewData] = useState<SharedWidgetData | null>(null);
+
+  const loadPreviewData = useCallback(async (cancelled?: () => boolean) => {
+    try {
+      const raw = await AsyncStorage.getItem('widget_shared_data');
+      if (!cancelled?.() && raw) setWidgetPreviewData(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadPreviewData(() => cancelled);
+    const interval = setInterval(() => loadPreviewData(() => cancelled), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [loadPreviewData]);
+
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await updateWidgetData();
+      } catch {}
+      await loadPreviewData(() => cancelled);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadPreviewData]));
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.galleryScroll}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={[styles.galleryHint, { color: colors.textLight, textAlign: ar ? 'right' : 'left', writingDirection: ar ? 'rtl' : 'ltr' }]}>
-        {Platform.OS === 'ios' ? t('widgetPage.iosHint') : t('widgetPage.androidHint')}
-      </Text>
+    <WidgetPreviewDataContext.Provider value={widgetPreviewData}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.galleryScroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.galleryHint, { color: colors.textLight, textAlign: ar ? 'right' : 'left', writingDirection: ar ? 'rtl' : 'ltr', marginBottom: 10 }]}>
+          {Platform.OS === 'ios' ? t('widgetPage.iosHint') : t('widgetPage.androidHint')}
+        </Text>
 
       {sections.map((section) => {
         const filtered = ar
@@ -335,8 +317,9 @@ function GalleryTab({
         );
       })}
 
-      <View style={{ height: 60 }} />
-    </ScrollView>
+        <View style={{ height: 60 }} />
+      </ScrollView>
+    </WidgetPreviewDataContext.Provider>
   );
 }
 
@@ -352,7 +335,7 @@ function VariantCard({
   isRTL: boolean;
 }) {
   const colors = useColors();
-  const locked = variant.isPremium && !isPremium;
+  const locked = !isWidgetUnlocked(variant.definition, isPremium, variant.size);
   const Preview = variant.Preview;
 
   return (
@@ -361,8 +344,11 @@ function VariantCard({
         <View>
           <Preview size={variant.size} language={variant.forcedLanguage} />
           {locked ? (
-            <View style={cardStyles.crownBadge}>
-              <MaterialCommunityIcons name="crown" size={12} color="#FFFFFF" />
+            <View pointerEvents="none" style={cardStyles.lockOverlay}>
+              <View style={cardStyles.lockPill}>
+                <MaterialCommunityIcons name="lock" size={13} color="#FFFFFF" />
+                <Text style={cardStyles.lockText}>{isRTL ? 'مميز' : 'Premium'}</Text>
+              </View>
             </View>
           ) : null}
         </View>
@@ -380,6 +366,7 @@ function VariantCard({
   );
 }
 
+
 const cardStyles = StyleSheet.create({
   cell: {
     alignItems: 'center',
@@ -391,16 +378,29 @@ const cardStyles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 20,
   },
-  crownBadge: {
+  lockOverlay: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 22,
+    top: 6,
+    right: 6,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+  },
+  lockPill: {
+    minWidth: 56,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(212,160,23,0.95)',
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(212,160,23,0.96)',
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  lockText: {
+    fontFamily: fontBold(),
+    fontSize: 11,
+    lineHeight: 14,
+    color: '#FFFFFF',
   },
 });
 
@@ -424,6 +424,7 @@ function SettingsTab({
   const styles = useScaledStyles(_styles, colors.fs);
   const { settings, updateDisplay } = useSettings();
   const [perms, setPerms] = useState<PermissionState>({ background: 'unknown', location: 'undetermined' });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -441,6 +442,12 @@ function SettingsTab({
     })();
   }, []);
 
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[WidgetTheme] settings screen initial value:', settings.display.widgetTheme);
+    }
+  }, [settings.display.widgetTheme]);
+
   // Persist + push fresh SharedWidgetData → forces iOS WidgetKit/Android
   // glance widgets to re-render with the new theme/language/etc. The
   // updateDisplay call updates the in-app reactive context (so previews
@@ -448,6 +455,7 @@ function SettingsTab({
   // Group UserDefaults / AsyncStorage so the home-screen widget picks them up.
   const applyWidgetSetting = useCallback(
     async (patch: Parameters<typeof updateDisplay>[0]) => {
+      if (__DEV__) console.log('[WidgetTheme] passed to updateDisplay:', patch);
       await updateDisplay(patch);
       try {
         await updateWidgetData();
@@ -455,6 +463,26 @@ function SettingsTab({
     },
     [updateDisplay],
   );
+
+  const forceRefreshWidgets = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      const result = await refreshWidgetsNow();
+      if (__DEV__) {
+        console.log(
+          `[widget/app] refresh proof complete version=${result.snapshotVersion ?? 'n/a'} updatedAt=${result.snapshotUpdatedAt ?? 'n/a'} manifestEntries=${result.snapshotCount}`,
+        );
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (e) {
+      console.warn('⚠️ Widget refresh failed:', e);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing]);
 
   // Live computed sample values for the date-format dropdown — mirrors Glassify
   // (e.g. "٢٠٢٦ / ٠٥ / ٠٩", "09 / 05 / 2026"). Recomputed once per mount.
@@ -535,6 +563,29 @@ function SettingsTab({
           ]}
           onChange={(v) => applyWidgetSetting({ widgetTheme: v as any })}
         />
+      </SettingsGroup>
+
+      {/* Force refresh — regenerates all widget snapshots and pushes to home screen */}
+      <SettingsGroup title={t('widgetPage.refreshTitle')} isRTL={isRTL}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          disabled={isRefreshing}
+          onPress={forceRefreshWidgets}
+          style={[
+            styles.refreshBtn,
+            { opacity: isRefreshing ? 0.5 : 1, flexDirection: isRTL ? 'row-reverse' : 'row' },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={isRefreshing ? 'loading' : 'refresh'}
+            size={20}
+            color="#fff"
+            style={isRefreshing ? { transform: [{ rotate: '45deg' }] } : undefined}
+          />
+          <Text style={[styles.refreshBtnText, { fontFamily: fontSemiBold() }]}>
+            {isRefreshing ? t('widgetPage.refreshing') : t('widgetPage.refreshBtn')}
+          </Text>
+        </TouchableOpacity>
       </SettingsGroup>
 
       {/* Permissions */}
@@ -927,15 +978,17 @@ const _styles = StyleSheet.create({
   sectionGrid: {
     flexDirection: 'column',
     gap: 16,
-    alignItems: 'center',
+    alignSelf: 'stretch',
   },
   smallRow: {
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   fullRow: {
     alignItems: 'center',
+    alignSelf: 'stretch',
   },
   // Settings
   settingsScroll: { paddingHorizontal: 16, paddingTop: 12 },
@@ -970,5 +1023,19 @@ const _styles = StyleSheet.create({
   rowValue: {
     fontFamily: fontMedium(),
     fontSize: 14,
+  },
+  refreshBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0f987f',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    margin: 12,
+  },
+  refreshBtnText: {
+    color: '#fff',
+    fontSize: 15,
   },
 });

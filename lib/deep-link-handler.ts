@@ -61,7 +61,8 @@ function navigateToRoute(router: Router, route: string) {
     pathOnly.startsWith('/(tabs)/') ||
     pathOnly === '/prayer' ||
     pathOnly === '/tasbih' ||
-    pathOnly === '/quran';
+    pathOnly === '/quran' ||
+    pathOnly === '/azkar';
   const target = isTab && !pathOnly.startsWith('/(tabs)/') ? `/(tabs)${pathOnly}` : pathOnly;
   router.navigate(`${target}${query}` as any);
 }
@@ -79,12 +80,14 @@ function navigateAfterInteractions(router: Router, route: string) {
 }
 
 function handleUrl(router: Router, url: string) {
+  const route = parseDeepLink(url);
+  if (!route) return;
+
   if (shouldSkipDuplicate(url)) {
     if (__DEV__) console.log('🔗 Deep link deduped:', url);
     return;
   }
-  const route = parseDeepLink(url);
-  if (!route) return;
+
   if (__DEV__) console.log('🔗 Deep link →', url, '→', route);
   _deepLinkConsumed = true;
   navigateAfterInteractions(router, route);
@@ -110,13 +113,13 @@ export async function consumePendingDeepLink(router: Router): Promise<boolean> {
     if (__DEV__) console.log('🔗 Pending deep link read:', url);
     if (!url) return false;
 
+    const route = parseDeepLink(url);
+    if (!route) return false;
+
     if (shouldSkipDuplicate(url)) {
       if (__DEV__) console.log('🔗 Pending deep link deduped:', url);
       return false;
     }
-
-    const route = parseDeepLink(url);
-    if (!route) return false;
 
     if (__DEV__) console.log('🔗 Consuming pending deep link:', url, '→', route);
 
@@ -140,13 +143,13 @@ export async function consumeInitialURL(router: Router): Promise<boolean> {
     if (__DEV__) console.log('🔗 Linking.getInitialURL:', url);
     if (!url || !url.startsWith(`${URL_SCHEME}://`)) return false;
 
+    const route = parseDeepLink(url);
+    if (!route) return false;
+
     if (shouldSkipDuplicate(url)) {
       if (__DEV__) console.log('🔗 Initial URL deduped:', url);
       return false;
     }
-
-    const route = parseDeepLink(url);
-    if (!route) return false;
 
     if (__DEV__) console.log('🔗 Consuming initial URL:', url, '→', route);
 

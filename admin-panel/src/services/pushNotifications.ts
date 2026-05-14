@@ -68,7 +68,7 @@ export interface PushNotificationPayload {
   imageUrl?: string;
 }
 
-interface SendResult {
+export interface SendResult {
   success: boolean;
   sentCount: number;
   failedCount: number;
@@ -82,6 +82,8 @@ interface UserToken {
   platform: string;
   language: string;
   country: string;
+  countrySource: string;
+  countryVerified: boolean;
   lastActive: Timestamp | null;
 }
 
@@ -103,6 +105,21 @@ export interface UserStats {
 // ==================== الثوابت ====================
 
 const BATCH_SIZE = 100;
+
+const PREMIUM_GRANT_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
+  ar: { title: 'تم تفعيل البريميم 🎉', body: 'تم منحك اشتراكاً مميزاً من الإدارة. استمتع بكل المميزات الآن.' },
+  en: { title: 'Premium activated 🎉', body: 'Your premium subscription has been granted by the admin team. Enjoy all premium features now.' },
+  fr: { title: 'Premium activé 🎉', body: "Votre abonnement premium a été accordé par l'équipe d'administration. Profitez de toutes les fonctionnalités." },
+  de: { title: 'Premium aktiviert 🎉', body: 'Dein Premium-Abo wurde vom Admin-Team aktiviert. Viel Freude mit allen Premium-Funktionen.' },
+  es: { title: 'Premium activado 🎉', body: 'El equipo de administración activó tu suscripción premium. Disfruta todas las funciones.' },
+  tr: { title: 'Premium etkinleştirildi 🎉', body: 'Premium aboneliğiniz yönetici ekibi tarafından tanımlandı. Tüm premium özelliklerin keyfini çıkarın.' },
+  ur: { title: 'پریمیم فعال ہو گیا 🎉', body: 'انتظامیہ نے آپ کے لیے پریمیم سبسکرپشن فعال کر دی ہے۔ تمام پریمیم سہولیات استعمال کریں۔' },
+  id: { title: 'Premium aktif 🎉', body: 'Langganan premium Anda telah diberikan oleh admin. Nikmati semua fitur premium sekarang.' },
+  ms: { title: 'Premium diaktifkan 🎉', body: 'Langganan premium anda telah diberikan oleh pentadbir. Nikmati semua ciri premium sekarang.' },
+  hi: { title: 'प्रीमियम सक्रिय हो गया 🎉', body: 'एडमिन टीम ने आपकी प्रीमियम सदस्यता सक्रिय कर दी है। अब सभी प्रीमियम सुविधाओं का आनंद लें।' },
+  bn: { title: 'প্রিমিয়াম চালু হয়েছে 🎉', body: 'অ্যাডমিন টিম আপনার প্রিমিয়াম সাবস্ক্রিপশন চালু করেছে। এখন সব প্রিমিয়াম সুবিধা উপভোগ করুন।' },
+  ru: { title: 'Premium активирован 🎉', body: 'Администратор активировал для вас premium-подписку. Все premium-функции уже доступны.' },
+};
 
 // ==================== دوال مساعدة ====================
 
@@ -131,7 +148,9 @@ const fetchUserTokens = async (
         fcmToken: data.fcmToken,
         platform: data.platform || 'unknown',
         language: data.language || 'ar',
-        country: data.country || 'SA',
+        country: (data.country || 'SA').toUpperCase(),
+        countrySource: data.countrySource || 'device_locale',
+        countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
         lastActive: data.lastActive,
       }];
     }
@@ -159,7 +178,9 @@ const fetchUserTokens = async (
           fcmToken: data.fcmToken,
           platform: data.platform || 'unknown',
           language: data.language || 'ar',
-          country: data.country || 'SA',
+          country: (data.country || 'SA').toUpperCase(),
+          countrySource: data.countrySource || 'device_locale',
+          countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
           lastActive: data.lastActive,
         });
       }
@@ -189,7 +210,11 @@ const fetchUserTokens = async (
     
     // تصفية حسب البلد
     if (targetCountries && targetCountries.length > 0) {
-      users = users.filter(u => targetCountries.includes(u.country));
+      const countrySet = new Set(targetCountries.map(c => c.toUpperCase()));
+      users = users.filter(u =>
+        countrySet.has((u.country || '').toUpperCase()) &&
+        u.countryVerified
+      );
     }
 
     // Deduplicate by fcmToken — keep latest (last in array = most recent Firestore doc)
@@ -418,6 +443,117 @@ export const sendPushNotification = async (
 };
 
 /**
+ * Send a premium-grant push to one user after the admin panel updates
+ * users/{userId}.adminPremium.
+ */
+export const sendPremiumGrantNotification = async (
+  userId: string,
+  grant: { plan?: string; expiresAt?: string | null; reason?: string } = {}
+): Promise<SendResult> => {
+  const errors: string[] = [];
+  let sentCount = 0;
+  let failedCount = 0;
+  const perLanguage: { [lang: string]: number } = {};
+
+  try {
+    const users = await fetchUserTokens('single_user', undefined, undefined, userId);
+
+    if (users.length === 0) {
+      return {
+        success: false,
+        sentCount: 0,
+        failedCount: 0,
+        errors: ['لا يوجد Expo Push Token صالح لهذا المستخدم'],
+        perLanguage: {},
+      };
+    }
+
+    const messages: ExpoPushMessage[] = users.map(user => {
+      const translation = getTranslationForUser(PREMIUM_GRANT_NOTIFICATION_TRANSLATIONS, user.language);
+      perLanguage[user.language] = (perLanguage[user.language] || 0) + 1;
+
+      return {
+        to: user.fcmToken,
+        title: translation.title,
+        body: translation.body,
+        sound: 'default',
+        priority: 'high',
+        channelId: 'general',
+        ttl: 86400,
+        _displayInForeground: true,
+        data: {
+          actionType: 'screen',
+          actionUrl: '/subscription',
+          type: 'premium_granted',
+          grantPlan: grant.plan || '',
+          grantExpiresAt: grant.expiresAt || '',
+        },
+      };
+    });
+
+    const notificationDoc: Record<string, any> = {
+      translations: PREMIUM_GRANT_NOTIFICATION_TRANSLATIONS,
+      targetAudience: 'single_user',
+      targetUserId: userId,
+      actionType: 'screen',
+      actionUrl: '/subscription',
+      status: 'sending',
+      type: 'premium_grant',
+      sentCount: 0,
+      failedCount: 0,
+      perLanguage: {},
+      deliveredCount: 0,
+      openedCount: 0,
+      clickedCount: 0,
+      createdAt: serverTimestamp(),
+    };
+    if (grant.plan) notificationDoc.grantPlan = grant.plan;
+    if (grant.expiresAt) notificationDoc.grantExpiresAt = grant.expiresAt;
+    if (grant.reason) notificationDoc.grantReason = grant.reason;
+
+    const notifDocRef = await addDoc(collection(db, 'notifications'), notificationDoc);
+
+    for (const msg of messages) {
+      (msg as any).data = { ...(msg as any).data, notificationDocId: notifDocRef.id };
+    }
+
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch);
+      sentCount += result.successCount;
+      failedCount += result.failureCount;
+      errors.push(...result.errors);
+    }
+
+    const { updateDoc: updateDocFn } = await import('firebase/firestore');
+    await updateDocFn(notifDocRef, {
+      status: 'sent',
+      sentCount,
+      failedCount,
+      perLanguage,
+      deliveredCount: sentCount,
+      sentAt: serverTimestamp(),
+    });
+
+    return {
+      success: sentCount > 0,
+      sentCount,
+      failedCount,
+      errors: errors.slice(0, 10),
+      perLanguage,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      sentCount,
+      failedCount,
+      errors: [(error as Error).message],
+      perLanguage,
+    };
+  }
+};
+
+/**
  * إرسال إشعار اختباري
  */
 export const sendTestNotification = async (token: string, language: string = 'ar'): Promise<boolean> => {
@@ -461,12 +597,12 @@ export const getUserStats = async (): Promise<UserStats> => {
     const { fetchActiveDevices } = await import('../utils/user-query');
     const { stats } = await fetchActiveDevices();
     return {
-      total: stats.total,
+      total: stats.storeRegistered,
       withTokens: stats.withTokens,
-      ios: stats.ios,
-      android: stats.android,
-      active: stats.active,
-      byLanguage: stats.byLanguage,
+      ios: stats.storeIos,
+      android: stats.storeAndroid,
+      active: stats.storeActive,
+      byLanguage: stats.storeByLanguage,
     };
   } catch {
     return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0, byLanguage: {} };
@@ -532,6 +668,8 @@ export const sendReengagementNotification = async (params: {
           platform: data.platform || 'unknown',
           language: data.language || 'ar',
           country: data.country || 'SA',
+          countrySource: data.countrySource || 'device_locale',
+          countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
           lastActive: data.lastActive,
         });
       }
@@ -742,6 +880,8 @@ export const sendPrizeNotification = async (
         platform: data.platform || 'unknown',
         language: data.language || 'ar',
         country: data.country || 'SA',
+        countrySource: data.countrySource || 'device_locale',
+        countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
         lastActive: data.lastActive,
       });
     });

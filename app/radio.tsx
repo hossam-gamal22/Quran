@@ -45,9 +45,58 @@ import {
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import NetInfo from '@react-native-community/netinfo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 
 const ACCENT = '#0d8e62';
+const RADIO_INTERSTITIAL_INTERVAL_MS = 180_000;
+const RADIO_DAILY_INTERSTITIAL_LIMIT = 6;
+const RADIO_AD_COUNT_KEY = '@radio_interstitial_daily_count';
+const RADIO_AD_DATE_KEY = '@radio_interstitial_daily_date';
+
+function radioTodayKey(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+async function getRadioInterstitialCountToday(): Promise<number> {
+  const today = radioTodayKey();
+  const savedDate = await AsyncStorage.getItem(RADIO_AD_DATE_KEY);
+
+  if (savedDate !== today) {
+    await AsyncStorage.multiSet([
+      [RADIO_AD_DATE_KEY, today],
+      [RADIO_AD_COUNT_KEY, '0'],
+    ]);
+    return 0;
+  }
+
+  const rawCount = await AsyncStorage.getItem(RADIO_AD_COUNT_KEY);
+  const count = Number(rawCount);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+async function canShowRadioInterstitialToday(): Promise<boolean> {
+  try {
+    return (await getRadioInterstitialCountToday()) < RADIO_DAILY_INTERSTITIAL_LIMIT;
+  } catch {
+    return true;
+  }
+}
+
+async function recordRadioInterstitialShown(): Promise<void> {
+  try {
+    const today = radioTodayKey();
+    const savedDate = await AsyncStorage.getItem(RADIO_AD_DATE_KEY);
+    const currentCount = savedDate === today
+      ? Number(await AsyncStorage.getItem(RADIO_AD_COUNT_KEY)) || 0
+      : 0;
+
+    await AsyncStorage.multiSet([
+      [RADIO_AD_DATE_KEY, today],
+      [RADIO_AD_COUNT_KEY, String(currentCount + 1)],
+    ]);
+  } catch {}
+}
 
 export default function RadioScreenWrapper() {
   return (
@@ -80,8 +129,9 @@ function RadioScreen() {
   const [isOffline, setIsOffline] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
 
-  // Interstitial ad — show every 5 minutes of radio playback
+  // Interstitial ad — show every 3 minutes of active radio playback.
   const adTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const radioAdInFlightRef = useRef(false);
 
   // Animation for search bar
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -123,6 +173,50 @@ function RadioScreen() {
     });
     return () => unsubscribe();
   }, []);
+
+  const maybeShowRadioInterstitial = useCallback(async () => {
+    if (radioAdInFlightRef.current) return;
+
+    radioAdInFlightRef.current = true;
+    try {
+      if (!(await canShowRadioInterstitialToday())) return;
+
+      await showInterstitial({
+        ignoreSmartFrequencyCaps: true,
+        onShown: recordRadioInterstitialShown,
+      });
+    } finally {
+      radioAdInFlightRef.current = false;
+    }
+  }, []);
+
+  const shouldRunRadioAdTimer = !!radioState.currentStation && (
+    radioState.status === 'loading' ||
+    radioState.status === 'buffering' ||
+    radioState.status === 'playing'
+  );
+
+  useEffect(() => {
+    if (!shouldRunRadioAdTimer) {
+      if (adTimerRef.current) {
+        clearInterval(adTimerRef.current);
+        adTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (adTimerRef.current) clearInterval(adTimerRef.current);
+    adTimerRef.current = setInterval(() => {
+      maybeShowRadioInterstitial();
+    }, RADIO_INTERSTITIAL_INTERVAL_MS);
+
+    return () => {
+      if (adTimerRef.current) {
+        clearInterval(adTimerRef.current);
+        adTimerRef.current = null;
+      }
+    };
+  }, [maybeShowRadioInterstitial, shouldRunRadioAdTimer]);
 
   const toggleSearch = useCallback(() => {
     const toValue = showSearch ? 0 : 1;
@@ -168,19 +262,9 @@ function RadioScreen() {
     try {
       console.log('[Radio] handlePlayStation:', station.name, station.streamUrl);
       if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
-        // Stopping — clear the ad timer
-        if (adTimerRef.current) {
-          clearInterval(adTimerRef.current);
-          adTimerRef.current = null;
-        }
         console.log('[Radio] Stopping current station');
         await stopRadio();
       } else {
-        // Starting a new station — schedule interstitial every 5 minutes.
-        if (adTimerRef.current) clearInterval(adTimerRef.current);
-        adTimerRef.current = setInterval(() => {
-          try { showInterstitial(); } catch {}
-        }, 300_000);
         console.log('[Radio] Starting playback for:', station.name);
         await playRadio(station);
         console.log('[Radio] playRadio call completed');

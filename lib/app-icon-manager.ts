@@ -245,8 +245,13 @@ export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
  * when the user changes language. Internally now delegates to setSeasonalIcon.
  */
 export async function switchAppIcon(language: Language): Promise<void> {
-  const target: SeasonalIconKey = isRTL(language) ? 'default_ar' : 'default_en';
-  await setSeasonalIcon(target);
+  try {
+    const { getCurrentSeason } = await import('@/lib/seasonal-content');
+    await syncAppIconOnStartup(language, getCurrentSeason()?.type ?? null, true);
+  } catch {
+    const target: SeasonalIconKey = isRTL(language) ? 'default_ar' : 'default_en';
+    await setSeasonalIcon(target);
+  }
 }
 
 // ─── Firestore config loader ────────────────────────────
@@ -272,9 +277,10 @@ export async function loadAppIconsConfig(force = false): Promise<AppIconsConfig 
  */
 export async function syncAppIconOnStartup(
   language: Language,
-  currentSeason: SeasonType | null = null
+  currentSeason: SeasonType | null = null,
+  forceConfigRefresh = false
 ): Promise<void> {
-  const config = await loadAppIconsConfig();
+  const config = await loadAppIconsConfig(forceConfigRefresh);
   const target = resolveActiveIcon(config, currentSeason, language);
   await setSeasonalIcon(target);
 }

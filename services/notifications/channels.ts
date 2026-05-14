@@ -34,7 +34,10 @@ const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
 // v21: Full-adhan playback is now opt-in via the `useFullAdhan` setting (was
 // erroneously forced on for all Android users in v20, leaving them with
 // silent prayer notifications because the service was never invoked).
-const CURRENT_CHANNELS_VERSION = '21';
+// v22: Force recreate adhan channels after real-device full-adhan QA so stale
+// Android channels created without a custom sound cannot keep producing silent
+// test notifications.
+const CURRENT_CHANNELS_VERSION = '22';
 
 export const ANDROID_FULL_ADHAN_CHANNEL_ID = 'adhan_full_visual';
 

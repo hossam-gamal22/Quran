@@ -41,6 +41,7 @@ const BANNER_SCREENS: { key: AdScreenKey; label: string; icon: string }[] = [
   { key: 'hadith', label: 'الأحاديث', icon: 'book-alphabet' },
   { key: 'ayat_universe', label: 'آيات كونية', icon: 'earth' },
   { key: 'hadith_sifat', label: 'صفات', icon: 'text-box-outline' },
+  { key: 'question_answer', label: 'سؤال وجواب', icon: 'frequently-asked-questions' },
   { key: 'duas', label: 'الأدعية', icon: 'hand-heart' },
   { key: 'surah', label: 'المصحف', icon: 'book-open-variant' },
   { key: 'tafsir', label: 'التفسير', icon: 'text-search' },
@@ -63,7 +64,12 @@ export default function AdsSettingsScreen() {
       const docRef = doc(db, FIRESTORE_PATH, FIRESTORE_DOC);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        setConfig({ ...DEFAULT_ADS_CONFIG, ...docSnap.data() as Partial<AdsConfig> });
+        const saved = docSnap.data() as Partial<AdsConfig>;
+        setConfig({
+          ...DEFAULT_ADS_CONFIG,
+          ...saved,
+          bannerScreens: { ...DEFAULT_ADS_CONFIG.bannerScreens, ...(saved.bannerScreens || {}) },
+        });
       }
     } catch (error) {
       console.error('Error loading ads settings:', error);

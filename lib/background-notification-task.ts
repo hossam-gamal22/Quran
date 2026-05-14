@@ -88,6 +88,7 @@ TaskManager.defineTask(TASK_NAME, async () => {
       vibration: n.vibration !== false,
       soundType: n.soundType,
       adhanSoundType: n.adhanSoundType || 'makkah',
+      fullAdhanSoundType: n.fullAdhanSoundType || 'makkah',
       azkarSoundType: n.azkarSoundType,
       dailyVerseSoundType: n.dailyVerseSoundType,
       salawatReminder: n.salawatReminder,
@@ -124,6 +125,20 @@ TaskManager.defineTask(TASK_NAME, async () => {
       worshipWeeklyReport: n.worshipWeeklyReport,
       kahfReminder: n.kahfReminder,
     });
+
+    // ── Widget data refresh ───────────────────────────────────────────────────
+    // Refresh widget shared data (prayer times, hijri date, etc.) in the
+    // background so home-screen widgets stay current even when the app is closed.
+    // We only update the AsyncStorage data layer here; full PNG snapshot
+    // regeneration requires the app UI and is deferred to foreground opens.
+    // Prayer-countdown overlays are already updated hourly by PrayerWidgetRefreshReceiver.
+    try {
+      const { refreshWidgetsNow } = await import('./widget-data-bridge');
+      await refreshWidgetsNow();
+      console.log('[background-task] Widget data refreshed');
+    } catch (we) {
+      console.warn('[background-task] Widget refresh failed (non-fatal):', we);
+    }
 
     // Record last successful background run for diagnostics
     await AsyncStorage.setItem(

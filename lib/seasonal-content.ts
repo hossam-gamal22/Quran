@@ -68,6 +68,21 @@ export interface DailySeasonalData {
 
 type SeasonDataEntry = Omit<SeasonInfo, 'isActive' | 'daysRemaining' | 'currentDay' | 'totalDays'>;
 
+type SeasonDate = Pick<HijriDate, 'day' | 'month' | 'year'>;
+
+const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
+  'eid_fitr',
+  'eid_adha',
+  'mawlid',
+  'ashura',
+  'ramadan',
+  'hajj',
+  'dhul_hijjah',
+  'muharram',
+  'rajab',
+  'shaban',
+];
+
 const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
   ramadan: {
     type: 'ramadan',
@@ -373,11 +388,12 @@ const isDateInRange = (
 /**
  * الحصول على الموسم الحالي
  */
-export const getCurrentSeason = (hijriDate?: HijriDate): SeasonInfo | null => {
+export const getCurrentSeason = (hijriDate?: SeasonDate): SeasonInfo | null => {
   const date = hijriDate || getHijriDate();
   const current = { month: date.month, day: date.day };
 
-  // البحث عن الموسم النشط
+  const activeSeasons: SeasonInfo[] = [];
+
   for (const [key, seasonData] of Object.entries(SEASONS_DATA)) {
     if (key === 'none') continue;
 
@@ -385,23 +401,29 @@ export const getCurrentSeason = (hijriDate?: HijriDate): SeasonInfo | null => {
       const totalDays = daysBetween(seasonData.startDate, seasonData.endDate) + 1;
       const currentDay = daysBetween(seasonData.startDate, current) + 1;
 
-      return {
+      activeSeasons.push({
         ...seasonData,
         isActive: true,
         daysRemaining: totalDays - currentDay,
         currentDay,
         totalDays,
-      };
+      });
     }
   }
 
-  return null;
+  if (activeSeasons.length === 0) return null;
+
+  return activeSeasons.sort((a, b) => {
+    const aPriority = SEASON_PRIORITY.indexOf(a.type as Exclude<SeasonType, 'none'>);
+    const bPriority = SEASON_PRIORITY.indexOf(b.type as Exclude<SeasonType, 'none'>);
+    return (aPriority === -1 ? 999 : aPriority) - (bPriority === -1 ? 999 : bPriority);
+  })[0];
 };
 
 /**
  * الحصول على الموسم القادم
  */
-export const getUpcomingSeason = (hijriDate?: HijriDate): SeasonInfo & { daysUntil: number } | null => {
+export const getUpcomingSeason = (hijriDate?: SeasonDate): SeasonInfo & { daysUntil: number } | null => {
   const date = hijriDate || getHijriDate();
   const current = { month: date.month, day: date.day };
   const currentDays = (current.month - 1) * 30 + current.day;
@@ -453,8 +475,7 @@ export const getCurrentSpecialDay = (season: SeasonInfo | null): SpecialDay | nu
 /**
  * الحصول على جميع المواسم
  */
-export const getAllSeasons = (): SeasonInfo[] => {
-  const hijriDate = getHijriDate();
+export const getAllSeasons = (hijriDate: SeasonDate = getHijriDate()): SeasonInfo[] => {
 
   return Object.entries(SEASONS_DATA)
     .filter(([key]) => key !== 'none')
@@ -545,8 +566,8 @@ export const getSeasonalGreeting = (seasonType: SeasonType): string => {
 /**
  * الحصول على البيانات الموسمية لليوم
  */
-export const getDailySeasonalData = (): DailySeasonalData => {
-  const season = getCurrentSeason();
+export const getDailySeasonalData = (hijriDate?: SeasonDate): DailySeasonalData => {
+  const season = getCurrentSeason(hijriDate);
   const specialDay = getCurrentSpecialDay(season);
   const greeting = season ? getSeasonalGreeting(season.type) : '';
 
@@ -579,8 +600,8 @@ export const getSeasonIcon = (seasonType: SeasonType): string => {
 /**
  * التحقق مما إذا كنا في موسم معين
  */
-export const isInSeason = (seasonType: SeasonType): boolean => {
-  const currentSeason = getCurrentSeason();
+export const isInSeason = (seasonType: SeasonType, hijriDate?: SeasonDate): boolean => {
+  const currentSeason = getCurrentSeason(hijriDate);
   return currentSeason?.type === seasonType;
 };
 
@@ -595,11 +616,10 @@ export const getSeasonProgress = (season: SeasonInfo): number => {
 /**
  * الحصول على معلومات موسم محدد
  */
-export const getSeasonInfo = (seasonType: SeasonType): SeasonInfo | null => {
+export const getSeasonInfo = (seasonType: SeasonType, hijriDate: SeasonDate = getHijriDate()): SeasonInfo | null => {
   const seasonData = SEASONS_DATA[seasonType];
   if (!seasonData || seasonType === 'none') return null;
 
-  const hijriDate = getHijriDate();
   const current = { month: hijriDate.month, day: hijriDate.day };
   const isActive = isDateInRange(current, seasonData.startDate, seasonData.endDate);
   const totalDays = daysBetween(seasonData.startDate, seasonData.endDate) + 1;

@@ -37,6 +37,7 @@ export interface RewardsConfig {
   autoNotify: boolean;
   scoreWeights: ScoreWeights;
   currentMonth: string; // YYYY-MM
+  processedMonth?: string; // YYYY-MM-v2; set by automatic winner selection guards
   currentWinners: Winner[];
   history: RewardHistoryEntry[];
 }

@@ -108,9 +108,10 @@ const AZKAR_CATEGORIES = [
 const QUICK_ACCESS = [
   { id: 'qibla', nameKey: 'home.qibla', icon: 'compass', color: '#5856D6' },
   { id: 'favorites', nameKey: 'home.favorites', icon: 'heart', color: '#FF6B6B' },
+  { id: 'question_answer', nameKey: 'questionAnswer.title', icon: 'frequently-asked-questions', color: '#0d8e62' },
   { id: 'ayat_kursi', nameKey: 'home.ayatKursi', icon: 'shield-star', color: '#9B7B00' },
   { id: 'surah_kahf', nameKey: 'home.surahKahf', icon: 'book-open-page-variant', color: '#3a7ca5' },
-  { id: 'surah_yasin', nameKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#4a3d73' },
+  { id: 'surah_yasin', nameKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#9B6BD6' },
   { id: 'surah_mulk', nameKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488' },
   { id: 'names', nameKey: 'home.namesOfAllah', ...PAGE_CONFIGS.names },
   { id: 'tasbih', nameKey: 'tabs.tasbih', icon: 'counter', color: '#0d8e62' },
@@ -164,6 +165,7 @@ interface HomeSectionItem {
   icon: string;
   color: string;
   route?: string;
+  iconTextColor?: boolean;
 }
 
 interface HomeSectionDef {
@@ -205,8 +207,8 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     icon: 'star-crescent',
     color: '#0D9488',
     items: [
-      { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: 'mosque', color: '#0D9488', route: '/hajj' },
-      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: '🤲', color: '#0d8e62', route: '/umrah' },
+      { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: '🕋', color: '#0D9488', route: '/hajj' },
+      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: '🕋', color: '#0d8e62', route: '/umrah' },
     ],
   },
   {
@@ -216,7 +218,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     color: '#3a7ca5',
     items: [
       { id: 'surah_kahf', labelKey: 'home.surahKahf', icon: 'book-open-page-variant', color: '#3a7ca5', route: '/surah-kahf' },
-      { id: 'surah_yasin', labelKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#4a3d73', route: '/surah-yasin' },
+      { id: 'surah_yasin', labelKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#9B6BD6', route: '/surah-yasin' },
       { id: 'surah_mulk', labelKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah-mulk' },
       { id: 'ayat_kursi', labelKey: 'home.ayatKursi', icon: 'shield-star', color: '#9B7B00', route: '/ayat-kursi' },
       { id: 'daily_ayah', labelKey: 'home.dailyVerse', icon: 'star-four-points', color: '#c07b10', route: '/daily-ayah' },
@@ -229,11 +231,11 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     icon: '🤲',
     color: getAzkarCategoryData('34').color,
     items: [
-      { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), route: '/sunnah-dua-daily' },
-      { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, route: '/daily-dua' },
+      { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), icon: 'hand-heart', color: '#c07b10', route: '/sunnah-dua-daily' },
+      { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, icon: 'calendar-heart', route: '/daily-dua' },
       { id: 'daily_hadith', labelKey: 'home.hadithOfDay', ...PAGE_CONFIGS.daily_hadith, route: '/hadith-of-day' },
-      { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), route: '/ruqya' },
-      { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), route: '/quran-dua-daily' },
+      { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), icon: 'shield-check', color: '#0D9488', route: '/ruqya' },
+      { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), icon: 'book-open-page-variant', color: '#3a7ca5', route: '/quran-dua-daily' },
       { id: 'famous_duas', labelKey: 'home.famousDuas', icon: 'star-circle', color: '#0d8e62', route: '/famous-duas' },
     ],
   },
@@ -259,8 +261,8 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     color: getAzkarCategoryData('129').color,
     items: [
       { id: 'tasbih', labelKey: 'tabs.tasbih', icon: 'counter', color: '#0d8e62', route: '/(tabs)/tasbih' },
-      { id: 'istighfar', labelKey: 'home.istighfar', ...getAzkarCategoryData('129'), route: '/azkar/129' },
-      { id: 'salawat', labelKey: 'home.salawat', ...getAzkarCategoryData('107'), route: '/azkar/107' },
+      { id: 'istighfar', labelKey: 'home.istighfar', ...getAzkarCategoryData('129'), icon: 'refresh-circle', route: '/azkar/129' },
+      { id: 'salawat', labelKey: 'home.salawat', ...getAzkarCategoryData('107'), icon: 'salawat-symbol', iconTextColor: true, route: '/azkar/107' },
       { id: 'tasbih_log', labelKey: 'home.tasbihLog', icon: 'history', color: '#3a7ca5', route: '/tasbih-stats' },
     ],
   },
@@ -277,7 +279,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
   },
 ];
 
-interface ModalCategoryItem { id: string; labelKey: string; icon: string; color: string; route?: string; }
+interface ModalCategoryItem { id: string; labelKey: string; icon: string; color: string; route?: string; iconTextColor?: boolean; }
 interface ModalCategoryDef { id: string; titleKey: string; icon: string; color: string; items: ModalCategoryItem[]; }
 
 const MODAL_CATEGORIES: ModalCategoryDef[] = [
@@ -302,15 +304,15 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
   {
     id: 'cat_hajj', titleKey: 'home.hajjUmrahSection', icon: 'star-crescent', color: '#0D9488',
     items: [
-      { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: 'mosque', color: '#0D9488', route: '/hajj' },
-      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: '🤲', color: '#0d8e62', route: '/umrah' },
+      { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: '🕋', color: '#0D9488', route: '/hajj' },
+      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: '🕋', color: '#0d8e62', route: '/umrah' },
     ],
   },
   {
     id: 'cat_quran', titleKey: 'home.quranSurahsSection', icon: 'book-open-page-variant', color: '#3a7ca5',
     items: [
       { id: 'surah_kahf', labelKey: 'home.surahKahf', icon: 'book-open-page-variant', color: '#3a7ca5', route: '/surah-kahf' },
-      { id: 'surah_yasin', labelKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#4a3d73', route: '/surah-yasin' },
+      { id: 'surah_yasin', labelKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#9B6BD6', route: '/surah-yasin' },
       { id: 'surah_mulk', labelKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah-mulk' },
       { id: 'ayat_kursi', labelKey: 'home.ayatKursi', icon: 'shield-star', color: '#9B7B00', route: '/ayat-kursi' },
       { id: 'daily_ayah', labelKey: 'home.dailyVerse', icon: 'star-four-points', color: '#c07b10', route: '/daily-ayah' },
@@ -320,11 +322,11 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
   {
     id: 'cat_duas', titleKey: 'home.duasHadithSection', icon: '🤲', color: getAzkarCategoryData('34').color,
     items: [
-      { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), route: '/sunnah-dua-daily' },
-      { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, route: '/daily-dua' },
+      { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), icon: 'hand-heart', color: '#c07b10', route: '/sunnah-dua-daily' },
+      { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, icon: 'calendar-heart', route: '/daily-dua' },
       { id: 'daily_hadith', labelKey: 'home.hadithOfDay', ...PAGE_CONFIGS.daily_hadith, route: '/hadith-of-day' },
-      { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), route: '/ruqya' },
-      { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), route: '/quran-dua-daily' },
+      { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), icon: 'shield-check', color: '#0D9488', route: '/ruqya' },
+      { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), icon: 'book-open-page-variant', color: '#3a7ca5', route: '/quran-dua-daily' },
       { id: 'famous_duas', labelKey: 'home.famousDuas', icon: 'star-circle', color: '#0d8e62', route: '/famous-duas' },
     ],
   },
@@ -344,8 +346,8 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
     id: 'cat_tasbih', titleKey: 'home.tasbihSection', icon: 'counter', color: getAzkarCategoryData('129').color,
     items: [
       { id: 'tasbih', labelKey: 'tabs.tasbih', icon: 'counter', color: '#0d8e62', route: '/(tabs)/tasbih' },
-      { id: 'istighfar', labelKey: 'home.istighfar', ...getAzkarCategoryData('129'), route: '/azkar/129' },
-      { id: 'salawat', labelKey: 'home.salawat', ...getAzkarCategoryData('107'), route: '/azkar/107' },
+      { id: 'istighfar', labelKey: 'home.istighfar', ...getAzkarCategoryData('129'), icon: 'refresh-circle', route: '/azkar/129' },
+      { id: 'salawat', labelKey: 'home.salawat', ...getAzkarCategoryData('107'), icon: 'salawat-symbol', iconTextColor: true, route: '/azkar/107' },
       { id: 'tasbih_log', labelKey: 'home.tasbihLog', icon: 'history', color: '#3a7ca5', route: '/tasbih-stats' },
     ],
   },
@@ -965,17 +967,51 @@ export default function HomeScreen() {
       AsyncStorage.getItem('@quick_access_items'),
       AsyncStorage.getItem(CUSTOM_ITEMS_STORAGE_KEY),
       AsyncStorage.getItem('@quick_access_customized'),
-    ]).then(([stored, storedCustom, customizedFlag]) => {
+      AsyncStorage.getItem('@quick_access_migration_qa_v2'),
+      AsyncStorage.getItem('@quick_access_migration_qa_v3'),
+      AsyncStorage.getItem('@quick_access_migration_qa_v4'),
+    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done]) => {
       // Check if user has ever customized their Quick Access
       const userHasCustomized = customizedFlag === 'true';
       setHasUserCustomized(userHasCustomized);
-      
-      if (userHasCustomized && stored) {
-        // User has customized - use their saved preferences
+
+      if (stored) {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setSelectedQuickAccessIds(parsed);
+            let ids: string[] = parsed;
+
+            if (!qaMigrationV2Done) {
+              // Legacy migration — keep for historical completeness
+              ids = ids.filter(id => id !== 'question_answer');
+              const favIdx = ids.indexOf('favorites');
+              const insertAt = favIdx >= 0 ? favIdx + 1 : Math.max(0, ids.length - 2);
+              ids = [...ids.slice(0, insertAt), 'question_answer', ...ids.slice(insertAt)];
+              AsyncStorage.setItem('@quick_access_migration_qa_v2', 'true');
+            }
+
+            if (!qaMigrationV3Done) {
+              // Force question_answer to be the 3rd item (index 2) for all users
+              ids = ids.filter(id => id !== 'question_answer');
+              ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+              AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+              AsyncStorage.setItem('@quick_access_migration_qa_v3', 'true');
+              if (!userHasCustomized) {
+                AsyncStorage.setItem('@quick_access_customized', 'true');
+                setHasUserCustomized(true);
+              }
+            }
+
+            // v4: Force question_answer at position 2 (3rd slot) on Android for all users
+            // regardless of previous customization — user can re-customize afterwards
+            if (!qaMigrationV4Done && Platform.OS === 'android') {
+              ids = ids.filter(id => id !== 'question_answer');
+              ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+              AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+              AsyncStorage.setItem('@quick_access_migration_qa_v4', 'true');
+            }
+
+            setSelectedQuickAccessIds(ids);
           }
         } catch {}
       }
@@ -1012,6 +1048,16 @@ export default function HomeScreen() {
             }
           }
         } catch {}
+      }
+      // v4 fallback: no stored items on Android — force question_answer into defaults
+      if (!stored && !qaMigrationV4Done && Platform.OS === 'android') {
+        const defaultIds = QUICK_ACCESS.slice(0, 4).map(i => i.id);
+        let ids = defaultIds.filter(id => id !== 'question_answer');
+        ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+        setSelectedQuickAccessIds(ids);
+        AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+        AsyncStorage.setItem('@quick_access_migration_qa_v4', 'true');
+        AsyncStorage.setItem('@quick_access_customized', 'true');
       }
     });
   }, []);
@@ -1051,7 +1097,11 @@ export default function HomeScreen() {
         label: undefined,
       }));
       const firestoreIds = new Set(firestoreItems.map(i => i.id));
-      return [...firestoreItems, ...customItems.filter(c => !firestoreIds.has(c.id))];
+      // Merge local QUICK_ACCESS items not yet in Firestore (e.g. newly added items like question_answer)
+      const localOnly = QUICK_ACCESS
+        .filter(q => !firestoreIds.has(q.id))
+        .map(q => ({ ...q, label: undefined, route: undefined }));
+      return [...firestoreItems, ...localOnly, ...customItems.filter(c => !firestoreIds.has(c.id))];
     }
     // Fallback to local hardcoded items
     const builtIn = QUICK_ACCESS.map(item => ({ ...item, label: undefined, route: undefined }));
@@ -1075,7 +1125,10 @@ export default function HomeScreen() {
         label: undefined,
       }));
       const firestoreIds = new Set(firestoreItems.map(i => i.id));
-      return [...firestoreItems, ...pendingCustomItems.filter(c => !firestoreIds.has(c.id))];
+      const localOnly = QUICK_ACCESS
+        .filter(q => !firestoreIds.has(q.id))
+        .map(q => ({ ...q, label: undefined, route: undefined }));
+      return [...firestoreItems, ...localOnly, ...pendingCustomItems.filter(c => !firestoreIds.has(c.id))];
     }
     const builtIn = QUICK_ACCESS.map(item => ({ ...item, label: undefined, route: undefined }));
     const builtInIds = new Set(builtIn.map(i => i.id));
@@ -1083,9 +1136,11 @@ export default function HomeScreen() {
   }, [homeConfig, pendingCustomItems]);
 
   const filteredQuickAccess = useMemo(() => {
+    let result: typeof allQuickAccessItems;
+
     // If user hasn't customized AND Firestore has config → use Firestore defaults
     if (!hasUserCustomized && homeConfig?.quickAccess?.items?.length) {
-      return [...allQuickAccessItems]
+      result = [...allQuickAccessItems]
         .filter(item => {
           // Custom items (user-added) are always shown if selected
           if (!('enabled' in item)) return selectedQuickAccessIds.includes(item.id);
@@ -1096,12 +1151,38 @@ export default function HomeScreen() {
           const orderB = (b as any).order ?? 99;
           return orderA - orderB;
         });
+    } else {
+      // User has customized - use their saved selection and order
+      result = [...allQuickAccessItems]
+        .filter(item => selectedQuickAccessIds.includes(item.id))
+        .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
     }
-    // User has customized - use their saved selection and order
-    return [...allQuickAccessItems]
-      .filter(item => selectedQuickAccessIds.includes(item.id))
-      .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
-  }, [homeConfig, allQuickAccessItems, selectedQuickAccessIds]);
+
+    // GUARANTEED on Android: question_answer MUST be at index 2
+    if (Platform.OS === 'android') {
+      const qaIndex = result.findIndex(item => item.id === 'question_answer');
+      const qaItem = result[qaIndex]
+        ?? allQuickAccessItems.find(item => item.id === 'question_answer')
+        ?? QUICK_ACCESS.find(q => q.id === 'question_answer');
+      if (qaItem) {
+        // Remove from wherever it is (if present)
+        result = result.filter(item => item.id !== 'question_answer');
+        // Force into index 2
+        const insertAt = Math.min(2, result.length);
+        result = [...result.slice(0, insertAt), qaItem as any, ...result.slice(insertAt)];
+      }
+    } else if (!result.find(item => item.id === 'question_answer')) {
+      // Non-Android: inject if missing
+      const qaItem = allQuickAccessItems.find(item => item.id === 'question_answer')
+        ?? QUICK_ACCESS.find(q => q.id === 'question_answer');
+      if (qaItem) {
+        const insertAt = Math.min(2, result.length);
+        result = [...result.slice(0, insertAt), qaItem as any, ...result.slice(insertAt)];
+      }
+    }
+
+    return result;
+  }, [homeConfig, allQuickAccessItems, selectedQuickAccessIds, hasUserCustomized]);
 
   // Strip emoji characters that can't render with custom fonts (show as "?" boxes)
   const stripEmojis = useCallback((text: string) => {
@@ -1315,6 +1396,9 @@ export default function HomeScreen() {
         break;
       case 'radio':
         router.push('/radio' as any);
+        break;
+      case 'question_answer':
+        router.push('/question-answer' as any);
         break;
       default:
         router.push(`/azkar/${itemId}` as any);
@@ -1583,7 +1667,7 @@ export default function HomeScreen() {
         )}
 
         {/* Permission Recovery Banner — يظهر فقط لو في إذن مفقود */}
-        <PermissionBanner />
+        <PermissionBanner excludedKeys={['batteryOptimization', 'location']} />
 
         {/* Daily Highlights */}
         <CollapsibleSection title={t('home.highlights')} icon="star-circle" iconColor="#c07b10" sectionId="highlights" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
@@ -1728,7 +1812,7 @@ export default function HomeScreen() {
                           {isGrid ? (
                             <>
                               <View style={styles.gridCardIcon}>
-                                <AppIcon name={item.icon} size={28} color={item.color} />
+                                <AppIcon name={item.icon} size={28} color={item.iconTextColor ? colors.text : item.color} />
                               </View>
                               <Text style={[styles.gridCardLabel, { color: colors.text, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                                 {t(item.labelKey)}
@@ -1738,7 +1822,7 @@ export default function HomeScreen() {
                             <>
                               <View style={[styles.listCardLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 <View style={[styles.listCardIcon, { backgroundColor: `${item.color}18` }]}>
-                                  <AppIcon name={item.icon} size={24} color={item.color} />
+                                  <AppIcon name={item.icon} size={24} color={item.iconTextColor ? colors.text : item.color} />
                                 </View>
                                 <Text style={[styles.listCardLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                                   {t(item.labelKey)}

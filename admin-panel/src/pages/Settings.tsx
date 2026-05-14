@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, AlertTriangle, Smartphone, ExternalLink, Mail, Bell } from 'lucide-react';
+import { Save, RefreshCw, AlertTriangle, Smartphone, ExternalLink, Mail, Bell, Clock } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { sendUpdatePushNotification, UPDATE_NOTIFICATION_TRANSLATIONS } from '../services/pushNotifications';
@@ -27,6 +27,10 @@ interface AppSettings {
     shareUrlIos: string;
     shareUrlAndroid: string;
   };
+  quranAutoScroll: {
+    minSeconds: number;
+    maxSeconds: number;
+  };
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -47,6 +51,10 @@ const DEFAULT_SETTINGS: AppSettings = {
     shareUrlFallback: 'https://roohmuslim.app',
     shareUrlIos: '',
     shareUrlAndroid: '',
+  },
+  quranAutoScroll: {
+    minSeconds: 10,
+    maxSeconds: 120,
   },
 };
 
@@ -103,6 +111,10 @@ const SettingsPage: React.FC = () => {
             shareUrlIos: data.shareModal?.shareUrlIos ?? prev.shareModal.shareUrlIos,
             shareUrlAndroid: data.shareModal?.shareUrlAndroid ?? prev.shareModal.shareUrlAndroid,
           },
+          quranAutoScroll: {
+            minSeconds: data.quranAutoScroll?.minSeconds ?? prev.quranAutoScroll.minSeconds,
+            maxSeconds: data.quranAutoScroll?.maxSeconds ?? prev.quranAutoScroll.maxSeconds,
+          },
         }));
       }
     } catch (error) {
@@ -154,6 +166,13 @@ const SettingsPage: React.FC = () => {
           shareUrlFallback: settings.shareModal.shareUrlFallback,
           shareUrlIos: settings.shareModal.shareUrlIos,
           shareUrlAndroid: settings.shareModal.shareUrlAndroid,
+        },
+        quranAutoScroll: {
+          minSeconds: Math.max(5, Math.round(Number(settings.quranAutoScroll.minSeconds) || 10)),
+          maxSeconds: Math.max(
+            Math.max(5, Math.round(Number(settings.quranAutoScroll.minSeconds) || 10)),
+            Math.round(Number(settings.quranAutoScroll.maxSeconds) || 120),
+          ),
         },
         updatedAt: new Date().toISOString(),
       }, { merge: true });
@@ -325,6 +344,58 @@ const SettingsPage: React.FC = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* إعدادات التصفح التلقائي للمصحف */}
+        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Clock size={20} className="text-emerald-500" />
+            التصفح التلقائي للمصحف
+          </h2>
+          <p className="text-gray-400 text-sm mb-4">
+            هذه القيم تحدد مدى السلايدر داخل التطبيق بدون الحاجة لإصدار جديد. اكتب المدة بالثواني.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">أقل مدة للصفحة (الأسرع)</label>
+              <input
+                type="number"
+                min={5}
+                max={3600}
+                value={settings.quranAutoScroll.minSeconds}
+                onChange={e => updateSetting('quranAutoScroll', {
+                  ...settings.quranAutoScroll,
+                  minSeconds: Math.max(5, Number(e.target.value) || 5),
+                })}
+                className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                dir="ltr"
+                aria-label="أقل مدة للصفحة"
+              />
+              <p className="text-gray-500 text-xs mt-1">مثال: 10 = عشر ثوانٍ لكل صفحة</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">أقصى مدة للصفحة (الأبطأ)</label>
+              <input
+                type="number"
+                min={settings.quranAutoScroll.minSeconds}
+                max={7200}
+                value={settings.quranAutoScroll.maxSeconds}
+                onChange={e => updateSetting('quranAutoScroll', {
+                  ...settings.quranAutoScroll,
+                  maxSeconds: Math.max(settings.quranAutoScroll.minSeconds, Number(e.target.value) || settings.quranAutoScroll.minSeconds),
+                })}
+                className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                dir="ltr"
+                aria-label="أقصى مدة للصفحة"
+              />
+              <p className="text-gray-500 text-xs mt-1">مثال: 120 = دقيقتان لكل صفحة</p>
+            </div>
+          </div>
+          {settings.quranAutoScroll.maxSeconds < settings.quranAutoScroll.minSeconds && (
+            <p className="text-red-400 text-sm mt-3">
+              أقصى مدة يجب أن تكون أكبر من أو مساوية لأقل مدة.
+            </p>
+          )}
         </div>
 
         {/* بيانات التواصل */}

@@ -80,13 +80,14 @@ service cloud.firestore {
       allow write: if
         request.resource.data.keys().hasOnly([
           // location & calc
-          'latitude', 'longitude', 'timezone',
-          'calculationMethod', 'madhab',
+          'latitude', 'longitude', 'city', 'timezone',
+          'timezoneOffsetMinutes', 'calculationMethod', 'madhab',
+          'asrJuristic', 'adjustments',
           // adjustments
           'fajrAdjust', 'sunriseAdjust', 'dhuhrAdjust',
           'asrAdjust', 'maghribAdjust', 'ishaAdjust',
           // toggles
-          'enabled', 'notifyFajr', 'notifySunrise', 'notifyDhuhr',
+          'enabled', 'disabled', 'notifyFajr', 'notifySunrise', 'notifyDhuhr',
           'notifyAsr', 'notifyMaghrib', 'notifyIsha',
           // sounds (per-prayer)
           'soundFajr', 'soundDhuhr', 'soundAsr', 'soundMaghrib', 'soundIsha',
@@ -126,27 +127,27 @@ service cloud.firestore {
     // Radio stations - public read, admin write
     match /admin_radio_stations/{stationId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     // ─── Sound System ────────────────────────────────────────────
     // Custom uploaded sounds (library) — admin uploads, app reads URLs
     match /sounds/{soundId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     // Pending uploaded sounds for next build — admin only
     match /uploadedSounds/{soundId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     // ─── Seasonal Content ────────────────────────────────────────
     // Seasonal banners, Ramadan/Hajj content — admin writes, app reads
     match /seasonalContent/{contentId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     // ─── Calendar & Events ───────────────────────────────────────
@@ -166,19 +167,42 @@ service cloud.firestore {
     // PDF templates - admin managed
     match /pdfTemplates/{templateId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     // PDF uploads
     match /pdfUploads/{uploadId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     // Theme PDFs config
     match /themePdfs/{docId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
+    }
+
+    // App content and daily content editors
+    match /appContent/{docId} {
+      allow read, write: if true;
+    }
+
+    match /dailyContent/{docId} {
+      allow read, write: if true;
+    }
+
+    // Theme background editor
+    match /backgrounds/{backgroundId} {
+      allow read, write: if true;
+    }
+
+    // Translation overrides and SDUI screens
+    match /translationOverrides/{overrideId} {
+      allow read, write: if true;
+    }
+
+    match /sdui_screens/{screenId} {
+      allow read, write: if true;
     }
 
     // Daily Dhikr - admin managed content

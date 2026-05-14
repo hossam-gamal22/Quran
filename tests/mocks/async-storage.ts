@@ -11,6 +11,11 @@ export default {
     return Promise.resolve();
   },
   getAllKeys: () => Promise.resolve(Array.from(storage.keys())),
+  multiGet: (keys: string[]) => Promise.resolve(keys.map((key) => [key, storage.get(key) ?? null])),
+  multiSet: (pairs: [string, string][]) => {
+    pairs.forEach(([key, value]) => storage.set(key, value));
+    return Promise.resolve();
+  },
   multiRemove: (keys: string[]) => {
     keys.forEach((key) => storage.delete(key));
     return Promise.resolve();

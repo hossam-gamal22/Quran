@@ -5,9 +5,18 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname, '..'), '');
+  const publicEnv = Object.fromEntries(
+    Object.entries(env).filter(([key]) => key.startsWith('EXPO_PUBLIC_')),
+  );
   return {
     plugins: [react()],
     base: '/',
+    define: {
+      'process.env': JSON.stringify({
+        ...publicEnv,
+        NODE_ENV: mode === 'production' ? 'production' : 'development',
+      }),
+    },
     envDir: path.resolve(__dirname, '..'),
     resolve: {
       alias: {

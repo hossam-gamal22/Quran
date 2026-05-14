@@ -134,13 +134,19 @@ export function canShowBanner(): boolean {
  * Can we show an interstitial ad right now?
  * Much stricter than banners — these are the most annoying.
  */
-export async function canShowInterstitial(): Promise<boolean> {
-  if (isInSacredContext()) return false;
+export async function canShowInterstitial(options: {
+  ignoreFrequencyCaps?: boolean;
+  ignoreSessionDelay?: boolean;
+  allowInSacredContext?: boolean;
+} = {}): Promise<boolean> {
+  if (!options.allowInSacredContext && isInSacredContext()) return false;
   if (_isInEngagementReward()) return false;
 
   // Session must be old enough
   const sessionAge = (Date.now() - _sessionStart) / 1000;
-  if (sessionAge < MIN_SESSION_FOR_INTERSTITIAL) return false;
+  if (!options.ignoreSessionDelay && sessionAge < MIN_SESSION_FOR_INTERSTITIAL) return false;
+
+  if (options.ignoreFrequencyCaps) return true;
 
   // Session cap
   if (_sessionInterstitials >= 2) return false;

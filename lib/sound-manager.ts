@@ -52,6 +52,133 @@ export const ADHAN_SOUNDS: Record<string, number> = {
   silent: require('@/assets/sounds/silent.mp3'),
 };
 
+// ─── Complete Adhan Sounds (Full-Length Recordings, 2-4 min) ─────────────────
+//
+// Used ONLY by the in-app Full Adhan Player (`app/full-adhan.tsx`). DIFFERENT
+// from `ADHAN_SOUNDS` above which holds the 29s/35s notification-cap clips
+// played as the system notification sound.
+//
+// IMPORTANT: React Native bundles assets at build time via static `require()`.
+// If you reference an MP3 here that does not physically exist in
+// `assets/sounds/adhan_complete/`, Metro will fail the build — there is no
+// runtime fallback for missing files.
+//
+// To populate:
+//   1. Drop the real MP3 file in `assets/sounds/adhan_complete/`
+//   2. Update SOURCES.md with the source URL, license, duration, and SHA256
+//   3. Run `pnpm verify:adhan-assets` to confirm
+//   4. Add the require() entry below
+//   5. Update VOICE_HAS_FAJR_PHRASE in data/adhan-transcript.ts if the
+//      recording contains "الصلاة خير من النوم"
+//
+// Example (after files are added):
+//   makkah: require('@/assets/sounds/adhan_complete/adhan_makkah_full.mp3'),
+//   madinah: require('@/assets/sounds/adhan_complete/adhan_madinah_full.mp3'),
+//   al_aqsa: require('@/assets/sounds/adhan_complete/adhan_al_aqsa_full.mp3'),
+//   mishary: require('@/assets/sounds/adhan_complete/adhan_mishary_full.mp3'),
+//   abdulbasit: require('@/assets/sounds/adhan_complete/adhan_abdulbasit_full.mp3'),
+//   fajr: require('@/assets/sounds/adhan_complete/adhan_fajr_full.mp3'),
+export const COMPLETE_ADHAN_SOUNDS: Record<string, number> = {
+  makkah: require('@/assets/sounds/adhan_complete/adhan_makkah_full.mp3'),
+  madinah: require('@/assets/sounds/adhan_complete/adhan_madinah_full.mp3'),
+  al_aqsa: require('@/assets/sounds/adhan_complete/adhan_al_aqsa_full.mp3'),
+  mishary: require('@/assets/sounds/adhan_complete/adhan_mishary_full.mp3'),
+  abdulbasit: require('@/assets/sounds/adhan_complete/adhan_abdulbasit_full.mp3'),
+};
+
+const COMPLETE_ADHAN_VOICE_ALIASES: Record<string, string> = {
+  alaqsa: 'al_aqsa',
+  al_aqsa: 'al_aqsa',
+};
+
+const COMPLETE_TO_NOTIFICATION_SOUND_KEY: Record<string, string> = {
+  al_aqsa: 'alaqsa',
+};
+
+// All adhan voice keys that have a bundled CAF file in assets/sounds/adhan_full_ios/.
+// Keys must exactly match the CAF filename suffix: adhan_full_{key}.caf
+// This is the source of truth for iOS full-adhan notification sounds.
+const IOS_FULL_ADHAN_CAF_VOICES = new Set([
+  'makkah', 'madinah', 'alaqsa', 'mishary', 'abdulbasit',
+  'sudais', 'egypt', 'dosari', 'ajman', 'ali_mulla',
+  'naqshbandi', 'sharif', 'mansoor_zahrani', 'haramain',
+]);
+
+/** Normalizes any adhan voice key to a key that has a full-adhan notification
+ * file (CAF on iOS, MP3 on Android). Wider than normalizeCompleteAdhanVoice
+ * which only covers the 5 voices with in-app player recordings. */
+export function normalizeFullAdhanNotificationVoice(voice: string | null | undefined): string {
+  const raw = String(voice || 'makkah').trim();
+  // al_aqsa → alaqsa to match the CAF/MP3 filename suffix
+  const key = raw === 'al_aqsa' ? 'alaqsa' : raw;
+  return IOS_FULL_ADHAN_CAF_VOICES.has(key) ? key : 'makkah';
+}
+
+// Dedicated Fajr adhan. Keep null until `adhan_fajr_full.mp3` is physically
+// added and legally documented, then replace null with the static require().
+export const COMPLETE_FAJR_ADHAN_SOUND: number | null =
+  require('@/assets/sounds/adhan_complete/adhan_fajr_full.mp3');
+
+/**
+ * Resolves a complete-adhan asset for the requested voice. Falls back to
+ * the makkah recording when the requested voice has no complete file
+ * (e.g., user previously picked `sudais` for notifications — sudais has no
+ * complete recording, so we play makkah instead).
+ *
+ * Fajr transcript safety lives in data/adhan-transcript.ts. Until a selected
+ * voice is explicitly marked as containing "الصلاة خير من النوم", the UI shows
+ * the normal transcript even when prayerKey is fajr.
+ *
+ * Returns `null` when no complete recordings are bundled at all (asset PR
+ * has not landed). Callers MUST handle the null case and surface
+ * `t('fullAdhan.loadError')` to the user instead of crashing.
+ */
+export function resolveCompleteAdhanSource(
+  voice: string | undefined,
+  prayerKey?: string,
+): number | null {
+  if (prayerKey === 'fajr' && COMPLETE_FAJR_ADHAN_SOUND != null) {
+    return COMPLETE_FAJR_ADHAN_SOUND;
+  }
+  const normalizedVoice = normalizeCompleteAdhanVoice(voice);
+  if (normalizedVoice && COMPLETE_ADHAN_SOUNDS[normalizedVoice] != null) {
+    return COMPLETE_ADHAN_SOUNDS[normalizedVoice];
+  }
+  if (COMPLETE_ADHAN_SOUNDS.makkah != null) return COMPLETE_ADHAN_SOUNDS.makkah;
+  // No complete recordings bundled yet.
+  return null;
+}
+
+/** Normalizes saved/legacy regular-adhan keys to complete-adhan picker keys. */
+export function normalizeCompleteAdhanVoice(voice: string | null | undefined): string {
+  const cleaned = String(voice || 'makkah').trim();
+  const aliased = COMPLETE_ADHAN_VOICE_ALIASES[cleaned] || cleaned;
+  return COMPLETE_ADHAN_SOUNDS[aliased] != null ? aliased : 'makkah';
+}
+
+/** Maps adhan voice keys to notification/raw sound keys (used by AlarmManager on Android).
+ * Delegates to normalizeFullAdhanNotificationVoice so all 14 voices are supported. */
+export function completeAdhanVoiceToNotificationSoundKey(voice: string | null | undefined): string {
+  return normalizeFullAdhanNotificationVoice(voice);
+}
+
+/** iOS notification-safe full adhan file. Custom notification sounds are
+ * bundled as CAF files capped at 29 seconds; Android keeps using MP3/raw.
+ * Covers all 14 voices with CAF files, not just the 5 in-app player voices. */
+export function completeAdhanVoiceToIosNotificationSoundFile(voice: string | null | undefined): string {
+  return `adhan_full_${normalizeFullAdhanNotificationVoice(voice)}.caf`;
+}
+
+/** Whether this build includes a dedicated complete Fajr recording. */
+export function hasCompleteFajrAdhanSource(): boolean {
+  return COMPLETE_FAJR_ADHAN_SOUND != null;
+}
+
+/** Voice keys that have a complete-adhan recording bundled in this build. */
+export function listCompleteAdhanVoices(): string[] {
+  return Object.keys(COMPLETE_ADHAN_SOUNDS);
+}
+
 export const EFFECT_SOUNDS: Record<string, number> = {
   button_click: require('@/assets/sounds/effects/button_click.mp3'),
   success: require('@/assets/sounds/effects/success.mp3'),

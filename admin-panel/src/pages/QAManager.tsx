@@ -7,6 +7,9 @@ interface QAQuestion {
   id: string;
   question: Record<string, string>;
   answer: Record<string, string>;
+  internalSourceName?: string;
+  internalSourceUrl?: string;
+  internalNotes?: string;
   order: number;
   isVisible: boolean;
   createdAt?: string;
@@ -28,7 +31,20 @@ interface QAContent {
   version?: number;
 }
 
+interface QAAssistantConfig {
+  enabled: boolean;
+  allowedSites: string;
+  dailyLimit: number;
+}
+
 type LangCode = 'ar' | 'en' | 'fr' | 'de' | 'tr' | 'es' | 'ur' | 'id' | 'ms' | 'hi' | 'bn' | 'ru';
+type ImportItem = {
+  question: string;
+  answer: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  notes?: string;
+};
 
 const LANGS: { code: LangCode; name: string; rtl?: boolean }[] = [
   { code: 'ar', name: 'العربية', rtl: true },
@@ -47,6 +63,37 @@ const LANGS: { code: LangCode; name: string; rtl?: boolean }[] = [
 
 const genId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+function parseBulkImport(input: string): ImportItem[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => ({
+        question: String(item.question || '').trim(),
+        answer: String(item.answer || '').trim(),
+        sourceName: item.sourceName ? String(item.sourceName).trim() : undefined,
+        sourceUrl: item.sourceUrl ? String(item.sourceUrl).trim() : undefined,
+        notes: item.notes ? String(item.notes).trim() : undefined,
+      }))
+      .filter((item) => item.question && item.answer);
+  } catch {
+    return trimmed
+      .split(/\n\s*---+\s*\n/g)
+      .map((block) => {
+        const questionMatch = block.match(/(?:^|\n)\s*(?:س|Q)\s*[:：]\s*([\s\S]*?)(?=\n\s*(?:ج|A)\s*[:：]|$)/i);
+        const answerMatch = block.match(/(?:^|\n)\s*(?:ج|A)\s*[:：]\s*([\s\S]*)/i);
+        return {
+          question: (questionMatch?.[1] || '').trim(),
+          answer: (answerMatch?.[1] || '').trim(),
+        };
+      })
+      .filter((item) => item.question && item.answer);
+  }
+}
+
 // ==================== Component ====================
 export default function QAManager() {
   const [data, setData] = useState<QAContent>({ categories: [], version: 0 });
@@ -55,9 +102,15 @@ export default function QAManager() {
   const [activeLang, setActiveLang] = useState<LangCode>('ar');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<{ catId: string; question: QAQuestion } | null>(null);
+  const [importCatId, setImportCatId] = useState<string | null>(null);
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [toast, setToast] = useState('');
+  const [assistantConfig, setAssistantConfig] = useState<QAAssistantConfig>({
+    enabled: true,
+    allowedSites: 'islamweb.net,islamqa.info,binbaz.org.sa,islamic-content.com',
+    dailyLimit: 95,
+  });
 
   // ========== Load ==========
   useEffect(() => {
@@ -66,9 +119,20 @@ export default function QAManager() {
 
   const loadData = async () => {
     try {
-      const snap = await getDoc(doc(db, 'qaContent', 'main'));
+      const [snap, assistantSnap] = await Promise.all([
+        getDoc(doc(db, 'qaContent', 'main')),
+        getDoc(doc(db, 'appConfig', 'qaAssistant')),
+      ]);
       if (snap.exists()) {
         setData(snap.data() as QAContent);
+      }
+      if (assistantSnap.exists()) {
+        const config = assistantSnap.data() as Partial<QAAssistantConfig>;
+        setAssistantConfig({
+          enabled: config.enabled !== false,
+          allowedSites: config.allowedSites || 'islamweb.net,islamqa.info,binbaz.org.sa,islamic-content.com',
+          dailyLimit: Number(config.dailyLimit || 95),
+        });
       }
     } catch (e) {
       console.error('Error loading QA data:', e);
@@ -101,6 +165,20 @@ export default function QAManager() {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   };
+
+  const saveAssistantConfig = useCallback(async (config: QAAssistantConfig) => {
+    setAssistantConfig(config);
+    try {
+      await setDoc(doc(db, 'appConfig', 'qaAssistant'), {
+        ...config,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      showToast('تم حفظ إعدادات الرد الذكي ✅');
+    } catch (e) {
+      console.error('Error saving QA assistant config:', e);
+      showToast('تعذر حفظ إعدادات الرد الذكي ❌');
+    }
+  }, []);
 
   // ========== Category CRUD ==========
   const addCategory = () => {
@@ -198,6 +276,35 @@ export default function QAManager() {
     setEditingQuestion(null);
   };
 
+  const importQuestions = (catId: string, items: ImportItem[]) => {
+    const updated = {
+      ...data,
+      categories: data.categories.map(c => {
+        if (c.id !== catId) return c;
+
+        const startOrder = c.questions.length;
+        const questions: QAQuestion[] = items.map((item, idx) => ({
+          id: genId(),
+          question: { ar: item.question },
+          answer: { ar: item.answer },
+          internalSourceName: item.sourceName,
+          internalSourceUrl: item.sourceUrl,
+          internalNotes: item.notes,
+          order: startOrder + idx,
+          isVisible: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+
+        return { ...c, questions: [...c.questions, ...questions] };
+      }),
+    };
+
+    setData(updated);
+    saveData(updated);
+    setImportCatId(null);
+  };
+
   const toggleQuestionVisibility = (catId: string, qId: string) => {
     const updated = {
       ...data,
@@ -269,6 +376,54 @@ export default function QAManager() {
             {l.name}
           </button>
         ))}
+      </div>
+
+      {/* Smart Answer Settings */}
+      <div className="bg-admin-surface rounded-xl p-4 mb-6 border border-admin-border/50">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">الرد الذكي الفوري</h2>
+            <p className="text-sm text-admin-muted mt-1">
+              يرد على سؤال المستخدم مباشرة من نتائج بحث موثوقة مع إظهار المصادر داخل التطبيق.
+            </p>
+          </div>
+          <button
+            onClick={() => saveAssistantConfig({ ...assistantConfig, enabled: !assistantConfig.enabled })}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              assistantConfig.enabled
+                ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                : 'bg-admin-bg text-admin-muted hover:text-white'
+            }`}
+          >
+            {assistantConfig.enabled ? 'مفعل' : 'متوقف'}
+          </button>
+        </div>
+        <label className="text-sm text-admin-muted mb-1.5 block">المواقع المسموح البحث فيها</label>
+        <input
+          value={assistantConfig.allowedSites}
+          onChange={e => setAssistantConfig({ ...assistantConfig, allowedSites: e.target.value })}
+          onBlur={() => saveAssistantConfig(assistantConfig)}
+          className="w-full bg-admin-bg rounded-lg px-4 py-2.5 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none"
+          dir="ltr"
+          placeholder="islamweb.net,islamqa.info,binbaz.org.sa"
+        />
+        <p className="text-xs text-admin-muted mt-2">
+          مفاتيح Google Programmable Search تُحفظ على السيرفر فقط، وهذه القائمة تتحكم في نطاق البحث.
+        </p>
+        <label className="text-sm text-admin-muted mt-4 mb-1.5 block">الحد اليومي للردود الفورية</label>
+        <input
+          type="number"
+          min={1}
+          max={100}
+          value={assistantConfig.dailyLimit}
+          onChange={e => setAssistantConfig({ ...assistantConfig, dailyLimit: Number(e.target.value || 95) })}
+          onBlur={() => saveAssistantConfig(assistantConfig)}
+          className="w-40 bg-admin-bg rounded-lg px-4 py-2.5 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none"
+          dir="ltr"
+        />
+        <p className="text-xs text-admin-muted mt-2">
+          يفضل تركه أقل من 100 لأن Google Programmable Search يعطي 100 عملية بحث مجانية يوميًا.
+        </p>
       </div>
 
       {/* Add Category */}
@@ -402,6 +557,12 @@ export default function QAManager() {
                 >
                   + إضافة سؤال جديد
                 </button>
+                <button
+                  onClick={() => setImportCatId(cat.id)}
+                  className="w-full py-2.5 border-2 border-dashed border-blue-500/30 hover:border-blue-500/60 rounded-lg text-sm text-admin-muted hover:text-blue-300 transition-colors"
+                >
+                  استيراد أسئلة دفعة واحدة
+                </button>
               </div>
             )}
           </div>
@@ -423,6 +584,14 @@ export default function QAManager() {
           activeLang={activeLang}
           onSave={saveQuestion}
           onClose={() => setEditingQuestion(null)}
+        />
+      )}
+
+      {/* Bulk Import Modal */}
+      {importCatId && (
+        <BulkImportModal
+          onImport={(items) => importQuestions(importCatId, items)}
+          onClose={() => setImportCatId(null)}
         />
       )}
 
@@ -507,6 +676,43 @@ function QuestionEditModal({
           />
         </div>
 
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-sm text-admin-muted mb-1.5 block">اسم المصدر الداخلي</label>
+            <input
+              value={q.internalSourceName || ''}
+              onChange={e => setQ({ ...q, internalSourceName: e.target.value })}
+              className="w-full bg-admin-bg rounded-lg px-4 py-3 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none"
+              dir="rtl"
+              placeholder="مثال: مراجعة داخلية / مصدر مرخص"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-admin-muted mb-1.5 block">رابط المصدر الداخلي</label>
+            <input
+              value={q.internalSourceUrl || ''}
+              onChange={e => setQ({ ...q, internalSourceUrl: e.target.value })}
+              className="w-full bg-admin-bg rounded-lg px-4 py-3 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none"
+              dir="ltr"
+              placeholder="https://..."
+            />
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <label className="text-sm text-admin-muted mb-1.5 block">ملاحظات داخلية لا تظهر في التطبيق</label>
+          <textarea
+            value={q.internalNotes || ''}
+            onChange={e => setQ({ ...q, internalNotes: e.target.value })}
+            className="w-full bg-admin-bg rounded-lg px-4 py-3 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none resize-none h-20"
+            dir="rtl"
+            placeholder="أي ملاحظات للمراجعة الشرعية أو حقوق النشر..."
+          />
+          <p className="text-xs text-admin-muted mt-2">
+            هذه البيانات محفوظة للإدارة فقط ولا تُعرض في شاشة سؤال وجواب داخل التطبيق.
+          </p>
+        </div>
+
         {/* Actions */}
         <div className="flex gap-3 justify-end">
           <button
@@ -521,6 +727,70 @@ function QuestionEditModal({
             className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors"
           >
             حفظ السؤال
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkImportModal({
+  onImport,
+  onClose,
+}: {
+  onImport: (items: ImportItem[]) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+
+  const handleImport = () => {
+    const items = parseBulkImport(value);
+    if (items.length === 0) {
+      setError('لم يتم العثور على أسئلة صالحة. استخدم JSON أو صيغة س:/ج: مع فاصل --- بين الأسئلة.');
+      return;
+    }
+    onImport(items);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-admin-surface rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
+        dir="rtl"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold text-white mb-2">استيراد أسئلة دفعة واحدة</h3>
+        <p className="text-sm text-admin-muted mb-4">
+          الصق JSON مثل [{"{"}"question":"...","answer":"...","sourceUrl":"..."{"}"}] أو استخدم الصيغة النصية: س: السؤال ثم ج: الجواب، وافصل بين كل سؤال وآخر بـ ---.
+        </p>
+
+        <textarea
+          value={value}
+          onChange={e => {
+            setValue(e.target.value);
+            setError('');
+          }}
+          className="w-full bg-admin-bg rounded-lg px-4 py-3 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none resize-none h-80"
+          dir="rtl"
+          placeholder={`س: ما حكم ...؟\nج: الجواب المختصر...\n---\nس: سؤال آخر؟\nج: جواب آخر...`}
+        />
+
+        {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+
+        <div className="flex gap-3 justify-end mt-6">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 bg-admin-bg text-admin-muted hover:text-white rounded-lg text-sm transition-colors"
+          >
+            إلغاء
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={!value.trim()}
+            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            استيراد
           </button>
         </div>
       </div>

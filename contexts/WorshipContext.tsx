@@ -314,7 +314,7 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   }, [refreshTodayRecords]);
 
   const refreshStats = useCallback(async () => {
-    const newStats = await getWorshipStats();
+    const newStats = await updateAllStats();
     setStats(newStats);
   }, []);
 
@@ -490,6 +490,10 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
       ...updates,
       date: today,
     };
+    if (updates.pagesRead !== undefined) {
+      const pagesRead = Number(updates.pagesRead) || 0;
+      newRecord.pagesRead = Math.max(0, Math.min(604, pagesRead));
+    }
     
     await saveQuranRecord(newRecord);
     setTodayQuran(newRecord);

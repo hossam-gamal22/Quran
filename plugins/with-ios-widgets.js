@@ -41,6 +41,7 @@ function copyDirectorySync(src, dest) {
 const WIDGET_SWIFT_FILES = [
   'WidgetBundle.swift',
   'RoohWidgets.swift',
+  'GeneratedWidgetEnums.swift',
   'PrayerLiveActivity.swift',
   'AppIntents.swift',
   'ControlWidgets.swift',

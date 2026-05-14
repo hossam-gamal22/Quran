@@ -562,7 +562,9 @@ export const addQuranPages = async (date: string, pages: number): Promise<void> 
       record = { date, pagesRead: 0 };
     }
     
-    record.pagesRead += pages;
+    const currentPages = Number(record.pagesRead) || 0;
+    const nextPages = currentPages + (Number(pages) || 0);
+    record.pagesRead = Math.max(0, Math.min(604, nextPages));
     await saveQuranRecord(record);
   } catch (error) {
     console.error('Error adding quran pages:', error);
@@ -1096,12 +1098,20 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
     }
   } catch {}
 
-  // 5. Azkar — sum zikrCount for the month
+  // 5. Azkar — prefer per-zikr completions, fall back to manual checklist marks
   try {
     const azkarRecords = await getAllAzkarRecords();
     for (const [date, record] of Object.entries(azkarRecords)) {
       if (date.startsWith(monthPrefix) && record && typeof record === 'object') {
-        stats.azkar += (record as any).zikrCount || 0;
+        const completedTypes = [
+          record.morning,
+          record.evening,
+          record.sleep,
+          record.wakeup,
+          record.afterPrayer,
+        ].filter(Boolean).length;
+        const zikrCount = Number((record as any).zikrCount) || 0;
+        stats.azkar += zikrCount > 0 ? zikrCount : completedTypes;
       }
     }
   } catch {}

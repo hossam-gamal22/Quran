@@ -96,6 +96,7 @@ const SCREEN_LABELS: Record<string, string> = {
   daily_dua: 'دعاء اليوم',
   story_of_day: 'قصة اليوم',
   quote_of_day: 'حكمة اليوم',
+  question_answer: 'سؤال وجواب',
 };
 
 const DEFAULT_SETTINGS: AdsSettings = {
@@ -142,6 +143,7 @@ const DEFAULT_SETTINGS: AdsSettings = {
     daily_dua: true,
     story_of_day: true,
     quote_of_day: true,
+    question_answer: true,
   },
   interstitialScreens: {},
   interstitialMode: 'pages',
@@ -174,7 +176,11 @@ export default function Ads() {
         const data = docSnap.data();
         // Migrate old format to new format
         const migrated = migrateSettings(data);
-        setSettings({ ...DEFAULT_SETTINGS, ...migrated } as AdsSettings);
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...migrated,
+          bannerScreens: { ...DEFAULT_SETTINGS.bannerScreens, ...(migrated.bannerScreens || {}) },
+        } as AdsSettings);
       }
     } catch (error) {
       console.error('Error loading ads settings:', error);

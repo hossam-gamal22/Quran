@@ -1,45 +1,55 @@
 // lib/android-widget-task-handler.tsx
 // Task handler for react-native-android-widget
-// On WIDGET_ADDED: generates fresh data immediately so widgets never show empty state
-// On WIDGET_UPDATE: reads cached data from AsyncStorage, falls back to fresh generation
+// If a widget is added before the user has ever launched the app, show an
+// explicit "open the app first" state. After first launch, WIDGET_ADDED /
+// WIDGET_UPDATE read cached data and fall back to fresh generation when needed.
 
 import React from 'react';
+import { Appearance } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SharedWidgetData } from './widget-data';
 
-import { RoohSmallWidget } from '@/components/widgets/android/RoohSmallWidget';
-import { RoohMediumWidget } from '@/components/widgets/android/RoohMediumWidget';
-import { RoohLargeWidget } from '@/components/widgets/android/RoohLargeWidget';
-import { PrayerTimesSmallWidget } from '@/components/widgets/android/PrayerTimesSmallWidget';
-import { PrayerTimesMediumWidget } from '@/components/widgets/android/PrayerTimesMediumWidget';
-import { PrayerTimesLargeWidget } from '@/components/widgets/android/PrayerTimesLargeWidget';
-import { DailyVerseSmallWidget } from '@/components/widgets/android/DailyVerseSmallWidget';
-import { DailyVerseMediumWidget } from '@/components/widgets/android/DailyVerseMediumWidget';
-import { DailyDhikrSmallWidget } from '@/components/widgets/android/DailyDhikrSmallWidget';
-import { DailyDhikrMediumWidget } from '@/components/widgets/android/DailyDhikrMediumWidget';
-import { AzkarProgressSmallWidget } from '@/components/widgets/android/AzkarProgressSmallWidget';
-import { AzkarProgressMediumWidget } from '@/components/widgets/android/AzkarProgressMediumWidget';
-import { HijriDateSmallWidget } from '@/components/widgets/android/HijriDateSmallWidget';
-import { HijriDateMediumWidget } from '@/components/widgets/android/HijriDateMediumWidget';
+import {
+  SnapshotWidget,
+  snapshotFilePath,
+  snapshotFilePathForKey,
+  snapshotRouteKeyForPlacement,
+  type AndroidSize,
+} from '@/components/widgets/android/SnapshotWidget';
 import { LockedWidget } from '@/components/widgets/android/LockedWidget';
+import { AppNotOpenedWidget } from '@/components/widgets/android/AppNotOpenedWidget';
 
 const WIDGET_DATA_KEY = 'widget_shared_data';
 const SUBSCRIPTION_STATE_KEY = '@subscription_state';
+export const APP_OPENED_ONCE_KEY = '@rooh_app_opened_once';
+/** Set to "true" when WIDGET_ADDED fires. SnapshotPumpController reads &
+ *  clears this on the next foreground pass to force a re-pump. */
+const PUMP_PENDING_KEY = '@widget_pump_pending';
 
-// Widgets available to all users (free tier), matching app/widget.tsx gallery.
-// Free: Prayer Times (includes Next Prayer) + Hijri Date.
-// Premium: Daily Verse, Daily Dhikr, Azkar Progress.
-const FREE_WIDGET_NAMES = [
-  'RoohSmall',
-  'RoohMedium',
-  'RoohLarge',
-  'PrayerTimesSmall',
-  'PrayerTimesMedium',
-  'PrayerTimesLarge',
-  'HijriDateSmall',
-  'HijriDateMedium',
-];
+// Widget provider names permitted without premium on WIDGET_ADDED. Derived from
+// LEGACY_ANDROID_WIDGET_MAP + premiumRequiredForSize so it matches gallery/iOS gating.
+import {
+  androidWidgetProviderNames,
+  androidWidgetProviderTarget,
+  getDefinition,
+  isAndroidLockWidgetProvider,
+  premiumRequiredForSize,
+} from './widgets/registry';
+import { resolveWidgetTheme } from './widgets/snapshot';
+
+const FREE_WIDGET_NAMES = (() => {
+  const free = new Set<string>();
+  for (const legacyName of androidWidgetProviderNames()) {
+    const mapped = androidWidgetProviderTarget(legacyName);
+    if (!mapped) continue;
+    const def = getDefinition(mapped.id);
+    if (!def) continue;
+    if (!premiumRequiredForSize(def, mapped.size)) free.add(legacyName);
+  }
+  return Array.from(free);
+})();
 
 async function isUserPremium(): Promise<boolean> {
   try {
@@ -63,6 +73,19 @@ async function loadWidgetData(): Promise<SharedWidgetData | null> {
     // ignore
   }
   return null;
+}
+
+async function hasAppEverOpened(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(APP_OPENED_ONCE_KEY);
+    if (value === 'true') return true;
+    // Older builds wrote this after first user registration. Treat either value
+    // as proof that the full app has run at least once.
+    const legacyFirstOpen = await AsyncStorage.getItem('@rooh_first_open');
+    return legacyFirstOpen !== null;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -105,6 +128,13 @@ function generateFallbackData(): SharedWidgetData {
       nextPrayerName: 'Fajr',
       nextPrayerNameAr: 'الفجر',
       nextPrayerTime: 'افتح التطبيق',
+      nextPrayerAtEpochMs: now.getTime() + 60 * 60 * 1000,
+      previousPrayerName: 'Isha',
+      previousPrayerNameAr: 'العشاء',
+      previousPrayerAtEpochMs: now.getTime() - 60 * 60 * 1000,
+      calculationLocation: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      prayerDataUpdatedAt: timestamp,
       timeRemaining: '...',
       timeRemainingMinutes: 0,
       timeRemainingLabel: 'الوقت المتبقي',
@@ -172,22 +202,93 @@ function generateFallbackData(): SharedWidgetData {
   };
 }
 
-const WIDGET_MAP: Record<string, React.FC<{ data: SharedWidgetData }>> = {
-  RoohSmall: RoohSmallWidget,
-  RoohMedium: RoohMediumWidget,
-  RoohLarge: RoohLargeWidget,
-  PrayerTimesSmall: PrayerTimesSmallWidget,
-  PrayerTimesMedium: PrayerTimesMediumWidget,
-  PrayerTimesLarge: PrayerTimesLargeWidget,
-  DailyVerseSmall: DailyVerseSmallWidget,
-  DailyVerseMedium: DailyVerseMediumWidget,
-  DailyDhikrSmall: DailyDhikrSmallWidget,
-  DailyDhikrMedium: DailyDhikrMediumWidget,
-  AzkarProgressSmall: AzkarProgressSmallWidget,
-  AzkarProgressMedium: AzkarProgressMediumWidget,
-  HijriDateSmall: HijriDateSmallWidget,
-  HijriDateMedium: HijriDateMediumWidget,
-};
+/**
+ * Resolve the (id, size) registry tuple for a placed widget by its provider
+ * name. All shipped legacy providers are listed in `LEGACY_ANDROID_WIDGET_MAP`.
+ * Returns null for unknown providers (which the caller treats as a no-op so we
+ * don't render an inert widget).
+ */
+function resolveTarget(widgetName: string): { id: string; size: AndroidSize } | null {
+  const t = androidWidgetProviderTarget(widgetName);
+  if (!t) return null;
+  return { id: t.id, size: t.size as AndroidSize };
+}
+
+function widgetDeepLink(widgetId: string): string {
+  switch (widgetId) {
+    case 'prayerSingle':
+    case 'prayerTable':
+    case 'prayerNextPrevious':
+      return 'rooh-almuslim://prayer';
+    case 'verseOfDay':
+      return 'rooh-almuslim://daily-ayah';
+    case 'azkarMorning':
+      return 'rooh-almuslim://azkar/morning';
+    case 'azkarEvening':
+    case 'dailyDhikr':
+      return 'rooh-almuslim://azkar';
+    case 'hijriDate':
+    case 'daySimple':
+    case 'dayThuluth':
+    case 'dayDigital':
+    case 'monthSimple':
+    case 'monthThuluth':
+      return 'rooh-almuslim://hijri';
+    default:
+      return 'rooh-almuslim://widget';
+  }
+}
+
+/**
+ * Render a SnapshotWidget for a placement. Resolves the active theme from the
+ * shared widget data, checks whether the corresponding `<id>_<size>_<theme>.png`
+ * exists on disk, and passes both signals to SnapshotWidget so it can pick the
+ * correct branch (real PNG vs branded loading card). Never layers a fallback
+ * underneath the transparent foreground PNG.
+ */
+async function renderSnapshotWidget(
+  widgetName: string,
+  data: SharedWidgetData,
+  renderWidget: (jsx: React.ReactElement) => void,
+): Promise<void> {
+  const target = resolveTarget(widgetName);
+  if (!target) return;
+  const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
+  const routeKey = snapshotRouteKeyForPlacement(target.id, target.size, theme);
+  const manifestEntry = data.snapshotManifest?.[routeKey];
+  const snapshotKey = manifestEntry?.key ?? routeKey;
+  const path = manifestEntry?.path ?? (manifestEntry?.key
+    ? snapshotFilePathForKey(manifestEntry.key)
+    : snapshotFilePath(target.id, target.size, theme));
+  let hasSnapshot = false;
+  let fallbackReason: string | undefined;
+  try {
+    const info = await FileSystem.getInfoAsync(path);
+    hasSnapshot = info.exists;
+    if (!hasSnapshot) fallbackReason = 'png_missing';
+  } catch (e) {
+    fallbackReason = `stat_failed:${(e as Error)?.message ?? 'unknown'}`;
+  }
+  if (__DEV__) {
+    const action = hasSnapshot ? 'loaded' : 'fallback';
+    console.log(`[widget/android] ${action} snapshot route=${routeKey} key=${snapshotKey} path=${path}${fallbackReason ? ` reason=${fallbackReason}` : ''}`);
+  }
+  const missingKey = hasSnapshot ? undefined : snapshotKey;
+  renderWidget(
+    <SnapshotWidget
+      widgetId={target.id}
+      size={target.size}
+      data={data}
+      hasSnapshot={hasSnapshot}
+      missingKey={missingKey}
+      snapshotKey={snapshotKey}
+      snapshotPath={path}
+      fallbackReason={fallbackReason}
+      clickAction="OPEN_URI"
+      clickUri={widgetDeepLink(target.id)}
+    />,
+  );
+}
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   const { widgetInfo, widgetAction, renderWidget } = props;
@@ -196,7 +297,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   switch (widgetAction) {
     case 'WIDGET_ADDED': {
       // Premium gate: non-free widgets require premium subscription
-      if (!FREE_WIDGET_NAMES.includes(widgetName)) {
+      if (!isAndroidLockWidgetProvider(widgetName) && !FREE_WIDGET_NAMES.includes(widgetName)) {
         const premium = await isUserPremium();
         if (!premium) {
           renderWidget(<LockedWidget widgetName={widgetName} />);
@@ -204,8 +305,22 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         }
       }
 
-      // Widget just added — try to generate fresh data immediately
+      // Flag the foreground pump to force-render on next launch even if the
+      // hash matches. The headless task handler can't mount SnapshotHost, so
+      // the snapshot PNGs are generated by the in-app pump.
+      try { await AsyncStorage.setItem(PUMP_PENDING_KEY, 'true'); } catch {}
+
+      const appOpened = await hasAppEverOpened();
+
+      // Widget just added — try to generate fresh data immediately only after
+      // the app has launched once. Before that, show instructions instead of
+      // silently writing generic Makkah/sample data.
       let data = await loadWidgetData();
+
+      if (!data && !appOpened) {
+        renderWidget(<AppNotOpenedWidget />);
+        return;
+      }
 
       if (!data) {
         // Try full sync first
@@ -227,17 +342,14 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         } catch {}
       }
 
-      const WidgetComponent = WIDGET_MAP[widgetName];
-      if (WidgetComponent) {
-        renderWidget(<WidgetComponent data={data} />);
-      }
+      await renderSnapshotWidget(widgetName, data, renderWidget);
       return;
     }
 
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
       // Premium gate: non-free widgets require premium subscription
-      if (!FREE_WIDGET_NAMES.includes(widgetName)) {
+      if (!isAndroidLockWidgetProvider(widgetName) && !FREE_WIDGET_NAMES.includes(widgetName)) {
         const premium = await isUserPremium();
         if (!premium) {
           renderWidget(<LockedWidget widgetName={widgetName} />);
@@ -246,6 +358,12 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       }
 
       let data = await loadWidgetData();
+      const appOpened = await hasAppEverOpened();
+
+      if (!data && !appOpened) {
+        renderWidget(<AppNotOpenedWidget />);
+        return;
+      }
 
       // If no cached data, try sync then fallback
       if (!data) {
@@ -263,10 +381,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         } catch {}
       }
 
-      const WidgetComponent = WIDGET_MAP[widgetName];
-      if (WidgetComponent) {
-        renderWidget(<WidgetComponent data={data} />);
-      }
+      await renderSnapshotWidget(widgetName, data, renderWidget);
       return;
     }
 

@@ -3,6 +3,29 @@ import { AuthContext } from './auth-context';
 
 const SESSION_KEY = 'rooh_admin_session';
 const VERIFY_URL = '/api/verify-admin';
+const LOCAL_DEV_SESSION_PREFIX = 'local-dev-session:';
+
+function isLocalDevAuthEnabled(): boolean {
+  return Boolean(
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    ['127.0.0.1', 'localhost'].includes(window.location.hostname)
+  );
+}
+
+function issueLocalDevSession(): string {
+  return `${LOCAL_DEV_SESSION_PREFIX}${Date.now()}`;
+}
+
+function isLocalDevSession(session: string | null): boolean {
+  return Boolean(isLocalDevAuthEnabled() && session?.startsWith(LOCAL_DEV_SESSION_PREFIX));
+}
+
+async function verifyLocalDevPassword(passwordHash: string): Promise<boolean> {
+  const expected = ((import.meta.env.VITE_LOCAL_ADMIN_PASSWORD_HASH as string | undefined) || '').trim().toLowerCase();
+  if (!expected) return true;
+  return expected === passwordHash;
+}
 
 async function hashPassword(password: string): Promise<string> {
   const encoded = new TextEncoder().encode(password);
@@ -45,6 +68,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
       return;
     }
+    if (isLocalDevSession(session)) {
+      setAuthenticated(true);
+      setLoading(false);
+      return;
+    }
     callVerifyAdmin({ mode: 'validate', sessionToken: session })
       .then(({ ok, data }) => {
         if (ok && data?.valid) {
@@ -66,10 +94,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       result = await callVerifyAdmin({ mode: 'login', passwordHash });
     } catch {
+      if (isLocalDevAuthEnabled() && await verifyLocalDevPassword(passwordHash)) {
+        localStorage.setItem(SESSION_KEY, issueLocalDevSession());
+        setAuthenticated(true);
+        return;
+      }
       throw new Error('network-error');
     }
     if (result.ok && result.data?.sessionToken) {
       localStorage.setItem(SESSION_KEY, result.data.sessionToken);
+      setAuthenticated(true);
+      return;
+    }
+    if (result.status === 404 && isLocalDevAuthEnabled() && await verifyLocalDevPassword(passwordHash)) {
+      localStorage.setItem(SESSION_KEY, issueLocalDevSession());
       setAuthenticated(true);
       return;
     }

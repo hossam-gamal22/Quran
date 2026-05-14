@@ -105,7 +105,7 @@ struct RitualPrayerPair: View {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(time)
-                        .font(.custom("WidgetFont", size: 32))
+                        .font(.custom("DecoTypeThuluth2", size: 32))
                         .foregroundColor(.white)
                     Text(countdown)
                         .font(.custom("Rubik-Regular", size: 13))
@@ -121,7 +121,7 @@ struct RitualPrayerPair: View {
                 }
                 Spacer()
                 Text(displayName)
-                    .font(.custom("WidgetFont", size: 26))
+                    .font(.custom("DecoTypeThuluth2", size: 26))
                     .foregroundColor(.white)
                     .tracking(isArabic ? 0 : 4)
                     .lineLimit(1)
@@ -150,7 +150,7 @@ struct RitualPrayerTable: View {
                 ForEach(items) { p in
                     VStack(spacing: 4) {
                         Text(isArabic ? p.nameAr : ritualLabel(p.nameAr, isArabic: false))
-                            .font(.custom("WidgetFont", size: 13))
+                            .font(.custom("DecoTypeThuluth2", size: 13))
                             .foregroundColor(p.isPassed ? .white.opacity(0.5) : .white)
                         Text(p.time)
                             .font(.custom("Rubik-Medium", size: 14))
@@ -193,11 +193,11 @@ struct RitualPrayerBanner: View {
         GlassCard {
             VStack(spacing: 6) {
                 Text(item.map { isArabic ? $0.nameAr : ritualLabel($0.nameAr, isArabic: false) } ?? "—")
-                    .font(.custom("WidgetFont", size: 13))
+                    .font(.custom("DecoTypeThuluth2", size: 13))
                     .foregroundColor(.white.opacity(0.7))
                     .tracking(isArabic ? 0 : 2)
                 Text(item?.time ?? "--:--")
-                    .font(.custom("WidgetFont", size: 30))
+                    .font(.custom("DecoTypeThuluth2", size: 30))
                     .foregroundColor(.white)
             }
             .padding(.vertical, 18)
@@ -222,13 +222,13 @@ struct RitualPrayerCompact: View {
         GlassCard {
             VStack(spacing: 4) {
                 Text(name)
-                    .font(.custom("WidgetFont", size: 16))
+                    .font(.custom("DecoTypeThuluth2", size: 16))
                     .foregroundColor(.white)
                     .tracking(isArabic ? 0 : 2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(time)
-                    .font(.custom("WidgetFont", size: 30))
+                    .font(.custom("DecoTypeThuluth2", size: 30))
                     .foregroundColor(.white)
                 Text(countdown)
                     .font(.custom("Rubik-Regular", size: 12))
@@ -255,10 +255,10 @@ struct RitualPrayerSimple: View {
         GlassCard {
             VStack(spacing: 4) {
                 Text(time)
-                    .font(.custom("WidgetFont", size: 26))
+                    .font(.custom("DecoTypeThuluth2", size: 26))
                     .foregroundColor(.white)
                 Text(name)
-                    .font(.custom("WidgetFont", size: 22))
+                    .font(.custom("DecoTypeThuluth2", size: 22))
                     .foregroundColor(.white)
                     .tracking(isArabic ? 0 : 3)
                     .lineLimit(1)
@@ -302,10 +302,10 @@ struct RitualPrayerSerene: View {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(nextLabel)
-                            .font(.custom("WidgetFont", size: 14))
+                            .font(.custom("DecoTypeThuluth2", size: 14))
                             .foregroundColor(.white)
                         Text(nextTime)
-                            .font(.custom("WidgetFont", size: 30))
+                            .font(.custom("DecoTypeThuluth2", size: 30))
                             .foregroundColor(.white)
                         Text(nextHeadline)
                             .font(.custom("Rubik-Regular", size: 11))
@@ -330,11 +330,11 @@ struct RitualPrayerSerene: View {
                                     .font(.system(size: 12))
                                     .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white)
                                 Text(isArabic ? p.nameAr : ritualLabel(p.nameAr, isArabic: false))
-                                    .font(.custom("WidgetFont", size: 14))
+                                    .font(.custom("DecoTypeThuluth2", size: 14))
                                     .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white)
                                 if !isArabic {
                                     Text(p.nameAr)
-                                        .font(.custom("WidgetFont", size: 11))
+                                        .font(.custom("DecoTypeThuluth2", size: 11))
                                         .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white.opacity(0.7))
                                 }
                             }

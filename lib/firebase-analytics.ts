@@ -136,7 +136,7 @@ export const initializeGlobalStats = async (): Promise<void> => {
 
     console.log('✅ Global stats initialized');
   } catch (error) {
-    console.error('❌ Error initializing global stats:', error);
+    console.warn('⚠️ Error initializing global stats:', error);
   }
 };
 

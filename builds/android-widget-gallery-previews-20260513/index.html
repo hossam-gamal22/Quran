@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Android Widget Gallery Previews</title>
+<style>
+  :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif; background: #f5f2eb; color: #211c16; }
+  body { margin: 0; padding: 28px; }
+  header { direction: rtl; max-width: 1180px; margin: 0 auto 20px; }
+  h1 { margin: 0 0 6px; font-size: 28px; font-weight: 750; }
+  p { margin: 0; color: #6f6659; }
+  h2 { max-width: 1180px; margin: 28px auto 14px; font-size: 18px; display: flex; gap: 10px; align-items: baseline; }
+  h2 small { color: #7f7465; font-weight: 500; }
+  .grid { direction: ltr; max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: #fffaf1; border: 1px solid #ddd4c6; border-radius: 8px; padding: 12px; display: grid; gap: 10px; box-shadow: 0 1px 1px rgba(31, 25, 15, .04); }
+  .frame { min-height: 174px; display: grid; place-items: center; background: #ece3d5; border: 1px solid #d6c9b8; border-radius: 6px; padding: 14px; }
+  .frame img { max-width: 100%; height: auto; image-rendering: auto; filter: drop-shadow(0 8px 18px rgba(35, 28, 16, .14)); }
+  .meta { direction: rtl; display: grid; gap: 5px; }
+  strong { font-size: 15px; }
+  code { direction: ltr; unicode-bidi: plaintext; font-size: 12px; color: #70675b; overflow-wrap: anywhere; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badges span { direction: ltr; border: 1px solid #d5c7b5; background: #f8efe3; border-radius: 999px; padding: 3px 8px; font-size: 11px; color: #554b3e; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>صور ودجات أندرويد</h1>
+    <p>مستخرجة من previewImage في appwidget-provider XML. صور Premium مرسومة بعلامة القفل كما تظهر في layer-list.</p>
+  </header>
+  <h2>ودجات الشاشة الرئيسية <small>26</small></h2><main class="grid">
+        <article class="card">
+          <div class="frame"><img src="images/01_home_RoohDaySimpleSmall.png" alt="اليوم"></div>
+          <div class="meta">
+            <strong dir="rtl">اليوم</strong>
+            <code>RoohDaySimpleSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/02_home_RoohDaySimpleMedium.png" alt="اليوم"></div>
+          <div class="meta">
+            <strong dir="rtl">اليوم</strong>
+            <code>RoohDaySimpleMedium</code>
+            <div class="badges"><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/03_home_RoohDayThuluthSmall.png" alt="اليوم - ثلث"></div>
+          <div class="meta">
+            <strong dir="rtl">اليوم - ثلث</strong>
+            <code>RoohDayThuluthSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/04_home_RoohDayThuluthMedium.png" alt="اليوم - ثلث"></div>
+          <div class="meta">
+            <strong dir="rtl">اليوم - ثلث</strong>
+            <code>RoohDayThuluthMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/05_home_RoohDayDigitalSmall.png" alt="اليوم - رقمي"></div>
+          <div class="meta">
+            <strong dir="rtl">اليوم - رقمي</strong>
+            <code>RoohDayDigitalSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/06_home_RoohMonthSimpleSmall.png" alt="الشهر"></div>
+          <div class="meta">
+            <strong dir="rtl">الشهر</strong>
+            <code>RoohMonthSimpleSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/07_home_RoohMonthThuluthMedium.png" alt="الشهر - ثلث"></div>
+          <div class="meta">
+            <strong dir="rtl">الشهر - ثلث</strong>
+            <code>RoohMonthThuluthMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/08_home_RoohPrayerSingleSmall.png" alt="الصلاة القادمة"></div>
+          <div class="meta">
+            <strong dir="rtl">الصلاة القادمة</strong>
+            <code>RoohPrayerSingleSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/09_home_RoohPrayerTableSmall.png" alt="جدول الصلاة"></div>
+          <div class="meta">
+            <strong dir="rtl">جدول الصلاة</strong>
+            <code>RoohPrayerTableSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/10_home_RoohPrayerTableMedium.png" alt="جدول الصلاة"></div>
+          <div class="meta">
+            <strong dir="rtl">جدول الصلاة</strong>
+            <code>RoohPrayerTableMedium</code>
+            <div class="badges"><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/11_home_RoohPrayerTableLarge.png" alt="جدول الصلاة"></div>
+          <div class="meta">
+            <strong dir="rtl">جدول الصلاة</strong>
+            <code>RoohPrayerTableLarge</code>
+            <div class="badges"><span>250dp × 250dp</span><span>329×345 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/12_home_RoohPrayerNextPreviousMedium.png" alt="الصلاة السابقة والقادمة"></div>
+          <div class="meta">
+            <strong dir="rtl">الصلاة السابقة والقادمة</strong>
+            <code>RoohPrayerNextPreviousMedium</code>
+            <div class="badges"><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/13_home_RoohVerseOfDaySmall.png" alt="آية اليوم"></div>
+          <div class="meta">
+            <strong dir="rtl">آية اليوم</strong>
+            <code>RoohVerseOfDaySmall</code>
+            <div class="badges"><span>Premium</span><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/14_home_RoohVerseOfDayMedium.png" alt="آية اليوم"></div>
+          <div class="meta">
+            <strong dir="rtl">آية اليوم</strong>
+            <code>RoohVerseOfDayMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/15_home_RoohVerseOfDayLarge.png" alt="آية اليوم"></div>
+          <div class="meta">
+            <strong dir="rtl">آية اليوم</strong>
+            <code>RoohVerseOfDayLarge</code>
+            <div class="badges"><span>Premium</span><span>250dp × 250dp</span><span>329×345 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/16_home_RoohAzkarMorningSmall.png" alt="أذكار الصباح"></div>
+          <div class="meta">
+            <strong dir="rtl">أذكار الصباح</strong>
+            <code>RoohAzkarMorningSmall</code>
+            <div class="badges"><span>Premium</span><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/17_home_RoohAzkarMorningMedium.png" alt="أذكار الصباح"></div>
+          <div class="meta">
+            <strong dir="rtl">أذكار الصباح</strong>
+            <code>RoohAzkarMorningMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/18_home_RoohAzkarEveningSmall.png" alt="أذكار المساء"></div>
+          <div class="meta">
+            <strong dir="rtl">أذكار المساء</strong>
+            <code>RoohAzkarEveningSmall</code>
+            <div class="badges"><span>Premium</span><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/19_home_RoohAzkarEveningMedium.png" alt="أذكار المساء"></div>
+          <div class="meta">
+            <strong dir="rtl">أذكار المساء</strong>
+            <code>RoohAzkarEveningMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/20_home_RoohDailyDhikrSmall.png" alt="الذكر اليومي"></div>
+          <div class="meta">
+            <strong dir="rtl">الذكر اليومي</strong>
+            <code>RoohDailyDhikrSmall</code>
+            <div class="badges"><span>Premium</span><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/21_home_RoohDailyDhikrMedium.png" alt="الذكر اليومي"></div>
+          <div class="meta">
+            <strong dir="rtl">الذكر اليومي</strong>
+            <code>RoohDailyDhikrMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/22_home_RoohHijriDateSmall.png" alt="الهجري"></div>
+          <div class="meta">
+            <strong dir="rtl">الهجري</strong>
+            <code>RoohHijriDateSmall</code>
+            <div class="badges"><span>Premium</span><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/23_home_RoohHijriDateMedium.png" alt="الهجري"></div>
+          <div class="meta">
+            <strong dir="rtl">الهجري</strong>
+            <code>RoohHijriDateMedium</code>
+            <div class="badges"><span>Premium</span><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/24_home_RoohSmall.png" alt="Small Widget"></div>
+          <div class="meta">
+            <strong dir="rtl">Small Widget</strong>
+            <code>RoohSmall</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/25_home_RoohMedium.png" alt="Medium Widget"></div>
+          <div class="meta">
+            <strong dir="rtl">Medium Widget</strong>
+            <code>RoohMedium</code>
+            <div class="badges"><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/26_home_RoohLarge.png" alt="Large Widget"></div>
+          <div class="meta">
+            <strong dir="rtl">Large Widget</strong>
+            <code>RoohLarge</code>
+            <div class="badges"><span>250dp × 250dp</span><span>329×345 px</span></div>
+          </div>
+        </article></main>
+  <h2>ودجات شاشة القفل <small>6</small></h2><main class="grid">
+        <article class="card">
+          <div class="frame"><img src="images/27_lock_RoohLockDayThuluth.png" alt="اليوم - ثلث"></div>
+          <div class="meta">
+            <strong dir="rtl">اليوم - ثلث</strong>
+            <code>RoohLockDayThuluth</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/28_lock_RoohLockMonthThuluth.png" alt="التاريخ الهجري"></div>
+          <div class="meta">
+            <strong dir="rtl">التاريخ الهجري</strong>
+            <code>RoohLockMonthThuluth</code>
+            <div class="badges"><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/29_lock_RoohLockNextPrayer.png" alt="الصلاة القادمة"></div>
+          <div class="meta">
+            <strong dir="rtl">الصلاة القادمة</strong>
+            <code>RoohLockNextPrayer</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/30_lock_RoohLockAllPrayers.png" alt="مواقيت الصلاة"></div>
+          <div class="meta">
+            <strong dir="rtl">مواقيت الصلاة</strong>
+            <code>RoohLockAllPrayers</code>
+            <div class="badges"><span>250dp × 110dp</span><span>329×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/31_lock_RoohLockHijriCircular.png" alt="التاريخ الهجري"></div>
+          <div class="meta">
+            <strong dir="rtl">التاريخ الهجري</strong>
+            <code>RoohLockHijriCircular</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="frame"><img src="images/32_lock_RoohLockNextPrayerCountdown.png" alt="عدّاد الصلاة القادمة"></div>
+          <div class="meta">
+            <strong dir="rtl">عدّاد الصلاة القادمة</strong>
+            <code>RoohLockNextPrayerCountdown</code>
+            <div class="badges"><span>110dp × 110dp</span><span>155×155 px</span></div>
+          </div>
+        </article></main>
+</body>
+</html>

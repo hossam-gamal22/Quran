@@ -197,6 +197,7 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
       const data = response.notification.request.content.data;
       const notifId = response.notification.request.identifier;
       const actionId = response.actionIdentifier;
+      if (__DEV__) console.log('🔔 [NotificationsCtx] warm-start tap:', notifId, JSON.stringify(data));
 
       // Phase 9: telemetry — سجّل opened أو action
       const isAction = actionId && actionId !== 'default' && actionId !== 'expo.modules.notifications.actions.DEFAULT';
@@ -224,14 +225,18 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
             return;
           }
 
-          const result = handleNotificationNavigation(data, router, notifId);
+          // Small delay so the navigation stack is stable whether the app
+          // resumed from background or was already in the foreground.
+          setTimeout(() => {
+            const result = handleNotificationNavigation(data, router, notifId);
 
-          // Play audio after navigation transition (e.g. Kahf ayah, custom ayah)
-          if (result.audioUrl) {
-            setTimeout(() => {
-              playAndCleanup(result.audioUrl!, result.audioLabel || 'notification tap');
-            }, 1500);
-          }
+            // Play audio after navigation transition (e.g. Kahf ayah, custom ayah)
+            if (result.audioUrl) {
+              setTimeout(() => {
+                playAndCleanup(result.audioUrl!, result.audioLabel || 'notification tap');
+              }, 1500);
+            }
+          }, 300);
         })
         .catch((e) => {
           console.warn('[notifications] response handler failed:', e);

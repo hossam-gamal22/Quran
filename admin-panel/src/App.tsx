@@ -374,12 +374,12 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void; onLogout: () => 
       )}
       
       <aside 
-        className={`fixed top-0 right-0 h-full w-64 bg-admin-bg text-white z-50 transform transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed top-0 right-0 h-full w-64 bg-admin-bg text-white z-50 transform transition-transform duration-300 lg:translate-x-0 flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
         dir="rtl"
       >
-        <div className="p-5 border-b border-admin-border">
+        <div className="p-5 border-b border-admin-border flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
@@ -396,7 +396,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void; onLogout: () => 
           </div>
         </div>
 
-        <nav className="p-3 space-y-0.5 max-h-[calc(100vh-160px)] overflow-y-auto">
+        <nav className="p-3 space-y-0.5 flex-1 min-h-0 overflow-y-auto">
           {/* Dashboard — always at top */}
           <NavLink
             to="/"
@@ -427,7 +427,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void; onLogout: () => 
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-admin-border">
+        <div className="p-4 border-t border-admin-border flex-shrink-0">
           <div
             onClick={onLogout}
             className="flex items-center gap-3 px-4 py-3 text-admin-muted hover:text-white hover:bg-admin-surface rounded-xl cursor-pointer transition-all"

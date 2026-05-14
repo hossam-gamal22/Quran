@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { sendPremiumGrantNotification } from '../services/pushNotifications';
 
 interface SubscriptionConfig {
   enabled: boolean;
@@ -38,7 +39,56 @@ interface AdminGrantEntry {
 interface UserOption {
   id: string;
   name: string;
+  platform: string;
+  installSource: string;
+  lastActiveMs: number;
+  lastActiveLabel: string;
+  hasPushToken: boolean;
+  hasAdminPremium: boolean;
 }
+
+const timestampToDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'object') {
+    const timestamp = value as { toDate?: () => Date; seconds?: number; nanoseconds?: number };
+    if (typeof timestamp.toDate === 'function') {
+      const date = timestamp.toDate();
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    if (typeof timestamp.seconds === 'number') {
+      const millis = timestamp.seconds * 1000 + Math.floor((timestamp.nanoseconds || 0) / 1_000_000);
+      const date = new Date(millis);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+  return null;
+};
+
+const formatLastActive = (value: unknown): { ms: number; label: string } => {
+  const date = timestampToDate(value);
+  if (!date) return { ms: 0, label: 'لا يوجد نشاط' };
+  return {
+    ms: date.getTime(),
+    label: date.toLocaleString('ar-EG', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  };
+};
+
+const dateInputToEndOfDayIso = (value: string): string | null => {
+  if (!value) return null;
+  const date = new Date(`${value}T23:59:59.999`);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+};
 
 const DEFAULT_CONFIG: SubscriptionConfig = {
   enabled: false,
@@ -111,9 +161,19 @@ export default function Subscriptions() {
       usersSnap.forEach((userDoc) => {
         const data = userDoc.data();
         const userName = data.displayName || data.name || '';
+        const lastActive = formatLastActive(data.lastActive);
         // Build full user list for the picker
         if (!data.placeholder) {
-          usersList.push({ id: userDoc.id, name: userName || userDoc.id });
+          usersList.push({
+            id: userDoc.id,
+            name: userName || userDoc.id,
+            platform: data.platform || 'unknown',
+            installSource: data.installSource || '',
+            lastActiveMs: lastActive.ms,
+            lastActiveLabel: lastActive.label,
+            hasPushToken: typeof data.fcmToken === 'string' && data.fcmToken.startsWith('ExponentPushToken'),
+            hasAdminPremium: !!data.adminPremium?.granted,
+          });
         }
         if (data.adminPremium?.granted) {
           granted.push({
@@ -127,6 +187,7 @@ export default function Subscriptions() {
           });
         }
       });
+      usersList.sort((a, b) => b.lastActiveMs - a.lastActiveMs);
       setGrantedUsers(granted);
       setAllUsers(usersList);
     } catch (error) {
@@ -163,17 +224,50 @@ export default function Subscriptions() {
         setGrantingUser(false);
         return;
       }
+      const userId = grantUserId.trim();
+      const selectedUser = allUsers.find(u => u.id === userId);
+      const fresherDuplicate = selectedUser
+        ? allUsers.find(u =>
+            u.id !== selectedUser.id &&
+            u.name === selectedUser.name &&
+            u.lastActiveMs > selectedUser.lastActiveMs
+          )
+        : null;
+      if (selectedUser && fresherDuplicate) {
+        const proceed = confirm(
+          `يوجد مستخدم آخر بنفس الاسم أحدث نشاطاً:\n\n` +
+          `${fresherDuplicate.name}\n` +
+          `${fresherDuplicate.id}\n` +
+          `آخر نشاط: ${fresherDuplicate.lastActiveLabel}\n\n` +
+          `المستخدم المحدد آخر نشاطه: ${selectedUser.lastActiveLabel}\n\n` +
+          `هل تريد المنح للمستخدم المحدد رغم ذلك؟`
+        );
+        if (!proceed) {
+          setGrantingUser(false);
+          return;
+        }
+      }
+      const reason = grantReason || 'منحة من الإدارة';
+      const expiresAt = dateInputToEndOfDayIso(grantExpiry);
       await updateDoc(userRef, {
         adminPremium: {
           granted: true,
           plan: grantPlan,
           grantedBy: 'admin',
           grantedAt: new Date().toISOString(),
-          expiresAt: grantExpiry || null,
-          reason: grantReason || 'منحة من الإدارة',
+          expiresAt,
+          reason,
         },
       });
-      setMessage(`✅ تم منح الاشتراك للمستخدم ${grantUserId}`);
+      const notificationResult = await sendPremiumGrantNotification(userId, {
+        plan: grantPlan,
+        expiresAt,
+        reason,
+      });
+      const notificationStatus = notificationResult.success
+        ? ' وتم إرسال الإشعار'
+        : ` لكن لم يتم إرسال إشعار (${notificationResult.errors[0] || 'فشل غير معروف'})`;
+      setMessage(`✅ تم منح الاشتراك للمستخدم ${userId}${notificationStatus}`);
       setGrantUserId('');
       setGrantReason('');
       setGrantExpiry('');
@@ -232,6 +326,7 @@ export default function Subscriptions() {
   };
 
   const offer = config.seasonalOffer || DEFAULT_CONFIG.seasonalOffer!;
+  const selectedGrantUser = allUsers.find(u => u.id === grantUserId);
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full" /></div>;
@@ -458,9 +553,20 @@ export default function Subscriptions() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white" dir="rtl">
                 <option value="">-- اختر مستخدم --</option>
                 {allUsers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name !== u.id ? `${u.name} (${u.id.slice(0, 20)}...)` : u.id}</option>
+                  <option key={u.id} value={u.id}>
+                    {u.name !== u.id
+                      ? `${u.name} — ${u.platform} — آخر نشاط: ${u.lastActiveLabel} — ${u.id.slice(0, 20)}...${u.hasAdminPremium ? ' — ممنوح' : ''}`
+                      : `${u.id} — آخر نشاط: ${u.lastActiveLabel}`}
+                  </option>
                 ))}
               </select>
+              {selectedGrantUser && (
+                <p className={`text-xs mt-2 ${selectedGrantUser.hasPushToken ? 'text-gray-500' : 'text-amber-600'}`}>
+                  آخر نشاط: {selectedGrantUser.lastActiveLabel} — {selectedGrantUser.platform}
+                  {selectedGrantUser.installSource ? ` — ${selectedGrantUser.installSource}` : ''}
+                  {selectedGrantUser.hasPushToken ? ' — لديه توكن إشعارات' : ' — بدون توكن إشعارات'}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">نوع الاشتراك</label>

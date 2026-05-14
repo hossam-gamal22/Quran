@@ -52,7 +52,7 @@ import TranslateButton from '../components/TranslateButton';
 // الأنواع
 // ========================================
 
-type NotificationStatus = 'draft' | 'scheduled' | 'sent' | 'failed';
+type NotificationStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
 type TargetAudience = 'all' | 'ios' | 'android' | 'active' | 'inactive' | 'single_user';
 
 interface PushNotification {
@@ -197,7 +197,7 @@ const ALL_NOTIFICATION_TYPES = [
     titleAr: 'نورٌ ما بين الجمعتين 🕯️', bodyAr: 'لا تنسَ قراءة سورة الكهف اليوم.. نورٌ وبركة ليومك.',
     titleEn: 'Friday — Surah Al-Kahf', bodyEn: 'Don\'t forget to read Surah Al-Kahf today.',
     hasScheduling: true, firestoreCategory: 'kahfFriday' },
-  { id: 'quran', category: 'quran', name: 'ورد القرآن', emoji: '📚', time: '19:00',
+  { id: 'quran', category: 'quran', name: 'ورد القرآن', emoji: '📚', time: '20:00',
     titleAr: 'وقت وردك القرآني 📖', bodyAr: 'القليل الدائم خيرٌ من الكثير المنقطع.. ابدأ وردك الآن.',
     titleEn: 'Quran Reading', bodyEn: 'Time for your daily Quran reading.',
     hasScheduling: true, firestoreCategory: 'quranReading' },
@@ -356,7 +356,6 @@ const NotificationsPage: React.FC = () => {
   const [expandedLanguages, setExpandedLanguages] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [tempPages, setTempPages] = useState<{ id: string; title: string }[]>([]);
-  const [autoProcessLog, setAutoProcessLog] = useState<string[]>([]);
   const [reminderSaving, setReminderSaving] = useState(false);
   const [notificationTexts, setNotificationTexts] = useState<NotificationTextOverrides>({});
   const [editingTextType, setEditingTextType] = useState<string | null>(null);
@@ -385,70 +384,6 @@ const NotificationsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
-
-  // ========================================
-  // معالج الإشعارات المجدولة تلقائياً
-  // Auto-process scheduled notifications
-  // ========================================
-  useEffect(() => {
-    const processScheduled = async () => {
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))
-        );
-        
-        const now = new Date();
-        
-        for (const docSnap of snapshot.docs) {
-          const data = docSnap.data() as PushNotification;
-          if (data.status !== 'scheduled' || !data.scheduledAt) continue;
-          
-          const scheduledTime = new Date(data.scheduledAt);
-          if (scheduledTime > now) continue;
-          
-          // Time to send!
-          console.log(`⏰ Auto-sending scheduled notification: ${docSnap.id}`);
-          setAutoProcessLog(prev => [...prev.slice(-9), `⏰ ${new Date().toLocaleTimeString('ar')} — جاري إرسال إشعار مجدول...`]);
-          
-          try {
-            const result = await sendPushNotification({
-              translations: data.translations || {},
-              targetAudience: data.targetAudience || 'all',
-              targetLanguages: (data as any).targetLanguages,
-              targetCountries: (data as any).targetCountries,
-              actionUrl: data.actionUrl,
-              imageUrl: data.imageUrl,
-            });
-            
-            // Update status in Firestore
-            const { updateDoc } = await import('firebase/firestore');
-            await updateDoc(doc(db, 'notifications', docSnap.id), {
-              status: 'sent',
-              sentAt: new Date().toISOString(),
-              sentCount: result.sentCount,
-              perLanguage: result.perLanguage,
-            });
-            
-            setAutoProcessLog(prev => [...prev.slice(-9), `✅ ${new Date().toLocaleTimeString('ar')} — تم إرسال ${result.sentCount} إشعار`]);
-            
-            // Reload data to reflect changes
-            loadData();
-          } catch (sendError) {
-            console.error('Auto-send failed:', sendError);
-            setAutoProcessLog(prev => [...prev.slice(-9), `❌ ${new Date().toLocaleTimeString('ar')} — فشل الإرسال: ${(sendError as Error).message}`]);
-          }
-        }
-      } catch (error) {
-        console.error('Auto-process check failed:', error);
-      }
-    };
-
-    // Run immediately on mount, then every 60 seconds
-    processScheduled();
-    const interval = setInterval(processScheduled, 60_000);
-    
-    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -688,10 +623,18 @@ const NotificationsPage: React.FC = () => {
     }
 
     try {
+      const scheduledDate = new Date(scheduledAt);
+      if (Number.isNaN(scheduledDate.getTime())) {
+        setSendResult({ success: false, message: 'وقت الجدولة غير صحيح' });
+        return;
+      }
+
       const scheduleDoc: Record<string, any> = {
         translations,
         targetAudience,
-        scheduledAt,
+        scheduledAt: scheduledDate.toISOString(),
+        scheduledAtLocal: scheduledAt,
+        scheduledTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         status: 'scheduled',
         sentCount: 0,
         deliveredCount: 0,
@@ -701,6 +644,7 @@ const NotificationsPage: React.FC = () => {
       };
       if (targetLanguages.length > 0) scheduleDoc.targetLanguages = targetLanguages;
       if (targetCountries.length > 0) scheduleDoc.targetCountries = targetCountries;
+      if (targetAudience === 'single_user') scheduleDoc.targetUserId = targetUserId;
       if (actionUrl) scheduleDoc.actionUrl = actionUrl;
       if (imageUrl) scheduleDoc.imageUrl = imageUrl;
       await addDoc(collection(db, 'notifications'), scheduleDoc);
@@ -893,6 +837,14 @@ const NotificationsPage: React.FC = () => {
   const getOpenRate = (n: PushNotification): string => {
     if (n.deliveredCount === 0) return '0%';
     return `${((n.openedCount / n.deliveredCount) * 100).toFixed(1)}%`;
+  };
+
+  const getStatusMeta = (status: NotificationStatus) => {
+    if (status === 'sent') return { label: '✅ مرسل', className: 'bg-accent/20 text-accent-light' };
+    if (status === 'scheduled') return { label: '⏰ مجدول', className: 'bg-amber-500/20 text-amber-400' };
+    if (status === 'sending') return { label: 'جاري الإرسال', className: 'bg-blue-500/20 text-blue-300' };
+    if (status === 'failed') return { label: '❌ فشل', className: 'bg-red-500/20 text-red-400' };
+    return { label: 'مسودة', className: 'bg-admin-muted/20 text-slate-400' };
   };
 
   const formatDate = (date: Timestamp | string | undefined): string => {
@@ -1239,18 +1191,9 @@ const NotificationsPage: React.FC = () => {
 
       ) : (
         <>
-          {/* سجل المعالجة التلقائية */}
-          {activeTab === 'scheduled' && autoProcessLog.length > 0 && (
-            <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50 mb-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                <RefreshCw size={14} className="text-accent-light animate-spin" />
-                سجل المعالجة التلقائية
-              </h4>
-              <div className="space-y-1 text-sm font-mono">
-                {autoProcessLog.map((log, i) => (
-                  <div key={i} className="text-slate-400">{log}</div>
-                ))}
-              </div>
+          {activeTab === 'scheduled' && (
+            <div className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20 mb-4 text-sm text-emerald-200">
+              الإشعارات المجدولة يتم إرسالها من Cloud Function كل دقيقة تقريباً، حتى لو لوحة التحكم مقفولة.
             </div>
           )}
         <div className="bg-admin-surface/50 rounded-xl border border-admin-border/50 overflow-hidden">
@@ -1279,17 +1222,16 @@ const NotificationsPage: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          {(() => {
+                            const meta = getStatusMeta(notification.status);
+                            return (
                           <span
-                            className={`px-2 py-0.5 rounded text-xs ${
-                              notification.status === 'sent'
-                                ? 'bg-accent/20 text-accent-light'
-                                : notification.status === 'scheduled'
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-admin-muted/20 text-slate-400'
-                            }`}
+                            className={`px-2 py-0.5 rounded text-xs ${meta.className}`}
                           >
-                            {notification.status === 'sent' ? '✅ مرسل' : '⏰ مجدول'}
+                            {meta.label}
                           </span>
+                            );
+                          })()}
                           <span className="text-slate-500 text-xs">
                             {TARGET_OPTIONS.find(t => t.value === notification.targetAudience)?.icon}{' '}
                             {TARGET_OPTIONS.find(t => t.value === notification.targetAudience)?.label}
@@ -1304,6 +1246,12 @@ const NotificationsPage: React.FC = () => {
                         </div>
                         <h3 className="font-bold text-white mb-1">{getNotificationTitle(notification)}</h3>
                         <p className="text-slate-400 text-sm">{getNotificationBody(notification)}</p>
+
+                        {notification.status === 'scheduled' && notification.scheduledAt && (
+                          <div className="text-xs text-amber-300 mt-2">
+                            موعد الإرسال: {formatDate(notification.scheduledAt)}
+                          </div>
+                        )}
 
                         {notification.status === 'sent' && (
                           <div className="flex gap-4 mt-3 text-sm flex-wrap">
@@ -2069,7 +2017,7 @@ const NotificationsPage: React.FC = () => {
                 </div>
                 {targetCountries.length > 0 && (
                   <p className="text-xs text-accent-light mt-2">
-                    سيتم الإرسال فقط للمستخدمين في: {targetCountries.join('، ')}
+                    سيتم الإرسال فقط للمستخدمين المؤكدين عبر GPS أو تعديل الأدمن في: {targetCountries.join('، ')}
                   </p>
                 )}
               </div>
@@ -2199,4 +2147,3 @@ const NotificationsPage: React.FC = () => {
 };
 
 export default NotificationsPage;
-

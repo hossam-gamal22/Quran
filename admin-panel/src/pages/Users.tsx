@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
-import { fetchActiveDevices, invalidateActiveDevicesCache } from '../utils/user-query';
+import { fetchActiveDevices, invalidateActiveDevicesCache, type ActiveDeviceStats } from '../utils/user-query';
 
 type TimestampLike = Timestamp | { toDate: () => Date } | { seconds: number; nanoseconds?: number } | string | Date | null | undefined;
+type UserPlan = 'free' | 'monthly' | 'yearly' | 'lifetime';
 
 const toMillis = (value: TimestampLike): number => {
   if (!value) return 0;
@@ -95,7 +96,13 @@ interface User {
   phone: string;
   country: string;
   countrySource?: 'gps' | 'device_locale' | 'admin' | '';
-  plan: 'free' | 'monthly' | 'yearly' | 'lifetime';
+  countryName?: string;
+  locationCity?: string;
+  locationLatitude?: number;
+  locationLongitude?: number;
+  locationUpdatedAt?: unknown;
+  plan: UserPlan;
+  planSource?: 'purchase' | 'admin' | 'manual' | 'none';
   status: 'active' | 'inactive' | 'banned';
   adsEnabled: boolean;
   fcmToken?: string;
@@ -105,8 +112,87 @@ interface User {
   currency: string;
 }
 
+interface PurchasePlanInfo {
+  plan: UserPlan;
+  source: User['planSource'];
+}
+
+const normalizePlan = (value: unknown): UserPlan | null => {
+  if (value === 'monthly' || value === 'yearly' || value === 'lifetime') return value;
+  return null;
+};
+
+const isFutureOrLifetime = (plan: UserPlan, expiresAt: unknown): boolean => {
+  if (plan === 'lifetime') return true;
+  const expiryMs = toMillis(expiresAt as TimestampLike);
+  return expiryMs > Date.now();
+};
+
+const getUserPlanFromDoc = (data: Record<string, unknown>): PurchasePlanInfo => {
+  const adminPremium = data.adminPremium as { granted?: boolean; plan?: string; expiresAt?: unknown } | undefined;
+  const adminPlan = normalizePlan(adminPremium?.plan);
+  if (adminPremium?.granted && adminPlan && isFutureOrLifetime(adminPlan, adminPremium.expiresAt)) {
+    return { plan: adminPlan, source: 'admin' };
+  }
+
+  const manualPlan = normalizePlan(data.plan);
+  if (manualPlan) return { plan: manualPlan, source: 'manual' };
+
+  return { plan: 'free', source: 'none' };
+};
+
+const getLatestPurchasePlan = async (userId: string): Promise<PurchasePlanInfo | null> => {
+  try {
+    const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
+    let bestPlan: UserPlan | null = null;
+    let bestPurchasedAtMs = -1;
+
+    purchasesSnap.forEach((purchaseDoc) => {
+      const data = purchaseDoc.data();
+      const plan = normalizePlan(data.plan);
+      if (!plan || !isFutureOrLifetime(plan, data.expiresAt)) return;
+      const purchasedAtMs = toMillis(data.purchasedAt as TimestampLike) || toMillis(data.createdAt as TimestampLike);
+      if (purchasedAtMs > bestPurchasedAtMs) {
+        bestPlan = plan;
+        bestPurchasedAtMs = purchasedAtMs;
+      }
+    });
+
+    return bestPlan ? { plan: bestPlan, source: 'purchase' } : null;
+  } catch {
+    return null;
+  }
+};
+
+const EMPTY_DEVICE_STATS: ActiveDeviceStats = {
+  total: 0,
+  withTokens: 0,
+  firestoreUsers: 0,
+  storeRegistered: 0,
+  storeActive: 0,
+  storeDaily: 0,
+  namedUsers: 0,
+  unnamedUsers: 0,
+  withoutTokens: 0,
+  storeIos: 0,
+  storeAndroid: 0,
+  ios: 0,
+  android: 0,
+  active: 0,
+  daily: 0,
+  byLanguage: {},
+  byCountry: {},
+  storeByLanguage: {},
+  storeByCountry: {},
+  retentionRate: 0,
+  monthlyAzkar: 0,
+  monthlyQuran: 0,
+  monthlyPrayers: 0,
+};
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [deviceStats, setDeviceStats] = useState<ActiveDeviceStats>(EMPTY_DEVICE_STATS);
   const [deviceGroupMap, setDeviceGroupMap] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -126,24 +212,30 @@ export default function UsersPage() {
 
   const loadUsers = async () => {
     try {
-      // SSOT: unified query — all active devices with valid FCM tokens, deduplicated
-      const { users: activeDevices, groupMap } = await fetchActiveDevices(true);
+      // SSOT: user counters match Dashboard/Analytics/Notifications.
+      const { storeUsers, stats, groupMap } = await fetchActiveDevices(true);
+      setDeviceStats(stats);
       setDeviceGroupMap(groupMap);
 
-      // For the Users list, only show users with a display name
-      const rawUsers: User[] = activeDevices
-        .filter(u => {
-          const displayName = (u.displayName || u.name || '') as string;
-          return !!displayName;
-        })
-        .map(u => ({
+      const rawUsers: User[] = await Promise.all(storeUsers
+        .map(async u => {
+          const basePlan = getUserPlanFromDoc(u as Record<string, unknown>);
+          const purchasePlan = basePlan.source === 'none' || basePlan.source === 'manual'
+            ? await getLatestPurchasePlan(u.id)
+            : null;
+          const resolvedPlan = purchasePlan || basePlan;
+
+          return ({
           ...u,
           id: u.id,
           name: (u.displayName || u.name || '') as string,
+          plan: resolvedPlan.plan,
+          planSource: resolvedPlan.source,
           adsEnabled: (u as Partial<User>).adsEnabled ?? false,
           totalSpent: (u as Partial<User>).totalSpent ?? 0,
           currency: (u as Partial<User>).currency ?? 'USD',
-        } as unknown as User));
+          } as unknown as User);
+        }));
 
       // Sort by registration date (oldest first) and assign display number
       rawUsers.sort((a, b) => toMillis(a.registrationDate as TimestampLike) - toMillis(b.registrationDate as TimestampLike));
@@ -161,7 +253,8 @@ export default function UsersPage() {
     const matchesSearch = !q
       || (user.name || '').toLowerCase().includes(q)
       || (user.email || '').toLowerCase().includes(q)
-      || (user.phone || '').toLowerCase().includes(q);
+      || (user.phone || '').toLowerCase().includes(q)
+      || user.id.toLowerCase().includes(q);
     // Treat missing/empty plan as 'free' (matches stats logic + reality:
     // most app users never wrote a plan field, they're free by default).
     const userPlan = user.plan || 'free';
@@ -174,14 +267,24 @@ export default function UsersPage() {
   });
 
   const stats = {
-    total: users.length,
-    // Match filter logic: missing status counts as 'active'.
+    total: deviceStats.storeRegistered,
+    active: deviceStats.storeActive,
+    daily: deviceStats.storeDaily,
+    named: deviceStats.namedUsers,
+    unnamed: deviceStats.unnamedUsers,
+    withTokens: deviceStats.withTokens,
+    withoutTokens: deviceStats.withoutTokens,
+  };
+  const planCounts = {
+    free: users.filter(u => (u.plan || 'free') === 'free').length,
+    monthly: users.filter(u => u.plan === 'monthly').length,
+    yearly: users.filter(u => u.plan === 'yearly').length,
+    lifetime: users.filter(u => u.plan === 'lifetime').length,
+  };
+  const statusCounts = {
     active: users.filter(u => (u.status || 'active') === 'active').length,
     inactive: users.filter(u => u.status === 'inactive').length,
     banned: users.filter(u => u.status === 'banned').length,
-    free: users.filter(u => (u.plan || 'free') === 'free').length,
-    premium: users.filter(u => u.plan && u.plan !== 'free').length,
-    lifetime: users.filter(u => u.plan === 'lifetime').length,
   };
 
   const handleEditUser = (user: User) => {
@@ -196,8 +299,15 @@ export default function UsersPage() {
       const { id, ...data } = selectedUser;
       const originalUser = users.find(u => u.id === id);
       const countryChanged = originalUser && originalUser.country !== data.country;
-      await setDoc(doc(db, 'users', id), { ...data, displayName: data.name, ...(countryChanged ? { countrySource: 'admin' } : {}) }, { merge: true });
-      setUsers(users.map(u => u.id === selectedUser.id ? selectedUser : u));
+      const { planSource: _planSource, displayNumber: _displayNumber, ...persistableData } = data as typeof data & {
+        planSource?: User['planSource'];
+        displayNumber?: number;
+      };
+      await setDoc(doc(db, 'users', id), { ...persistableData, displayName: data.name, ...(countryChanged ? { countrySource: 'admin' } : {}) }, { merge: true });
+      setUsers(users.map(u => u.id === selectedUser.id
+        ? { ...selectedUser, ...(countryChanged ? { countrySource: 'admin' as const } : {}) }
+        : u
+      ));
       setShowModal(false);
       setSelectedUser(null);
     } catch (error) {
@@ -263,6 +373,73 @@ export default function UsersPage() {
     return <span className={`px-3 py-1 rounded-full text-sm font-medium ${badges[status] || badges.active}`}>{labels[status] || 'نشط'}</span>;
   };
 
+  const getPlanBadge = (user: User) => {
+    const labels: Record<UserPlan, string> = {
+      free: 'مجاني',
+      monthly: 'شهري',
+      yearly: 'سنوي',
+      lifetime: 'Lifetime',
+    };
+    const classes: Record<UserPlan, string> = {
+      free: 'bg-slate-500/15 text-slate-300 border-slate-500/20',
+      monthly: 'bg-blue-500/15 text-blue-300 border-blue-500/20',
+      yearly: 'bg-purple-500/15 text-purple-300 border-purple-500/20',
+      lifetime: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+    };
+    const sourceLabels: Record<NonNullable<User['planSource']>, string> = {
+      purchase: 'شراء',
+      admin: 'منحة',
+      manual: 'يدوي',
+      none: '',
+    };
+    const plan = user.plan || 'free';
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs border ${classes[plan]}`}>
+        {labels[plan]}
+        {user.planSource && user.planSource !== 'none' && (
+          <span className="opacity-70">({sourceLabels[user.planSource]})</span>
+        )}
+      </span>
+    );
+  };
+
+  const getCountrySourceLabel = (user: User): { label: string; className: string; title: string } => {
+    const gpsVerified = user.countrySource === 'gps' && Boolean(user.locationUpdatedAt || user.locationLatitude);
+    if (gpsVerified) {
+      return {
+        label: 'GPS مؤكد',
+        className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
+        title: 'تم تحديد الدولة من موقع الصلاة/GPS الحقيقي',
+      };
+    }
+    if (user.countrySource === 'gps') {
+      return {
+        label: 'GPS قديم',
+        className: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+        title: 'تم تحديدها بإصدار قديم بدون بيانات تحقق كافية، وستتحدث عند فتح الموقع مرة أخرى',
+      };
+    }
+    if (user.countrySource === 'admin') {
+      return {
+        label: 'تعديل يدوي',
+        className: 'bg-blue-500/15 text-blue-300 border-blue-500/20',
+        title: 'تم تعديل الدولة يدوياً من لوحة التحكم',
+      };
+    }
+    if (user.country) {
+      return {
+        label: 'غير مؤكد',
+        className: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+        title: 'مصدر الدولة هو إقليم/لغة الجهاز وليس GPS',
+      };
+    }
+    return {
+      label: 'غير محدد',
+      className: 'bg-slate-500/15 text-slate-400 border-slate-500/20',
+      title: 'لم يتم تحديد دولة بعد',
+    };
+  };
+
   if (loading) {
     return <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full" /></div>;
   }
@@ -291,32 +468,32 @@ export default function UsersPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">الإجمالي</p>
+          <p className="text-slate-400 text-sm">مسجلون من المتاجر</p>
           <p className="text-2xl font-bold text-white">{stats.total}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">نشط</p>
+          <p className="text-slate-400 text-sm">نشطون 7 أيام</p>
           <p className="text-2xl font-bold text-green-400">{stats.active}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">غير نشط</p>
-          <p className="text-2xl font-bold text-yellow-400">{stats.inactive}</p>
+          <p className="text-slate-400 text-sm">اليوم</p>
+          <p className="text-2xl font-bold text-yellow-400">{stats.daily}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">محظور</p>
-          <p className="text-2xl font-bold text-red-400">{stats.banned}</p>
+          <p className="text-slate-400 text-sm">قابلون للإشعارات</p>
+          <p className="text-2xl font-bold text-cyan-400">{stats.withTokens}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">مجاني</p>
-          <p className="text-2xl font-bold text-slate-300">{stats.free}</p>
+          <p className="text-slate-400 text-sm">بدون توكن</p>
+          <p className="text-2xl font-bold text-slate-300">{stats.withoutTokens}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">مدفوع</p>
-          <p className="text-2xl font-bold text-purple-400">{stats.premium}</p>
+          <p className="text-slate-400 text-sm">لديهم اسم</p>
+          <p className="text-2xl font-bold text-purple-400">{stats.named}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
-          <p className="text-slate-400 text-sm">Lifetime</p>
-          <p className="text-2xl font-bold text-amber-400">{stats.lifetime}</p>
+          <p className="text-slate-400 text-sm">بدون اسم</p>
+          <p className="text-2xl font-bold text-amber-400">{stats.unnamed}</p>
         </div>
       </div>
 
@@ -329,17 +506,17 @@ export default function UsersPage() {
           <select title="فلتر الباقة" aria-label="فلتر الباقة" value={filterPlan} onChange={e => setFilterPlan(e.target.value)}
             className="px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg focus:ring-2 focus:ring-accent outline-none text-white">
             <option value="all">كل الباقات</option>
-            <option value="free">مجاني</option>
-            <option value="monthly">شهري</option>
-            <option value="yearly">سنوي</option>
-            <option value="lifetime">Lifetime</option>
+            <option value="free">مجاني ({planCounts.free})</option>
+            <option value="monthly">شهري ({planCounts.monthly})</option>
+            <option value="yearly">سنوي ({planCounts.yearly})</option>
+            <option value="lifetime">Lifetime ({planCounts.lifetime})</option>
           </select>
           <select title="فلتر الحالة" aria-label="فلتر الحالة" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             className="px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg focus:ring-2 focus:ring-accent outline-none text-white">
             <option value="all">كل الحالات</option>
-            <option value="active">نشط</option>
-            <option value="inactive">غير نشط</option>
-            <option value="banned">محظور</option>
+            <option value="active">نشط ({statusCounts.active})</option>
+            <option value="inactive">غير نشط ({statusCounts.inactive})</option>
+            <option value="banned">محظور ({statusCounts.banned})</option>
           </select>
         </div>
       </div>
@@ -356,6 +533,7 @@ export default function UsersPage() {
               <tr>
                 <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">المستخدم</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">الدولة</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">الباقة</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">الحالة</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">آخر نشاط</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">إجراءات</th>
@@ -365,7 +543,19 @@ export default function UsersPage() {
               {filteredUsers.map(user => (
                 <tr key={user.id} className="hover:bg-admin-surface-light/30">
                   <td className="px-4 py-4">
-                    <p className="font-medium text-white">{user.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-white">{user.name || 'بدون اسم'}</p>
+                      {!user.name && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/20">
+                          غير ظاهر في الاسم
+                        </span>
+                      )}
+                      {!user.fcmToken?.startsWith('ExponentPushToken') && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-300 border border-slate-500/20">
+                          بدون توكن
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs font-mono text-accent-light">user_{(user as User & { displayNumber?: number }).displayNumber}</span>
                       <button
@@ -378,15 +568,27 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-4 text-slate-300">
-                    {getCountryDisplay(user.country)}
-                    {user.countrySource === 'gps' ? (
-                      <span title="موقع محقق عبر GPS" className="ml-1 text-xs">🛰️</span>
-                    ) : user.countrySource === 'admin' ? (
-                      <span title="تم تعديله بواسطة الأدمن" className="ml-1 text-xs">✏️</span>
-                    ) : user.country ? (
-                      <span title="مصدر: لغة الجهاز (قد لا يكون دقيق)" className="ml-1 text-xs opacity-50">⚠️</span>
-                    ) : null}
+                    {(() => {
+                      const source = getCountrySourceLabel(user);
+                      const gpsVerified = user.countrySource === 'gps' && Boolean(user.locationUpdatedAt || user.locationLatitude);
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span>{getCountryDisplay(user.country)}</span>
+                            <span title={source.title} className={`text-[11px] px-2 py-0.5 rounded-full border ${source.className}`}>
+                              {source.label}
+                            </span>
+                          </div>
+                          {gpsVerified && user.locationCity && (
+                            <div className="text-xs text-slate-500">
+                              {user.locationCity}{user.countryName ? `، ${user.countryName}` : ''}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
+                  <td className="px-4 py-4">{getPlanBadge(user)}</td>
                   <td className="px-4 py-4">{getStatusBadge(user.status || 'active')}</td>
                   <td className="px-4 py-4 text-sm text-slate-400">{formatDate(user.lastActive)}</td>
                   <td className="px-4 py-4">
@@ -452,7 +654,7 @@ export default function UsersPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">الباقة</label>
                   <select value={selectedUser.plan || 'free'}
-                    onChange={e => setSelectedUser({ ...selectedUser, plan: e.target.value as User['plan'] })}
+                    onChange={e => setSelectedUser({ ...selectedUser, plan: e.target.value as User['plan'], planSource: 'manual' })}
                     aria-label="الباقة"
                     className="w-full px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg text-white">
                     <option value="free">مجاني</option>

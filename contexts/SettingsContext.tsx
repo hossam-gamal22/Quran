@@ -112,6 +112,7 @@ export interface NotificationSettings {
   vibration: boolean;
   soundType: NotificationSoundType;
   adhanSoundType: AdhanSoundType;
+  fullAdhanSoundType?: string;
   // When true, prayer notifications use full adhan recordings from
   // assets/sounds/adhan_full/. Android plays them via a foreground media
   // service; iOS uses the bundled full sound and the system cuts it at ~29s.
@@ -223,6 +224,8 @@ export interface DisplaySettings {
   homeLayout: HomeLayout;
   /** Font size adjustment for Mushaf reader (-4 to +8, default 0) */
   quranFontSizeAdjust: number;
+  /** Auto-scroll speed for Mushaf reader (0 = slow, 1 = fast) */
+  quranAutoScrollSpeed: number;
   /** Use CDN page images instead of text rendering */
   quranUseCdnPages?: boolean;
   /** Show tafsir panel below Mushaf reader */
@@ -344,6 +347,7 @@ const defaultNotifications: NotificationSettings = {
   vibration: true,
   soundType: 'default',
   adhanSoundType: 'makkah',
+  fullAdhanSoundType: 'makkah',
   useFullAdhan: false,
   // Worship tracking notifications
   worshipPrayerLogging: true,
@@ -357,7 +361,7 @@ const defaultNotifications: NotificationSettings = {
   worshipQuietHoursEnd: '06:00',
   // Quran reading reminder
   quranReadingReminder: true,
-  quranReadingReminderTime: '19:00',
+  quranReadingReminderTime: '20:00',
   quranReminderDays: [0, 1, 2, 3, 4, 5, 6],
   quranReminder24Hour: true,
   quranReminderSoundType: 'default',
@@ -400,6 +404,7 @@ const defaultDisplay: DisplaySettings = {
   backgroundOpacity: 1,
   quranBackground: 'quranbg1',
   quranFontSizeAdjust: 0,
+  quranAutoScrollSpeed: 0.5,
   quranThemeIndex: 0,
   quranUseCdnPages: false,
   widgetFontVariant: 'widget1',
@@ -456,6 +461,71 @@ const defaultSettings: AppSettings = {
 // ========================================
 
 const STORAGE_KEY = 'app_settings';
+const WIDGET_DISPLAY_PREFS_KEY = '@widget_display_preferences';
+const WIDGET_DISPLAY_KEYS = [
+  'widgetCalendar',
+  'widgetDayCalendar',
+  'widgetMonthCalendar',
+  'widgetNumerals',
+  'widgetTheme',
+  'widgetLanguage',
+  'widgetDateFormat',
+  'widgetFontVariant',
+] as const;
+
+type WidgetDisplayKey = typeof WIDGET_DISPLAY_KEYS[number];
+type WidgetDisplayPrefs = Partial<Pick<DisplaySettings, WidgetDisplayKey>>;
+
+function pickWidgetDisplayPrefs(display: Partial<DisplaySettings>): WidgetDisplayPrefs {
+  const out: Partial<Record<WidgetDisplayKey, unknown>> = {};
+  for (const key of WIDGET_DISPLAY_KEYS) {
+    if (key in display && display[key] !== undefined) {
+      out[key] = display[key];
+    }
+  }
+  return out as WidgetDisplayPrefs;
+}
+
+function logWidgetTheme(message: string, payload?: unknown) {
+  if (!__DEV__) return;
+  if (payload === undefined) {
+    console.log(`[WidgetTheme] ${message}`);
+  } else {
+    console.log(`[WidgetTheme] ${message}`, payload);
+  }
+}
+
+async function readWidgetDisplayPrefs(reason: string): Promise<WidgetDisplayPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(WIDGET_DISPLAY_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    logWidgetTheme(`loaded from storage (${reason}):`, parsed);
+    return parsed;
+  } catch (e) {
+    logWidgetTheme(`loaded from storage (${reason}) failed:`, (e as Error)?.message ?? e);
+    return {};
+  }
+}
+
+async function writeWidgetDisplayPrefs(prefs: WidgetDisplayPrefs, reason: string): Promise<void> {
+  await AsyncStorage.setItem(WIDGET_DISPLAY_PREFS_KEY, JSON.stringify(prefs));
+  logWidgetTheme(`saved to storage (${reason}):`, prefs);
+}
+
+function mergeWidgetDisplayPrefs(settings: AppSettings, prefs: WidgetDisplayPrefs, reason: string): AppSettings {
+  const merged = {
+    ...settings,
+    display: {
+      ...settings.display,
+      ...prefs,
+    },
+  };
+  logWidgetTheme(`after merge/normalization (${reason}):`, {
+    selectedWidgetTheme: merged.display.widgetTheme,
+    widgetPrefs: pickWidgetDisplayPrefs(merged.display),
+  });
+  return merged;
+}
 
 // ========================================
 // Notification Defaults Migration
@@ -467,6 +537,7 @@ const STORAGE_KEY = 'app_settings';
 // receives the full standardized notification schedule.
 const NOTIFICATION_DEFAULTS_VERSION = 10;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
+const QURAN_ISTIGHFAR_COLLISION_MIGRATION_KEY = '@quran_istighfar_collision_migration_v1';
 const MAKKAH_FALLBACK_MIGRATION_KEY = '@prayer_makkah_fallback_migration_v1';
 
 async function clearPrayerTimeFallbackCaches(): Promise<void> {
@@ -612,6 +683,24 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
           display: { ...defaultDisplay, ...(parsed.display || {}) },
           prayer: { ...defaultPrayer, ...(parsed.prayer || {}) },
         };
+        console.log('[FullAdhan] loaded settings:', parsed.notifications);
+        console.log('[FullAdhan] after merge:', {
+          useFullAdhan: loadedSettings.notifications.useFullAdhan === true,
+          fullAdhanSoundType: loadedSettings.notifications.fullAdhanSoundType,
+          adhanSoundType: loadedSettings.notifications.adhanSoundType,
+        });
+
+        // Widget visual preferences are also mirrored to a narrow key so
+        // default normalization / unrelated settings writes cannot silently
+        // reset an explicit user-selected widget theme back to `auto`.
+        {
+          const widgetPrefs = await readWidgetDisplayPrefs('loadSettings');
+          Object.assign(loadedSettings.display, widgetPrefs);
+          logWidgetTheme('after merge/normalization (loadSettings):', {
+            selectedWidgetTheme: loadedSettings.display.widgetTheme,
+            widgetPrefs: pickWidgetDisplayPrefs(loadedSettings.display),
+          });
+        }
         
         // Prefer i18n-saved language if it differs (handles onboarding sync)
         if (i18nLang && i18nLang !== loadedSettings.language) {
@@ -682,6 +771,35 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
 
         try {
+          const migrated = await AsyncStorage.getItem(QURAN_ISTIGHFAR_COLLISION_MIGRATION_KEY);
+          if (migrated !== 'true') {
+            const notifications = loadedSettings.notifications as any;
+            const quranTime = notifications.quranReadingReminderTime;
+            const istighfarTime = notifications.istighfarReminderTime;
+            const quranTimes = notifications.quranReadingReminderTimes;
+            const quranOnlyAtSeven =
+              !Array.isArray(quranTimes) ||
+              quranTimes.length === 0 ||
+              (quranTimes.length === 1 && quranTimes[0] === '19:00');
+
+            if (quranTime === '19:00' && istighfarTime === '19:00' && quranOnlyAtSeven) {
+              notifications.quranReadingReminderTime = '20:00';
+              notifications.quranReadingReminderTimes = ['20:00'];
+              notifications.notifOverrides = {
+                ...(notifications.notifOverrides ?? {}),
+                quranReading: true,
+              };
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
+              console.log('🔔 Moved Quran reminder from 19:00 to 20:00 to avoid istighfar collision');
+            }
+
+            await AsyncStorage.setItem(QURAN_ISTIGHFAR_COLLISION_MIGRATION_KEY, 'true');
+          }
+        } catch (migrationErr) {
+          console.warn('⚠️ Quran/istighfar collision migration failed:', migrationErr);
+        }
+
+        try {
           const migrated = await AsyncStorage.getItem(MAKKAH_FALLBACK_MIGRATION_KEY);
           if (migrated !== 'true') {
             const [savedGpsCountry, storedLocation] = await Promise.all([
@@ -740,11 +858,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         // Schedule notifications on app init based on saved settings
         const n = loadedSettings.notifications;
         if (n.enabled) {
+          console.log('[FullAdhan] cold-start scheduling with useFullAdhan:', n.useFullAdhan === true);
           scheduleNotificationsFromSettings({
             enabled: n.enabled,
             prayerTimes: n.prayerTimes,
             prayerReminder: n.prayerReminder,
             reminderMinutes: n.reminderMinutes,
+            didYouPrayReminder: n.didYouPrayReminder,
+            didYouPrayDelayMinutes: n.didYouPrayDelayMinutes,
+            didYouPraySnoozeMinutes: n.didYouPraySnoozeMinutes,
             morningAzkar: n.morningAzkar,
             morningAzkarTime: n.morningAzkarTime,
             eveningAzkar: n.eveningAzkar,
@@ -760,6 +882,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             vibration: n.vibration !== false,
             soundType: n.soundType,
             adhanSoundType: n.adhanSoundType || 'makkah',
+            fullAdhanSoundType: n.fullAdhanSoundType || 'makkah',
+            useFullAdhan: n.useFullAdhan === true,
             azkarSoundType: n.azkarSoundType,
             dailyVerseSoundType: n.dailyVerseSoundType,
             salawatReminder: n.salawatReminder,
@@ -930,13 +1054,23 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   const saveSettings = async (newSettings: AppSettings) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
-      setSettings(newSettings);
+      // Any generic settings save can be based on an older closure. Keep the
+      // user's explicit widget visual preferences authoritative so unrelated
+      // saves (notifications, prayer reconciliation, import side effects) never
+      // reset `widgetTheme` back to `auto`.
+      const widgetPrefs = await readWidgetDisplayPrefs('saveSettings');
+      const settingsToSave = mergeWidgetDisplayPrefs(newSettings, widgetPrefs, 'saveSettings');
+      logWidgetTheme('saved to app_settings:', {
+        selectedWidgetTheme: settingsToSave.display.widgetTheme,
+        widgetPrefs: pickWidgetDisplayPrefs(settingsToSave.display),
+      });
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
+      setSettings(settingsToSave);
       // Cache theme snapshot for next cold start — eliminates theme flash
       const snapshot: ThemeCacheSnapshot = {
-        theme: newSettings.theme,
-        appBackground: newSettings.display.appBackground ?? 'none',
-        appBackgroundTextColor: newSettings.display.appBackgroundTextColor,
+        theme: settingsToSave.theme,
+        appBackground: settingsToSave.display.appBackground ?? 'none',
+        appBackgroundTextColor: settingsToSave.display.appBackgroundTextColor,
       };
       _cachedThemeSnapshot = snapshot;
       AsyncStorage.setItem(THEME_CACHE_KEY, JSON.stringify(snapshot)).catch(() => {});
@@ -991,15 +1125,41 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, [settings]);
 
   const updateNotifications = useCallback(async (notifications: Partial<NotificationSettings>) => {
+    console.log('[FullAdhan] user toggled:', notifications.useFullAdhan);
+    // Read the freshest persisted state from disk so concurrent writers
+    // (e.g. non-premium adhan reset effect firing in parallel with a
+    // toggle) cannot clobber each other via stale `settings` closures.
+    let baseSettings: AppSettings = settings;
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AppSettings;
+        baseSettings = {
+          ...settings,
+          ...parsed,
+          notifications: { ...settings.notifications, ...(parsed.notifications || {}) },
+          display: { ...settings.display, ...(parsed.display || {}) },
+          prayer: { ...settings.prayer, ...(parsed.prayer || {}) },
+        };
+      }
+    } catch (e) {
+      console.warn('[updateNotifications] freshest-read failed, falling back to closure state:', e);
+    }
     const newSettings = {
-      ...settings,
-      notifications: { ...settings.notifications, ...notifications },
+      ...baseSettings,
+      notifications: { ...baseSettings.notifications, ...notifications },
     };
+    console.log('[FullAdhan] saved settings:', {
+      incoming: notifications,
+      useFullAdhan: newSettings.notifications.useFullAdhan === true,
+      fullAdhanSoundType: newSettings.notifications.fullAdhanSoundType,
+      adhanSoundType: newSettings.notifications.adhanSoundType,
+    });
     await saveSettings(newSettings);
 
     // If sound-related keys changed, reset Android channels so the new sound takes effect
     const soundKeys = [
-      'adhanSoundType', 'soundType', 'azkarSoundType',
+      'adhanSoundType', 'fullAdhanSoundType', 'useFullAdhan', 'soundType', 'azkarSoundType',
       'salawatSoundType', 'tasbihSoundType', 'istighfarSoundType',
       'dailyVerseSoundType', 'customReminderSoundType', 'quranReminderSoundType',
     ] as const;
@@ -1043,6 +1203,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       vibration: n.vibration !== false,
       soundType: n.soundType,
       adhanSoundType: n.adhanSoundType || 'makkah',
+      fullAdhanSoundType: n.fullAdhanSoundType || 'makkah',
+      useFullAdhan: n.useFullAdhan === true,
       azkarSoundType: n.azkarSoundType,
       dailyVerseSoundType: n.dailyVerseSoundType,
       salawatReminder: n.salawatReminder,
@@ -1123,17 +1285,59 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, [isLoading, initialSchedulingDone]);
 
   const updateDisplay = useCallback(async (display: Partial<DisplaySettings>) => {
+    logWidgetTheme('passed to updateDisplay:', display);
+    const touchedWidgetPrefs = WIDGET_DISPLAY_KEYS.some((key) => key in display);
+    let widgetPrefsForSave: WidgetDisplayPrefs = {};
+    if (touchedWidgetPrefs) {
+      try {
+        const previous = await readWidgetDisplayPrefs('updateDisplay.before');
+        widgetPrefsForSave = {
+          ...previous,
+          ...pickWidgetDisplayPrefs(display),
+        };
+        if ('widgetTheme' in display) {
+          logWidgetTheme('user selected:', display.widgetTheme);
+        }
+        await writeWidgetDisplayPrefs(widgetPrefsForSave, 'updateDisplay');
+      } catch (e) {
+        logWidgetTheme('saved to storage (updateDisplay) failed:', (e as Error)?.message ?? e);
+      }
+    }
     const newSettings = {
       ...settings,
-      display: { ...settings.display, ...display },
+      display: {
+        ...settings.display,
+        ...display,
+        ...widgetPrefsForSave,
+      },
     };
     await saveSettings(newSettings);
   }, [settings]);
 
   const updatePrayer = useCallback(async (prayer: Partial<PrayerSettings>) => {
+    // Read freshest persisted state from disk before merging, same pattern as
+    // updateNotifications. This prevents a stale closure from overwriting keys
+    // like `useFullAdhan` that were changed concurrently (e.g. user enabled full
+    // adhan then immediately adjusted a prayer time before the state re-render).
+    let baseSettings: AppSettings = settings;
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AppSettings;
+        baseSettings = {
+          ...settings,
+          ...parsed,
+          notifications: { ...settings.notifications, ...(parsed.notifications || {}) },
+          display: { ...settings.display, ...(parsed.display || {}) },
+          prayer: { ...settings.prayer, ...(parsed.prayer || {}) },
+        };
+      }
+    } catch (e) {
+      console.warn('[updatePrayer] freshest-read failed, falling back to closure state:', e);
+    }
     const newSettings = {
-      ...settings,
-      prayer: { ...settings.prayer, ...prayer },
+      ...baseSettings,
+      prayer: { ...baseSettings.prayer, ...prayer },
     };
     await saveSettings(newSettings);
     // Sync calculation-relevant fields to @prayer_settings for background consumers (notifications, widgets)
@@ -1167,6 +1371,13 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         );
       } catch (e) {
         console.warn('[updatePrayer] Could not trigger notification reschedule:', e);
+      }
+      // Update widget shared data immediately so widgets reflect the new prayer times
+      // without waiting for the user to open the prayer tab (which has its own useEffect).
+      if ('adjustments' in prayer) {
+        try {
+          updateSharedData().catch(() => {});
+        } catch {}
       }
     }
   }, [settings]);

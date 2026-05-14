@@ -14,11 +14,18 @@ import * as Haptics from 'expo-haptics';
 import {
   getPermissionIssues,
   dismissBanner,
+  type PermissionKey,
   type PermissionIssue,
 } from '@/lib/permission-recovery';
 import { useColors } from '@/hooks/use-colors';
 
-export function PermissionBanner() {
+interface PermissionBannerProps {
+  excludedKeys?: PermissionKey[];
+  /** Show only these specific permission keys (takes precedence over excludedKeys) */
+  onlyKeys?: PermissionKey[];
+}
+
+export function PermissionBanner({ excludedKeys = [], onlyKeys }: PermissionBannerProps) {
   const colors = useColors();
   const [issues, setIssues] = useState<PermissionIssue[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,13 +35,16 @@ export function PermissionBanner() {
     setLoading(true);
     try {
       const list = await getPermissionIssues();
-      setIssues(list);
+      const filtered = onlyKeys
+        ? list.filter((issue) => onlyKeys.includes(issue.key))
+        : list.filter((issue) => !excludedKeys.includes(issue.key));
+      setIssues(filtered);
     } catch (e) {
       console.warn('⚠️ [PermissionBanner] فشل فحص الأذونات:', e);
     } finally {
       setLoading(false);
     }
-  }, [loading]);
+  }, [excludedKeys, loading]);
 
   useEffect(() => {
     refresh();

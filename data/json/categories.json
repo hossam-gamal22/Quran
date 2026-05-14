@@ -2249,7 +2249,7 @@
     {
       "id": "107",
       "name": {
-        "ar": "فضل الصلاة على النبي صلى الله عليه و سلم",
+        "ar": "فضل الصلاة على النبي صلى الله عليه وسلم",
         "en": "The excellence of asking for Allah's blessings upon the Prophet pbuh",
         "fr": "Mérite des salutations sur le Prophète",
         "id": "Keutamaan membaca shalawat",
@@ -2262,7 +2262,7 @@
         "bn": "মহানবী (সাঃ) এর উপর আল্লাহর কাছে দোয়া চাওয়ার শ্রেষ্ঠত্ব",
         "ru": "Превосходство просить благословения Аллаха на Пророка, мир ему и благословение Аллаха"
       },
-      "icon": "🤲",
+      "icon": "☪️",
       "color": "#EC4899",
       "order": 108,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_108.mp3"
@@ -2724,7 +2724,7 @@
         "bn": "অনুতপ্ত হওয়া এবং ক্ষমা চাওয়া",
         "ru": "Покаяние и поиск прощения"
       },
-      "icon": "🤲",
+      "icon": "💚",
       "color": "#8B5CF6",
       "order": 130,
       "audioFile": "ar_7esn_AlMoslem_by_Doors_130.mp3"

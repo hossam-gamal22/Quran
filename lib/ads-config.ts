@@ -33,7 +33,8 @@ export type AdScreenKey =
   | 'radio'
   | 'daily_dua'
   | 'story_of_day'
-  | 'quote_of_day';
+  | 'quote_of_day'
+  | 'question_answer';
 
 // ==================== Test Ad IDs ====================
 
@@ -165,6 +166,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     daily_dua: true,
     story_of_day: true,
     quote_of_day: true,
+    question_answer: true,
   },
   showAdOnQiblaStyleChange: true,
   interstitialMode: 'time',
@@ -270,7 +272,11 @@ export const fetchAdsConfig = async (): Promise<AdsConfig> => {
     if (docSnap.exists()) {
       const raw = docSnap.data();
       const normalized = normalizeAdminConfig(raw);
-      const config = { ...DEFAULT_ADS_CONFIG, ...normalized };
+      const config = {
+        ...DEFAULT_ADS_CONFIG,
+        ...normalized,
+        bannerScreens: { ...DEFAULT_ADS_CONFIG.bannerScreens, ...(normalized.bannerScreens || {}) },
+      };
 
       await AsyncStorage.setItem('ads_config_cache', JSON.stringify(config));
       return config;
@@ -283,7 +289,12 @@ export const fetchAdsConfig = async (): Promise<AdsConfig> => {
   try {
     const cached = await AsyncStorage.getItem('ads_config_cache');
     if (cached) {
-      return { ...DEFAULT_ADS_CONFIG, ...JSON.parse(cached) };
+      const parsed = JSON.parse(cached);
+      return {
+        ...DEFAULT_ADS_CONFIG,
+        ...parsed,
+        bannerScreens: { ...DEFAULT_ADS_CONFIG.bannerScreens, ...(parsed.bannerScreens || {}) },
+      };
     }
   } catch (error) {
     console.log('Error reading ads cache');
@@ -399,7 +410,11 @@ export function subscribeToAdsConfig(
       if (docSnap.exists()) {
         const raw = docSnap.data();
         const normalized = normalizeAdminConfig(raw);
-        const config = { ...DEFAULT_ADS_CONFIG, ...normalized };
+        const config = {
+          ...DEFAULT_ADS_CONFIG,
+          ...normalized,
+          bannerScreens: { ...DEFAULT_ADS_CONFIG.bannerScreens, ...(normalized.bannerScreens || {}) },
+        };
         // Update local cache
         AsyncStorage.setItem('ads_config_cache', JSON.stringify(config)).catch(() => {});
         onUpdate(config);

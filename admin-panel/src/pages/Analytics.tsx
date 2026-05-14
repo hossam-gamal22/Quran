@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Styled } from '../components/Styled';
 import { fetchActiveDevices, fetchActiveUsersLifetimeEngagement, type LifetimeEngagement } from '../utils/user-query';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import {
   BarChart3,
   Users,
@@ -19,10 +21,10 @@ import {
 interface AppStats {
   totalUsers: number;
   activeUsers: number;
-  avgSessionDuration: number;
+  appOpens: number;
   retentionRate: number;
   totalAzkar: number;
-  totalQuran: number;
+  totalTasbih: number;
   totalPrayers: number;
 }
 
@@ -47,10 +49,10 @@ interface PlatformStats {
 const DEFAULT_STATS: AppStats = {
   totalUsers: 0,
   activeUsers: 0,
-  avgSessionDuration: 0,
+  appOpens: 0,
   retentionRate: 0,
   totalAzkar: 0,
-  totalQuran: 0,
+  totalTasbih: 0,
   totalPrayers: 0,
 };
 
@@ -62,9 +64,63 @@ const COUNTRY_FLAGS: Record<string, string> = {
   FR: '🇫🇷', RU: '🇷🇺', SG: '🇸🇬',
 };
 
+type DateRange = 'today' | 'week' | 'month' | 'year';
+
+const RANGE_LABELS: Record<DateRange, string> = {
+  today: 'اليوم',
+  week: 'آخر 7 أيام',
+  month: 'آخر 30 يوم',
+  year: 'آخر سنة',
+};
+
+const getRangeStart = (range: DateRange): Date => {
+  const now = new Date();
+  const start = new Date(now);
+  if (range === 'today') {
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+  const days = range === 'week' ? 7 : range === 'month' ? 30 : 365;
+  start.setTime(now.getTime() - days * 24 * 60 * 60 * 1000);
+  return start;
+};
+
+const getActivityStatsForRange = async (range: DateRange) => {
+  const start = getRangeStart(range);
+  const snapshot = await getDocs(query(
+    collection(db, 'activity'),
+    where('timestamp', '>=', Timestamp.fromDate(start))
+  ));
+
+  const activeUserIds = new Set<string>();
+  let appOpens = 0;
+  let azkar = 0;
+  let tasbih = 0;
+  let prayers = 0;
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const userId = typeof data.userId === 'string' ? data.userId : '';
+    if (userId) activeUserIds.add(userId);
+
+    if (data.type === 'app_open') appOpens += 1;
+    if (data.type === 'azkar') azkar += 1;
+    if (data.type === 'prayer') prayers += 1;
+    if (data.type === 'tasbih') tasbih += Number(data.count) || 1;
+  });
+
+  return {
+    activeUsers: activeUserIds.size,
+    appOpens,
+    azkar,
+    tasbih,
+    prayers,
+  };
+};
+
 const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('month');
+  const [dateRange, setDateRange] = useState<DateRange>('month');
   const [stats, setStats] = useState<AppStats>(DEFAULT_STATS);
   const [topCountries, setTopCountries] = useState<CountryStat[]>([]);
   const [topAzkar] = useState<AzkarStat[]>([]);
@@ -74,34 +130,38 @@ const Analytics: React.FC = () => {
   // Single SSOT load — both demographics + engagement
   useEffect(() => {
     loadDeviceStats();
-  }, []);
+  }, [dateRange]);
 
   const loadDeviceStats = async () => {
+    setIsLoading(true);
     try {
       // SSOT: unified query — all active devices with valid FCM tokens, deduplicated
       const { users, stats: deviceStats } = await fetchActiveDevices();
 
-      const sortedCountries = Object.entries(deviceStats.byCountry)
+      const sortedCountries = Object.entries(deviceStats.storeByCountry)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([code, count]) => ({
           country: code,
           flag: COUNTRY_FLAGS[code] || '🌍',
           users: count,
-          percentage: deviceStats.total > 0 ? Math.round((count / deviceStats.total) * 100) : 0,
+          percentage: deviceStats.storeRegistered > 0 ? Math.round((count / deviceStats.storeRegistered) * 100) : 0,
         }));
 
+      const activityStats = await getActivityStatsForRange(dateRange);
+
       setStats({
-        totalUsers: deviceStats.total,
-        activeUsers: deviceStats.active,
-        avgSessionDuration: 0,
-        retentionRate: deviceStats.retentionRate,
-        // Monthly engagement — aggregated from user docs (zero extra reads)
-        totalAzkar: deviceStats.monthlyAzkar,
-        totalQuran: deviceStats.monthlyQuran,
-        totalPrayers: deviceStats.monthlyPrayers,
+        totalUsers: deviceStats.storeRegistered,
+        activeUsers: activityStats.activeUsers,
+        appOpens: activityStats.appOpens,
+        retentionRate: deviceStats.storeRegistered > 0
+          ? Math.round((activityStats.activeUsers / deviceStats.storeRegistered) * 100)
+          : 0,
+        totalAzkar: activityStats.azkar,
+        totalTasbih: activityStats.tasbih,
+        totalPrayers: activityStats.prayers,
       });
-      setPlatforms({ ios: deviceStats.ios, android: deviceStats.android });
+      setPlatforms({ ios: deviceStats.storeIos, android: deviceStats.storeAndroid });
       if (sortedCountries.length > 0) setTopCountries(sortedCountries);
 
       // Lifetime engagement — from users/{uid}/stats/lifetime subcollection
@@ -116,7 +176,7 @@ const Analytics: React.FC = () => {
   };
 
   const exportData = () => {
-    const data = { stats, topCountries, topAzkar, platforms, exportedAt: new Date().toISOString() };
+    const data = { dateRange, rangeLabel: RANGE_LABELS[dateRange], stats, topCountries, topAzkar, platforms, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -153,7 +213,7 @@ const Analytics: React.FC = () => {
         <div className="flex items-center gap-3">
           <select
             value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
+            onChange={(e) => setDateRange(e.target.value as DateRange)}
             aria-label="نطاق التاريخ"
             className="px-4 py-2 border rounded-lg"
           >
@@ -174,7 +234,7 @@ const Analytics: React.FC = () => {
         <div className="bg-white p-5 rounded-xl shadow-sm border">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-500">إجمالي المستخدمين</p>
+              <p className="text-sm text-gray-500">مسجلون من المتاجر</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{stats.totalUsers.toLocaleString()}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-xl">
@@ -186,8 +246,9 @@ const Analytics: React.FC = () => {
         <div className="bg-white p-5 rounded-xl shadow-sm border">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-500">المستخدمين النشطين</p>
+              <p className="text-sm text-gray-500">مستخدمون فتحوا التطبيق</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{stats.activeUsers.toLocaleString()}</p>
+              <p className="text-xs text-gray-400 mt-1">{RANGE_LABELS[dateRange]}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-xl">
               <Activity className="w-6 h-6 text-green-600" />
@@ -198,8 +259,9 @@ const Analytics: React.FC = () => {
         <div className="bg-white p-5 rounded-xl shadow-sm border">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-500">متوسط الجلسة</p>
-              <p className="text-2xl font-bold text-gray-800 mt-1">{stats.avgSessionDuration} د</p>
+              <p className="text-sm text-gray-500">مرات فتح التطبيق</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{stats.appOpens.toLocaleString()}</p>
+              <p className="text-xs text-gray-400 mt-1">{RANGE_LABELS[dateRange]}</p>
             </div>
             <div className="p-3 bg-purple-100 rounded-xl">
               <Clock className="w-6 h-6 text-purple-600" />
@@ -210,8 +272,9 @@ const Analytics: React.FC = () => {
         <div className="bg-white p-5 rounded-xl shadow-sm border">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-gray-500">معدل الاحتفاظ</p>
+              <p className="text-sm text-gray-500">نسبة النشاط</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{stats.retentionRate}%</p>
+              <p className="text-xs text-gray-400 mt-1">من مسجلي المتاجر في {RANGE_LABELS[dateRange]}</p>
             </div>
             <div className="p-3 bg-pink-100 rounded-xl">
               <Target className="w-6 h-6 text-pink-600" />
@@ -224,12 +287,12 @@ const Analytics: React.FC = () => {
       <div>
         <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-emerald-600" />
-          تفاعل المستخدمين النشطين
-          <span className="text-xs font-normal text-gray-400 mr-1">(بيانات نقية — المستخدمين الحاليين فقط)</span>
+          تفاعل المستخدمين
+          <span className="text-xs font-normal text-gray-400 mr-1">(من سجل النشاط — {RANGE_LABELS[dateRange]})</span>
         </h2>
 
-        {/* Monthly Engagement */}
-        <p className="text-sm text-gray-500 mb-2 font-medium">📅 هذا الشهر</p>
+        {/* Range Engagement */}
+        <p className="text-sm text-gray-500 mb-2 font-medium">📅 {RANGE_LABELS[dateRange]}</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div className="bg-white p-5 rounded-xl shadow-sm border border-purple-100">
             <div className="flex items-center gap-3 mb-2">
@@ -246,9 +309,9 @@ const Analytics: React.FC = () => {
               <div className="p-2 bg-emerald-100 rounded-lg">
                 <BookOpen className="w-5 h-5 text-emerald-600" />
               </div>
-              <span className="text-gray-600">صفحات القرآن</span>
+              <span className="text-gray-600">التسبيحات المسجلة</span>
             </div>
-            <p className="text-3xl font-bold text-gray-800">{stats.totalQuran.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-800">{stats.totalTasbih.toLocaleString()}</p>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-blue-100">

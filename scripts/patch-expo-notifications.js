@@ -129,7 +129,8 @@ function patch() {
   // ────────────────────────────────────────────────────────────────
   const START_FULL_ADHAN_PLAYBACK = `      val contentData = notificationRequest.content.body
       val shouldPlayFullAdhan = contentData?.let {
-        it.optString("type") == "prayer" && it.optString("androidFullAdhan") == "true"
+        val notifType = it.optString("type")
+        (notifType == "prayer" || notifType == "full_adhan") && it.optString("androidFullAdhan") == "true"
       } ?: false
       if (shouldPlayFullAdhan) {
         try {

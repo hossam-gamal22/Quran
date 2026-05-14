@@ -8,6 +8,9 @@ export interface QAQuestion {
   id: string;
   question: Record<string, string>;
   answer: Record<string, string>;
+  internalSourceName?: string;
+  internalSourceUrl?: string;
+  internalNotes?: string;
   order: number;
   isVisible: boolean;
   createdAt?: string;

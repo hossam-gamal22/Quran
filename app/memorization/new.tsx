@@ -85,13 +85,14 @@ export default function NewMemorizationPlan() {
   const colors = useColors();
   const { settings: appSettings } = useSettings();
   const isRTL = useIsRTL();
-  const { createPlan, registerAyahsForPlan } = useMemorization();
+  const { plans, createPlan, registerAyahsForPlan, setActivePlan } = useMemorization();
 
   const [scope, setScope] = useState<MemorizationScope>('preset');
   const [presetId, setPresetId] = useState<string>(
     MEMORIZATION_PRESETS[0]?.id ?? 'juzAmma',
   );
   const [pickedSurah, setPickedSurah] = useState<number>(67);
+  const [surahInput, setSurahInput] = useState<string>('67');
   const [rangeFrom, setRangeFrom] = useState<string>('1');
   const [rangeTo, setRangeTo] = useState<string>('5');
   const [level, setLevel] = useState<MemorizationLevel>('beginner');
@@ -119,17 +120,23 @@ export default function NewMemorizationPlan() {
       return;
     }
 
+    const selectedSurah = parseAyahInput(surahInput) ?? pickedSurah;
+    if ((scope === 'surah' || scope === 'range') && !getAyahCount(selectedSurah)) {
+      Alert.alert(mt('errSave'), mt('errInvalidSurah'));
+      return;
+    }
+
     let ayahRange: { surahNumber: number; fromAyah: number; toAyah: number } | undefined;
     if (scope === 'range') {
       const from = parseAyahInput(rangeFrom);
       const to = parseAyahInput(rangeTo);
-      const ayahCount = getAyahCount(pickedSurah);
+      const ayahCount = getAyahCount(selectedSurah);
       if (!from || !to || from > to || to > ayahCount) {
         Alert.alert(mt('errSave'), mt('errInvalidRange'));
         return;
       }
       ayahRange = {
-        surahNumber: pickedSurah,
+        surahNumber: selectedSurah,
         fromAyah: from,
         toAyah: to,
       };
@@ -151,7 +158,7 @@ export default function NewMemorizationPlan() {
         partial.presetId = presetId;
         partial.surahNumbers = getPresetById(presetId)?.surahNumbers ?? [];
       } else if (scope === 'surah') {
-        partial.surahNumbers = [pickedSurah];
+        partial.surahNumbers = [selectedSurah];
       } else if (scope === 'range') {
         partial.ayahRange = ayahRange;
       }
@@ -178,8 +185,38 @@ export default function NewMemorizationPlan() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <UniversalHeader title={mt('newPlanTitle')} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.scroll}>
+        {plans.length > 0 && (
+          <Section title={mt('continuePlan')} colors={colors} isRTL={isRTL}>
+            <Text style={styles.hint}>{mt('continuePlanHint')}</Text>
+            <View style={styles.gap8}>
+              {plans.map((plan) => (
+                <TouchableOpacity
+                  key={plan.id}
+                  onPress={async () => {
+                    await setActivePlan(plan.id);
+                    router.replace('/memorization');
+                  }}
+                  style={[
+                    styles.presetRow,
+                    plan.isActive && {
+                      borderColor: colors.primary,
+                      backgroundColor: 'rgba(13,142,98,0.08)',
+                    },
+                  ]}
+                >
+                  <Text style={styles.presetTitle}>{plan.name}</Text>
+                  <Text style={styles.presetMeta}>
+                    {toArabicDigits(plan.dailyTarget)} {mt('ayahsUnit')} / {mt('daysUnit')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Section>
+        )}
+
         {/* Step 1: Scope */}
         <Section title={mt('step1')} colors={colors} isRTL={isRTL}>
+          <Text style={styles.hint}>{mt('externalReviewHint')}</Text>
           <ChipsRow
             colors={colors}
             isRTL={isRTL}
@@ -222,7 +259,10 @@ export default function NewMemorizationPlan() {
                 {SHORT_SURAH_OPTIONS.map((s) => (
                   <TouchableOpacity
                     key={s}
-                    onPress={() => setPickedSurah(s)}
+                    onPress={() => {
+                      setPickedSurah(s);
+                      setSurahInput(String(s));
+                    }}
                     style={[
                       styles.chip,
                       pickedSurah === s && { backgroundColor: colors.primary },
@@ -239,11 +279,41 @@ export default function NewMemorizationPlan() {
                   </TouchableOpacity>
                 ))}
               </View>
+              <View style={styles.exactBox}>
+                <Text style={styles.label}>{mt('exactSelection')}</Text>
+                <Text style={styles.hint}>{mt('ayahRangeHint')}</Text>
+                <View style={styles.rowGap}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>{mt('surahNumber')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={surahInput}
+                      onChangeText={(v) => {
+                        const normalized = normalizeDigits(v).replace(/[^0-9]/g, '').slice(0, 3);
+                        setSurahInput(normalized);
+                        const parsed = parseAyahInput(normalized);
+                        if (parsed && getAyahCount(parsed)) setPickedSurah(parsed);
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>{mt('selectedSurah')}</Text>
+                    <View style={styles.readOnlyInput}>
+                      <Text style={styles.readOnlyText} numberOfLines={1}>
+                        {getAyahCount(pickedSurah)
+                          ? getSurahName(pickedSurah)
+                          : mt('errInvalidSurah')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
 
               {scope === 'range' && (
                 <View style={styles.rowGap}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>من</Text>
+                    <Text style={styles.label}>{mt('ayahFrom')}</Text>
                     <TextInput
                       style={styles.input}
                       keyboardType="number-pad"
@@ -252,7 +322,7 @@ export default function NewMemorizationPlan() {
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>إلى</Text>
+                    <Text style={styles.label}>{mt('ayahTo')}</Text>
                     <TextInput
                       style={styles.input}
                       keyboardType="number-pad"
@@ -454,6 +524,21 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       backgroundColor: 'rgba(255,255,255,0.06)',
     },
     chipText: { color: colors.text, fontFamily: 'Cairo-Regular', fontSize: 12 },
+    exactBox: {
+      gap: 8,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      backgroundColor: 'rgba(255,255,255,0.04)',
+    },
+    hint: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 12,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
     presetRow: {
       padding: 12,
       borderRadius: 12,
@@ -486,6 +571,23 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       textAlign: 'center',
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.1)',
+    },
+    readOnlyInput: {
+      minHeight: 47,
+      backgroundColor: 'rgba(255,255,255,0.04)',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    readOnlyText: {
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     cta: {
       flexDirection: isRTL ? 'row-reverse' : 'row',

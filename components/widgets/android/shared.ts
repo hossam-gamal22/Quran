@@ -48,7 +48,7 @@ export interface WidgetPalette {
 }
 
 export const THEME_PALETTES: Record<WidgetThemeKey, WidgetPalette> = {
-  auto: { bg: '#373737', surface: '#1FFFFFFF', text: '#FFFFFF', muted: '#B3FFFFFF', isLight: false },
+  auto: { bg: '#E3E0DB', surface: '#4DFFFFFF', text: '#3A3A39', muted: '#5E5E5C', isLight: true },
   dark: { bg: '#373737', surface: '#1FFFFFFF', text: '#FFFFFF', muted: '#B3FFFFFF', isLight: false },
   light: { bg: '#E3E0DB', surface: '#4DFFFFFF', text: '#3A3A39', muted: '#5E5E5C', isLight: true },
   olive: { bg: '#293126', surface: '#1FFFFFFF', text: '#F2F3E8', muted: '#C7CBB8', isLight: false },
@@ -68,9 +68,18 @@ export function paletteFor(theme?: string): WidgetPalette {
   return THEME_PALETTES[t] ?? THEME_PALETTES.auto;
 }
 
+// Names below MUST be a prefix of the asset font filename. RNAW resolves font
+// names via `ResourceUtils.findAssetFont` which scans `assets/fonts/` and picks
+// the first file whose basename starts with the requested name + ".".
+//
+// Examples:
+//   "Amiri"        → searches Amiri.ttf       (no match — fallback to system font)
+//   "Amiri-Regular" → searches Amiri-Regular.ttf  (correct)
+//   "AmiriBold"    → searches AmiriBold.ttf    (no match)
+//   "Amiri-Bold"   → searches Amiri-Bold.ttf  (correct)
 export const FONT = {
-  amiri: 'Amiri',
-  amiriBold: 'AmiriBold',
+  amiri: 'Amiri-Regular',
+  amiriBold: 'Amiri-Bold',
   /** Decorative Arabic + Latin headings (default Glassify-style font). */
   widget: 'WidgetFont',
   /** Alternate Glassify-style font — user can opt-in via app settings. */

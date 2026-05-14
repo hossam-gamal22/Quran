@@ -20,8 +20,9 @@ import {
   applySeasonsMetadataOverrides,
 } from '@/lib/seasonal-content';
 import { loadSeasonsMetadata } from '@/lib/content-api';
-import { getHijriDate } from '@/lib/hijri-date';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { getHijriDate as getLocalHijriDate, type HijriDate } from '@/lib/hijri-date';
+import { getHijriDate as getAuthoritativeHijriDate } from '@/services/hijriCalendarService';
+import { collection, getDocs, query, where, orderBy, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { getLanguage } from '@/lib/i18n';
 import type { WelcomeBannerConfig } from '@/lib/app-config-api';
@@ -132,6 +133,25 @@ async function getDocsWithTimeout<T>(promise: Promise<T>, timeoutMs = FIRESTORE_
   ]);
 }
 
+async function getSeasonHijriDate(date: Date = new Date()): Promise<HijriDate> {
+  const fallback = getLocalHijriDate(date);
+  try {
+    const result = await getDocsWithTimeout(getAuthoritativeHijriDate(date), 5000);
+    return {
+      day: result.day,
+      month: result.month,
+      year: result.year,
+      monthName: result.monthName,
+      monthNameAr: result.monthNameAr,
+      weekday: fallback.weekday,
+      weekdayAr: fallback.weekdayAr,
+    };
+  } catch (error) {
+    if (__DEV__) console.log('Seasonal Hijri date fallback:', (error as any)?.message || error);
+    return fallback;
+  }
+}
+
 // ========================================
 // مفاتيح التخزين
 // ========================================
@@ -196,7 +216,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       const stored = await AsyncStorage.getItem(STORAGE_KEYS.PROGRESS);
       if (stored) {
         const progress: SeasonalProgress = JSON.parse(stored);
-        const hijriDate = getHijriDate();
+        const hijriDate = getLocalHijriDate();
         
         // التحقق من أن التقدم للموسم الحالي والسنة الحالية
         if (progress.seasonType === seasonType && progress.year === hijriDate.year) {
@@ -215,7 +235,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
         const newProgress: SeasonalProgress = {
           ...defaultProgress,
           seasonType,
-          year: getHijriDate().year,
+          year: getLocalHijriDate().year,
         };
         setSeasonalProgress(newProgress);
       }
@@ -273,7 +293,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
   // جلب بانر المحتوى الموسمي من الأدمن
   // ========================================
 
-  const loadAdminBanners = useCallback(async () => {
+  const loadAdminBanners = useCallback(async (seasonHijriDate?: HijriDate) => {
     try {
       const lang = getLanguage() || 'ar';
       const q = query(
@@ -288,7 +308,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       }
 
       const now = new Date();
-      const hijri = getHijriDate(now);
+      const hijri = seasonHijriDate || getLocalHijriDate(now);
       const dayOfWeek = now.getDay(); // 0=Sun, 5=Fri
 
       // خريطة المواسم حسب التاريخ الهجري
@@ -405,11 +425,12 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       } catch { /* CMS unavailable — use defaults */ }
 
       // الحصول على الموسم الحالي
-      const season = getCurrentSeason();
+      const hijriDate = await getSeasonHijriDate();
+      const season = getCurrentSeason(hijriDate);
       setCurrentSeason(season);
 
       // الحصول على الموسم القادم
-      const upcoming = getUpcomingSeason();
+      const upcoming = getUpcomingSeason(hijriDate);
       setUpcomingSeason(upcoming);
 
       // الحصول على اليوم المميز
@@ -417,11 +438,11 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       setSpecialDay(special);
 
       // الحصول على البيانات اليومية
-      const daily = getDailySeasonalData();
+      const daily = getDailySeasonalData(hijriDate);
       setDailyData(daily);
 
       // الحصول على جميع المواسم
-      const seasons = getAllSeasons();
+      const seasons = getAllSeasons(hijriDate);
       setAllSeasons(seasons);
 
       // تحميل التقدم إذا كان هناك موسم نشط
@@ -435,7 +456,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       }
 
       // جلب بانرات الأدمن (دائماً — حتى لو لا يوجد موسم تقويمي)
-      await loadAdminBanners();
+      await loadAdminBanners(hijriDate);
     } catch (error) {
       console.error('Error refreshing seasonal data:', error);
     } finally {
@@ -513,7 +534,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       const newProgress: SeasonalProgress = {
         ...defaultProgress,
         seasonType: currentSeason.type,
-        year: getHijriDate().year,
+        year: getLocalHijriDate().year,
       };
 
       setSeasonalProgress(newProgress);
@@ -531,11 +552,32 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
     (async () => {
       try {
         const { syncAppIconOnStartup } = await import('@/lib/app-icon-manager');
-        await syncAppIconOnStartup(getLanguage() as any, currentSeason?.type ?? null);
+        await syncAppIconOnStartup(getLanguage() as any, currentSeason?.type ?? null, true);
       } catch (e) {
         if (__DEV__) console.log('Seasonal icon sync skipped:', e);
       }
     })();
+  }, [currentSeason?.type, isLoading]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'appConfig', 'appIcons'),
+      async () => {
+        try {
+          const { syncAppIconOnStartup } = await import('@/lib/app-icon-manager');
+          await syncAppIconOnStartup(getLanguage() as any, currentSeason?.type ?? null, true);
+        } catch (e) {
+          if (__DEV__) console.log('Realtime app icon sync skipped:', e);
+        }
+      },
+      (error) => {
+        if (__DEV__) console.log('Realtime app icon listener unavailable:', error);
+      }
+    );
+
+    return unsubscribe;
   }, [currentSeason?.type, isLoading]);
 
   // ========================================

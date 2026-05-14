@@ -61,15 +61,18 @@ export default function WirdScreen() {
   // Generate page list for today's wird
   const pagesList = useMemo(() => {
     if (!wirdInfo || !activeKhatma) return [];
-    
-    const pages = [];
-    for (let i = wirdInfo.startPage; i <= wirdInfo.endPage; i++) {
-      pages.push({
-        number: i,
-        surah: getPageSurah(i),
-      });
-    }
-    return pages;
+
+    const pageNumbers = wirdInfo.pageNumbers?.length
+      ? wirdInfo.pageNumbers
+      : Array.from(
+        { length: Math.max(wirdInfo.endPage - wirdInfo.startPage + 1, 0) },
+        (_, index) => wirdInfo.startPage + index,
+      );
+
+    return pageNumbers.map((number) => ({
+      number,
+      surah: getPageSurah(number),
+    }));
   }, [wirdInfo, activeKhatma]);
 
   // Handle complete wird
@@ -358,7 +361,7 @@ export default function WirdScreen() {
 
       {/* Complete Button */}
       {!wirdInfo?.isCompleted && (
-        <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
+        <View style={styles.bottomBar}>
           <TouchableOpacity
             style={[styles.completeButton, { backgroundColor: '#0d8e62', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleCompleteWird}

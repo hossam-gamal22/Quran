@@ -67,6 +67,7 @@ export const LINKING_CONFIG = {
           prayer: 'prayer',
           tasbih: 'tasbih',
           quran: 'quran',
+          azkar: 'azkar',
           'hijri-calendar': 'hijri-calendar',
         },
       },
@@ -95,6 +96,30 @@ export function buildDeepLink(path: string): string {
   return `${URL_SCHEME}://${cleanPath}`;
 }
 
+export function normalizeDeepLinkRoute(path: string): string {
+  const [pathname, suffix = ''] = path.split(/([?#].*)/, 2);
+
+  switch (pathname) {
+    case '/':
+    case '':
+      return '/';
+    case '/widget':
+    case '/widgets-gallery':
+    case '/widget-settings':
+      return `/widget${suffix}`;
+    case '/qibla':
+      return '/(tabs)/prayer?tab=qibla';
+    case '/azkar/morning':
+      return `/azkar/1${suffix}`;
+    case '/azkar/evening':
+      return `/azkar/1b${suffix}`;
+    case '/azkar':
+      return `/(tabs)/azkar${suffix}`;
+    default:
+      return `${pathname}${suffix}`;
+  }
+}
+
 /**
  * Parse a deep link URL into a route path.
  * Preserves query string and hash so that downstream consumers
@@ -103,7 +128,13 @@ export function buildDeepLink(path: string): string {
 export function parseDeepLink(url: string): string | null {
   const prefix = `${URL_SCHEME}://`;
   if (!url.startsWith(prefix)) return null;
-  return '/' + url.slice(prefix.length);
+  if (url.includes('expo-development-client')) return null;
+
+  const rawPath = url.slice(prefix.length);
+  if (!rawPath || rawPath === '/') return '/';
+
+  const routePath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  return normalizeDeepLinkRoute(routePath);
 }
 
 /**

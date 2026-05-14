@@ -31,16 +31,77 @@ service firebase.storage {
 
     // General admin uploads (welcome banner backgrounds, etc.)
     match /uploads/{allPaths=**} {
-      allow write: if request.resource.size < 10 * 1024 * 1024
+      allow write: if request.resource != null
+                   && request.resource.size < 10 * 1024 * 1024
                    && (request.resource.contentType.matches('image/.*')
                        || request.resource.contentType.matches('audio/.*'));
+      allow delete: if true;
     }
 
     // Adhkar audio files uploaded from AzkarManager admin page.
     // Same trust model as other admin uploads.
     match /adhkar-audio/{fileName} {
-      allow write: if request.resource.size < 10 * 1024 * 1024
+      allow write: if request.resource != null
+                   && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('audio/.*');
+      allow delete: if true;
+    }
+
+    // Admin-managed image uploads used by the dashboard editors.
+    match /category-icons/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if true;
+    }
+
+    match /theme-icons/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if true;
+    }
+
+    match /backgrounds/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if true;
+    }
+
+    match /content-icons/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if true;
+    }
+
+    match /app-content/icons/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if true;
+    }
+
+    // Admin-managed audio/PDF uploads.
+    match /duas-audio/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 15 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+      allow delete: if true;
+    }
+
+    match /pdf-uploads/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 25 * 1024 * 1024
+                   && request.resource.contentType == 'application/pdf';
+      allow delete: if true;
+    }
+
+    match /theme-pdfs/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 25 * 1024 * 1024
+                   && request.resource.contentType == 'application/pdf';
       allow delete: if true;
     }
 

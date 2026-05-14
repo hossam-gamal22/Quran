@@ -384,7 +384,7 @@ export default function NewKhatmaScreen() {
       </ScrollView>
 
       {/* Create Button */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
+      <View style={styles.bottomBar}>
         <TouchableOpacity
           style={[
             styles.createButton,

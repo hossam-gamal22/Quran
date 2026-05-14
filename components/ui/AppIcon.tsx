@@ -8,6 +8,7 @@ const EMOJI_ICON_REGEX = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 
 const ICON_ALIASES: Record<string, string> = {
   'hands-pray': '🤲',
+  'salawat-symbol': 'text:ﷺ',
 };
 
 export function resolveAppIconName(name?: string | null): string {
@@ -49,6 +50,29 @@ export function AppIcon({
         style={[{ width: size, height: size }, imageStyle]}
         resizeMode="contain"
       />
+    );
+  }
+
+  if (resolvedName.startsWith('text:')) {
+    const txt = resolvedName.slice(5);
+    return (
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        style={[
+          {
+            color,
+            fontSize: size * 0.8,
+            lineHeight: Math.ceil(size * 1.15),
+            textAlign: 'center',
+            includeFontPadding: false,
+            fontWeight: '600',
+          },
+          style,
+        ]}
+      >
+        {txt}
+      </Text>
     );
   }
 

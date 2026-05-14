@@ -344,7 +344,12 @@ export default function SalatiScreen() {
               },
               trigger: null,
             });
-            try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayerKey}`); } catch {}
+            // Cancel today's did_you_pray notification (date-based identifier)
+            try {
+              const td = new Date();
+              const ds = `${td.getFullYear()}${String(td.getMonth() + 1).padStart(2, '0')}${String(td.getDate()).padStart(2, '0')}`;
+              await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayerKey}_${ds}`);
+            } catch {}
           } catch (e) {
             console.warn('[Salati] Failed to send completion notification:', e);
           }

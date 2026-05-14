@@ -1,0 +1,342 @@
+[
+  {
+    "id": "daySimple",
+    "category": "date",
+    "titleAr": "اليوم",
+    "titleEn": "Day Simple",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://hijri",
+    "iosKind": "daySimple",
+    "androidProvider": "RoohDateSmall",
+    "legacyAndroidProvider": "RoohSmall"
+  },
+  {
+    "id": "dayThuluth",
+    "category": "date",
+    "titleAr": "اليوم - ثلث",
+    "titleEn": "Day Thuluth",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": "ar",
+    "deepLink": "rooh-almuslim://hijri",
+    "iosKind": "dayThuluth",
+    "androidProvider": "RoohDateSmall",
+    "legacyAndroidProvider": null,
+    "premiumSizes": [
+      "medium"
+    ]
+  },
+  {
+    "id": "dayDigital",
+    "category": "date",
+    "titleAr": "اليوم - رقمي",
+    "titleEn": "Day Digital",
+    "sizes": [
+      "small"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://hijri",
+    "iosKind": "dayDigital",
+    "androidProvider": "RoohDateSmall",
+    "legacyAndroidProvider": null,
+    "overlay": {
+      "kind": "currentTime",
+      "anchors": {
+        "small": {
+          "x": 78,
+          "y": 70,
+          "fontSize": 44,
+          "fontFamily": "Rubik-Bold",
+          "align": "center",
+          "color": "text",
+          "clearWidth": 130,
+          "clearHeight": 56
+        }
+      }
+    }
+  },
+  {
+    "id": "monthSimple",
+    "category": "date",
+    "titleAr": "الشهر",
+    "titleEn": "Month Simple",
+    "sizes": [
+      "small"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://hijri",
+    "iosKind": "monthSimple",
+    "androidProvider": "RoohDateSmall",
+    "legacyAndroidProvider": null
+  },
+  {
+    "id": "monthThuluth",
+    "category": "date",
+    "titleAr": "الشهر - ثلث",
+    "titleEn": "Month Thuluth",
+    "sizes": [
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": true,
+    "forcedLanguage": "ar",
+    "deepLink": "rooh-almuslim://hijri",
+    "iosKind": "monthThuluth",
+    "androidProvider": "RoohDateMedium",
+    "legacyAndroidProvider": null
+  },
+  {
+    "id": "prayerSingle",
+    "category": "prayer",
+    "titleAr": "الصلاة القادمة",
+    "titleEn": "Prayer Simple",
+    "sizes": [
+      "small"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://prayer",
+    "iosKind": "prayerSingle",
+    "androidProvider": "RoohPrayerSmall",
+    "legacyAndroidProvider": "PrayerTimesSmall",
+    "overlay": {
+      "kind": "prayerCountdown",
+      "anchors": {
+        "small": {
+          "x": 78,
+          "y": 130,
+          "fontSize": 10,
+          "fontFamily": "Rubik-Medium",
+          "align": "center",
+          "color": "muted",
+          "clearWidth": 140,
+          "clearHeight": 14
+        }
+      }
+    }
+  },
+  {
+    "id": "prayerTable",
+    "category": "prayer",
+    "titleAr": "جدول الصلاة",
+    "titleEn": "Prayer Table",
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://prayer",
+    "iosKind": "prayerTable",
+    "androidProvider": "RoohPrayerMedium",
+    "legacyAndroidProvider": "PrayerTimesLarge",
+    "overlay": {
+      "kind": "prayerCountdown",
+      "anchors": {
+        "small": {
+          "x": 44,
+          "y": 24,
+          "fontSize": 9,
+          "fontFamily": "Rubik-Medium",
+          "align": "left",
+          "color": "muted",
+          "clearWidth": 82,
+          "clearHeight": 12
+        },
+        "medium": {
+          "x": 246,
+          "y": 130,
+          "fontSize": 9,
+          "fontFamily": "Rubik-Medium",
+          "align": "center",
+          "color": "muted",
+          "clearWidth": 112,
+          "clearHeight": 12
+        },
+        "large": {
+          "x": 246,
+          "y": 126,
+          "fontSize": 12,
+          "fontFamily": "Rubik-Medium",
+          "align": "center",
+          "color": "muted",
+          "clearWidth": 180,
+          "clearHeight": 18
+        }
+      }
+    }
+  },
+  {
+    "id": "prayerNextPrevious",
+    "category": "prayer",
+    "titleAr": "الصلاة السابقة والقادمة",
+    "titleEn": "Next & Previous",
+    "sizes": [
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": false,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://prayer",
+    "iosKind": "prayerNextPrevious",
+    "androidProvider": "RoohPrayerMedium",
+    "legacyAndroidProvider": null,
+    "overlay": {
+      "kind": "prayerCountdown",
+      "anchors": {
+        "medium": {
+          "x": 91,
+          "y": 126,
+          "fontSize": 9,
+          "fontFamily": "Rubik-Medium",
+          "align": "center",
+          "color": "muted",
+          "clearWidth": 120,
+          "clearHeight": 12
+        }
+      }
+    }
+  },
+  {
+    "id": "verseOfDay",
+    "category": "quran",
+    "titleAr": "آية اليوم",
+    "titleEn": "Verse of Day",
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": true,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://daily-ayah",
+    "iosKind": "verseOfDay",
+    "androidProvider": "RoohQuranSmall",
+    "legacyAndroidProvider": "DailyVerseSmall"
+  },
+  {
+    "id": "azkarMorning",
+    "category": "azkar",
+    "titleAr": "أذكار الصباح",
+    "titleEn": "Morning Adhkar",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": true,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://azkar/morning",
+    "iosKind": "azkarMorning",
+    "androidProvider": "RoohAzkarSmall",
+    "legacyAndroidProvider": "AzkarProgressSmall"
+  },
+  {
+    "id": "azkarEvening",
+    "category": "azkar",
+    "titleAr": "أذكار المساء",
+    "titleEn": "Evening Adhkar",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": true,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://azkar/evening",
+    "iosKind": "azkarEvening",
+    "androidProvider": "RoohAzkarSmall",
+    "legacyAndroidProvider": null
+  },
+  {
+    "id": "dailyDhikr",
+    "category": "azkar",
+    "titleAr": "الذكر اليومي",
+    "titleEn": "Daily Dhikr",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": true,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://daily-dhikr",
+    "iosKind": "dailyDhikr",
+    "androidProvider": "RoohAzkarSmall",
+    "legacyAndroidProvider": "DailyDhikrSmall"
+  },
+  {
+    "id": "hijriDate",
+    "category": "hijri",
+    "titleAr": "الهجري",
+    "titleEn": "Hijri",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "isPremium": true,
+    "forcedLanguage": null,
+    "deepLink": "rooh-almuslim://hijri",
+    "iosKind": "hijriDate",
+    "androidProvider": "RoohHijriSmall",
+    "legacyAndroidProvider": "HijriDateSmall"
+  }
+]

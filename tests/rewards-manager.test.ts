@@ -149,6 +149,7 @@ vi.mock('firebase/firestore', () => {
 });
 
 import {
+  autoSelectMonthlyWinners,
   getCurrentMonth,
   getMonthlyLeaderboard,
   syncMonthlyEngagementFromLocalWorship,
@@ -259,5 +260,61 @@ describe('rewards-manager monthly sync', () => {
     await expect(getMonthlyLeaderboard(20)).resolves.toEqual([
       { userId: 'visible', displayName: 'Visible', score: 10 },
     ]);
+  });
+
+  it('auto-selects previous-month winners and grants app-readable admin premium', async () => {
+    const previousMonth = '2026-04-v2';
+    firestoreState.config.currentMonth = '';
+    firestoreState.config.currentWinners = [];
+    firestoreState.config.history = [];
+    firestoreState.config.rewardDurationDays = 30;
+
+    firestoreState.users.set('first', {
+      displayName: 'First',
+      monthlyEngagement: { month: previousMonth, score: 300, activities: { prayer: 60 } },
+    });
+    firestoreState.users.set('second', {
+      displayName: 'Second',
+      monthlyEngagement: { month: previousMonth, score: 200, activities: { quran: 60 } },
+    });
+    firestoreState.users.set('third', {
+      displayName: 'Third',
+      monthlyEngagement: { month: previousMonth, score: 100, activities: { azkar: 50 } },
+    });
+    firestoreState.users.set('fourth', {
+      displayName: 'Fourth',
+      monthlyEngagement: { month: previousMonth, score: 50, activities: { app_open: 50 } },
+    });
+    firestoreState.users.set('hidden-winner', {
+      displayName: 'Hidden Winner',
+      hiddenFromLeaderboard: true,
+      monthlyEngagement: { month: previousMonth, score: 500, activities: { prayer: 100 } },
+    });
+
+    await autoSelectMonthlyWinners();
+
+    expect(firestoreState.config.currentMonth).toBe(previousMonth);
+    expect(firestoreState.config.processedMonth).toBe(previousMonth);
+    expect(firestoreState.config.currentWinners.map((w: any) => w.userId)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+    expect(firestoreState.config.history[0].month).toBe(previousMonth);
+
+    for (const userId of ['first', 'second', 'third']) {
+      const premium = firestoreState.users.get(userId)?.adminPremium;
+      expect(premium).toMatchObject({
+        granted: true,
+        grantedBy: 'auto_reward_system',
+        plan: 'monthly',
+        reason: `فائز في مسابقة الشهر ${previousMonth}`,
+      });
+      expect(typeof premium.expiresAt).toBe('string');
+      expect(Number.isNaN(new Date(premium.expiresAt).getTime())).toBe(false);
+    }
+
+    expect(firestoreState.users.get('fourth')?.adminPremium).toBeUndefined();
+    expect(firestoreState.users.get('hidden-winner')?.adminPremium).toBeUndefined();
   });
 });

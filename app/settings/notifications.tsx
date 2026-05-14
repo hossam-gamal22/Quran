@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  AppState,
+  AppStateStatus,
   Platform,
   Linking,
   ActivityIndicator,
@@ -35,11 +37,18 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { Colors, DarkColors } from '@/constants/theme';
 import { t } from '@/lib/i18n';
-import { ADHAN_SOUNDS as ADHAN_SOUND_FILES, NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES, fetchDisabledBundledSounds } from '@/lib/sound-manager';
+import {
+  ADHAN_SOUNDS as ADHAN_SOUND_FILES,
+  NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES,
+  fetchDisabledBundledSounds,
+  normalizeCompleteAdhanVoice,
+  normalizeFullAdhanNotificationVoice,
+} from '@/lib/sound-manager';
 import { getSurahName } from '@/lib/quran-api';
 import { fetchDownloadableSounds, getDownloadedSounds, downloadSound, isSoundDownloaded, type DownloadableSound, type DownloadedSound } from '@/lib/downloadable-sounds';
 import { sendTestNotification } from '@/lib/notifications-manager';
 import { checkExactAlarmPermission, openExactAlarmSettings } from '@/services/notifications/permissions';
+import { checkAllPermissions, openBatteryOptimizationSettings } from '@/lib/permission-recovery';
 
 
 // Removed: interstitial ads on sound download to reduce user frustration
@@ -304,9 +313,14 @@ export default function NotificationsScreen() {
   // Test notification button state
   const [testingSending, setTestingSending] = useState<string | null>(null);
   const [testingSent, setTestingSent] = useState<string | null>(null);
+  const [showBatteryOptimizationTip, setShowBatteryOptimizationTip] = useState(false);
 
   // Admin-disabled bundled sounds
   const [disabledSoundIds, setDisabledSoundIds] = useState<Set<string>>(new Set());
+  const regularAdhanSoundType =
+    !isPremium && !FREE_ADHAN_IDS.includes(settings.notifications.adhanSoundType || 'makkah')
+      ? 'makkah'
+      : (settings.notifications.adhanSoundType || 'makkah');
 
   // Load disabled sounds from admin config
   useEffect(() => {
@@ -314,6 +328,21 @@ export default function NotificationsScreen() {
       .then(setDisabledSoundIds)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const currentRegularVoice = settings.notifications.adhanSoundType || 'makkah';
+    if (isPremium || FREE_ADHAN_IDS.includes(currentRegularVoice)) return;
+
+    updateNotifications({
+      adhanSoundType: 'makkah',
+      fullAdhanSoundType: settings.notifications.fullAdhanSoundType || normalizeFullAdhanNotificationVoice(currentRegularVoice),
+    });
+  }, [
+    isPremium,
+    settings.notifications.adhanSoundType,
+    settings.notifications.fullAdhanSoundType,
+    updateNotifications,
+  ]);
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
@@ -342,11 +371,15 @@ export default function NotificationsScreen() {
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
-        shouldDuckAndroid: true,
+        // On Android, request audio focus so playback isn't blocked by other apps
+        ...(Platform.OS === 'android' ? {
+          shouldDuckAndroid: false,
+          playThroughEarpieceAndroid: false,
+        } : {}),
       });
       const { sound } = await Audio.Sound.createAsync(
         bundledSound,
-        { shouldPlay: true },
+        { shouldPlay: true, volume: 1.0 },
         (status) => {
           if (status.isLoaded && status.didJustFinish) {
             stopPreview();
@@ -354,9 +387,14 @@ export default function NotificationsScreen() {
         }
       );
       previewSoundRef.current = sound;
+      // On Android, explicitly call playAsync after createAsync to ensure playback starts
+      if (Platform.OS === 'android') {
+        await sound.playAsync();
+      }
       setPreviewPlaying(soundId);
-    } catch {
-      // silently fail
+    } catch (e) {
+      console.warn('[preview] playback failed:', e);
+      setPreviewPlaying(null);
     } finally {
       setPreviewLoading(null);
     }
@@ -414,6 +452,29 @@ export default function NotificationsScreen() {
     setPermissionChecked(true);
   };
 
+  const refreshBatteryOptimizationTip = useCallback(async () => {
+    if (Platform.OS !== 'android') {
+      setShowBatteryOptimizationTip(false);
+      return;
+    }
+
+    try {
+      const status = await checkAllPermissions();
+      setShowBatteryOptimizationTip(status.batteryOptimization === 'optimized');
+    } catch (e) {
+      console.warn('[notifications] Failed to check battery optimization:', e);
+      setShowBatteryOptimizationTip(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshBatteryOptimizationTip();
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') refreshBatteryOptimizationTip();
+    });
+    return () => sub.remove();
+  }, [refreshBatteryOptimizationTip]);
+
   const requestPermissions = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -449,11 +510,15 @@ export default function NotificationsScreen() {
   // Toggle is still applied either way — Layer 2 (sounded notification) is the
   // safety net so the user always hears at least the short adhan.
   const handleFullAdhanToggle = async (next: boolean) => {
-    const currentVoice = settings.notifications.adhanSoundType || 'makkah';
-    const voiceLocked = !isPremium && !FREE_ADHAN_IDS.includes(currentVoice);
+    const currentRegularVoice = settings.notifications.adhanSoundType || 'makkah';
+    const voiceLocked = !isPremium && !FREE_ADHAN_IDS.includes(currentRegularVoice);
+    const selectedVoice = settings.notifications.fullAdhanSoundType || normalizeFullAdhanNotificationVoice(currentRegularVoice);
+    console.log('[FullAdhan] user toggled:', next);
+    console.log('[FullAdhan] selected voice:', selectedVoice);
     await updateNotifications({
       useFullAdhan: next,
-      ...(next && voiceLocked ? { adhanSoundType: 'makkah' as AdhanSoundType } : {}),
+      fullAdhanSoundType: selectedVoice,
+      ...(voiceLocked ? { adhanSoundType: 'makkah' as AdhanSoundType } : {}),
     });
 
     if (!next || Platform.OS !== 'android') return;
@@ -479,6 +544,12 @@ export default function NotificationsScreen() {
 
   const handleTogglePrayerNotification = (prayerKey: string, value: boolean) => {
     setPrayerNotifications((prev) => ({ ...prev, [prayerKey]: value }));
+  };
+
+  const handleBatteryOptimizationPress = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await openBatteryOptimizationSettings();
+    setTimeout(() => refreshBatteryOptimizationTip(), 500);
   };
 
   const toggleCategory = (categoryId: string) => {
@@ -560,7 +631,7 @@ export default function NotificationsScreen() {
       case 'istighfar': return settings.notifications.istighfarReminderTime ?? '12:00';
       case 'dailyVerse': return settings.notifications.dailyVerseTime;
       case 'customReminder': return settings.notifications.customReminderTime ?? '08:00';
-      case 'quranReading': return settings.notifications.quranReadingReminderTime ?? '21:00';
+      case 'quranReading': return settings.notifications.quranReadingReminderTime ?? '20:00';
       case 'worshipDailySummary': return settings.notifications.worshipDailySummaryTime ?? '22:00';
       default: return null;
     }
@@ -835,8 +906,8 @@ export default function NotificationsScreen() {
 
       {/* Reminder minutes selector */}
       {settings.notifications.prayerReminder && (
-        <View style={styles.reminderMinutesContainer}>
-          <Text style={[styles.smallLabel, { color: colors.textLight }]}>
+        <View style={[styles.reminderMinutesContainer, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+          <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 4 }]}>
             {t('notificationSounds.reminderBeforeAdhanBy')}
           </Text>
           <ScrollView
@@ -1022,13 +1093,7 @@ export default function NotificationsScreen() {
 
       {/* Full Adhan toggle — plays the complete adhan recording at prayer time. On iOS, playback will be cut automatically at ~29s by the system. */}
       <View style={[styles.adhanSoundSection, { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
-            const next = !(settings.notifications.useFullAdhan === true);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            handleFullAdhanToggle(next);
-          }}
+        <View
           style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}
         >
           <MaterialCommunityIcons
@@ -1056,7 +1121,7 @@ export default function NotificationsScreen() {
             trackColor={{ false: colors.divider, true: '#0d8e62' }}
             thumbColor="#fff"
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* Adhan sound selection */}
@@ -1076,7 +1141,7 @@ export default function NotificationsScreen() {
             {t('notificationSounds.adhanSound')}
           </Text>
           {(() => {
-            const selectedAdhan = ADHAN_SOUNDS.find(s => s.id === (settings.notifications.adhanSoundType || 'default'));
+            const selectedAdhan = ADHAN_SOUNDS.find(s => s.id === regularAdhanSoundType);
             return selectedAdhan ? (
               <Text style={[styles.adhanSelectedName, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {selectedAdhan.name}
@@ -1092,7 +1157,7 @@ export default function NotificationsScreen() {
 
         {/* Selected sound preview row (when collapsed) */}
         {!adhanListExpanded && (() => {
-          const selectedId = settings.notifications.adhanSoundType || 'default';
+          const selectedId = regularAdhanSoundType;
           const selectedSound = ADHAN_SOUNDS.find(s => s.id === selectedId);
           if (!selectedSound || selectedId === 'default') return null;
           return (
@@ -1133,7 +1198,7 @@ export default function NotificationsScreen() {
           );
         })()}
         {adhanListExpanded && ADHAN_SOUNDS.filter(s => !disabledSoundIds.has(s.id)).map((sound) => {
-          const isSelected = settings.notifications.adhanSoundType === sound.id;
+          const isSelected = regularAdhanSoundType === sound.id;
           const isSoundLocked = !isPremium && !FREE_ADHAN_IDS.includes(sound.id);
           return (
             <TouchableOpacity
@@ -1204,6 +1269,40 @@ export default function NotificationsScreen() {
           );
         })}
       </View>
+
+      {showBatteryOptimizationTip && (
+        <View
+          style={[
+            styles.prayerBatteryTip,
+            {
+              backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : '#FFF7E6',
+              borderColor: isDarkMode ? 'rgba(245,158,11,0.35)' : '#FFE2A8',
+            },
+          ]}
+        >
+          <View style={[styles.prayerBatteryTipHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={styles.prayerBatteryTipIcon}>
+              <MaterialCommunityIcons name="alert" size={18} color="#f59e0b" />
+            </View>
+            <Text style={[styles.prayerBatteryTipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              لضمان وصول الإشعارات
+            </Text>
+          </View>
+          <Text style={[styles.prayerBatteryTipBody, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            استثناء التطبيق من توفير البطارية يساعد إشعارات الصلاة على الوصول في وقتها دائماً.
+          </Text>
+          <TouchableOpacity
+            style={[styles.prayerBatteryTipButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            onPress={handleBatteryOptimizationPress}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="battery-check" size={18} color="#fff" />
+            <Text style={styles.prayerBatteryTipButtonText}>
+              استثناء التطبيق
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Test + Close buttons */}
       {renderTestButton('prayer')}
@@ -1527,9 +1626,14 @@ export default function NotificationsScreen() {
       const soundType = getCategorySoundType(categoryId);
       await sendTestNotification(categoryId, {
         soundType,
-        adhanSoundType: settings.notifications.adhanSoundType || 'makkah',
+        adhanSoundType: regularAdhanSoundType,
+        fullAdhanSoundType: settings.notifications.fullAdhanSoundType || 'makkah',
         sound: settings.notifications.sound,
         vibration: settings.notifications.vibration,
+        useFullAdhan: settings.notifications.useFullAdhan === true,
+        advanceMinutes: categoryId === 'prayer' && settings.notifications.prayerReminder
+          ? (settings.notifications.reminderMinutes ?? 0)
+          : 0,
       });
       setTestingSent(categoryId);
       setTimeout(() => setTestingSent(null), 2500);
@@ -2437,6 +2541,57 @@ const _styles = StyleSheet.create({
   prayerTogglesContainer: {
     marginTop: 8,
     paddingHorizontal: 4,
+  },
+  prayerBatteryTip: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginHorizontal: 4,
+    marginTop: 16,
+    gap: 10,
+  },
+  prayerBatteryTipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  prayerBatteryTipIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(245,158,11,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prayerBatteryTipTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: fontBold(),
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
+  prayerBatteryTipBody: {
+    fontSize: 13,
+    fontFamily: fontRegular(),
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  prayerBatteryTipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 10,
+    backgroundColor: '#f59e0b',
+  },
+  prayerBatteryTipButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: fontSemiBold(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 
   // Time picker row

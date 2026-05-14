@@ -17,6 +17,14 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import defaultArIcon from '../../../assets/images/icons/icon.png';
+import defaultEnIcon from '../../../assets/images/icons/icon_en.png';
+import ramadanIcon from '../../../assets/images/icons/seasonal/ramadan.png';
+import hajjIcon from '../../../assets/images/icons/seasonal/hajj.png';
+import mawlidIcon from '../../../assets/images/icons/seasonal/mawlid.png';
+import eidFitrIcon from '../../../assets/images/icons/seasonal/eid_fitr.png';
+import eidAdhaIcon from '../../../assets/images/icons/seasonal/eid_adha.png';
+import dhulHijjahIcon from '../../../assets/images/icons/seasonal/dhul_hijjah.png';
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -84,15 +92,15 @@ const LANGUAGES: { code: LangCode; nameAr: string; nameEn: string; rtl: boolean 
   { code: 'ru', nameAr: 'الروسية', nameEn: 'Russian', rtl: false },
 ];
 
-const ICONS: { key: SeasonalIconKey; nameAr: string; nameEn: string; color: string; emoji: string }[] = [
-  { key: 'default_ar', nameAr: 'الافتراضية (عربي)', nameEn: 'Default (AR)', color: '#0d8e62', emoji: '🕌' },
-  { key: 'default_en', nameAr: 'الافتراضية (إنجليزي)', nameEn: 'Default (EN)', color: '#0d8e62', emoji: '🕌' },
-  { key: 'ramadan', nameAr: 'رمضان', nameEn: 'Ramadan', color: '#0f987f', emoji: '🌙' },
-  { key: 'hajj', nameAr: 'الحج', nameEn: 'Hajj', color: '#8B4513', emoji: '🕋' },
-  { key: 'mawlid', nameAr: 'المولد النبوي', nameEn: 'Mawlid', color: '#2E8B57', emoji: '🌹' },
-  { key: 'eid_fitr', nameAr: 'عيد الفطر', nameEn: 'Eid Fitr', color: '#FFD700', emoji: '⭐' },
-  { key: 'eid_adha', nameAr: 'عيد الأضحى', nameEn: 'Eid Adha', color: '#CD853F', emoji: '🐏' },
-  { key: 'dhul_hijjah', nameAr: 'العشر من ذي الحجة', nameEn: 'Dhul Hijjah', color: '#DAA520', emoji: '✨' },
+const ICONS: { key: SeasonalIconKey; nameAr: string; nameEn: string; color: string; image: string }[] = [
+  { key: 'default_ar', nameAr: 'الافتراضية (عربي)', nameEn: 'Default (AR)', color: '#0d8e62', image: defaultArIcon },
+  { key: 'default_en', nameAr: 'الافتراضية (إنجليزي)', nameEn: 'Default (EN)', color: '#0d8e62', image: defaultEnIcon },
+  { key: 'ramadan', nameAr: 'رمضان', nameEn: 'Ramadan', color: '#0f987f', image: ramadanIcon },
+  { key: 'hajj', nameAr: 'الحج', nameEn: 'Hajj', color: '#8B4513', image: hajjIcon },
+  { key: 'mawlid', nameAr: 'المولد النبوي', nameEn: 'Mawlid', color: '#2E8B57', image: mawlidIcon },
+  { key: 'eid_fitr', nameAr: 'عيد الفطر', nameEn: 'Eid Fitr', color: '#FFD700', image: eidFitrIcon },
+  { key: 'eid_adha', nameAr: 'عيد الأضحى', nameEn: 'Eid Adha', color: '#CD853F', image: eidAdhaIcon },
+  { key: 'dhul_hijjah', nameAr: 'العشر من ذي الحجة', nameEn: 'Dhul Hijjah', color: '#DAA520', image: dhulHijjahIcon },
 ];
 
 const SEASONS: { key: SeasonName; nameAr: string; nameEn: string }[] = [
@@ -327,11 +335,13 @@ export default function AppIconManager() {
                       : 'border-admin-border bg-admin-bg hover:border-admin-muted'
                   }`}
                 >
-                  <div
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-lg"
-                    style={{ backgroundColor: ic.color }}
-                  >
-                    {ic.emoji}
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg bg-admin-surface-light">
+                    <img
+                      src={ic.image}
+                      alt={ic.nameAr}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className={`text-sm font-medium text-center ${active ? 'text-accent-light' : 'text-white'}`}>
                     {ic.nameAr}
@@ -385,7 +395,16 @@ export default function AppIconManager() {
 
                   <div className="flex-1 text-white text-sm font-medium">{s.nameAr}</div>
 
-                  <div className="text-2xl">{iconByKey[mapped]?.emoji}</div>
+                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-admin-surface-light border border-admin-border flex-shrink-0">
+                    {iconByKey[mapped]?.image && (
+                      <img
+                        src={iconByKey[mapped].image}
+                        alt={iconByKey[mapped].nameAr}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
 
                   <select
                     value={mapped}
@@ -535,11 +554,14 @@ export default function AppIconManager() {
               {config.mode === 'language_only' && 'يتم التبديل بين العربي والإنجليزي حسب لغة المستخدم'}
             </div>
           </div>
-          <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-xl flex-shrink-0"
-            style={{ backgroundColor: iconByKey[previewIcon]?.color ?? '#0d8e62' }}
-          >
-            {iconByKey[previewIcon]?.emoji ?? '🕌'}
+          <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-xl flex-shrink-0 bg-admin-surface-light border border-admin-border">
+            {iconByKey[previewIcon]?.image && (
+              <img
+                src={iconByKey[previewIcon].image}
+                alt={iconByKey[previewIcon].nameAr}
+                className="w-full h-full object-cover"
+              />
+            )}
           </div>
         </div>
       </div>

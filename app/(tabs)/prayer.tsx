@@ -46,6 +46,8 @@ import {
   getTodayDateString,
   isInLastThird,
   formatPrayerTime,
+  getNextPrayer,
+  getTimeRemaining,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
 import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
@@ -58,6 +60,7 @@ import { useAppConfig } from '@/lib/app-config-context';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { PermissionBanner } from '@/components/notifications/PermissionBanner';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSacredContext } from '@/hooks/use-sacred-context';
@@ -101,6 +104,10 @@ import {
   cacheWeekPrayerTimes,
   buildWeekEntries,
 } from '@/lib/prayer-week-cache';
+import {
+  buildCanonicalPrayerSnapshot,
+  saveCanonicalPrayerSnapshot,
+} from '@/lib/canonical-prayer-snapshot';
 
 const CLOCK_STYLE_KEY = '@prayer_clock_style';
 const CLOCK_THUMB_SIZE = 72;
@@ -215,6 +222,50 @@ export default function PrayerScreen() {
     { key: 'analog', label: t('prayer.clockStyleAnalog') },
     { key: 'digital', label: t('prayer.clockStyleDigital') },
   ];
+  const [thumbnailNow, setThumbnailNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setThumbnailNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const clockThumbnailData = useMemo(() => {
+    const pad = (n: number) => String(Math.max(0, n)).padStart(2, '0');
+    const next = prayerTimes ? getNextPrayer(prayerTimes) : null;
+    const remaining = prayerTimes ? getTimeRemaining(prayerTimes) : null;
+    const name = next?.name ?? 'fajr';
+    const label = t(`prayer.${name}`);
+    const countdown = remaining
+      ? `${pad(remaining.hours)}:${pad(remaining.minutes)}:${pad(remaining.seconds)}`
+      : '--:--:--';
+    const countdownShort = remaining
+      ? `${pad(remaining.hours)}:${pad(remaining.minutes)}`
+      : '--:--';
+    return {
+      label,
+      countdown,
+      countdownShort,
+      time: next ? formatPrayerTime(next.time, settings.prayer.show24Hour) : '--:--',
+    };
+  }, [prayerTimes, settings.prayer.show24Hour, t, thumbnailNow]);
+
+  const analogThumbHands = useMemo(() => {
+    const hours = thumbnailNow.getHours() % 12;
+    const minutes = thumbnailNow.getMinutes();
+    const seconds = thumbnailNow.getSeconds();
+    const handEnd = (angle: number, length: number) => {
+      const rad = (angle - 90) * (Math.PI / 180);
+      return {
+        x: 50 + Math.cos(rad) * length,
+        y: 50 + Math.sin(rad) * length,
+      };
+    };
+    return {
+      hour: handEnd((hours + minutes / 60) * 30, 25),
+      minute: handEnd((minutes + seconds / 60) * 6, 34),
+      second: handEnd(seconds * 6, 38),
+    };
+  }, [thumbnailNow]);
 
   const PRAYER_METHODS = useMemo(() => getPrayerMethods(t), [t]);
   const ASR_METHODS = useMemo(() => getAsrMethods(t), [t]);
@@ -238,13 +289,18 @@ export default function PrayerScreen() {
   const handleToggleAutoMethod = useCallback(async (turnOn: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (turnOn) {
+      const zeroAdj = { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 };
       try {
         const cc = await getSavedUserCountry();
         const cd = applyCountryPrayerDefaults(cc) ?? MAKKAH_FALLBACK_DEFAULTS;
         if (cd) {
-          updatePrayer({ calculationMethod: cd.method as CalculationMethod, asrJuristic: cd.asrSchool, methodManuallySet: false });
+          updatePrayer({ calculationMethod: cd.method as CalculationMethod, asrJuristic: cd.asrSchool, methodManuallySet: false, adjustments: zeroAdj });
+        } else {
+          updatePrayer({ methodManuallySet: false, adjustments: zeroAdj });
         }
-      } catch {}
+      } catch {
+        updatePrayer({ methodManuallySet: false, adjustments: zeroAdj });
+      }
     } else {
       updatePrayer({ methodManuallySet: true });
     }
@@ -432,7 +488,12 @@ export default function PrayerScreen() {
       // so the SettingsContext reconcile effect can pick it up on next launch.
       if (countryCode) {
         import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
-          updateUserCountryFromGPS(countryCode).catch((err) => console.warn('⚠️ Prayer GPS country update failed:', err));
+          updateUserCountryFromGPS(countryCode, {
+            city,
+            countryName: country,
+            latitude: lat,
+            longitude: lon,
+          }).catch((err) => console.warn('⚠️ Prayer GPS country update failed:', err));
         }).catch((err) => console.warn('⚠️ Failed to import firebase-user for GPS country:', err));
         setUserCountry(countryCode).catch(() => {});
       }
@@ -461,7 +522,7 @@ export default function PrayerScreen() {
       import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
         rescheduleAllFromStorage().catch(() => {});
       }).catch(() => {});
-      return locationData;
+      return (await getStoredLocation()) || locationData;
     } catch (err) {
       console.error('Error fetching location:', err);
       const stored = await getStoredLocation();
@@ -541,6 +602,11 @@ export default function PrayerScreen() {
     }
   };
 
+  // Holds the most recent un-adjusted prayer times so the +/- stepper can re-apply
+  // offsets locally without a full API refetch. Declared above loadPrayerTimes so
+  // the closure binding is resolved before the function is invoked.
+  const rawPrayerTimesRef = useRef<PrayerTimes | null>(null);
+
   const loadPrayerTimes = async (forceRefresh = false) => {
     try {
       setError(null);
@@ -602,6 +668,31 @@ export default function PrayerScreen() {
       console.log(`🕌 [prayer-times] method=${settings.prayer.calculationMethod}, school=${settings.prayer.asrJuristic}, source=app_settings`);
 
       const today = getTodayDateString();
+      const publishCanonicalPrayerData = async (
+        times: PrayerTimes,
+        loc: LocationType | null | undefined,
+        source: Parameters<typeof buildCanonicalPrayerSnapshot>[0]['source'],
+      ) => {
+        const effectiveLoc = loc ?? await getStoredLocation();
+        if (!effectiveLoc) return;
+        const locationLabel = effectiveLoc.city
+          ? `${effectiveLoc.city}${effectiveLoc.country ? ', ' + effectiveLoc.country : ''}`
+          : '';
+        const snapshot = buildCanonicalPrayerSnapshot({
+          times,
+          location: effectiveLoc,
+          locationName: locationLabel,
+          settings: settingsFromStore,
+          source,
+        });
+        await saveCanonicalPrayerSnapshot(snapshot);
+        console.log('[PrayerCanonical] app countdown:', Math.max(0, Math.floor((snapshot.nextPrayerAtEpochMs - Date.now()) / 1000)));
+        try {
+          const { updateSharedData } = require('@/lib/widget-data');
+          await updateSharedData(times, locationLabel);
+        } catch {}
+      };
+
       // Always load location for display
       let currentLoc: LocationType | null = location;
       if (!currentLoc) {
@@ -636,7 +727,12 @@ export default function PrayerScreen() {
               // SettingsContext reconcile picks it up next launch.
               if (countryCode) {
                 import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
-                  updateUserCountryFromGPS(countryCode).catch((err) => console.warn('⚠️ Cached-location GPS country update failed:', err));
+                  updateUserCountryFromGPS(countryCode, {
+                    city: currentLoc?.city || city,
+                    countryName: country,
+                    latitude: currentLoc?.latitude,
+                    longitude: currentLoc?.longitude,
+                  }).catch((err) => console.warn('⚠️ Cached-location GPS country update failed:', err));
                 }).catch((err) => console.warn('⚠️ Failed to import firebase-user for GPS country:', err));
                 setUserCountry(countryCode).catch(() => {});
               }
@@ -663,15 +759,11 @@ export default function PrayerScreen() {
       if (!forceRefresh) {
         const cached = await getCachedPrayerTimes(today, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
         if (cached) {
+          rawPrayerTimesRef.current = null;
           setPrayerTimes(cached);
           setDataSource('todayCache');
           setCacheAgeDays(0);
-          // Also sync cached times to widgets
-          try {
-            const { updateSharedData } = require('@/lib/widget-data');
-            const locationLabel = currentLoc?.city ? `${currentLoc.city}${currentLoc.country ? ', ' + currentLoc.country : ''}` : '';
-            updateSharedData(cached, locationLabel).catch(() => {});
-          } catch {}
+          publishCanonicalPrayerData(cached, currentLoc, 'todayCache').catch(() => {});
           setIsLoading(false);
           return;
         }
@@ -705,15 +797,13 @@ export default function PrayerScreen() {
         console.log('📴 Offline detected — skipping API, using offline fallback chain');
         const offlineResult = await getOfflinePrayerTimes();
         if (offlineResult.times) {
+          rawPrayerTimesRef.current = offlineResult.times;
           setPrayerTimes(offlineResult.times);
           setDataSource(offlineResult.source);
           setCacheAgeDays(offlineResult.cacheAgeDays);
-          // Sync offline times to widgets
-          try {
-            const { updateSharedData } = require('@/lib/widget-data');
-            const locationLabel = loc?.city ? `${loc.city}${loc.country ? ', ' + loc.country : ''}` : '';
-            updateSharedData(offlineResult.times, locationLabel).catch(() => {});
-          } catch {}
+          if (offlineResult.source !== 'error') {
+            publishCanonicalPrayerData(offlineResult.times, loc, offlineResult.source).catch(() => {});
+          }
           // Update live activity with offline times
           if (Platform.OS === 'ios') {
             updatePrayerLiveActivity(offlineResult.times);
@@ -725,8 +815,9 @@ export default function PrayerScreen() {
       }
 
       const response = await fetchPrayerTimes(loc, new Date(), effectiveSettings);
-      let times = parsePrayerTimes(response);
-      times = applyAdjustments(times, effectiveSettings.adjustments);
+      const rawTimes = parsePrayerTimes(response);
+      rawPrayerTimesRef.current = rawTimes;
+      const times = applyAdjustments(rawTimes, effectiveSettings.adjustments);
       await cachePrayerTimes(today, times, effectiveSettings.calculationMethod, effectiveSettings.asrJuristic);
       setPrayerTimes(times);
       setDataSource('live');
@@ -749,11 +840,7 @@ export default function PrayerScreen() {
       }
 
       // Sync prayer times to widget data so home screen widgets update immediately
-      try {
-        const { updateSharedData } = require('@/lib/widget-data');
-        const locationLabel = loc?.city ? `${loc.city}${loc.country ? ', ' + loc.country : ''}` : '';
-        updateSharedData(times, locationLabel).catch(() => {});
-      } catch {}
+      publishCanonicalPrayerData(times, loc, 'live').catch(() => {});
 
       // Save scheduled times to worship tracker for historical Fajr tracking
       saveDayTimes(today, {
@@ -780,9 +867,36 @@ export default function PrayerScreen() {
       try {
         const offlineResult = await getOfflinePrayerTimes();
         if (offlineResult.times) {
+          rawPrayerTimesRef.current = offlineResult.times;
           setPrayerTimes(offlineResult.times);
           setDataSource(offlineResult.source);
           setCacheAgeDays(offlineResult.cacheAgeDays);
+          if (offlineResult.source !== 'error') {
+            const snapshotSource = offlineResult.source as Exclude<PrayerDataSource, 'error'>;
+            (async () => {
+              const effectiveLoc = location ?? await getStoredLocation();
+              if (!effectiveLoc) return;
+              const locationLabel = effectiveLoc.city
+                ? `${effectiveLoc.city}${effectiveLoc.country ? ', ' + effectiveLoc.country : ''}`
+                : '';
+              const localNotifSettings = await getPrayerSettings();
+              const snapshot = buildCanonicalPrayerSnapshot({
+                times: offlineResult.times!,
+                location: effectiveLoc,
+                locationName: locationLabel,
+                settings: {
+                  ...localNotifSettings,
+                  calculationMethod: settings.prayer.calculationMethod,
+                  asrJuristic: settings.prayer.asrJuristic,
+                  adjustments: settings.prayer.adjustments,
+                },
+                source: snapshotSource,
+              });
+              await saveCanonicalPrayerSnapshot(snapshot);
+              const { updateSharedData } = require('@/lib/widget-data');
+              await updateSharedData(offlineResult.times, locationLabel);
+            })().catch(() => {});
+          }
           console.log(`📅 Offline fallback: source=${offlineResult.source}, age=${offlineResult.cacheAgeDays} days`);
           return;
         }
@@ -830,6 +944,48 @@ export default function PrayerScreen() {
       loadPrayerTimes(true);
     }
   }, [settings.prayer.calculationMethod, settings.prayer.asrJuristic]);
+
+  // Re-apply adjustments to displayed prayer times when stepper +/- changes the offsets.
+  // Skips first run (initial mount). Uses cached raw times when available; otherwise
+  // forces a refetch so cache-hit displays catch up.
+  const prevAdjRef = useRef(settings.prayer.adjustments);
+  useEffect(() => {
+    const curr = settings.prayer.adjustments;
+    const prev = prevAdjRef.current;
+    if (prev === curr) return;
+    const changed = !prev || (['fajr','sunrise','dhuhr','asr','maghrib','isha'] as const).some(
+      (k) => (prev?.[k] ?? 0) !== (curr?.[k] ?? 0)
+    );
+    if (!changed) return;
+    prevAdjRef.current = curr;
+    const raw = rawPrayerTimesRef.current;
+    if (!raw) {
+      loadPrayerTimes(true);
+      return;
+    }
+    const adjusted = applyAdjustments(raw, curr);
+    setPrayerTimes(adjusted);
+    try {
+      const { updateSharedData } = require('@/lib/widget-data');
+      const locationLabel = location?.city ? `${location.city}${location.country ? ', ' + location.country : ''}` : '';
+      if (location) {
+        const snapshot = buildCanonicalPrayerSnapshot({
+          times: adjusted,
+          location,
+          locationName: locationLabel,
+          settings: {
+            calculationMethod: settings.prayer.calculationMethod,
+            asrJuristic: settings.prayer.asrJuristic,
+            adjustments: curr,
+          },
+          source: 'live',
+        });
+        saveCanonicalPrayerSnapshot(snapshot).catch(() => {});
+      }
+      updateSharedData(adjusted, locationLabel).catch(() => {});
+    } catch {}
+    if (Platform.OS === 'ios') updatePrayerLiveActivity(adjusted);
+  }, [settings.prayer.adjustments, location]);
 
   // Auto-refresh prayer times at midnight for the new day
   useEffect(() => {
@@ -1013,6 +1169,9 @@ export default function PrayerScreen() {
             </Animated.View>
           )}
 
+          {/* Location permission banner — يظهر فقط لو الموقع معطّل أو غير محدد */}
+          <PermissionBanner onlyKeys={['location']} />
+
           {/* Makkah fallback location banner */}
           {usingMakkahFallback && !error && dataSource !== 'extrapolated' && (
             <Animated.View entering={FadeInDown.duration(300)} style={[styles.staleBanner, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,152,0,0.15)' : 'rgba(255,243,224,0.95)' }]}>
@@ -1033,11 +1192,15 @@ export default function PrayerScreen() {
             <>
               {/* Clock style selector with thumbnails — always visible */}
               <View style={styles.clockStyleSelectorWrap}>
-                <View style={[styles.clockThumbnailsContainer, { borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}>
+                <View style={[styles.clockThumbnailsContainer, Platform.OS === 'android' && styles.clockThumbnailsContainerAndroidFlat, { borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={[styles.clockStyleSelectorScroll, { flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, justifyContent: 'flex-start' }]}
+                    contentContainerStyle={[
+                      styles.clockStyleSelectorScroll,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                      { flex: 1, justifyContent: 'flex-start' },
+                    ]}
                   >
                     {clockStyles.map((style) => {
                       const isActive = activeClockStyle === style.key;
@@ -1054,7 +1217,7 @@ export default function PrayerScreen() {
                           {/* Thumbnail preview */}
                           {style.key === 'widget' && (
                             <View style={styles.thumbWidgetContainer}>
-                              <View style={[styles.thumbWidgetCard, { backgroundColor: colors.card }]}>
+                              <View style={styles.thumbWidgetCard}>
                                 <View style={[styles.thumbWidgetRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                   {/* Logo on left */}
                                   <View style={styles.thumbWidgetLogoSide}>
@@ -1066,8 +1229,8 @@ export default function PrayerScreen() {
                                   </View>
                                   {/* Countdown on right */}
                                   <View style={styles.thumbWidgetCountdownSide}>
-                                    <Text style={[styles.thumbWidgetCountdown, { color: colors.text }]}>03:13</Text>
-                                    <Text style={[styles.thumbWidgetPrayerLabel, { color: colors.textLight }]}>{t('prayer.dhuhr')}</Text>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.thumbWidgetCountdown, { color: colors.text }]}>{clockThumbnailData.countdownShort}</Text>
+                                    <Text numberOfLines={1} style={[styles.thumbWidgetPrayerLabel, { color: colors.textLight }]}>{clockThumbnailData.label}</Text>
                                   </View>
                                 </View>
                               </View>
@@ -1090,11 +1253,11 @@ export default function PrayerScreen() {
                                   />
                                 ))}
                                 {/* Hour hand */}
-                                <Line x1="50" y1="50" x2="50" y2="24" stroke={colors.text} strokeWidth="3" strokeLinecap="round" />
+                                <Line x1="50" y1="50" x2={analogThumbHands.hour.x} y2={analogThumbHands.hour.y} stroke={colors.text} strokeWidth="3" strokeLinecap="round" />
                                 {/* Minute hand */}
-                                <Line x1="50" y1="50" x2="68" y2="35" stroke={colors.textLight} strokeWidth="2" strokeLinecap="round" />
+                                <Line x1="50" y1="50" x2={analogThumbHands.minute.x} y2={analogThumbHands.minute.y} stroke={colors.textLight} strokeWidth="2" strokeLinecap="round" />
                                 {/* Second hand */}
-                                <Line x1="50" y1="50" x2="45" y2="18" stroke="#0d8e62" strokeWidth="1" strokeLinecap="round" />
+                                <Line x1="50" y1="50" x2={analogThumbHands.second.x} y2={analogThumbHands.second.y} stroke="#0d8e62" strokeWidth="1" strokeLinecap="round" />
                                 {/* Center dot */}
                                 <Circle cx="50" cy="50" r="3" fill="#0d8e62" />
                               </Svg>
@@ -1102,8 +1265,8 @@ export default function PrayerScreen() {
                           )}
                           {style.key === 'digital' && (
                             <View style={styles.thumbDigitalContainer}>
-                              <Text style={[styles.thumbDigitalTime, { color: colors.text }]}>05:23</Text>
-                              <Text style={[styles.thumbDigitalLabel, { color: colors.textLight }]}>{t('prayer.fajr')}</Text>
+                              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.thumbDigitalTime, { color: colors.text }]}>{clockThumbnailData.countdown}</Text>
+                              <Text numberOfLines={1} style={[styles.thumbDigitalLabel, { color: colors.textLight }]}>{clockThumbnailData.label}</Text>
                               <View style={styles.thumbDigitalSeparator} />
                               <MaterialCommunityIcons name="mosque" size={16} color="#0d8e62" />
                             </View>
@@ -1300,40 +1463,44 @@ export default function PrayerScreen() {
                   </>
                 )}
 
-                {/* ضبط يدوي لأوقات الصلاة — always visible */}
-                <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayerAdjustments.title')}</Text>
-                {(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map((prayer) => {
-                  const adj = settings.prayer.adjustments?.[prayer] || 0;
-                  const prayerTime = prayerTimes ? formatPrayerTime(prayerTimes[prayer], settings.prayer.show24Hour) : '--:--';
-                  const prayerLabel = t(('prayer.' + prayer) as any);
-                  return (
-                    <View key={prayer} style={[settingsStyles.adjustRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <Text style={[settingsStyles.adjustLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                        {prayerLabel}  :  {prayerTime}
-                      </Text>
-                      <View style={[settingsStyles.stepperWrap, { flexDirection: 'row' }]}>
-                        <TouchableOpacity
-                          style={settingsStyles.stepperBtn}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            updatePrayer({ adjustments: { ...settings.prayer.adjustments, [prayer]: Math.min((adj || 0) + 1, 30) } });
-                          }}
-                        >
-                          <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={settingsStyles.stepperBtn}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            updatePrayer({ adjustments: { ...settings.prayer.adjustments, [prayer]: Math.max((adj || 0) - 1, -30) } });
-                          }}
-                        >
-                          <MaterialCommunityIcons name="minus" size={18} color={colors.text} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })}
+                {/* ضبط يدوي لأوقات الصلاة — يظهر فقط عند إيقاف الضبط التلقائي */}
+                {!isAutoMode && (
+                  <>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayerAdjustments.title')}</Text>
+                    {(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map((prayer) => {
+                      const adj = settings.prayer.adjustments?.[prayer] || 0;
+                      const prayerTime = prayerTimes ? formatPrayerTime(prayerTimes[prayer], settings.prayer.show24Hour) : '--:--';
+                      const prayerLabel = t(('prayer.' + prayer) as any);
+                      return (
+                        <View key={prayer} style={[settingsStyles.adjustRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                          <Text style={[settingsStyles.adjustLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                            {prayerLabel}  :  {prayerTime}
+                          </Text>
+                          <View style={[settingsStyles.stepperWrap, { flexDirection: 'row' }]}>
+                            <TouchableOpacity
+                              style={settingsStyles.stepperBtn}
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                updatePrayer({ adjustments: { ...settings.prayer.adjustments, [prayer]: Math.min((adj || 0) + 1, 30) } });
+                              }}
+                            >
+                              <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={settingsStyles.stepperBtn}
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                updatePrayer({ adjustments: { ...settings.prayer.adjustments, [prayer]: Math.max((adj || 0) - 1, -30) } });
+                              }}
+                            >
+                              <MaterialCommunityIcons name="minus" size={18} color={colors.text} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </>
+                )}
 
                 <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.displayOptions')}</Text>
                 <GlassToggle label={t('prayer.showSunrise')} icon="weather-sunny" enabled={settings.prayer.showSunrise} onToggle={(val) => updatePrayer({ showSunrise: val })} />
@@ -1514,27 +1681,32 @@ const _styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
+  clockThumbnailsContainerAndroidFlat: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+  },
   clockStyleSelectorScroll: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: Spacing.sm },
   clockStyleThumbnail: {
     width: CLOCK_THUMB_SIZE + 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: Platform.OS === 'android' ? 'transparent' : 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: Platform.OS === 'android' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
   clockStyleThumbnailActive: {
     borderColor: '#0d8e62',
-    backgroundColor: 'rgba(6,79,47,0.18)',
+    backgroundColor: Platform.OS === 'android' ? 'transparent' : 'rgba(6,79,47,0.18)',
     shadowColor: '#0d8e62',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 0,
   },
   clockStyleLabel: { fontSize: 10, fontFamily: fontSemiBold(), marginTop: 3 },
   clockStyleLabelActive: { color: '#2ECC71' },
@@ -1547,13 +1719,13 @@ const _styles = StyleSheet.create({
   thumbWidgetLogo: { width: 18, height: 18, borderRadius: 5 },
   thumbWidgetAppName: { fontSize: 4, fontFamily: fontSemiBold(), color: '#0d8e62' },
   thumbWidgetCountdownSide: { alignItems: 'center' },
-  thumbWidgetCountdown: { fontSize: 10, fontFamily: fontBold(), letterSpacing: 0.5 },
+  thumbWidgetCountdown: { fontSize: 10, fontFamily: fontBold(), letterSpacing: 0 },
   thumbWidgetPrayerLabel: { fontSize: 5, fontFamily: fontSemiBold() },
   // Analog thumbnail
   thumbAnalogContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'visible' },
   // Digital thumbnail
   thumbDigitalContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
-  thumbDigitalTime: { fontSize: 14, fontFamily: fontBold(), letterSpacing: 1 },
+  thumbDigitalTime: { fontSize: 11, fontFamily: fontBold(), letterSpacing: 0 },
   thumbDigitalLabel: { fontSize: 7, fontFamily: fontSemiBold(), marginTop: -2 },
   thumbDigitalSeparator: { width: 20, height: 1, backgroundColor: 'rgba(6,79,47,0.4)', marginVertical: 2 },
   thumbDigitalCountdown: { fontSize: 9, fontFamily: fontBold() },

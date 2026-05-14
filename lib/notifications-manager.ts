@@ -5,7 +5,7 @@
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db as firebaseDb } from '../config/firebase';
 import { schedulePrayerNotifications } from './prayer-notifications';
@@ -14,7 +14,7 @@ import { getAyahAudioUrl } from './quran-cache';
 import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
-import { getReminderChannelId, getAdhanChannelId } from '../services/notifications/channels';
+import { getReminderChannelId, getAdhanChannelId, ANDROID_FULL_ADHAN_CHANNEL_ID } from '../services/notifications/channels';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
 import { safeParseTime } from './safe-parse-time';
@@ -23,6 +23,12 @@ import { resolveNotificationSound } from './resolve-notification-sound';
 import { fetchNotificationTexts, getNotifText } from './notification-texts';
 export { resolveNotificationSound } from './resolve-notification-sound';
 import { getNotificationIconAttachment } from './notification-icons';
+import {
+  completeAdhanVoiceToIosNotificationSoundFile,
+  completeAdhanVoiceToNotificationSoundKey,
+  normalizeCompleteAdhanVoice,
+  normalizeFullAdhanNotificationVoice,
+} from './sound-manager';
 
 // ─── Shared Scheduling Mutex ─────────────────────────────────────────────────
 // Prevents concurrent calls to scheduleNotificationsFromSettings from different
@@ -246,7 +252,13 @@ export async function requestNotifPermission(): Promise<boolean> {
   }
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
-  const { status } = await Notifications.requestPermissionsAsync();
+  const { status } = await Notifications.requestPermissionsAsync({
+    ios: {
+      allowAlert: true,
+      allowBadge: true,
+      allowSound: true,
+    },
+  });
   return status === 'granted';
 }
 
@@ -611,6 +623,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   // Sound type selections
   soundType?: string;
   adhanSoundType?: string;
+  fullAdhanSoundType?: string;
   useFullAdhan?: boolean;
   // Per-category sound types for foreground playback
   azkarSoundType?: string;
@@ -719,14 +732,23 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Resolve sound types with admin defaults fallback
     const adhanSound = resolveWithAdminDefault(notifSettings.adhanSoundType, adminDefaults, 'prayer', 'makkah');
+    const fullAdhanSound = normalizeFullAdhanNotificationVoice(notifSettings.fullAdhanSoundType || adhanSound);
     const azkarSound = resolveWithAdminDefault(notifSettings.azkarSoundType, adminDefaults, 'azkarReminder', 'general_reminder');
     const salawatSound = resolveWithAdminDefault(notifSettings.salawatSoundType, adminDefaults, 'salawat', 'salawat');
     const generalSound = resolveWithAdminDefault(notifSettings.soundType, adminDefaults, 'general', 'general_reminder');
 
     // Log per-category sound types for debugging
+    console.log('[FullAdhan] after merge:', {
+      useFullAdhan: notifSettings.useFullAdhan === true,
+      selectedVoice: fullAdhanSound,
+      regularAdhan: adhanSound,
+      soundEnabled: notifSettings.sound,
+    });
     console.log('[notifications-manager] Sound config (with admin defaults):', JSON.stringify({
       sound: notifSettings.sound,
       adhan: adhanSound,
+      fullAdhan: fullAdhanSound,
+      useFullAdhan: notifSettings.useFullAdhan === true,
       azkar: azkarSound,
       salawat: salawatSound,
       general: generalSound,
@@ -936,6 +958,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       advanceMinutes: notifSettings.prayerReminder ? notifSettings.reminderMinutes : 0,
       adhanSound: notifSettings.sound,
       adhanSoundType: adhanSound,
+      fullAdhanSoundType: fullAdhanSound,
       useFullAdhan: notifSettings.useFullAdhan === true,
       soundType: generalSound,
       didYouPrayReminder: notifSettings.didYouPrayReminder,
@@ -1219,7 +1242,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 8) Schedule Quran reading reminder
     if (notifSettings.quranReadingReminder) {
-      const quranTimes = getTimesArray(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime, '19:00');
+      const quranTimes = getTimesArray(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime, '20:00');
       // quranReminderDays uses 0=Sat..6=Fri, convert to 1=Sun..7=Sat
       const qDays = notifSettings.quranReminderDays;
       const convertedDays = qDays && qDays.length > 0 && qDays.length < 7
@@ -1303,7 +1326,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
               title: dirText(getNotifText('worship_weekly', t('settings.worshipWeeklyReportTitle'), t('settings.worshipWeeklyReportBody'), lang).title),
               body: dirText(getNotifText('worship_weekly', t('settings.worshipWeeklyReportTitle'), t('settings.worshipWeeklyReportBody'), lang).body),
               sound: resolveNotificationSound('general_reminder', true),
-              data: { type: 'worship_weekly', iconType: 'reminder' },
+              data: { type: 'worship_weekly', iconType: 'reminder', screen: '/weekly-summary' },
               ...(Platform.OS === 'android' && { channelId: worshipWeeklyChannelId }),
               ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
               ...(Platform.OS === 'ios' && worshipWeeklyAttachments && { attachments: worshipWeeklyAttachments }),
@@ -1696,6 +1719,8 @@ export async function rescheduleAllFromStorage(): Promise<void> {
       vibration: n.vibration !== false,
       soundType: n.soundType,
       adhanSoundType: n.adhanSoundType || 'makkah',
+      fullAdhanSoundType: n.fullAdhanSoundType || 'makkah',
+      useFullAdhan: n.useFullAdhan === true,
       azkarSoundType: n.azkarSoundType,
       dailyVerseSoundType: n.dailyVerseSoundType,
       salawatReminder: n.salawatReminder,
@@ -1804,8 +1829,11 @@ export async function sendTestNotification(
   opts: {
     soundType?: string;
     adhanSoundType?: string;
+    fullAdhanSoundType?: string;
     sound?: boolean;
     vibration?: boolean;
+    useFullAdhan?: boolean;
+    advanceMinutes?: number;
   } = {},
 ): Promise<void> {
   const hasPermission = await requestNotifPermission();
@@ -1813,56 +1841,185 @@ export async function sendTestNotification(
 
   const meta = TEST_NOTIF_MAP[categoryId] ?? TEST_NOTIF_MAP.prayer;
 
-  // Resolve sound: prayer uses adhan sound/channel, others use reminder sound/channel
   const isAdhan = categoryId === 'prayer';
+  // Advance reminder test: mirrors the real prayer advance-reminder notification
+  // (reminder sound + "X دقائق قبل الصلاة" body, no adhan sound, no AlarmManager).
+  const advanceMinutes = isAdhan ? (opts.advanceMinutes ?? 0) : 0;
+  const isAdvanceReminderTest = advanceMinutes > 0;
+
   const rawSoundType = isAdhan
     ? (opts.adhanSoundType || 'makkah')
     : (opts.soundType || 'general_reminder');
-  // Layer 2 safety net: always play short adhan via system notification.
-  // Patched expo-notifications additionally starts AdhanPlaybackService when
-  // androidFullAdhan='true' so the full recording plays via STREAM_ALARM.
-  const shouldUseAndroidFullAdhan =
-    Platform.OS === 'android' &&
+  const fullAdhanVoice = normalizeFullAdhanNotificationVoice(opts.fullAdhanSoundType || rawSoundType);
+  const fullAdhanNotificationSound = completeAdhanVoiceToNotificationSoundKey(fullAdhanVoice);
+  const useFullAdhan =
     isAdhan &&
+    !isAdvanceReminderTest &&
     opts.sound !== false &&
-    rawSoundType !== 'silent';
+    rawSoundType !== 'silent' &&
+    opts.useFullAdhan === true;
+  const shouldUseAndroidFullAdhan = Platform.OS === 'android' && useFullAdhan;
 
+  // Channel selection mirrors real prayer scheduling logic:
+  // - Advance reminder → reminder channel (gentle sound)
+  // - Android full adhan → silent channel (AlarmManager handles audio)
+  // - Short adhan → regular adhan channel
   const resolvedChannelId = isAdhan
-    ? getAdhanChannelId(rawSoundType)
+    ? (isAdvanceReminderTest
+        ? getReminderChannelId('notif_after_prayer')
+        : (shouldUseAndroidFullAdhan ? ANDROID_FULL_ADHAN_CHANNEL_ID : getAdhanChannelId(rawSoundType)))
     : getReminderChannelId(rawSoundType);
-  const soundValue = resolveNotificationSound(rawSoundType, opts.sound !== false);
+  const soundValue = isAdvanceReminderTest
+    ? resolveNotificationSound('general_reminder', opts.sound !== false)
+    : (isAdhan && Platform.OS === 'ios' && useFullAdhan
+        ? completeAdhanVoiceToIosNotificationSoundFile(fullAdhanVoice)
+        : (Platform.OS === 'android' && shouldUseAndroidFullAdhan)
+          ? false
+          : resolveNotificationSound(rawSoundType, opts.sound !== false));
+  console.log('[FullAdhan] permission status:', hasPermission);
+  console.log('[FullAdhan] selected voice:', fullAdhanVoice);
+  console.log('[FullAdhan] selected sound file:', soundValue);
+  console.log('[FullAdhan] test path master-sound flag:', opts.sound, '→ effective sound:', soundValue);
+  console.log('[AdhanSound] test notification config:', {
+    platform: Platform.OS,
+    categoryId,
+    isAdhan,
+    useFullAdhan,
+    rawSoundType,
+    fullAdhanVoice,
+    fullAdhanNotificationSound,
+    soundValue,
+    resolvedChannelId,
+    note: Platform.OS === 'ios'
+      ? 'iOS bundle file must be present as a 29s CAF notification sound'
+      : 'Android channel sound is immutable; channels version must recreate stale channels',
+  });
 
-  const identifier = `test_${categoryId}`;
+  const testNonce = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const identifier = `test_${categoryId}_${testNonce}`;
+  const oldTestIdentifier = `test_${categoryId}`;
 
-  // Cancel any existing test notification for this category
-  try { await Notifications.cancelScheduledNotificationAsync(identifier); } catch {}
+  // Cancel the legacy fixed-id pending test notification if one exists from an
+  // older build. New test notifications use unique ids so each tap can route
+  // during the same app session without being swallowed by tap de-duplication.
+  try { await Notifications.cancelScheduledNotificationAsync(oldTestIdentifier); } catch {}
 
   const testAttachments = await getNotificationIconAttachment(meta.iconType);
 
-  await Notifications.scheduleNotificationAsync({
-    identifier,
-    content: {
-      title: dirText(t(meta.titleKey)),
-      body: dirText(t(meta.bodyKey)),
-      sound: soundValue,
-      data: {
-        type: shouldUseAndroidFullAdhan ? 'prayer' : 'test',
-        category: categoryId,
-        iconType: meta.iconType,
-        soundType: rawSoundType,
-        ...(shouldUseAndroidFullAdhan && { androidFullAdhan: 'true' }),
+  const isFullAdhanTest = isAdhan && useFullAdhan;
+
+  // Title/body mirrors real scheduling:
+  // - Advance reminder: "{N} دقائق قبل [اسم الصلاة]"
+  // - Full adhan: dedicated title/body for the in-app player screen
+  // - Short adhan: standard prayer notification text
+  const notifTitle = isAdvanceReminderTest
+    ? t('notificationSounds.advanceReminderTestTitle')
+    : (isFullAdhanTest ? t('fullAdhan.testTitle') : t(meta.titleKey));
+  const notifBody = isAdvanceReminderTest
+    ? t('notificationSounds.advanceReminderBody')
+        .replace('{count}', String(advanceMinutes))
+        .replace('{prayer}', t('notificationSounds.advanceReminderTestPrayer'))
+    : (isFullAdhanTest ? t('fullAdhan.tapToOpenTest') : t(meta.bodyKey));
+  const dataType = isFullAdhanTest
+    ? 'full_adhan'
+    : shouldUseAndroidFullAdhan
+      ? 'prayer'
+      : 'test';
+
+  const testContent: Notifications.NotificationContentInput = {
+    title: dirText(notifTitle),
+    body: dirText(notifBody),
+    sound: soundValue,
+    data: {
+      type: dataType,
+      category: categoryId,
+      iconType: meta.iconType,
+      soundType: isFullAdhanTest ? fullAdhanNotificationSound : rawSoundType,
+      regularSoundType: rawSoundType,
+      fullAdhanSoundType: fullAdhanVoice,
+      ...(isFullAdhanTest && { voice: fullAdhanVoice, test: '1', prayer: 'dhuhr', testNonce }),
+      ...(shouldUseAndroidFullAdhan && { androidFullAdhan: 'true' }),
+    },
+    ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
+    ...(Platform.OS === 'android' && {
+      priority: isAdvanceReminderTest
+        ? Notifications.AndroidNotificationPriority.HIGH
+        : Notifications.AndroidNotificationPriority.MAX,
+    }),
+    ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+    ...(Platform.OS === 'ios' && testAttachments && { attachments: testAttachments }),
+  };
+  const testTrigger: Notifications.NotificationTriggerInput = {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
+    date: new Date(Date.now() + 5000),
+    ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
+  };
+
+  try {
+    // Cancel any stale test AlarmManager before scheduling a new one to prevent
+    // multiple overlapping service instances (the 3-sound overlap bug).
+    if (Platform.OS === 'android' && shouldUseAndroidFullAdhan) {
+      try {
+        const FullAdhanModule = (NativeModules as any)?.FullAdhanModule;
+        if (FullAdhanModule?.cancelAllFullAdhan) await FullAdhanModule.cancelAllFullAdhan();
+      } catch {}
+    }
+
+    const result = await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: testContent,
+      trigger: testTrigger,
+    });
+    console.log('[FullAdhan] schedule result:', { identifier, result, soundValue, dataType });
+
+    // Mirror the real-prayer flow for full-adhan tests on Android:
+    // start the AdhanPlaybackService via AlarmManager at the same time
+    // as the visual notification fires. Without this, the test only plays
+    // the 15s channel sound while real prayers play the full 35s clip —
+    // a mismatch that makes the test useless for verifying full adhan.
+    if (shouldUseAndroidFullAdhan) {
+      try {
+        const FullAdhanModule = (NativeModules as any)?.FullAdhanModule;
+        if (FullAdhanModule?.scheduleFullAdhan) {
+          await FullAdhanModule.scheduleFullAdhan(
+            Date.now() + 6000, // +1s after the notification (which fires at +5s) to avoid audio-focus conflict
+            fullAdhanNotificationSound,
+            t(meta.titleKey),
+            999, // dedicated request code for the test; reused so taps replace prior tests
+          );
+          console.log('[FullAdhan] Android test — AlarmManager scheduled for full-adhan service');
+        } else {
+          console.warn('[FullAdhan] Android test — FullAdhanModule unavailable; only short adhan will play');
+        }
+      } catch (alarmError) {
+        console.warn('[FullAdhan] Android test — FullAdhanModule.scheduleFullAdhan failed:', alarmError);
+      }
+    }
+  } catch (primaryError) {
+    console.log('[FullAdhan] did rollback toggle?', 'no: scheduling fallback does not mutate saved settings');
+    console.warn('[notifications-manager] Test notification with sound failed; retrying visual-only fallback', primaryError);
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        ...testContent,
+        sound: false,
+        data: {
+          ...(testContent.data ?? {}),
+          visualFallback: '1',
+          soundFallbackReason: 'schedule_error',
+        },
+        ...(Platform.OS === 'android' && {
+          channelId: 'silent',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        }),
       },
-      ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
-      ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
-      ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
-      ...(Platform.OS === 'ios' && testAttachments && { attachments: testAttachments }),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(Date.now() + 5000),
-      ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
-    },
-  });
+      trigger: {
+        ...(testTrigger as Record<string, unknown>),
+        ...(Platform.OS === 'android' && { channelId: 'silent' }),
+      } as Notifications.NotificationTriggerInput,
+    });
+  }
+  if (__DEV__) console.log(`🔔 Test notification scheduled for ${categoryId} in 5s — type:${dataType} isFullAdhanTest:${isFullAdhanTest}`, { prayer: 'dhuhr', voice: fullAdhanVoice, regularAdhanSound: rawSoundType, test: '1' });
   console.log(`🔔 Test notification scheduled for ${categoryId} in 5s (channel: ${resolvedChannelId})`);
 
   // Wait for the notification to actually fire before resolving.

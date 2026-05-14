@@ -99,6 +99,7 @@ export async function cacheWeekPrayerTimes(
   location: { latitude: number; longitude: number },
 ): Promise<void> {
   try {
+    const eff = await getEffectivePrayerCalcSettings();
     const data: WeekCacheData = {
       entries: entries.slice(0, 7), // Max 7 days
       createdAt: new Date().toISOString(),
@@ -109,7 +110,7 @@ export async function cacheWeekPrayerTimes(
 
     // Also populate per-day caches for instant lookup
     for (const entry of data.entries) {
-      await cachePrayerTimes(entry.date, entry.times);
+      await cachePrayerTimes(entry.date, entry.times, eff.calculationMethod, eff.asrJuristic);
     }
     console.log(`📅 Week cache saved (${key}): ${data.entries.length} days starting ${data.entries[0]?.date}`);
   } catch (e) {
@@ -258,9 +259,10 @@ export interface OfflinePrayerResult {
  */
 export async function getOfflinePrayerTimes(targetDate?: string): Promise<OfflinePrayerResult> {
   const today = targetDate || getTodayDateString();
+  const eff = await getEffectivePrayerCalcSettings();
 
   // 1. Try today's per-day cache
-  const todayCache = await getCachedPrayerTimes(today);
+  const todayCache = await getCachedPrayerTimes(today, eff.calculationMethod, eff.asrJuristic);
   if (todayCache) {
     return { times: todayCache, source: 'todayCache', cacheAgeDays: 0 };
   }
@@ -289,7 +291,7 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
     const prevDate = new Date();
     prevDate.setDate(prevDate.getDate() - i);
     const prevDateStr = formatDateString(prevDate);
-    const prevCache = await getCachedPrayerTimes(prevDateStr);
+    const prevCache = await getCachedPrayerTimes(prevDateStr, eff.calculationMethod, eff.asrJuristic);
     if (prevCache) {
       return { times: prevCache, source: 'extrapolated', cacheAgeDays: i };
     }
@@ -300,9 +302,15 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
     const storedLoc = await getStoredLocation();
     if (storedLoc?.latitude && storedLoc?.longitude) {
       const targetDateObj = new Date(today + 'T12:00:00');
-      // Use default method 4 (Umm Al-Qura); user settings would need AsyncStorage read
-      const times = calculateLocalPrayerTimes(storedLoc.latitude, storedLoc.longitude, targetDateObj, 4, 0);
-      console.log('📍 Offline: used local calculation from stored coordinates');
+      const rawTimes = calculateLocalPrayerTimes(
+        storedLoc.latitude,
+        storedLoc.longitude,
+        targetDateObj,
+        eff.calculationMethod,
+        eff.asrJuristic,
+      );
+      const times = applyAdjustments(rawTimes, eff.adjustments as any);
+      console.log(`📍 Offline: used local calculation from stored coordinates method=${eff.calculationMethod} school=${eff.asrJuristic}`);
       return { times, source: 'localCalc', cacheAgeDays: 0 };
     }
   } catch (e) {
@@ -402,6 +410,7 @@ export async function getOfflinePrayerTimesRange(
   const results: Array<{ date: string; times: PrayerTimes; source: PrayerDataSource }> = [];
   const weekCache = await getWeekCache();
   const storedLoc = await getStoredLocation();
+  const eff = await getEffectivePrayerCalcSettings();
 
   for (let i = 0; i < days; i++) {
     const d = new Date(startDate);
@@ -409,7 +418,7 @@ export async function getOfflinePrayerTimesRange(
     const dateStr = formatDateString(d);
 
     // 1. Per-day cache
-    const cached = await getCachedPrayerTimes(dateStr);
+    const cached = await getCachedPrayerTimes(dateStr, eff.calculationMethod, eff.asrJuristic);
     if (cached) {
       results.push({ date: dateStr, times: cached, source: 'todayCache' });
       continue;
@@ -436,7 +445,14 @@ export async function getOfflinePrayerTimesRange(
     // 4. Local calculation with stored coordinates
     if (storedLoc?.latitude && storedLoc?.longitude) {
       try {
-        const times = calculateLocalPrayerTimes(storedLoc.latitude, storedLoc.longitude, d, 4, 0);
+        const rawTimes = calculateLocalPrayerTimes(
+          storedLoc.latitude,
+          storedLoc.longitude,
+          d,
+          eff.calculationMethod,
+          eff.asrJuristic,
+        );
+        const times = applyAdjustments(rawTimes, eff.adjustments as any);
         results.push({ date: dateStr, times, source: 'localCalc' });
         continue;
       } catch {}

@@ -1,7 +1,7 @@
 {
   "name": "rooh-almuslim",
   "main": "expo-router/entry",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "scripts": {
     "start": "expo start",
     "dev": "expo start --dev-client",
@@ -12,8 +12,11 @@
     "build:preview": "eas build --profile preview --platform all",
     "build:prod": "eas build --profile production --platform all",
     "test": "vitest run",
+    "widgets:generate": "node scripts/generate-widget-enum.mjs && node scripts/generate-android-widget-preview-images.mjs && node scripts/generate-android-widget-providers.mjs",
+    "verify:widgets": "node scripts/verify-widget-parity.mjs",
     "translate": "node scripts/islamic-translator.js",
     "sync-sounds": "node scripts/sync-sounds.js",
+    "verify:adhan-assets": "node scripts/verify-adhan-assets.js",
     "postinstall": "node scripts/patch-expo-notifications.js || true"
   },
   "dependencies": {

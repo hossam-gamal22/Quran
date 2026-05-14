@@ -42,6 +42,7 @@ class AdhanPlaybackService : Service() {
   private var noisyReceiverRegistered: Boolean = false
   private var pausedByLossTransient: Boolean = false
   private var originalAlarmVolume: Int = -1
+  private var currentPrayerName: String = ""
 
   // متجاهل ACTION_AUDIO_BECOMING_NOISY عمداً — الأذان لازم يستمر على السبيكر
   // لما المستخدم يشيل السماعات. (الموسيقى عادة تتوقف، لكن الأذان عبادة لها أولوية.)
@@ -54,9 +55,10 @@ class AdhanPlaybackService : Service() {
   private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
     when (change) {
       AudioManager.AUDIOFOCUS_LOSS -> {
-        // فقد دائم (تطبيق ميديا تاني أخذ الفوكس) → أوقف
-        Log.i(TAG, "AUDIOFOCUS_LOSS — إيقاف الأذان")
-        stopSelfSafely()
+        // بعض التطبيقات تطلب فوكس دائم وهي شغالة في الخلفية. للأذان لا نوقف
+        // الخدمة بالكامل؛ نعلّمها كمؤقتة ونكمل/نستأنف عند رجوع الفوكس.
+        Log.i(TAG, "AUDIOFOCUS_LOSS — الحفاظ على خدمة الأذان ومحاولة الاستمرار")
+        pausedByLossTransient = true
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
         // فقد مؤقت (مكالمة، إشعار قصير) → اعمل pause مؤقت
@@ -65,8 +67,8 @@ class AdhanPlaybackService : Service() {
         } catch (_: Exception) {}
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-        // إشعار قصير قابل للـ ducking → خفّض الصوت بدلاً من الإيقاف
-        try { player?.setVolume(0.3f, 0.3f) } catch (_: Exception) {}
+        // الأذان لا يُخفض لصوت تطبيق آخر.
+        try { player?.setVolume(1f, 1f) } catch (_: Exception) {}
       }
       AudioManager.AUDIOFOCUS_GAIN -> {
         // استرجعنا الفوكس → كمّل
@@ -94,6 +96,18 @@ class AdhanPlaybackService : Service() {
 
     val soundKey = normalizeSoundKey(intent?.getStringExtra(EXTRA_SOUND_TYPE))
     val prayerName = intent?.getStringExtra(EXTRA_PRAYER_NAME).orEmpty()
+
+    // Idempotency guard: if a second ACTION_PLAY arrives while we're already
+    // playing the same sound (e.g. AlarmManager fired and the patched
+    // expo-notifications "androidFullAdhan" path fired ~milliseconds apart),
+    // skip the second start so we don't restart the MediaPlayer mid-adhan.
+    val currentlyPlaying = try { player?.isPlaying == true } catch (_: Exception) { false }
+    if (currentlyPlaying) {
+      Log.i(TAG, "Already playing adhan — ignoring duplicate ACTION_PLAY for " + soundKey)
+      return START_NOT_STICKY
+    }
+
+    currentPrayerName = prayerName
     val notification = buildForegroundNotification(prayerName)
 
     try {
@@ -109,6 +123,7 @@ class AdhanPlaybackService : Service() {
       playAdhan(soundKey)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to start full adhan playback", e)
+      postPlaybackFallbackNotification(prayerName)
       stopSelfSafely()
     }
 
@@ -144,6 +159,7 @@ class AdhanPlaybackService : Service() {
     val fallbackChain = buildFallbackChain(soundKey)
     if (fallbackChain.isEmpty()) {
       Log.e(TAG, "No playable adhan resources found for " + soundKey)
+      postPlaybackFallbackNotification(currentPrayerName)
       stopSelfSafely()
       return
     }
@@ -154,6 +170,7 @@ class AdhanPlaybackService : Service() {
   private fun tryPlayFromChain(chain: List<Int>, index: Int, soundKey: String) {
     if (index >= chain.size) {
       Log.e(TAG, "Exhausted all adhan fallback resources for " + soundKey)
+      postPlaybackFallbackNotification(currentPrayerName)
       stopSelfSafely()
       return
     }
@@ -339,11 +356,42 @@ class AdhanPlaybackService : Service() {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setCategory(NotificationCompat.CATEGORY_ALARM)
-      .setPriority(NotificationCompat.PRIORITY_LOW)
+      .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setSound(null)
       .addAction(0, "Stop", stopPendingIntent)
       .build()
+  }
+
+  private fun postPlaybackFallbackNotification(prayerName: String) {
+    try {
+      val launchPendingIntent = android.app.PendingIntent.getActivity(
+        this,
+        1704,
+        packageManager.getLaunchIntentForPackage(packageName) ?: Intent(),
+        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+      )
+      val text = if (prayerName.isNotBlank()) {
+        prayerName + " - تعذر تشغيل صوت الأذان"
+      } else {
+        "تعذر تشغيل صوت الأذان"
+      }
+      val notification = NotificationCompat.Builder(this, PLAYBACK_CHANNEL_ID)
+        .setSmallIcon(resolveSmallIcon())
+        .setContentTitle("حان وقت الصلاة")
+        .setContentText(text)
+        .setContentIntent(launchPendingIntent)
+        .setAutoCancel(true)
+        .setCategory(NotificationCompat.CATEGORY_ALARM)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .setSound(null)
+        .build()
+      val manager = getSystemService(NotificationManager::class.java)
+      manager.notify(FALLBACK_NOTIFICATION_ID, notification)
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to post visual fallback notification", e)
+    }
   }
 
   private fun createPlaybackChannel() {
@@ -352,7 +400,7 @@ class AdhanPlaybackService : Service() {
     val channel = NotificationChannel(
       PLAYBACK_CHANNEL_ID,
       "Full adhan playback",
-      NotificationManager.IMPORTANCE_LOW
+      NotificationManager.IMPORTANCE_HIGH
     ).apply {
       setSound(null, null)
       enableVibration(false)
@@ -368,6 +416,7 @@ class AdhanPlaybackService : Service() {
       val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
         .setAudioAttributes(audioAttributes())
         .setOnAudioFocusChangeListener(focusChangeListener)
+        .setWillPauseWhenDucked(false)
         .build()
       audioFocusRequest = request
       manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -421,8 +470,9 @@ class AdhanPlaybackService : Service() {
     const val EXTRA_PRAYER_NAME = "prayerName"
 
     private const val TAG = "AdhanPlaybackService"
-    private const val PLAYBACK_CHANNEL_ID = "adhan_full_playback"
+    private const val PLAYBACK_CHANNEL_ID = "adhan_full_playback_v2"
     private const val NOTIFICATION_ID = 7110
+    private const val FALLBACK_NOTIFICATION_ID = 7111
     private const val DEFAULT_SOUND = "makkah"
 
     private val ALLOWED_SOUND_KEYS = setOf(

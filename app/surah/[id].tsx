@@ -49,6 +49,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import ViewShot from 'react-native-view-shot';
+import Slider from '@react-native-community/slider';
 import { useQuran } from '@/contexts/QuranContext';
 import { hasPerAyahSync } from '@/lib/reciters-registry';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -68,6 +69,7 @@ import { getAppName } from '@/constants/app';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
+import { fetchAppConfig, subscribeToAppConfig } from '@/lib/app-config-api';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
 function getTargetAyahBg(themeIndex: number): string {
@@ -139,6 +141,13 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGES = Array.from({ length: TOTAL_PAGES }, (_, i) => i + 1);
 const LAST_PAGE_KEY = 'quran_last_page';
+const AUTO_SCROLL_MIN_SPEED = 0;
+const AUTO_SCROLL_MAX_SPEED = 1;
+const DEFAULT_AUTO_SCROLL_MIN_SECONDS = 10;
+const DEFAULT_AUTO_SCROLL_MAX_SECONDS = 120;
+const AUTO_SCROLL_TICK_MS = 80;
+const AUTO_SCROLL_BOTTOM_SPACER = 135;
+const AUTO_SCROLL_ACCENT = '#0d8e62';
 
 const BOOKMARK_COLOR_ORDER: BookmarkColor[] = ['yellow', 'red', 'green'];
 
@@ -159,6 +168,15 @@ const QURAN_BG_IMAGES: Record<string, any> = {
 // ══════════════════════════════════════════════
 
 const toArabicNumber = (n: number): string => String(n);
+
+const formatAutoScrollDuration = (seconds: number, isArabic: boolean): string => {
+  if (seconds >= 60) {
+    const minutes = seconds / 60;
+    const value = Number.isInteger(minutes) ? String(minutes) : minutes.toFixed(1);
+    return isArabic ? `${value} د/صفحة` : `${value} min/page`;
+  }
+  return isArabic ? `${seconds} ث/صفحة` : `${seconds}s/page`;
+};
 
 const stripTashkeel = (text: string): string =>
   text.replace(/[\u064B-\u065F\u0670]/g, '');
@@ -257,14 +275,26 @@ interface MushafPageProps {
   showTranslation?: boolean;
   translationFontSize?: number;
   translationIsRTL?: boolean;
+  isActivePage?: boolean;
+  autoScrollActive?: boolean;
+  autoScrollControlsVisible?: boolean;
+  autoScrollContinuousMode?: boolean;
+  autoScrollDurationMs?: number;
+  onAutoScrollPageEnd?: () => void;
+  onAutoScrollTouch?: () => void;
+  onContinuousPageLayout?: (page: number, height: number) => void;
 }
 
 const MushafPage = React.memo(function MushafPage({
   page, themeIndex, width, fontSizeAdjust, forceLightText, forcePlainArabicForCapture, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
-  translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false,
+  translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false, isActivePage = false, autoScrollActive = false, autoScrollControlsVisible = false, autoScrollContinuousMode = false, autoScrollDurationMs = DEFAULT_AUTO_SCROLL_MAX_SECONDS * 1000, onAutoScrollPageEnd, onAutoScrollTouch, onContinuousPageLayout,
 }: MushafPageProps) {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
+  const pageScrollRef = useRef<ScrollView>(null);
+  const pageScrollOffsetRef = useRef(0);
+  const pageContentHeightRef = useRef(0);
+  const pageViewportHeightRef = useRef(0);
   // Tajweed mode: use COLRv1 colored font for this page if available.
   // RN <Text> on iOS does not rasterize COLR layers, so tajweed lines render
   // via Skia (see MushafLineSkia). Pages without a bundled color font
@@ -374,6 +404,41 @@ const MushafPage = React.memo(function MushafPage({
 
   // Add top/bottom padding when using QCF per-page fonts to avoid glyph clipping (letters like ك، ل، ط)
   const extraTopPadding = fontLoaded ? Math.ceil(fontSize * 0.18) : 0;
+  const WINDOW_HEIGHT = Dimensions.get('window').height;
+  const MIN_PAGE_HEIGHT = Math.max(WINDOW_HEIGHT - 140, 520);
+  const shouldReserveAutoScrollSpace = autoScrollActive || autoScrollControlsVisible;
+
+  useEffect(() => {
+    if (!autoScrollActive || !isActivePage) return;
+    let shortPageTimer: ReturnType<typeof setTimeout> | null = null;
+    const timer = setInterval(() => {
+      if (pageContentHeightRef.current <= 0 || pageViewportHeightRef.current <= 0) return;
+      const maxOffset = Math.max(0, pageContentHeightRef.current - pageViewportHeightRef.current);
+      if (maxOffset <= 2) {
+        if (!shortPageTimer) {
+          shortPageTimer = setTimeout(() => {
+            onAutoScrollPageEnd?.();
+          }, autoScrollDurationMs);
+        }
+        return;
+      }
+      if (shortPageTimer) {
+        clearTimeout(shortPageTimer);
+        shortPageTimer = null;
+      }
+      const pixelsPerTick = Math.max(0.8, maxOffset / Math.max(1, autoScrollDurationMs / AUTO_SCROLL_TICK_MS));
+      const nextOffset = Math.min(maxOffset, pageScrollOffsetRef.current + pixelsPerTick);
+      pageScrollOffsetRef.current = nextOffset;
+      pageScrollRef.current?.scrollTo({ y: nextOffset, animated: false });
+      if (maxOffset - nextOffset <= 1) {
+        onAutoScrollPageEnd?.();
+      }
+    }, AUTO_SCROLL_TICK_MS);
+    return () => {
+      clearInterval(timer);
+      if (shortPageTimer) clearTimeout(shortPageTimer);
+    };
+  }, [autoScrollActive, autoScrollDurationMs, isActivePage, onAutoScrollPageEnd]);
 
   // Font loading state — show spinner with text fallback so user always sees something
   if (!usePlainArabicMode && !fontLoaded && !fontError) {
@@ -405,26 +470,8 @@ const MushafPage = React.memo(function MushafPage({
     );
   }
 
-  const WINDOW_HEIGHT = Dimensions.get('window').height;
-  const MIN_PAGE_HEIGHT = Math.max(WINDOW_HEIGHT - 140, 520);
-
-  return (
-    <ScrollView
-      style={{ width, flex: 1 }}
-      contentContainerStyle={{
-        flexGrow: 1,
-        justifyContent: 'flex-start',
-        paddingTop: 12,
-        paddingBottom: 44,
-        paddingHorizontal: 16,
-        minHeight: MIN_PAGE_HEIGHT,
-      }}
-      showsVerticalScrollIndicator={false}
-      bounces={false}
-      nestedScrollEnabled
-      directionalLockEnabled
-      scrollEventThrottle={16}
-    >
+  const pageInner = (
+    <>
       {blocks.map((block, i) => {
         if (block.type === 'surah_name') {
           return <SurahBanner key={`sh-${i}`} surahNumber={block.surahNumber} themeIndex={themeIndex} isLightBg={forceLightText === undefined ? isThemeLight(themeIndex) : !forceLightText} />;
@@ -647,6 +694,57 @@ const MushafPage = React.memo(function MushafPage({
       >
         {page}
       </Text>
+    </>
+  );
+
+  if (autoScrollContinuousMode) {
+    return (
+      <View
+        style={{
+          width,
+          justifyContent: 'flex-start',
+          paddingTop: 12,
+          paddingBottom: 44,
+          paddingHorizontal: 16,
+          minHeight: MIN_PAGE_HEIGHT,
+        }}
+        onLayout={(event) => onContinuousPageLayout?.(page, event.nativeEvent.layout.height)}
+      >
+        {pageInner}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      ref={pageScrollRef}
+      style={{ width, flex: 1 }}
+      contentContainerStyle={{
+        flexGrow: 1,
+        justifyContent: 'flex-start',
+        paddingTop: 12,
+        paddingBottom: shouldReserveAutoScrollSpace ? AUTO_SCROLL_BOTTOM_SPACER : 44,
+        paddingHorizontal: 16,
+        minHeight: MIN_PAGE_HEIGHT,
+      }}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+      nestedScrollEnabled
+      directionalLockEnabled
+      scrollEventThrottle={16}
+      onLayout={(event) => {
+        pageViewportHeightRef.current = event.nativeEvent.layout.height;
+      }}
+      onContentSizeChange={(_, height) => {
+        pageContentHeightRef.current = height;
+      }}
+      onScroll={(event) => {
+        pageScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+      }}
+      onTouchStart={autoScrollActive ? onAutoScrollTouch : undefined}
+      onScrollBeginDrag={autoScrollActive ? onAutoScrollTouch : undefined}
+    >
+      {pageInner}
     </ScrollView>
   );
 });
@@ -668,8 +766,10 @@ interface GlassHeaderProps {
   showDownloadButton: boolean;
   downloadState: 'idle' | 'downloading' | 'done';
   downloadProgress: number;
+  autoScrollActive: boolean;
   onTafsir: () => void;
   onPlay: () => void;
+  onToggleAutoScroll: () => void;
   onBack: () => void;
   onToggleFavorite: () => void;
   onShare: () => void;
@@ -678,7 +778,7 @@ interface GlassHeaderProps {
   onDownloadLongPress: () => void;
 }
 
-function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, showLockBadge, showDownloadButton, downloadState, downloadProgress, onTafsir, onPlay, onBack, onToggleFavorite, onShare, onSettings, onDownload, onDownloadLongPress }: GlassHeaderProps) {
+function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, showLockBadge, showDownloadButton, downloadState, downloadProgress, autoScrollActive, onTafsir, onPlay, onToggleAutoScroll, onBack, onToggleFavorite, onShare, onSettings, onDownload, onDownloadLongPress }: GlassHeaderProps) {
   return (
     <View style={gh.wrapper} collapsable={false}>
       <View style={gh.inner}>
@@ -736,6 +836,13 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
           </TouchableOpacity>
           <TouchableOpacity hitSlop={8} onPress={onSettings}>
             <MaterialCommunityIcons name="cog-outline" size={22} color={goldenColor} />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={onToggleAutoScroll}>
+            <MaterialCommunityIcons
+              name={autoScrollActive ? 'pause-circle-outline' : 'play-speed'}
+              size={23}
+              color={AUTO_SCROLL_ACCENT}
+            />
           </TouchableOpacity>
         </View>
 
@@ -838,6 +945,7 @@ export default function SurahScreen() {
   const { showCelebration } = useCelebration();
   const { addPagesRead } = useQuranTracker();
   const flatListRef = useRef<FlatList>(null);
+  const continuousScrollRef = useRef<FlatList<number>>(null);
   const pageViewShotRef = useRef<ViewShot>(null);
   const trackedPagesRef = useRef<Set<number>>(new Set());
   const sessionPagesRef = useRef(0);
@@ -847,6 +955,10 @@ export default function SurahScreen() {
   const shareViewShotRef = useRef<ViewShot>(null);
   const verseShareRef = useRef<IslamicShareCardHandle>(null);
   const autoShareTriggeredRef = useRef(false);
+  const autoScrollAdvancingPageRef = useRef<number | null>(null);
+  const continuousScrollOffsetRef = useRef(0);
+  const continuousViewportHeightRef = useRef(0);
+  const continuousPageHeightsRef = useRef<Map<number, number>>(new Map());
   const targetIndicatorOpacity = useRef(new Animated.Value(targetAyah ? 1 : 0)).current;
   // waitForInteraction prevents the inverted FlatList from firing a spurious
   // onViewableItemsChanged during initial layout (which would overwrite the
@@ -887,6 +999,15 @@ export default function SurahScreen() {
   const [showLongPressHint, setShowLongPressHint] = useState(false);
   const [isPageFavorited, setIsPageFavorited] = useState(false);
   const [highlightAyahKey, setHighlightAyahKey] = useState<string | null>(null);
+  const [autoScrollActive, setAutoScrollActive] = useState(false);
+  const [showAutoScrollControls, setShowAutoScrollControls] = useState(false);
+  const [autoScrollMinimized, setAutoScrollMinimized] = useState(false);
+  const [autoScrollStartPage, setAutoScrollStartPage] = useState(currentPage);
+  const [autoScrollDraftSpeed, setAutoScrollDraftSpeed] = useState(0.5);
+  const [autoScrollDurationRange, setAutoScrollDurationRange] = useState({
+    minSeconds: DEFAULT_AUTO_SCROLL_MIN_SECONDS,
+    maxSeconds: DEFAULT_AUTO_SCROLL_MAX_SECONDS,
+  });
 
   // FlatList onViewableItemsChanged callback - must be after setCurrentPage is available
   // Picks the item with the largest visible area (most reliable on inverted lists
@@ -957,6 +1078,60 @@ export default function SurahScreen() {
   const translationEdition = settings?.display?.translationEdition ?? 'en.sahih';
   const translationFontSize = settings?.display?.translationFontSize ?? 14;
   const highlightTajweed = settings?.display?.highlightTajweed ?? false;
+  const autoScrollMinSeconds = autoScrollDurationRange.minSeconds;
+  const autoScrollMaxSeconds = Math.max(autoScrollMinSeconds, autoScrollDurationRange.maxSeconds);
+  const autoScrollSpeed = Math.max(
+    AUTO_SCROLL_MIN_SPEED,
+    Math.min(AUTO_SCROLL_MAX_SPEED, autoScrollDraftSpeed),
+  );
+  const autoScrollDurationMs = Math.round(
+    autoScrollMaxSeconds * 1000 -
+      autoScrollSpeed * ((autoScrollMaxSeconds - autoScrollMinSeconds) * 1000),
+  );
+  const autoScrollSeconds = Math.round(autoScrollDurationMs / 1000);
+  const autoScrollDurationLabel = formatAutoScrollDuration(autoScrollSeconds, isArabicLang);
+  const autoScrollCopy = {
+    title: isArabicLang ? 'التصفح التلقائي' : 'Auto Scroll',
+    play: isArabicLang ? 'تشغيل التصفح التلقائي' : 'Start Auto Scroll',
+    pause: isArabicLang ? 'إيقاف مؤقت' : 'Pause',
+    minimized: isArabicLang ? 'مصغر' : 'Minimized',
+    resume: isArabicLang ? 'متابعة' : 'Resume',
+    speed: isArabicLang ? 'مدة الصفحة' : 'Page duration',
+    slower: `${isArabicLang ? 'أبطأ' : 'Slower'} · ${formatAutoScrollDuration(autoScrollMaxSeconds, isArabicLang).replace(isArabicLang ? '/صفحة' : '/page', '')}`,
+    faster: `${isArabicLang ? 'أسرع' : 'Faster'} · ${formatAutoScrollDuration(autoScrollMinSeconds, isArabicLang).replace(isArabicLang ? '/صفحة' : '/page', '')}`,
+  };
+
+  useEffect(() => {
+    setAutoScrollDraftSpeed(settings?.display?.quranAutoScrollSpeed ?? 0.5);
+  }, [settings?.display?.quranAutoScrollSpeed]);
+
+  const applyRemoteAutoScrollConfig = useCallback((config: any) => {
+    const rawMin = Number(config?.quranAutoScroll?.minSeconds);
+    const rawMax = Number(config?.quranAutoScroll?.maxSeconds);
+    const minSeconds = Number.isFinite(rawMin)
+      ? Math.max(5, Math.min(3600, Math.round(rawMin)))
+      : DEFAULT_AUTO_SCROLL_MIN_SECONDS;
+    const maxSeconds = Number.isFinite(rawMax)
+      ? Math.max(minSeconds, Math.min(7200, Math.round(rawMax)))
+      : DEFAULT_AUTO_SCROLL_MAX_SECONDS;
+    setAutoScrollDurationRange({ minSeconds, maxSeconds });
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchAppConfig()
+      .then((config) => {
+        if (mounted) applyRemoteAutoScrollConfig(config);
+      })
+      .catch(() => {});
+    const unsubscribe = subscribeToAppConfig((config) => {
+      if (mounted) applyRemoteAutoScrollConfig(config);
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [applyRemoteAutoScrollConfig]);
 
   // Translation language direction
   const translationLang = TRANSLATION_EDITIONS.find(e => e.identifier === translationEdition)?.language ?? 'en';
@@ -1515,11 +1690,107 @@ export default function SurahScreen() {
     checkAndShare();
   }, [autoShareParam, currentPage, handleSharePage, forceLightText, isDarkMode]);
 
-  const jumpToPage = useCallback((page: number) => {
+  const scrollToPage = useCallback((page: number, animated = false) => {
     const idx = Math.max(0, Math.min(page - 1, TOTAL_PAGES - 1));
-    flatListRef.current?.scrollToIndex({ index: idx, animated: false });
-    setCurrentPage(page);
+    const nextPage = idx + 1;
+    flatListRef.current?.scrollToIndex({ index: idx, animated });
+    setCurrentPage(nextPage);
   }, []);
+
+  const jumpToPage = useCallback((page: number) => {
+    scrollToPage(page, false);
+  }, [scrollToPage]);
+
+  const pauseAutoScrollFromTouch = useCallback(() => {
+    setAutoScrollActive(false);
+  }, []);
+
+  const toggleAutoScroll = useCallback(() => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync();
+    setShowAutoScrollControls(true);
+    setAutoScrollMinimized(false);
+    if (!autoScrollActive && !showAutoScrollControls) {
+      setAutoScrollStartPage(currentPage);
+      continuousScrollOffsetRef.current = 0;
+      requestAnimationFrame(() => {
+        continuousScrollRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    }
+    setAutoScrollActive(prev => {
+      if (prev) return false;
+      return currentPage < TOTAL_PAGES;
+    });
+  }, [autoScrollActive, currentPage, showAutoScrollControls]);
+
+  const updateAutoScrollSpeed = useCallback((speed: number) => {
+    const normalized = Math.max(AUTO_SCROLL_MIN_SPEED, Math.min(AUTO_SCROLL_MAX_SPEED, speed));
+    setAutoScrollDraftSpeed(normalized);
+    updateDisplay({ quranAutoScrollSpeed: normalized });
+  }, [updateDisplay]);
+
+  const handleAutoScrollPageEnd = useCallback(() => {
+    if (autoScrollAdvancingPageRef.current === currentPage) return;
+    if (currentPage >= TOTAL_PAGES) {
+      setAutoScrollActive(false);
+      return;
+    }
+    autoScrollAdvancingPageRef.current = currentPage;
+    scrollToPage(currentPage + 1, true);
+  }, [currentPage, scrollToPage]);
+
+  useEffect(() => {
+    autoScrollAdvancingPageRef.current = null;
+  }, [currentPage]);
+
+  const autoScrollContinuousMode = showAutoScrollControls;
+  const continuousPages = useMemo(
+    () => PAGES.slice(Math.max(0, autoScrollStartPage - 1)),
+    [autoScrollStartPage],
+  );
+
+  const getContinuousPageMetrics = useCallback((offsetY: number) => {
+    let cursor = 0;
+    for (const page of continuousPages) {
+      const height = continuousPageHeightsRef.current.get(page) ?? (Dimensions.get('window').height - 120);
+      if (offsetY < cursor + height) {
+        return { page, height, pageStart: cursor };
+      }
+      cursor += height;
+    }
+    const lastPage = continuousPages[continuousPages.length - 1] ?? TOTAL_PAGES;
+    const lastHeight = continuousPageHeightsRef.current.get(lastPage) ?? (Dimensions.get('window').height - 120);
+    return { page: lastPage, height: lastHeight, pageStart: Math.max(0, cursor - lastHeight) };
+  }, [continuousPages]);
+
+  const updateContinuousPageFromOffset = useCallback((offsetY: number) => {
+    const { page } = getContinuousPageMetrics(offsetY + 8);
+    setCurrentPage(prev => (prev === page ? prev : page));
+  }, [getContinuousPageMetrics]);
+
+  useEffect(() => {
+    if (!autoScrollActive || !autoScrollContinuousMode) return;
+    const timer = setInterval(() => {
+      const offset = continuousScrollOffsetRef.current;
+      const { page, height } = getContinuousPageMetrics(offset);
+      if (page >= TOTAL_PAGES) {
+        const totalHeight = continuousPages.reduce(
+          (sum, p) => sum + (continuousPageHeightsRef.current.get(p) ?? height),
+          0,
+        );
+        const maxOffset = Math.max(0, totalHeight - continuousViewportHeightRef.current);
+        if (offset >= maxOffset - 2) {
+          setAutoScrollActive(false);
+          return;
+        }
+      }
+      const pixelsPerTick = Math.max(0.25, height / Math.max(1, autoScrollDurationMs / AUTO_SCROLL_TICK_MS));
+      const nextOffset = offset + pixelsPerTick;
+      continuousScrollOffsetRef.current = nextOffset;
+      continuousScrollRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
+      updateContinuousPageFromOffset(nextOffset);
+    }, AUTO_SCROLL_TICK_MS);
+    return () => clearInterval(timer);
+  }, [autoScrollActive, autoScrollContinuousMode, autoScrollDurationMs, continuousPages, getContinuousPageMetrics, updateContinuousPageFromOffset]);
 
   // Auto-sync page to audio while playing — jump to verse page when playback moves
   useEffect(() => {
@@ -1540,13 +1811,16 @@ export default function SurahScreen() {
     [],
   );
 
-  const initialScrollIndex = Math.max(0, Math.min(initialPage - 1, TOTAL_PAGES - 1));
+  const initialScrollIndex = Math.max(0, Math.min(currentPage - 1, TOTAL_PAGES - 1));
 
   const renderPage = useCallback(
     ({ item: page }: { item: number }) => (
       <TouchableOpacity
         activeOpacity={1}
-        onPress={() => { if (settings?.display?.focusMode) setShowControls(p => !p); }}
+        onPress={() => {
+          if (autoScrollActive) setAutoScrollActive(false);
+          if (settings?.display?.focusMode) setShowControls(p => !p);
+        }}
         style={{ width: SCREEN_WIDTH, flex: 1 }}
       >
         <MushafPage
@@ -1564,10 +1838,16 @@ export default function SurahScreen() {
           showTranslation={showTranslation}
           translationFontSize={translationFontSize}
           translationIsRTL={translationIsRTL}
+          isActivePage={page === currentPage}
+          autoScrollActive={autoScrollActive}
+          autoScrollControlsVisible={showAutoScrollControls}
+          autoScrollDurationMs={autoScrollDurationMs}
+          onAutoScrollPageEnd={handleAutoScrollPageEnd}
+          onAutoScrollTouch={pauseAutoScrollFromTouch}
         />
       </TouchableOpacity>
     ),
-    [themeIndex, fontSizeAdjust, forceLightText, bookmarkMap, playingAyahKey, highlightAyahKey, handleAyahLongPress, showTranslation, translationMap, translationFontSize, translationIsRTL],
+    [themeIndex, fontSizeAdjust, forceLightText, bookmarkMap, playingAyahKey, highlightAyahKey, handleAyahLongPress, showTranslation, translationMap, translationFontSize, translationIsRTL, currentPage, autoScrollActive, showAutoScrollControls, autoScrollDurationMs, handleAutoScrollPageEnd, pauseAutoScrollFromTouch, settings?.display?.focusMode],
   );
 
   // ══════════════════════════════════════════════
@@ -1594,27 +1874,79 @@ export default function SurahScreen() {
           )}
           {/* Mushaf pages */}
           <View style={{ flex: (showTafsirPanel && !tafsirMinimized) ? 2 : 1 }}>
-            <FlatList
-              ref={flatListRef}
-              data={PAGES}
-              renderItem={renderPage}
-              keyExtractor={String}
-              horizontal
-              inverted
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              initialScrollIndex={initialScrollIndex}
-              getItemLayout={getItemLayout}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
-              onMomentumScrollEnd={onMomentumScrollEnd}
-              windowSize={5}
-              maxToRenderPerBatch={2}
-              initialNumToRender={3}
-              removeClippedSubviews={Platform.OS !== 'web'}
-              directionalLockEnabled
-              disableIntervalMomentum
-            />
+            {autoScrollContinuousMode ? (
+              <FlatList
+                key="mushaf-auto-scroll-continuous"
+                ref={continuousScrollRef}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: AUTO_SCROLL_BOTTOM_SPACER + 16 }}
+                data={continuousPages}
+                keyExtractor={(page) => `continuous-${page}`}
+                renderItem={({ item: page }) => (
+                  <MushafPage
+                    page={page}
+                    themeIndex={themeIndex}
+                    width={SCREEN_WIDTH}
+                    fontSizeAdjust={fontSizeAdjust}
+                    forceLightText={forceLightText}
+                    useCdnImage={settings?.display?.quranUseCdnPages}
+                    bookmarkMap={bookmarkMap}
+                    playingAyahKey={playingAyahKey}
+                    highlightAyahKey={highlightAyahKey}
+                    onAyahLongPress={handleAyahLongPress}
+                    translationMap={showTranslation ? translationMap : undefined}
+                    showTranslation={showTranslation}
+                    translationFontSize={translationFontSize}
+                    translationIsRTL={translationIsRTL}
+                    autoScrollContinuousMode
+                    onContinuousPageLayout={(p, height) => {
+                      continuousPageHeightsRef.current.set(p, height);
+                    }}
+                  />
+                )}
+                showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onLayout={(event) => {
+                  continuousViewportHeightRef.current = event.nativeEvent.layout.height;
+                }}
+                onScroll={(event) => {
+                  const offsetY = event.nativeEvent.contentOffset.y;
+                  continuousScrollOffsetRef.current = offsetY;
+                  updateContinuousPageFromOffset(offsetY);
+                }}
+                onScrollBeginDrag={autoScrollActive ? pauseAutoScrollFromTouch : undefined}
+                onTouchStart={autoScrollActive ? pauseAutoScrollFromTouch : undefined}
+                initialNumToRender={2}
+                maxToRenderPerBatch={2}
+                windowSize={5}
+                removeClippedSubviews={Platform.OS !== 'web'}
+              />
+            ) : (
+              <FlatList
+                key="mushaf-paged-reader"
+                ref={flatListRef}
+                data={PAGES}
+                renderItem={renderPage}
+                keyExtractor={String}
+                horizontal
+                inverted
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                initialScrollIndex={initialScrollIndex}
+                getItemLayout={getItemLayout}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                onTouchStart={autoScrollActive ? pauseAutoScrollFromTouch : undefined}
+                onScrollBeginDrag={autoScrollActive ? pauseAutoScrollFromTouch : undefined}
+                onMomentumScrollEnd={onMomentumScrollEnd}
+                windowSize={5}
+                maxToRenderPerBatch={2}
+                initialNumToRender={3}
+                removeClippedSubviews={Platform.OS !== 'web'}
+                directionalLockEnabled
+                disableIntervalMomentum
+              />
+            )}
           </View>
 
           {/* ═══ TAFSIR SPLIT-SCREEN PANEL ═══ */}
@@ -1800,8 +2132,10 @@ export default function SurahScreen() {
               showDownloadButton={isPremium}
               downloadState={downloadState}
               downloadProgress={downloadProgress}
+              autoScrollActive={autoScrollActive}
               onTafsir={() => updateDisplay({ showTafsir: !showTafsirPanel } as any)}
               onPlay={handlePlayPage}
+              onToggleAutoScroll={toggleAutoScroll}
               onBack={handleBack}
               onToggleFavorite={handleToggleFavorite}
               onShare={handleSharePage}
@@ -1815,6 +2149,130 @@ export default function SurahScreen() {
           <View style={{ flex: 1, overflow: 'hidden' }}>
             {pageContent}
           </View>
+
+          {/* ═══ AUTO SCROLL CONTROLS ═══ */}
+          {showAutoScrollControls && (
+            <View pointerEvents="box-none" style={[s.autoScrollWrap, { bottom: Math.max(insets.bottom, 12) + 8 }]}>
+              <BlurView
+                intensity={Platform.OS === 'ios' ? 34 : 18}
+                tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
+                style={s.autoScrollBlur}
+              >
+                {autoScrollMinimized ? (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setAutoScrollMinimized(false)}
+                    style={[
+                      s.autoScrollMiniPanel,
+                      {
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        backgroundColor: isLightBg ? 'rgba(255,255,255,0.88)' : 'rgba(24,24,28,0.86)',
+                      },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      onPress={toggleAutoScroll}
+                      style={[s.autoScrollMiniPlayButton, { backgroundColor: autoScrollActive ? 'rgba(13,142,98,0.18)' : AUTO_SCROLL_ACCENT }]}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialCommunityIcons
+                        name={autoScrollActive ? 'pause' : 'play'}
+                        size={16}
+                        color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'}
+                      />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.autoScrollTitle, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                        {autoScrollCopy.title}
+                      </Text>
+                      <Text style={[s.autoScrollSubtitle, { color: isLightBg ? '#666' : '#bbb', textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                        {autoScrollCopy.minimized} · {autoScrollDurationLabel}
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-up" size={18} color={isLightBg ? '#555' : '#bbb'} />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[
+                    s.autoScrollPanel,
+                    { backgroundColor: isLightBg ? 'rgba(255,255,255,0.84)' : 'rgba(24,24,28,0.82)' },
+                  ]}>
+                    <View style={[s.autoScrollTopRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <TouchableOpacity
+                        onPress={toggleAutoScroll}
+                        style={[s.autoScrollPlayButton, { backgroundColor: autoScrollActive ? 'rgba(13,142,98,0.18)' : AUTO_SCROLL_ACCENT }]}
+                        activeOpacity={0.85}
+                      >
+                        <MaterialCommunityIcons
+                          name={autoScrollActive ? 'pause' : 'play'}
+                          size={18}
+                          color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'}
+                        />
+                      </TouchableOpacity>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.autoScrollTitle, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left' }]}>
+                          {autoScrollCopy.title}
+                        </Text>
+                        <Text style={[s.autoScrollSubtitle, { color: isLightBg ? '#666' : '#bbb', textAlign: isRTL ? 'right' : 'left' }]}>
+                          {autoScrollActive ? autoScrollCopy.pause : autoScrollCopy.play} · {autoScrollCopy.speed}: {autoScrollDurationLabel}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        hitSlop={8}
+                        onPress={() => setAutoScrollMinimized(true)}
+                        style={[s.autoScrollCloseButton, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.10)' }]}
+                      >
+                        <MaterialCommunityIcons name="chevron-down" size={16} color={isLightBg ? '#333' : '#fff'} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        hitSlop={8}
+                        onPress={() => {
+                          setAutoScrollActive(false);
+                          setShowAutoScrollControls(false);
+                          setAutoScrollMinimized(false);
+                        }}
+                        style={[s.autoScrollCloseButton, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.10)' }]}
+                      >
+                        <MaterialCommunityIcons name="close" size={14} color={isLightBg ? '#333' : '#fff'} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={[s.autoScrollCurrentRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Text style={[s.autoScrollDurationLabel, { color: isLightBg ? '#666' : '#aaa', textAlign: isRTL ? 'right' : 'left' }]}>
+                        {autoScrollCopy.speed}
+                      </Text>
+                      <View style={[s.autoScrollCurrentPill, { backgroundColor: 'rgba(13,142,98,0.12)' }]}>
+                        <Text style={[s.autoScrollCurrentText, { color: AUTO_SCROLL_ACCENT }]}>
+                          {autoScrollDurationLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={s.autoScrollSliderLabels}>
+                      <Text style={[s.autoScrollSliderLabel, { color: isLightBg ? '#666' : '#aaa', textAlign: 'left' }]}>
+                        {autoScrollCopy.slower}
+                      </Text>
+                      <Text style={[s.autoScrollSliderLabel, { color: isLightBg ? '#666' : '#aaa', textAlign: 'right' }]}>
+                        {autoScrollCopy.faster}
+                      </Text>
+                    </View>
+
+                    <Slider
+                      style={s.autoScrollSlider}
+                      minimumValue={AUTO_SCROLL_MIN_SPEED}
+                      maximumValue={AUTO_SCROLL_MAX_SPEED}
+                      value={autoScrollSpeed}
+                      inverted={isRTL}
+                      onValueChange={setAutoScrollDraftSpeed}
+                      onSlidingComplete={updateAutoScrollSpeed}
+                      minimumTrackTintColor={AUTO_SCROLL_ACCENT}
+                      maximumTrackTintColor={isLightBg ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)'}
+                      thumbTintColor={AUTO_SCROLL_ACCENT}
+                    />
+                  </View>
+                )}
+              </BlurView>
+            </View>
+          )}
 
           {/* ═══ TARGET AYAH INDICATOR ═══ */}
           {targetAyah && highlightAyahKey && (
@@ -2250,7 +2708,11 @@ export default function SurahScreen() {
                                     void (async () => {
                                       const downloaded = await isAllTajweedDownloaded();
                                       if (!downloaded) {
-                                        setShowTajweedDownload(true);
+                                        // iOS RN won't render a second <Modal> on top of an already-visible
+                                        // one, so close the settings sheet first, then open the download
+                                        // modal on the next tick. onComplete/onCancel reopens settings.
+                                        setShowSettings(false);
+                                        setTimeout(() => setShowTajweedDownload(true), Platform.OS === 'ios' ? 350 : 0);
                                         return;
                                       }
                                       updateDisplay({ quranReadingMode: mode });
@@ -2486,9 +2948,12 @@ export default function SurahScreen() {
             onComplete={() => {
               setShowTajweedDownload(false);
               updateDisplay({ quranReadingMode: 'tajweed' });
+              // Reopen the settings sheet so the user can see tajweed is now active.
+              setTimeout(() => setShowSettings(true), Platform.OS === 'ios' ? 350 : 0);
             }}
             onCancel={() => {
               setShowTajweedDownload(false);
+              setTimeout(() => setShowSettings(true), Platform.OS === 'ios' ? 350 : 0);
             }}
           />
 
@@ -2580,6 +3045,114 @@ const _s = StyleSheet.create({
     includeFontPadding: false,
   },
 
+  // Auto scroll controls
+  autoScrollWrap: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 18,
+    zIndex: 90,
+  },
+  autoScrollBlur: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  autoScrollPanel: {
+    borderRadius: 16,
+    padding: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(120,120,128,0.20)',
+  },
+  autoScrollMiniPanel: {
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(120,120,128,0.20)',
+    alignItems: 'center',
+    gap: 10,
+  },
+  autoScrollTopRow: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  autoScrollPlayButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoScrollMiniPlayButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoScrollCloseButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoScrollTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontFamily: fontBold(),
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  autoScrollSubtitle: {
+    fontSize: FONT_SIZES.xs,
+    fontFamily: fontRegular(),
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  autoScrollCurrentRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 6,
+  },
+  autoScrollDurationLabel: {
+    flex: 1,
+    fontSize: FONT_SIZES.xs,
+    fontFamily: fontSemiBold(),
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  autoScrollCurrentPill: {
+    minWidth: 104,
+    minHeight: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  autoScrollCurrentText: {
+    fontSize: FONT_SIZES.xs,
+    fontFamily: fontBold(),
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  autoScrollSliderLabels: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  autoScrollSliderLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: fontMedium(),
+    lineHeight: 16,
+    includeFontPadding: false,
+  },
+  autoScrollSlider: {
+    width: '100%',
+    height: 30,
+  },
   // ── Bottom Sheet ──
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
   sheetContainer: { height: '72%', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },

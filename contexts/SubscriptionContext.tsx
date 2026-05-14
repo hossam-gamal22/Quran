@@ -121,6 +121,89 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
 
 export const useSubscription = () => useContext(SubscriptionContext);
 
+const parseDateLike = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}T23:59:59.999`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'object') {
+    const maybeTimestamp = value as { seconds?: number; nanoseconds?: number; toDate?: () => Date };
+    if (typeof maybeTimestamp.toDate === 'function') {
+      const date = maybeTimestamp.toDate();
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    if (typeof maybeTimestamp.seconds === 'number') {
+      const millis = maybeTimestamp.seconds * 1000 + Math.floor((maybeTimestamp.nanoseconds || 0) / 1_000_000);
+      const date = new Date(millis);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+  return null;
+};
+
+const dateLikeToStorageString = (value: unknown): string | null => {
+  if (!value) return null;
+  const date = parseDateLike(value);
+  return date ? date.toISOString() : null;
+};
+
+const dateLikeKey = (value: unknown): string => {
+  if (!value) return 'unknown';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  const date = parseDateLike(value);
+  return date ? date.toISOString() : 'unknown';
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const startOfLocalDay = (date: Date): number =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+const formatExpiryTiming = (expiresAt: Date, now = new Date()): string => {
+  const dayDiff = Math.max(
+    0,
+    Math.round((startOfLocalDay(expiresAt) - startOfLocalDay(now)) / DAY_MS)
+  );
+
+  if (dayDiff === 0) return 'اليوم';
+  if (dayDiff === 1) return 'غدًا';
+  if (dayDiff === 2) return 'خلال يومين';
+  return `خلال ${dayDiff} أيام`;
+};
+
+const buildExpiryNotificationBody = (
+  expiresAt: Date,
+  isAdminGrant: boolean,
+  now = new Date()
+): string => {
+  const timing = formatExpiryTiming(expiresAt, now);
+  return isAdminGrant
+    ? `تنتهي منحة البريميم ${timing}. سيعود التطبيق للوضع المجاني بعدها.`
+    : `ينتهي اشتراكك ${timing}. جدد اشتراكك للاستمرار بدون إعلانات.`;
+};
+
+const sanitizeFirestoreId = (value: unknown): string => {
+  const raw = typeof value === 'string' && value.trim() ? value.trim() : `purchase_${Date.now()}`;
+  return raw.replace(/[/.#[\]]/g, '_').slice(0, 180);
+};
+
+const getPurchaseField = (purchase: any, key: string): string | null => {
+  const value = purchase?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+};
+
+const purchaseMillisToIso = (value: unknown): string | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 // ==================== Provider ====================
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -135,11 +218,21 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [config, setConfig] = useState<SubscriptionConfig>(DEFAULT_SUBSCRIPTION_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const [premiumSource, setPremiumSource] = useState<PremiumSource>(null);
+  const stateRef = useRef<SubscriptionState>(state);
+  const premiumSourceRef = useRef<PremiumSource>(null);
   const [featureGating, setFeatureGating] = useState<FeatureGatingConfig>(DEFAULT_FEATURE_GATING);
   const purchaseUpdateSubscription = useRef<any>(null);
   const purchaseErrorSubscription = useRef<any>(null);
   const adminPremiumUnsub = useRef<(() => void) | null>(null);
   const [autoShowPaywall, setAutoShowPaywall] = useState(false);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    premiumSourceRef.current = premiumSource;
+  }, [premiumSource]);
 
   useEffect(() => {
     let mounted = true;
@@ -158,88 +251,141 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         if (!mounted) return;
 
+        const savedSource: PremiumSource = savedState.isPremium
+          ? (savedState.purchaseToken === 'admin_grant' ? 'admin' : 'iap')
+          : null;
         setState(savedState);
+        stateRef.current = savedState;
         setConfig(fetchedConfig);
+        setPremiumSource(savedSource);
+        premiumSourceRef.current = savedSource;
 
         // Check admin-granted premium
-        if (savedState.isPremium) {
-          setPremiumSource('iap');
-        } else {
-          try {
-            const userId = await getUserId();
-            if (userId) {
-              const userRef = doc(db, 'users', userId);
-              // Real-time listener for admin premium changes (grant/revoke/expiry)
-              adminPremiumUnsub.current = onSnapshot(userRef, async (snap) => {
-                if (!mounted) return;
-                const data = snap.data();
-                const adminPremium = data?.adminPremium as AdminGrantedPremium | undefined;
-                if (adminPremium?.granted) {
-                  const notExpired = !adminPremium.expiresAt || new Date(adminPremium.expiresAt) > new Date();
-                  if (notExpired) {
-                    // Detect false → true transition (new grant)
-                    const wasPremium = premiumSource === 'admin';
-                    setState(prev => ({ ...prev, isPremium: true }));
+        try {
+          const userId = await getUserId();
+          if (userId) {
+            const userRef = doc(db, 'users', userId);
+            // Real-time listener for admin premium changes (grant/revoke/expiry)
+            adminPremiumUnsub.current = onSnapshot(userRef, async (snap) => {
+              if (!mounted) return;
+              const data = snap.data();
+              const adminPremium = data?.adminPremium as AdminGrantedPremium | undefined;
+              const currentState = stateRef.current;
+              const currentSource = premiumSourceRef.current;
+
+              if (adminPremium?.granted) {
+                const expiresAtValue = (adminPremium as any).expiresAt;
+                const expiresAtDate = parseDateLike(expiresAtValue);
+                const expiresAtStorage = dateLikeToStorageString(expiresAtValue);
+                const notExpired = !expiresAtValue || (expiresAtDate ? expiresAtDate > new Date() : false);
+                if (notExpired) {
+                  const adminState: SubscriptionState = {
+                    isPremium: true,
+                    plan: adminPremium.plan || currentState.plan || 'yearly',
+                    expiresAt: expiresAtStorage,
+                    purchaseToken: 'admin_grant',
+                  };
+                  const wasAdminPremium =
+                    currentSource === 'admin' &&
+                    currentState.isPremium &&
+                    currentState.purchaseToken === 'admin_grant';
+                  const shouldApplyAdminState =
+                    currentSource !== 'iap' ||
+                    !currentState.isPremium ||
+                    currentState.purchaseToken === 'admin_grant';
+
+                  if (shouldApplyAdminState) {
+                    stateRef.current = adminState;
+                    premiumSourceRef.current = 'admin';
+                    setState(adminState);
                     setPremiumSource('admin');
-                    // Send local notification on new premium grant (once per grantedAt)
-                    if (!wasPremium) {
-                      const grantTs = adminPremium.grantedAt
-                        ? (typeof adminPremium.grantedAt === 'object' && 'seconds' in adminPremium.grantedAt
-                            ? (adminPremium.grantedAt as any).seconds
-                            : String(adminPremium.grantedAt))
-                        : 'unknown';
-                      const grantKey = `@admin_premium_notified_${grantTs}`;
-                      const alreadyNotified = await AsyncStorage.getItem(grantKey).catch(() => null);
-                      if (!alreadyNotified) {
-                        await AsyncStorage.setItem(grantKey, 'true').catch(() => {});
-                        const isWinner = adminPremium.grantedBy === 'auto_reward_system';
-                        Notifications.scheduleNotificationAsync({
-                          content: {
-                            title: '🎉 تهانينا!',
-                            body: isWinner
-                              ? 'أنت بطل الشهر! تم منحك نسخة مميزة مجاناً 🏆'
-                              : 'تم منحك نسخة مميزة من الإدارة 🌟',
-                            sound: 'default',
-                            data: { type: 'premium_granted' },
-                            ...(Platform.OS === 'android' && { channelId: 'general' }),
+                    setSubscriptionState(adminState).catch(() => {});
+                  }
+
+                  // Send local notification on new premium grant (once per grantedAt)
+                  if (!wasAdminPremium) {
+                    const grantTs = dateLikeKey((adminPremium as any).grantedAt);
+                    const grantKey = `@admin_premium_notified_${grantTs}`;
+                    const alreadyNotified = await AsyncStorage.getItem(grantKey).catch(() => null);
+                    if (!alreadyNotified) {
+                      await AsyncStorage.setItem(grantKey, 'true').catch(() => {});
+                      const isWinner =
+                        adminPremium.grantedBy === 'auto_reward_system' ||
+                        adminPremium.grantedBy === 'reward_system';
+                      Notifications.scheduleNotificationAsync({
+                        content: {
+                          title: '🎉 تهانينا!',
+                          body: isWinner
+                            ? 'أنت بطل الشهر! تم منحك نسخة مميزة مجاناً 🏆'
+                            : 'تم منحك نسخة مميزة من الإدارة 🌟',
+                          sound: 'default',
+                          data: {
+                            type: 'premium_granted',
+                            actionType: 'screen',
+                            actionUrl: isWinner ? '/honor-board' : '/subscription',
                           },
-                          trigger: null,
-                        }).catch(() => {});
-                      }
-                    }
-                  } else {
-                    // Premium expired — clean up stale data in Firestore
-                    setState(prev => ({ ...prev, isPremium: prev.plan ? prev.isPremium : false }));
-                    if (premiumSource === 'admin') setPremiumSource(null);
-                    try {
-                      await updateDoc(userRef, {
-                        'adminPremium.granted': false,
-                        'adminPremium.expiredAt': serverTimestamp(),
-                      });
-                    } catch (cleanupErr) {
-                      console.log('⚠️ Failed to clean stale admin premium:', cleanupErr);
+                          ...(Platform.OS === 'android' && { channelId: 'general' }),
+                        },
+                        trigger: null,
+                      }).catch(() => {});
                     }
                   }
                 } else {
-                  // Admin premium revoked or not granted
-                  if (premiumSource === 'admin') {
-                    setState(prev => ({ ...prev, isPremium: false }));
+                  const shouldClearAdmin =
+                    currentSource === 'admin' ||
+                    currentState.purchaseToken === 'admin_grant';
+                  if (shouldClearAdmin) {
+                    const clearedState: SubscriptionState = {
+                      isPremium: false,
+                      plan: null,
+                      expiresAt: null,
+                      purchaseToken: null,
+                    };
+                    stateRef.current = clearedState;
+                    premiumSourceRef.current = null;
+                    setState(clearedState);
                     setPremiumSource(null);
+                    setSubscriptionState(clearedState).catch(() => {});
+                  }
+                  try {
+                    await updateDoc(userRef, {
+                      'adminPremium.granted': false,
+                      'adminPremium.expiredAt': serverTimestamp(),
+                    });
+                  } catch (cleanupErr) {
+                    console.log('⚠️ Failed to clean stale admin premium:', cleanupErr);
                   }
                 }
-              }, (err) => {
-                console.log('⚠️ Admin premium listener error:', err);
-              });
-            }
-          } catch (e) {
-            console.log('⚠️ Admin premium check failed:', e);
+              } else {
+                const shouldClearAdmin =
+                  currentSource === 'admin' ||
+                  currentState.purchaseToken === 'admin_grant';
+                if (shouldClearAdmin) {
+                  const clearedState: SubscriptionState = {
+                    isPremium: false,
+                    plan: null,
+                    expiresAt: null,
+                    purchaseToken: null,
+                  };
+                  stateRef.current = clearedState;
+                  premiumSourceRef.current = null;
+                  setState(clearedState);
+                  setPremiumSource(null);
+                  setSubscriptionState(clearedState).catch(() => {});
+                }
+              }
+            }, (err) => {
+              console.log('⚠️ Admin premium listener error:', err);
+            });
           }
+        } catch (e) {
+          console.log('⚠️ Admin premium check failed:', e);
         }
 
         if (!fetchedConfig.enabled || !IAP) {
           // Paywall auto-display check (even if IAP unavailable, count opens)
           await incrementPaywallOpenCount();
-          const currentIsPremium = savedState.isPremium || premiumSource === 'admin';
+          const currentIsPremium = stateRef.current.isPremium || premiumSourceRef.current === 'admin';
           const show = await shouldShowPaywall(fetchedConfig, currentIsPremium);
           if (show && mounted) setAutoShowPaywall(true);
           setIsLoading(false);
@@ -360,14 +506,66 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
               try {
                 const userId = await getUserId();
                 if (userId) {
-                  await setDoc(doc(db, 'users', userId, 'purchases', purchase.transactionId || `purchase_${Date.now()}`), {
+                  const userRef = doc(db, 'users', userId);
+                  const userSnap = await getDoc(userRef).catch(() => null);
+                  const userData = userSnap?.exists?.() ? userSnap.data() : {};
+                  const transactionId = getPurchaseField(purchase, 'transactionId');
+                  const orderId = transactionId || getPurchaseField(purchase, 'id');
+                  const purchaseToken =
+                    getPurchaseField(purchase, 'purchaseToken') ||
+                    getPurchaseField(purchase, 'purchaseTokenAndroid');
+                  const purchaseDocId = sanitizeFirestoreId(orderId || purchaseToken);
+                  const purchasedAtIso = purchaseMillisToIso(purchase.transactionDate);
+
+                  await setDoc(doc(db, 'users', userId, 'purchases', purchaseDocId), {
+                    userId,
+                    userDisplayName: userData?.displayName || userData?.name || null,
+                    userPlatform: userData?.platform || Platform.OS,
+                    userInstallSource: userData?.installSource || null,
+                    userCountry: userData?.country || null,
+                    userLanguage: userData?.language || null,
+                    userAppVersion: userData?.appVersion || Constants.expoConfig?.version || null,
                     productId: purchase.productId,
                     plan,
-                    transactionId: purchase.transactionId || null,
+                    orderId,
+                    transactionId,
+                    purchaseId: getPurchaseField(purchase, 'id'),
+                    purchaseToken,
                     platform: Platform.OS,
+                    store: purchase.store || (Platform.OS === 'ios' ? 'app_store' : 'play_store'),
+                    currentPlanId: purchase.currentPlanId || null,
+                    purchaseState: purchase.purchaseState || null,
+                    quantity: typeof purchase.quantity === 'number' ? purchase.quantity : null,
+                    isAutoRenewing: typeof purchase.isAutoRenewing === 'boolean' ? purchase.isAutoRenewing : null,
+                    isAcknowledgedAndroid: purchase.isAcknowledgedAndroid ?? null,
+                    packageNameAndroid: purchase.packageNameAndroid || null,
+                    obfuscatedAccountIdAndroid: purchase.obfuscatedAccountIdAndroid || null,
+                    obfuscatedProfileIdAndroid: purchase.obfuscatedProfileIdAndroid || null,
+                    environmentIOS: purchase.environmentIOS || null,
+                    storefrontCountryCodeIOS: purchase.storefrontCountryCodeIOS || null,
+                    originalTransactionIdentifierIOS: purchase.originalTransactionIdentifierIOS || null,
+                    webOrderLineItemIdIOS: purchase.webOrderLineItemIdIOS || null,
+                    transactionDate: purchasedAtIso,
                     purchasedAt: serverTimestamp(),
                     expiresAt: newState.expiresAt || null,
-                  });
+                    recordedAt: serverTimestamp(),
+                    source: 'iap_listener',
+                  }, { merge: true });
+
+                  await setDoc(userRef, {
+                    iapPremium: {
+                      active: true,
+                      plan,
+                      productId: purchase.productId,
+                      orderId,
+                      transactionId,
+                      purchaseDocId,
+                      platform: Platform.OS,
+                      store: purchase.store || (Platform.OS === 'ios' ? 'app_store' : 'play_store'),
+                      expiresAt: newState.expiresAt || null,
+                      updatedAt: serverTimestamp(),
+                    },
+                  }, { merge: true });
                 }
               } catch (firestoreError) {
                 console.log('⚠️ Purchase Firestore record failed (non-blocking):', firestoreError);
@@ -387,7 +585,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         // Paywall auto-display check (full IAP path)
         await incrementPaywallOpenCount();
-        const currentIsPremium = savedState.isPremium || premiumSource === 'admin';
+        const currentIsPremium = stateRef.current.isPremium || premiumSourceRef.current === 'admin';
         const showPw = await shouldShowPaywall(fetchedConfig, currentIsPremium);
         if (showPw && mounted) setAutoShowPaywall(true);
 
@@ -406,8 +604,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
               await AsyncStorage.setItem(expiryNotifKey, 'true').catch(() => {});
               Notifications.scheduleNotificationAsync({
                 content: {
-                  title: '⏳ تنبيه الاشتراك',
-                  body: `ينتهي اشتراكك خلال ${Math.ceil(daysUntilExpiry)} ${Math.ceil(daysUntilExpiry) === 1 ? 'يوم' : 'أيام'}. جدد اشتراكك للاستمرار بدون إعلانات.`,
+                  title: 'تنبيه الاشتراك',
+                  body: buildExpiryNotificationBody(
+                    localExpiry,
+                    savedState.purchaseToken === 'admin_grant',
+                    now
+                  ),
                   sound: 'default',
                   data: { type: 'subscription_expiry' },
                   ...(Platform.OS === 'android' && { channelId: 'general' }),
@@ -517,13 +719,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
 
       if (plan === 'lifetime') {
+        const userId = await getUserId().catch(() => '');
         await IAP.requestPurchase({
           type: 'in-app',
           request: Platform.OS === 'ios'
             ? { apple: { sku: productId } }
-            : { google: { skus: [productId] } },
+            : { google: { skus: [productId], ...(userId ? { obfuscatedAccountId: userId } : {}) } },
         });
       } else {
+        const userId = await getUserId().catch(() => '');
         // For Android subscriptions, IAP v14 requires subscriptionOffers with offerToken
         let subscriptionOffers: { sku: string; offerToken: string }[] | undefined;
         if (Platform.OS === 'android') {
@@ -538,7 +742,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           type: 'subs',
           request: Platform.OS === 'ios'
             ? { apple: { sku: productId } }
-            : { google: { skus: [productId], ...(subscriptionOffers ? { subscriptionOffers } : {}) } },
+            : { google: { skus: [productId], ...(subscriptionOffers ? { subscriptionOffers } : {}), ...(userId ? { obfuscatedAccountId: userId } : {}) } },
         });
       }
       return true;

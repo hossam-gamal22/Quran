@@ -20,6 +20,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
 import { languageInitPromise, getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
 import { syncAppIconOnStartup, checkForIconUpdate } from '@/lib/app-icon-manager';
+import { getCurrentSeason as getLocalCurrentSeason } from '@/lib/seasonal-content';
 
 // Contexts
 import { SettingsProvider, themeCachePromise } from '@/contexts/SettingsContext';
@@ -51,6 +52,8 @@ import {
 import { autoSelectMonthlyWinners, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
+import { SnapshotHost } from '@/lib/widgets/snapshot';
+import { SnapshotPumpController } from '@/components/widgets/SnapshotPumpController';
 import { GlobalAudioProvider, markTrackPlayerReady } from '@/contexts/GlobalAudioContext';
 import { usePathname, useRouter } from 'expo-router';
 import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
@@ -115,6 +118,8 @@ export const channelsReadyPromise = new Promise<void>((resolve) => {
 // Safety: resolve after 5s to prevent deadlock if init fails silently
 setTimeout(() => _channelsReadyResolve(), 5000);
 
+const APP_OPENED_ONCE_KEY = '@rooh_app_opened_once';
+
 // Disable system-level RTL — the app handles RTL manually via useIsRTL() hook
 // in 200+ components. Without this, Arabic device language causes double-reversal.
 I18nManager.allowRTL(false);
@@ -127,6 +132,11 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 // Suppress known non-critical warnings
 LogBox.ignoreLogs([
+  // Firebase JS SDK WebSocket stream state-machine assertion in React Native.
+  // Fixed by experimentalForceLongPolling in config/firebase.ts; kept here as
+  // a safety net for any remaining edge cases during network transitions.
+  'FIRESTORE (10',
+  'INTERNAL ASSERTION FAILED',
   'expo-notifications: Android Push notifications',
   'Failed to initialize IAP',
   '[RN-IAP]',
@@ -157,13 +167,25 @@ LogBox.ignoreLogs([
 // Wrapped in try-catch to avoid console error on Expo Go (SDK 53+ removed push notifications from Expo Go)
 try {
   ExpoNotifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      const type = notification.request.content.data?.type;
+      // On iOS, the system cuts notification sounds after ~2-3 s when the app is
+      // in the foreground. For full_adhan we suppress the notification sound here
+      // and instead play the audio via expo-av in addNotificationReceivedListener
+      // so the full 2-4 min adhan plays without any OS time cap.
+      // On Android the notification sound is just the short safety-net; the
+      // foreground service handles the actual full-adhan playback — so we keep
+      // sound enabled on Android for the safety-net path.
+      const suppressSoundForFullAdhan =
+        type === 'full_adhan' && Platform.OS === 'ios';
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: !suppressSoundForFullAdhan,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      };
+    },
   });
 } catch (e) {
   // Silently ignore — Expo Go doesn't support push notifications
@@ -187,6 +209,12 @@ try {
   }
 } catch {
   // Native splash screen not available (Expo Go / hot reload)
+}
+
+if (Platform.OS === 'android') {
+  setTimeout(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, 7000);
 }
 
 // TrackPlayer initialization for lock screen audio controls (native only)
@@ -367,6 +395,13 @@ const ThemeBootOverlay = () => {
       });
     }
   }, [isLoading]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setVisible(false);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (!visible) return null;
 
@@ -661,6 +696,7 @@ export default function RootLayout() {
   // Firebase Integration — each step isolated with timeout
   useEffect(() => {
     if (__DEV__) console.log('🚀 Starting app initialization...');
+    AsyncStorage.setItem(APP_OPENED_ONCE_KEY, 'true').catch(() => {});
 
     const initFirebase = async () => {
       if (__DEV__) console.log('🔥 Initializing Firebase services...');
@@ -681,7 +717,7 @@ export default function RootLayout() {
       // Phase 2: ارفع موقع وإعدادات الصلاة لـ Firestore عشان FCM Push fallback
       // (Cloud Function تحسب الصلاة محلياً وترسل push احتياطي لو local scheduling فشل)
       setTimeout(() => {
-        AsyncStorage.getItem('@user_id').then((uid) => {
+        getUserId().then((uid) => {
           if (!uid) return;
           import('@/lib/fcm-prayer-sync').then(({ syncPrayerDataToFirestore }) => {
             syncPrayerDataToFirestore(uid).catch(() => {});
@@ -954,9 +990,10 @@ export default function RootLayout() {
       );
     }
 
-    // Sync app icon to match saved language on launch
+    // Sync app icon to match saved language/season on launch.
+    // SeasonalProvider refreshes this later with authoritative Hijri data.
     initWithTimeout(
-      () => syncAppIconOnStartup(getLanguage() as any),
+      () => syncAppIconOnStartup(getLanguage() as any, getLocalCurrentSeason()?.type ?? null),
       'App icon sync',
       5000
     );
@@ -1075,11 +1112,26 @@ export default function RootLayout() {
     };
   }, []);
 
-  // NOTE: Foreground notification sound player REMOVED.
-  // The native notification handler (setNotificationHandler with shouldPlaySound: true)
-  // already plays the correct custom sound from the bundled assets.
-  // Having a second expo-av player here caused double sound playback / echo
-  // when notifications arrived while the app was in the foreground.
+  // iOS foreground full-adhan player:
+  // When a full_adhan notification arrives while the app is in the foreground,
+  // iOS would cut the notification sound at ~2-3 s (system limitation).
+  // We suppress the notification sound for full_adhan on iOS (see setNotificationHandler
+  // above) and instead auto-navigate to /full-adhan which plays the audio via
+  // expo-av without any OS time cap.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const sub = ExpoNotifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.type !== 'full_adhan') return;
+      const prayer = typeof data.prayer === 'string' ? data.prayer : 'dhuhr';
+      const voice = typeof data.voice === 'string' ? data.voice : 'makkah';
+      const test = data.test === '1' ? '1' : '0';
+      try {
+        router.push({ pathname: '/full-adhan', params: { prayer, voice, test } } as any);
+      } catch {}
+    });
+    return () => sub.remove();
+  }, [router]);
 
   // Mark app ready when fonts finish (splash hide is handled by SplashGate inside SettingsProvider)
   useEffect(() => {
@@ -1131,7 +1183,7 @@ export default function RootLayout() {
         const data = response.notification.request.content.data;
         const notifId = response.notification.request.identifier;
 
-        if (__DEV__) console.log('🔔 Cold-start notification tap:', notifId, data?.type);
+        if (__DEV__) console.log('🔔 Cold-start notification tap:', notifId, JSON.stringify(data));
 
         // Handle "هل صليت؟" action buttons (prayed / will_pray) on cold start.
         // If consumed, skip navigation — the user tapped an action, not the notification body.
@@ -1208,7 +1260,7 @@ export default function RootLayout() {
   // This prevents t() calls from returning Arabic on first render
   // when the user's language is different.
   if (!languageReady || (!appReady && !fontsLoaded)) {
-    return null;
+    return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
   }
 
   // RTL is handled manually via useIsRTL() hook throughout the app (200+ components).
@@ -1280,9 +1332,19 @@ export default function RootLayout() {
                           <Stack.Screen name="memorization" />
                           <Stack.Screen name="temp-page/[id]" />
                           <Stack.Screen name="sdui/[screenId]" />
+                          <Stack.Screen
+                            name="full-adhan"
+                            options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                              animation: 'slide_from_bottom',
+                            }}
+                          />
                         </Stack>
                         {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
                         <DynamicSplashOverlay />
+                        <SnapshotHost />
+                        <SnapshotPumpController />
                           </CelebrationProvider>
                           </OnboardingProvider>
                         </SeasonalProvider>

@@ -129,17 +129,26 @@ export const TEMPORARY_PRAYER_PRESETS: TemporaryPrayerPreset[] = [
 
 /**
  * Calculate current rakat based on sujood count
- * 2 sujood = 1 rakat
+ * 1/2 sujood = rakat 1, 3/4 = rakat 2, etc.
  */
 export function calculateRakat(sujoodCount: number): number {
-  return Math.floor(sujoodCount / 2);
+  if (sujoodCount <= 0) return 0;
+  return Math.ceil(sujoodCount / 2);
+}
+
+/**
+ * Calculate fully completed rakats based on sujood count.
+ * This is intentionally separate from the displayed current rakat.
+ */
+export function calculateCompletedRakats(sujoodCount: number): number {
+  return Math.floor(Math.max(0, sujoodCount) / 2);
 }
 
 /**
  * Check if prayer is completed
  */
 export function isPrayerCompleted(sujoodCount: number, totalRakats: number): boolean {
-  const completedRakats = calculateRakat(sujoodCount);
+  const completedRakats = calculateCompletedRakats(sujoodCount);
   return completedRakats >= totalRakats;
 }
 
@@ -155,7 +164,7 @@ export function getRemainingSujood(sujoodCount: number, totalRakats: number): nu
  * Get remaining rakats to complete prayer
  */
 export function getRemainingRakats(sujoodCount: number, totalRakats: number): number {
-  const completedRakats = calculateRakat(sujoodCount);
+  const completedRakats = calculateCompletedRakats(sujoodCount);
   return Math.max(0, totalRakats - completedRakats);
 }
 

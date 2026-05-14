@@ -1,8 +1,8 @@
 // components/ui/BackgroundWrapper.tsx
 // غلاف لتطبيق صور الخلفية على الشاشات
 
-import React, { useState, useEffect } from 'react';
-import { View, ImageBackground, ViewProps, ImageSourcePropType, StyleSheet, Platform } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, ImageBackground, ViewProps, ImageSourcePropType, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { AppBackgroundKey, useSettings } from '@/contexts/SettingsContext';
 import { BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
@@ -61,42 +61,54 @@ const BackgroundWrapper: React.FC<BackgroundWrapperProps> = ({
   // Resolve cached background URI for remote Pexels URLs (offline safety net)
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   useEffect(() => {
+    let cancelled = false;
+    const resolveUrl = (url: string | null) => {
+      if (!cancelled) setResolvedUrl(url);
+    };
+
     if (backgroundKey !== 'dynamic' || !backgroundUrl) {
-      setResolvedUrl(null);
-      return;
+      resolveUrl(null);
+      return () => { cancelled = true; };
     }
     // If URL is already local (file:// or no scheme), use as-is
     if (!backgroundUrl.startsWith('https://images.pexels.com/')) {
-      setResolvedUrl(backgroundUrl);
-      return;
+      resolveUrl(backgroundUrl);
+      return () => { cancelled = true; };
     }
     // Try to extract pexels ID from URL and check cache
     const match = backgroundUrl.match(/photos\/(\d+)\//);
     if (match) {
       const pexelsId = parseInt(match[1], 10);
       getCachedBackgroundUri(pexelsId, 'large2x')
-        .then(cached => setResolvedUrl(cached || backgroundUrl))
-        .catch(() => setResolvedUrl(backgroundUrl));
+        .then(cached => resolveUrl(cached || backgroundUrl))
+        .catch(() => resolveUrl(backgroundUrl));
     } else {
-      setResolvedUrl(backgroundUrl);
+      resolveUrl(backgroundUrl);
     }
+    return () => { cancelled = true; };
   }, [backgroundKey, backgroundUrl]);
   
   const effectiveUrl = resolvedUrl ?? backgroundUrl;
 
   // Determine background source
-  let backgroundSource: ImageSourcePropType | null = null;
-  if (backgroundKey === 'dynamic' && effectiveUrl) {
-    // Validate URL: only allow local files or curated Pexels photos
-    const isLocal = !effectiveUrl.startsWith('http');
-    const pexelsMatch = effectiveUrl.match(/photos\/(\d+)\//);
-    const isCurated = pexelsMatch ? CURATED_PEXELS_IDS.has(parseInt(pexelsMatch[1], 10)) : false;
-    if (isLocal || isCurated) {
-      backgroundSource = { uri: effectiveUrl };
+  const backgroundSource = useMemo<ImageSourcePropType | null>(() => {
+    if (backgroundKey === 'dynamic' && effectiveUrl) {
+      // Validate URL: only allow local files or curated Pexels photos
+      const isLocal = !effectiveUrl.startsWith('http');
+      const pexelsMatch = effectiveUrl.match(/photos\/(\d+)\//);
+      const isCurated = pexelsMatch ? CURATED_PEXELS_IDS.has(parseInt(pexelsMatch[1], 10)) : false;
+      if (isLocal || isCurated) {
+        return { uri: effectiveUrl };
+      }
+      return null;
     }
-  } else if (backgroundKey && backgroundKey !== 'dynamic' && backgroundKey !== 'none') {
-    backgroundSource = BACKGROUND_SOURCE_MAP[backgroundKey] || null;
-  }
+
+    if (backgroundKey && backgroundKey !== 'dynamic' && backgroundKey !== 'none') {
+      return BACKGROUND_SOURCE_MAP[backgroundKey] || null;
+    }
+
+    return null;
+  }, [backgroundKey, effectiveUrl]);
 
   const hasBackground = !!backgroundSource;
 

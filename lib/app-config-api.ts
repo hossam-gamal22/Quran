@@ -103,6 +103,11 @@ export interface ShareModalConfig {
   shareUrlAndroid?: string;
 }
 
+export interface QuranAutoScrollConfig {
+  minSeconds: number;
+  maxSeconds: number;
+}
+
 export interface RemoteAppConfig {
   name: string;
   nameEn: string;
@@ -138,6 +143,7 @@ export interface RemoteAppConfig {
   highlights?: HighlightItemConfig[];
   uiCustomization?: UICustomizationConfig;
   shareModal?: ShareModalConfig;
+  quranAutoScroll?: QuranAutoScrollConfig;
 }
 
 const DEFAULT_UI_CUSTOMIZATION: UICustomizationConfig = {
@@ -233,6 +239,10 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
     shareUrlFallback: 'https://roohmuslim.app',
     shareUrlIos: '',
     shareUrlAndroid: '',
+  },
+  quranAutoScroll: {
+    minSeconds: 10,
+    maxSeconds: 120,
   },
 };
 
@@ -749,6 +759,15 @@ export interface TempPageBlock {
   translations?: Record<string, string>;
 }
 
+export interface TempPageCtaButton {
+  enabled: boolean;
+  label: string;
+  labelEn?: string;
+  labels?: Record<string, string>;
+  route: string;
+  color?: string;
+}
+
 export interface TempPage {
   id: string;
   title: string;
@@ -764,6 +783,7 @@ export interface TempPage {
   endDate: string;
   isPermanent?: boolean;
   enabled: boolean;
+  ctaButton?: TempPageCtaButton;
 }
 
 /**
@@ -771,14 +791,6 @@ export interface TempPage {
  */
 export const fetchActiveTempPages = async (): Promise<TempPage[]> => {
   try {
-    const cached = await AsyncStorage.getItem('@temp_pages_cache');
-    const cacheDate = await AsyncStorage.getItem('@temp_pages_cache_date');
-    const today = new Date().toISOString().slice(0, 10);
-
-    if (cached && cacheDate === today) {
-      return JSON.parse(cached) as TempPage[];
-    }
-
     const snapshot = await getDocs(collection(db, 'tempPages'));
     const now = new Date();
     const active: TempPage[] = [];
@@ -798,11 +810,17 @@ export const fetchActiveTempPages = async (): Promise<TempPage[]> => {
     });
 
     await AsyncStorage.setItem('@temp_pages_cache', JSON.stringify(active));
-    await AsyncStorage.setItem('@temp_pages_cache_date', today);
-
     return active;
   } catch (error) {
     console.error('Error fetching temp pages:', error);
+    const cached = await AsyncStorage.getItem('@temp_pages_cache');
+    if (cached) {
+      try {
+        return JSON.parse(cached) as TempPage[];
+      } catch {
+        return [];
+      }
+    }
     return [];
   }
 };

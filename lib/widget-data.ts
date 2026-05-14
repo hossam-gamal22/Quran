@@ -3,7 +3,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './prayer-times';
+import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h, timeStringToDate } from './prayer-times';
+import { getOfflinePrayerTimesRange } from './prayer-week-cache';
+import type { CanonicalPrayerSnapshot } from './canonical-prayer-snapshot';
 import { getLocalizedHijriDate, HIJRI_MONTHS_EN } from './hijri-date';
 import { getAllAzkar, resolveTranslationValue } from '@/lib/azkar-api';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
@@ -37,6 +39,20 @@ export interface WidgetPrayerData {
   nextPrayerName: string;
   nextPrayerNameAr: string;
   nextPrayerTime: string;
+  /** Absolute local device timestamp for the next prayer. Countdown derives from this. */
+  nextPrayerAtEpochMs?: number;
+  previousPrayerName?: string;
+  previousPrayerNameAr?: string;
+  previousPrayerAtEpochMs?: number;
+  calculationLocation?: string;
+  timezone?: string;
+  prayerDataUpdatedAt?: string;
+  canonicalSnapshot?: CanonicalPrayerSnapshot;
+  latitude?: number;
+  longitude?: number;
+  calculationMethod?: number;
+  madhab?: number;
+  source?: string;
   timeRemaining: string;
   timeRemainingMinutes: number;
   timeRemainingLabel: string;
@@ -44,9 +60,13 @@ export interface WidgetPrayerData {
     name: string;
     nameAr: string;
     time: string;
+    epochMs?: number;
     isPassed: boolean;
     isNext: boolean;
   }[];
+  /** Flat sorted array of epoch timestamps for today + next 6 days.
+   *  Used ONLY for countdown / timeline calculations, not for display. */
+  allPrayerEpochs?: number[];
   hijriDate: string;
   hijriDay: number;
   hijriMonth: string;
@@ -108,6 +128,21 @@ export interface PrayerCompletionData {
   lastUpdated: string;
 }
 
+export interface WidgetSnapshotManifestEntry {
+  /** Route key: `${widgetId}_${size}_${theme}`. */
+  routeKey: string;
+  /** Versioned/cache-busted PNG basename without `.png`. */
+  key: string;
+  /** Final platform path when the app can expose it to native/widget JS. */
+  path?: string;
+  /** Snapshot content/version hash used for logs and cleanup. */
+  hash?: string;
+  id: string;
+  size: 'small' | 'medium' | 'large' | string;
+  theme: string;
+  updatedAt: string;
+}
+
 export interface WidgetSettings {
   enabled: boolean;
   prayerWidget: {
@@ -154,6 +189,11 @@ export interface SharedWidgetData {
   widgetTheme?: string;
   widgetLanguage?: string;
   widgetDateFormat?: string;
+  isPremium?: boolean;
+  snapshotVersion?: number;
+  snapshotUpdatedAt?: string;
+  snapshotManifest?: Record<string, WidgetSnapshotManifestEntry>;
+  canonicalPrayerSnapshot?: CanonicalPrayerSnapshot;
 }
 
 // ========================================
@@ -230,16 +270,19 @@ export const getWidgetSettings = async (): Promise<WidgetSettings> => {
 export const preparePrayerWidgetData = async (
   prayerTimes: PrayerTimes | null,
   location?: string,
-  language: string = 'ar'
+  language: string = 'ar',
+  canonicalSnapshot?: CanonicalPrayerSnapshot | null,
 ): Promise<WidgetPrayerData> => {
   const now = new Date();
   const hijri = getLocalizedHijriDate();
+  const updatedAt = now.toISOString();
   
   // الصلاة القادمة
-  const nextPrayerResult = prayerTimes ? getNextPrayer(prayerTimes) : null;
+  const effectivePrayerTimes = canonicalSnapshot?.prayerTimes ?? prayerTimes;
+  const nextPrayerResult = effectivePrayerTimes ? getNextPrayer(effectivePrayerTimes) : null;
   const nextPrayerKey = nextPrayerResult?.name || 'fajr';
   const nextPrayerTime = nextPrayerResult?.time || '--:--';
-  const timeRemaining = prayerTimes ? getTimeRemaining(prayerTimes) : null;
+  const timeRemaining = effectivePrayerTimes ? getTimeRemaining(effectivePrayerTimes) : null;
   
   // أسماء الصلوات
   const prayerNames: Record<string, { en: string; ar: string }> = {
@@ -253,30 +296,109 @@ export const preparePrayerWidgetData = async (
 
   // تحضير قائمة الصلوات
   const prayersList = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+  const prayerEpochs = new Map<string, number>();
   const allPrayers = prayersList.map(prayer => {
-    const time = prayerTimes?.[prayer as keyof PrayerTimes] as string || '--:--';
+    const time = effectivePrayerTimes?.[prayer as keyof PrayerTimes] as string || '--:--';
+    const explicitEpoch = canonicalSnapshot
+      ? ({
+          fajr: canonicalSnapshot.fajrAtEpochMs,
+          sunrise: canonicalSnapshot.sunriseAtEpochMs,
+          dhuhr: canonicalSnapshot.dhuhrAtEpochMs,
+          asr: canonicalSnapshot.asrAtEpochMs,
+          maghrib: canonicalSnapshot.maghribAtEpochMs,
+          isha: canonicalSnapshot.ishaAtEpochMs,
+        } as Record<string, number>)[prayer]
+      : undefined;
     const prayerDate = new Date();
-    const parts = time.split(':').map(Number);
-    const hours = parts[0] ?? 0;
-    const minutes = parts[1] ?? 0;
-    if (!isNaN(hours) && !isNaN(minutes)) {
-      prayerDate.setHours(hours, minutes, 0, 0);
+    if (explicitEpoch && Number.isFinite(explicitEpoch)) {
+      prayerDate.setTime(explicitEpoch);
+    } else {
+      const parts = time.split(':').map(Number);
+      const hours = parts[0] ?? 0;
+      const minutes = parts[1] ?? 0;
+      if (!isNaN(hours) && !isNaN(minutes)) {
+        prayerDate.setHours(hours, minutes, 0, 0);
+      }
     }
+    prayerEpochs.set(prayer, prayerDate.getTime());
     
     return {
       name: prayerNames[prayer]?.en || prayer,
       nameAr: prayerNames[prayer]?.ar || prayer,
       time: formatTime12h(time),
+      epochMs: prayerDate.getTime(),
       isPassed: prayerDate < now,
       isNext: prayer === nextPrayerKey,
     };
   });
 
+  // Build a flat epoch list for 7 days (today + 6 future).
+  // Used ONLY for countdown calculations — never for display.
+  // allPrayers stays as today's 6 prayers so table widgets don't duplicate.
+  const allPrayerEpochs: number[] = allPrayers
+    .map((p) => p.epochMs)
+    .filter((e): e is number => typeof e === 'number' && e > 0);
+  try {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const futureDays = await getOfflinePrayerTimesRange(tomorrow, 6);
+    for (const { date, times } of futureDays) {
+      const dayDate = new Date(date + 'T00:00:00');
+      for (const prayer of prayersList) {
+        const time = times[prayer as keyof PrayerTimes] as string | undefined;
+        if (!time || time === '--:--') continue;
+        const parts = time.split(':').map(Number);
+        if (isNaN(parts[0]) || isNaN(parts[1])) continue;
+        const prayerDate = new Date(dayDate);
+        prayerDate.setHours(parts[0], parts[1], 0, 0);
+        allPrayerEpochs.push(prayerDate.getTime());
+      }
+    }
+    allPrayerEpochs.sort((a, b) => a - b);
+  } catch {
+    // Silently fallback — countdown still works with today's epochs only
+  }
+
+  let nextPrayerAtEpochMs: number | undefined;
+  if (canonicalSnapshot?.nextPrayerAtEpochMs) {
+    nextPrayerAtEpochMs = canonicalSnapshot.nextPrayerAtEpochMs;
+  } else if (effectivePrayerTimes && nextPrayerResult) {
+    const nextDate = timeStringToDate(nextPrayerResult.time, now);
+    if (nextDate <= now) nextDate.setDate(nextDate.getDate() + 1);
+    nextPrayerAtEpochMs = nextDate.getTime();
+  }
+
+  const sortedPrayers = prayersList
+    .map((name) => ({ name, at: prayerEpochs.get(name) ?? 0 }))
+    .filter((p) => p.at > 0)
+    .sort((a, b) => a.at - b.at);
+  const previousPrayer = canonicalSnapshot?.previousPrayerName
+    ? sortedPrayers.find((p) => p.name === canonicalSnapshot.previousPrayerName)
+    : ([...sortedPrayers].reverse().find((p) => p.at <= now.getTime()) ?? sortedPrayers[sortedPrayers.length - 1]);
+  const previousPrayerAtEpochMs = canonicalSnapshot?.previousPrayerAtEpochMs
+    ?? (previousPrayer
+      ? (previousPrayer.at > now.getTime() ? previousPrayer.at - 24 * 60 * 60 * 1000 : previousPrayer.at)
+      : undefined);
+
   return {
     nextPrayer: nextPrayerKey,
     nextPrayerName: prayerNames[nextPrayerKey]?.en || nextPrayerKey,
     nextPrayerNameAr: prayerNames[nextPrayerKey]?.ar || nextPrayerKey,
-    nextPrayerTime: prayerTimes ? formatTime12h(nextPrayerTime) : '--:--',
+    nextPrayerTime: effectivePrayerTimes ? formatTime12h(nextPrayerTime) : '--:--',
+    nextPrayerAtEpochMs,
+    previousPrayerName: previousPrayer ? (prayerNames[previousPrayer.name]?.en || previousPrayer.name) : undefined,
+    previousPrayerNameAr: previousPrayer ? (prayerNames[previousPrayer.name]?.ar || previousPrayer.name) : undefined,
+    previousPrayerAtEpochMs,
+    calculationLocation: canonicalSnapshot?.locationName || location || '',
+    timezone: canonicalSnapshot?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    prayerDataUpdatedAt: canonicalSnapshot?.prayerDataUpdatedAt || updatedAt,
+    canonicalSnapshot: canonicalSnapshot ?? undefined,
+    latitude: canonicalSnapshot?.latitude,
+    longitude: canonicalSnapshot?.longitude,
+    calculationMethod: canonicalSnapshot?.calculationMethod,
+    madhab: canonicalSnapshot?.madhab,
+    source: canonicalSnapshot?.source,
     timeRemaining: timeRemaining 
       ? `${timeRemaining.hours}:${String(timeRemaining.minutes).padStart(2, '0')}`
       : '--:--',
@@ -285,6 +407,7 @@ export const preparePrayerWidgetData = async (
       : 0,
     timeRemainingLabel: t('prayer.timeRemaining'),
     allPrayers,
+    allPrayerEpochs,
     hijriDate: hijri ? `${hijri.day} ${hijri.monthName} ${hijri.year}` : '',
     hijriDay: hijri?.day || 1,
     hijriMonth: hijri?.monthName || '',
@@ -295,8 +418,8 @@ export const preparePrayerWidgetData = async (
       day: 'numeric', 
       month: 'long' 
     }),
-    location: location || '',
-    lastUpdated: now.toISOString(),
+    location: canonicalSnapshot?.locationName || location || '',
+    lastUpdated: canonicalSnapshot?.prayerDataUpdatedAt || updatedAt,
   };
 };
 

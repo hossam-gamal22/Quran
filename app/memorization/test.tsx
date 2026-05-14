@@ -8,6 +8,11 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,10 +24,41 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useMemorization } from '@/contexts/MemorizationContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { mt } from '@/lib/memorization-i18n';
-import { formatAyahProgress, formatSurahAyahLabel, toArabicDigits } from '@/lib/memorization-helpers';
+import {
+  formatAyahProgress,
+  formatSurahAyahLabel,
+  getAllSurahOptions,
+  getAyahCount,
+  getSurahName,
+  toArabicDigits,
+} from '@/lib/memorization-helpers';
 import { buildQuiz, type TestQuestion } from '@/lib/memorization-test-builders';
+import type { MemorizationPlan } from '@/types/memorization';
 
 const QUIZ_LENGTH = 5;
+const ARABIC_DIGIT_MAP: Record<string, string> = {
+  '٠': '0',
+  '١': '1',
+  '٢': '2',
+  '٣': '3',
+  '٤': '4',
+  '٥': '5',
+  '٦': '6',
+  '٧': '7',
+  '٨': '8',
+  '٩': '9',
+};
+
+function normalizeDigits(value: string): string {
+  return value.replace(/[٠-٩]/g, (d) => ARABIC_DIGIT_MAP[d] ?? d);
+}
+
+function parsePositiveInput(value: string): number | null {
+  const normalized = normalizeDigits(value).trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 export default function TestScreen() {
   const router = useRouter();
@@ -31,6 +67,24 @@ export default function TestScreen() {
   const isRTL = useIsRTL();
   const { activePlan, todayPlan, ayahStates, markPassed, markFailed, recordDailyActivity } =
     useMemorization();
+  const basePlan = useMemo<MemorizationPlan>(() => {
+    return activePlan ?? {
+      id: 'quick-test',
+      name: mt('testCustomScope'),
+      scope: 'range',
+      ayahRange: { surahNumber: 67, fromAyah: 1, toAyah: 5 },
+      dailyTarget: 5,
+      level: 'reviewer',
+      method: 'ayah_by_ayah',
+      reciterId: 'mishary_alafasy',
+      startDate: new Date().toISOString().slice(0, 10),
+      reminderTime: null,
+      reminderEnabled: false,
+      createdAt: new Date().toISOString(),
+      isActive: false,
+      isCompleted: false,
+    };
+  }, [activePlan]);
 
   const memorizedAyahs = useMemo(() => {
     return Object.values(ayahStates)
@@ -48,12 +102,28 @@ export default function TestScreen() {
   const [reorderPicked, setReorderPicked] = useState<number[]>([]);
   const [scorePassed, setScorePassed] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [setupDone, setSetupDone] = useState(false);
+  const [testSurah, setTestSurah] = useState('67');
+  const [testFrom, setTestFrom] = useState('1');
+  const [testTo, setTestTo] = useState('5');
+  const [surahPickerOpen, setSurahPickerOpen] = useState(false);
+  const [surahSearch, setSurahSearch] = useState('');
 
-  useEffect(() => {
-    if (activePlan && ayahPool.length > 0 && questions.length === 0) {
-      setQuestions(buildQuiz(activePlan, ayahPool, QUIZ_LENGTH));
-    }
-  }, [activePlan, ayahPool, questions.length]);
+  const surahOptions = useMemo(() => getAllSurahOptions(), []);
+  const selectedSurahNumber = parsePositiveInput(testSurah) ?? 67;
+  const selectedSurah = useMemo(
+    () => surahOptions.find((surah) => surah.number === selectedSurahNumber),
+    [selectedSurahNumber, surahOptions],
+  );
+  const filteredSurahOptions = useMemo(() => {
+    const q = normalizeDigits(surahSearch).trim().toLowerCase();
+    if (!q) return surahOptions;
+    return surahOptions.filter((surah) =>
+      String(surah.number).includes(q) ||
+      surah.name.toLowerCase().includes(q) ||
+      (surah.englishName ?? '').toLowerCase().includes(q)
+    );
+  }, [surahOptions, surahSearch]);
 
   const current = questions[qIndex];
 
@@ -107,26 +177,137 @@ export default function TestScreen() {
   }, [current, isReorderCorrect, selected, qIndex, questions, markPassed, markFailed, recordDailyActivity, activePlan, scorePassed]);
 
   const onRestart = useCallback(() => {
-    if (!activePlan) return;
-    setQuestions(buildQuiz(activePlan, ayahPool, QUIZ_LENGTH));
+    setQuestions(buildQuiz(basePlan, ayahPool, QUIZ_LENGTH));
     setQIndex(0);
     setSelected(null);
     setReorderPicked([]);
     setScorePassed(0);
     setFinished(false);
-  }, [activePlan, ayahPool]);
+  }, [ayahPool, basePlan]);
+
+  const resetQuizState = useCallback((nextQuestions: TestQuestion[]) => {
+    setQuestions(nextQuestions);
+    setQIndex(0);
+    setSelected(null);
+    setReorderPicked([]);
+    setScorePassed(0);
+    setFinished(false);
+    setSetupDone(true);
+  }, []);
+
+  const startPlanTest = useCallback(() => {
+    if (ayahPool.length === 0) return;
+    resetQuizState(buildQuiz(basePlan, ayahPool, QUIZ_LENGTH));
+  }, [ayahPool, basePlan, resetQuizState]);
+
+  const startCustomTest = useCallback(() => {
+    const surahNumber = parsePositiveInput(testSurah) ?? selectedSurahNumber;
+    const from = parsePositiveInput(testFrom);
+    const to = parsePositiveInput(testTo);
+    const max = getAyahCount(surahNumber);
+    if (!max || !from || !to || from > to || to > max) return;
+    const pool = Array.from({ length: to - from + 1 }, (_, index) => ({
+      surahNumber,
+      ayahNumber: from + index,
+    }));
+    const customPlan: MemorizationPlan = {
+      ...basePlan,
+      scope: 'range',
+      ayahRange: { surahNumber, fromAyah: from, toAyah: to },
+      surahNumbers: [surahNumber],
+    };
+    resetQuizState(buildQuiz(customPlan, pool, Math.min(QUIZ_LENGTH, pool.length)));
+  }, [basePlan, resetQuizState, selectedSurahNumber, testFrom, testSurah, testTo]);
 
   const styles = makeStyles(colors, isRTL);
 
-  if (!activePlan || ayahPool.length === 0) {
+  if (!setupDone) {
     return (
       <Wrapper appSettings={appSettings} styles={styles}>
         <UniversalHeader title={mt('testTitle')} onBack={() => router.back()} />
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            {!activePlan ? mt('noActivePlan') : mt('noAyahsToday')}
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <GlassCard style={styles.setupCard}>
+            <Text style={styles.setupTitle}>{mt('testPlanScope')}</Text>
+            <Text style={styles.setupHint}>
+              {ayahPool.length > 0 ? mt('currentWirdPosition', { n: 1, total: ayahPool.length }) : mt('noAyahsToday')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: colors.primary }, ayahPool.length === 0 && { opacity: 0.45 }]}
+              disabled={ayahPool.length === 0}
+              onPress={startPlanTest}
+            >
+              <Text style={styles.primaryBtnText}>{mt('startTest')}</Text>
+            </TouchableOpacity>
+          </GlassCard>
+
+          <GlassCard style={styles.setupCard}>
+            <Text style={styles.setupTitle}>{mt('testCustomScope')}</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                setSurahSearch('');
+                setSurahPickerOpen(true);
+              }}
+              style={styles.surahPickerButton}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>{mt('chooseSurah')}</Text>
+                <Text style={styles.surahPickerName}>{selectedSurah?.name ?? mt('errInvalidSurah')}</Text>
+                {!!selectedSurah && (
+                  <Text style={styles.surahPickerMeta}>
+                    {toArabicDigits(selectedSurah.ayahCount)} {mt('ayahsUnit')}
+                  </Text>
+                )}
+              </View>
+              <MaterialCommunityIcons name="chevron-down" size={20} color={colors.textLight} />
+            </TouchableOpacity>
+            <View style={styles.inputsRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>{mt('ayahFrom')}</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  keyboardType="number-pad"
+                  value={toArabicDigits(testFrom)}
+                  onChangeText={(v) => setTestFrom(normalizeDigits(v).replace(/[^0-9]/g, '').slice(0, 3))}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>{mt('ayahTo')}</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  keyboardType="number-pad"
+                  value={toArabicDigits(testTo)}
+                  onChangeText={(v) => setTestTo(normalizeDigits(v).replace(/[^0-9]/g, '').slice(0, 3))}
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+              onPress={startCustomTest}
+            >
+              <Text style={styles.primaryBtnText}>{mt('startTest')}</Text>
+            </TouchableOpacity>
+          </GlassCard>
+        </ScrollView>
+        <SurahPickerModal
+          visible={surahPickerOpen}
+          colors={colors}
+          isRTL={isRTL}
+          search={surahSearch}
+          setSearch={setSurahSearch}
+          options={filteredSurahOptions}
+          selected={selectedSurahNumber}
+          onClose={() => setSurahPickerOpen(false)}
+          onPick={(surah) => {
+            setTestSurah(String(surah.number));
+            const max = Math.max(1, surah.ayahCount);
+            const from = Math.min(parsePositiveInput(testFrom) ?? 1, max);
+            const to = Math.min(Math.max(parsePositiveInput(testTo) ?? from, from), max);
+            setTestFrom(String(from));
+            setTestTo(String(to));
+            setSurahPickerOpen(false);
+          }}
+        />
       </Wrapper>
     );
   }
@@ -265,6 +446,76 @@ function Wrapper({
         {children}
       </SafeAreaView>
     </BackgroundWrapper>
+  );
+}
+
+function SurahPickerModal({
+  visible,
+  colors,
+  isRTL,
+  search,
+  setSearch,
+  options,
+  selected,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  colors: ReturnType<typeof useColors>;
+  isRTL: boolean;
+  search: string;
+  setSearch: (value: string) => void;
+  options: ReturnType<typeof getAllSurahOptions>;
+  selected: number;
+  onClose: () => void;
+  onPick: (surah: ReturnType<typeof getAllSurahOptions>[number]) => void;
+}) {
+  const styles = makeStyles(colors, isRTL);
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={modalStyles.backdrop} onPress={onClose}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={modalStyles.center}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={[modalStyles.card, styles.surahPickerModal]}
+          >
+            <Text style={[modalStyles.title, { color: colors.text }]}>{mt('chooseSurah')}</Text>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={mt('searchSurah')}
+              placeholderTextColor={colors.textLight}
+              style={styles.surahSearchInput}
+            />
+            <ScrollView style={styles.surahList} keyboardShouldPersistTaps="handled">
+              {options.map((surah) => (
+                <TouchableOpacity
+                  key={surah.number}
+                  onPress={() => onPick(surah)}
+                  style={[
+                    styles.surahOption,
+                    selected === surah.number && styles.surahOptionActive,
+                  ]}
+                >
+                  <View style={styles.surahOptionNumber}>
+                    <Text style={styles.surahOptionNumberText}>{toArabicDigits(surah.number)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.surahOptionName}>{surah.name}</Text>
+                    <Text style={styles.surahOptionMeta}>
+                      {toArabicDigits(surah.ayahCount)} {mt('ayahsUnit')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -499,6 +750,20 @@ const qStyles = (colors: ReturnType<typeof useColors>) =>
     },
   });
 
+const modalStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  card: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  title: { fontFamily: 'Cairo-Bold', fontSize: 18, textAlign: 'center' },
+});
+
 const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: 'transparent' },
@@ -522,6 +787,128 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       fontFamily: 'Cairo-Bold',
       fontSize: 16,
       textAlign: 'center',
+    },
+    setupCard: { padding: 16, gap: 12 },
+    setupTitle: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 16,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    setupHint: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 12,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    inputsRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 },
+    inputLabel: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 12,
+      marginBottom: 4,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    rangeInput: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 14,
+      textAlign: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    surahPickerButton: {
+      minHeight: 72,
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.12)',
+    },
+    surahPickerName: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 18,
+      lineHeight: 32,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahPickerMeta: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahPickerModal: {
+      maxHeight: '78%',
+      backgroundColor: colors.card,
+    },
+    surahSearchInput: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.12)',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 14,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahList: { maxHeight: 420 },
+    surahOption: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.08)',
+    },
+    surahOptionActive: {
+      backgroundColor: 'rgba(13,142,98,0.12)',
+      borderRadius: 10,
+      paddingHorizontal: 8,
+    },
+    surahOptionNumber: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    surahOptionNumberText: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 12,
+    },
+    surahOptionName: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 18,
+      lineHeight: 32,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahOptionMeta: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     primaryBtn: {
       paddingVertical: 14,

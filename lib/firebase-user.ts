@@ -77,6 +77,12 @@ export interface UserData {
   appVersion: string;
   language: string;
   country: string;
+  countrySource?: 'device_locale' | 'gps' | 'admin';
+  countryName?: string;
+  locationCity?: string;
+  locationLatitude?: number;
+  locationLongitude?: number;
+  locationUpdatedAt?: Timestamp | null;
   timezone: string;
   fcmToken: string;
   installSource: string;
@@ -300,6 +306,7 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     
     const locales = Localization.getLocales();
     const appVersion = Constants.expoConfig?.version || '1.2.1';
+    const localeCountry = locales[0]?.regionCode || 'SA';
     const userData: Partial<UserData> = {
       id: userId,
       platform: Platform.OS as 'ios' | 'android' | 'web',
@@ -308,7 +315,8 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
       osVersion: Device.osVersion || 'Unknown',
       appVersion,
       language: locales[0]?.languageCode || 'ar',
-      country: locales[0]?.regionCode || 'SA',
+      country: localeCountry,
+      countrySource: 'device_locale',
       timezone: Localization.getCalendars()[0]?.timeZone || 'Asia/Riyadh',
       fcmToken,
       isActive: true,
@@ -350,8 +358,26 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     } else {
       // Existing user — update session data
       const existingData = userDoc.data();
+      const existingCountrySource = existingData?.countrySource;
+      const shouldPreserveCountry =
+        existingCountrySource === 'gps' ||
+        existingCountrySource === 'admin';
       await updateDoc(userRef, {
         ...userData,
+        ...(shouldPreserveCountry
+          ? {
+              country: existingData.country,
+              countrySource: existingCountrySource,
+              countryName: existingData.countryName,
+              locationCity: existingData.locationCity,
+              locationLatitude: existingData.locationLatitude,
+              locationLongitude: existingData.locationLongitude,
+              locationUpdatedAt: existingData.locationUpdatedAt,
+            }
+          : {
+              country: localeCountry,
+              countrySource: existingCountrySource || 'device_locale',
+            }),
         // Preserve installSource if already set (don't override on subsequent sessions)
         ...(existingData?.installSource ? {} : { installSource }),
         // Don't overwrite a valid token with empty string
@@ -362,7 +388,7 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     
     return { success: true, userId };
   } catch (error) {
-    console.error('❌ Error registering user:', error);
+    console.warn('⚠️ Error registering user:', error);
     return { success: false, userId: '' };
   }
 };
@@ -381,17 +407,31 @@ export const updateLastActive = async (): Promise<void> => {
  * تحديث دولة المستخدم بناء على GPS الحقيقي (ISO country code)
  * أدق من locales[0].regionCode اللي بيعكس لغة الجهاز مش الموقع الفعلي
  */
-export const updateUserCountryFromGPS = async (isoCountryCode: string): Promise<void> => {
+export const updateUserCountryFromGPS = async (
+  isoCountryCode: string,
+  location?: {
+    city?: string;
+    countryName?: string;
+    latitude?: number;
+    longitude?: number;
+  },
+): Promise<void> => {
   try {
     const code = (isoCountryCode || '').toUpperCase().trim();
     if (!code || code.length !== 2) return;
     const userId = await getUserId();
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
+      id: userId,
       country: code,
       countrySource: 'gps',
+      ...(location?.countryName ? { countryName: location.countryName } : {}),
+      ...(location?.city ? { locationCity: location.city } : {}),
+      ...(typeof location?.latitude === 'number' ? { locationLatitude: location.latitude } : {}),
+      ...(typeof location?.longitude === 'number' ? { locationLongitude: location.longitude } : {}),
+      locationUpdatedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
     console.log('🌍 Updated user country from GPS:', code);
   } catch {
     console.log('Could not update user country from GPS');

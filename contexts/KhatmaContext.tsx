@@ -54,7 +54,7 @@ interface KhatmaContextType {
   updateKhatmaReminder: (khatmaId: string, reminderTime: string | null, enabled: boolean) => Promise<boolean>;
   
   // Helpers
-  getTodayWirdInfo: () => { startPage: number; endPage: number; pagesRemaining: number; isCompleted: boolean } | null;
+  getTodayWirdInfo: () => { startPage: number; endPage: number; pageNumbers: number[]; pagesRemaining: number; isCompleted: boolean } | null;
   getActiveKhatmaStats: () => {
     progressPercentage: number;
     pagesRead: number;

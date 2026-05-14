@@ -263,6 +263,16 @@ const ensureReadPages = (khatma: Khatma): number[] => {
   return [...khatma.readPages];
 };
 
+const getFirstUnreadPage = (readPages: number[]): number => {
+  const readSet = new Set(readPages);
+  for (let page = 1; page <= TOTAL_QURAN_PAGES; page++) {
+    if (!readSet.has(page)) {
+      return page;
+    }
+  }
+  return TOTAL_QURAN_PAGES;
+};
+
 /**
  * Record reading specific page numbers (Set-based, no duplicates)
  */
@@ -288,10 +298,7 @@ export const recordPageRead = async (
     if (newPagesCount === 0) return khatma;
 
     khatma.readPages = Array.from(readSet).sort((a, b) => a - b);
-    khatma.currentPage = khatma.readPages.length + 1; // next unread page position
-    if (khatma.currentPage > TOTAL_QURAN_PAGES) {
-      khatma.currentPage = TOTAL_QURAN_PAGES;
-    }
+    khatma.currentPage = getFirstUnreadPage(khatma.readPages);
     khatma.lastReadDate = getTodayDateString();
 
     // Update daily progress
@@ -360,7 +367,20 @@ export const completeTodayWird = async (khatmaId: string): Promise<Khatma | null
     const khatma = await getKhatma(khatmaId);
     if (!khatma) return null;
 
-    return await recordDailyProgress(khatmaId, khatma.pagesPerDay);
+    const today = getTodayDateString();
+    const todayProgress = khatma.dailyProgress.find((p) => p.date === today);
+    const pagesReadToday = todayProgress?.pagesRead || 0;
+    const pagesRemainingToday = Math.max(khatma.pagesPerDay - pagesReadToday, 0);
+
+    if (pagesRemainingToday === 0) {
+      if (todayProgress && !todayProgress.completed) {
+        todayProgress.completed = true;
+        await updateKhatma(khatma);
+      }
+      return khatma;
+    }
+
+    return await recordDailyProgress(khatmaId, pagesRemainingToday);
   } catch (error) {
     console.error('Error completing wird:', error);
     return null;
@@ -373,29 +393,32 @@ export const completeTodayWird = async (khatmaId: string): Promise<Khatma | null
 export const getTodayWird = (khatma: Khatma): {
   startPage: number;
   endPage: number;
+  pageNumbers: number[];
   pagesRemaining: number;
   isCompleted: boolean;
 } => {
   const today = getTodayDateString();
   const todayProgress = khatma.dailyProgress.find((p) => p.date === today);
-  const readSet = new Set(ensureReadPages(khatma));
-
-  // Find the first unread page as start
-  let startPage = 1;
-  for (let p = 1; p <= TOTAL_QURAN_PAGES; p++) {
-    if (!readSet.has(p)) {
-      startPage = p;
-      break;
-    }
-  }
+  const readPages = ensureReadPages(khatma);
+  const startPage = getFirstUnreadPage(readPages);
+  const readSet = new Set(readPages);
 
   const pagesReadToday = todayProgress?.pagesRead || 0;
-  const endPage = Math.min(startPage + khatma.pagesPerDay - 1, TOTAL_QURAN_PAGES);
-  const pagesRemaining = Math.max(khatma.pagesPerDay - pagesReadToday, 0);
+  const targetRemaining = Math.max(khatma.pagesPerDay - pagesReadToday, 0);
+  const unreadRemaining = Math.max(TOTAL_QURAN_PAGES - readPages.length, 0);
+  const pagesRemaining = Math.min(targetRemaining, unreadRemaining);
+  const pageNumbers: number[] = [];
+  for (let page = startPage; page <= TOTAL_QURAN_PAGES && pageNumbers.length < pagesRemaining; page++) {
+    if (!readSet.has(page)) {
+      pageNumbers.push(page);
+    }
+  }
+  const endPage = pageNumbers.length > 0 ? pageNumbers[pageNumbers.length - 1] : startPage - 1;
 
   return {
     startPage,
     endPage,
+    pageNumbers,
     pagesRemaining,
     isCompleted: todayProgress?.completed || false,
   };

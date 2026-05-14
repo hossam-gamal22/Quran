@@ -141,7 +141,9 @@ export function useWidgetFontFamily(variant?: 'widget1' | 'widget2'): string {
 }
 
 /** Locked WidgetFont2 family for Azkar/Dhikr previews — bypasses user choice. */
-export const AZKAR_PREVIEW_FONT = 'Amiri-Bold';
+// Phase E (C1): default Azkar font is Amiri-Regular (clean Naskh). Bold
+// emphasis is only used for titles + count badges, not body dhikr text.
+export const AZKAR_PREVIEW_FONT = 'Amiri';
 
 /**
  * Prayer name labels (next/prev, table, single) — always Rubik for Arabic + Latin
@@ -155,12 +157,12 @@ export const PRAYER_NAME_FONT = 'Rubik-Bold';
 
 export const PREVIEW_PALETTES: Record<WidgetThemeKey, ThemePalette> = {
   auto: {
-    background: '#373737',
-    surface: 'rgba(255,255,255,0.12)',
-    text: '#FFFFFF',
-    muted: 'rgba(255,255,255,0.62)',
-    faint: 'rgba(255,255,255,0.32)',
-    isLight: false,
+    background: '#E3E0DB',
+    surface: 'rgba(255,255,255,0.30)',
+    text: '#3A3A39',
+    muted: '#5E5E5C',
+    faint: 'rgba(58,58,57,0.32)',
+    isLight: true,
   },
   dark: {
     background: '#373737',

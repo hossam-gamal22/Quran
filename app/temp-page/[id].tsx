@@ -2,16 +2,16 @@
 // عرض صفحة مؤقتة — بلوكات أصلية أو HTML حسب نوع المحتوى
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, StyleSheet, ActivityIndicator, Text, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSettings } from '@/contexts/SettingsContext';
-import { fetchTempPageById, TempPage, TempPageBlock } from '@/lib/app-config-api';
+import { fetchTempPageById, TempPage, TempPageBlock, TempPageCtaButton } from '@/lib/app-config-api';
 import { t, getLanguage, isRTL } from '@/lib/i18n';
 import { useColors } from '@/hooks/use-colors';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { ScreenContainer } from '@/components/screen-container';
+import { UniversalHeader } from '@/components/ui/UniversalHeader';
 
 function BlockItem({ block, lang, colors, isRtl }: {
   block: TempPageBlock;
@@ -48,9 +48,16 @@ function BlockItem({ block, lang, colors, isRtl }: {
   );
 }
 
+function getCtaLabel(cta: TempPageCtaButton, lang: string) {
+  if (lang !== 'ar') {
+    return cta.labels?.[lang] || cta.labelEn || cta.label;
+  }
+  return cta.labels?.ar || cta.label;
+}
+
 export default function TempPageScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { isDarkMode } = useSettings();
+  const router = useRouter();
   const colors = useColors();
   const [page, setPage] = useState<TempPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +78,55 @@ export default function TempPageScreen() {
   const isAr = lang === 'ar';
   const isRtl = isRTL();
   const dir = isRtl ? 'rtl' : 'ltr';
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
+  const handleCtaPress = async () => {
+    const route = page?.ctaButton?.route?.trim();
+    if (!route) return;
+
+    if (/^https?:\/\//i.test(route)) {
+      await Linking.openURL(route);
+      return;
+    }
+
+    const appRoute = route.startsWith('/') ? route : `/${route}`;
+    router.push(appRoute as any);
+  };
+  const renderCta = () => {
+    const cta = page?.ctaButton;
+    if (!cta?.enabled || !cta.route?.trim()) return null;
+
+    const label = getCtaLabel(cta, lang)?.trim();
+    if (!label) return null;
+
+    return (
+      <View style={styles.ctaContainer}>
+        <TouchableOpacity
+          activeOpacity={0.86}
+          onPress={handleCtaPress}
+          style={[
+            styles.ctaButton,
+            {
+              backgroundColor: cta.color || page?.color || colors.primary,
+              flexDirection: isRtl ? 'row-reverse' : 'row',
+            },
+          ]}
+        >
+          <Text style={styles.ctaText}>{label}</Text>
+          <MaterialCommunityIcons
+            name={isRtl ? 'arrow-left' : 'arrow-right'}
+            size={20}
+            color="#fff"
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -85,6 +141,12 @@ export default function TempPageScreen() {
   if (!page) {
     return (
       <ScreenContainer>
+        <UniversalHeader
+          title={t('common.pageUnavailable')}
+          titleColor={colors.text}
+          onBack={handleBack}
+          showBack
+        />
         <View style={styles.loader}>
           <Text style={{ color: colors.text }}>
             {t('common.pageUnavailable')}
@@ -94,28 +156,25 @@ export default function TempPageScreen() {
     );
   }
 
+  const title = (lang !== 'ar' && page.titles?.[lang])
+    ? page.titles[lang]
+    : page.title;
+
   // ===== Blocks mode: native rendering =====
   if (page.contentMode === 'blocks' && page.blocks?.length) {
-    const title = (lang !== 'ar' && page.titles?.[lang])
-      ? page.titles[lang]
-      : page.title;
-
     return (
       <ScreenContainer edges={['top']}>
+        <UniversalHeader
+          title={title}
+          titleColor={colors.text}
+          onBack={handleBack}
+          showBack
+        />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={styles.blocksContainer}
           showsVerticalScrollIndicator={false}
         >
-          {title ? (
-            <Text style={[styles.blocksTitle, {
-              color: colors.primary,
-              textAlign: isRtl ? 'right' : 'left',
-              writingDirection: isRtl ? 'rtl' : 'ltr',
-            }]}>
-              {title}
-            </Text>
-          ) : null}
           {page.blocks.map((block) => (
             <BlockItem
               key={block.id}
@@ -125,6 +184,7 @@ export default function TempPageScreen() {
               isRtl={isRtl}
             />
           ))}
+          {renderCta()}
         </ScrollView>
       </ScreenContainer>
     );
@@ -136,22 +196,32 @@ export default function TempPageScreen() {
 
   return (
     <ScreenContainer edges={['top']}>
-      <WebView
-        source={{ html: wrappedHtml }}
-        style={styles.webview}
-        startInLoadingState
-        renderLoading={() => (
-          <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#0d8e62" />
-          </View>
-        )}
+      <UniversalHeader
+        title={title}
+        titleColor={colors.text}
+        onBack={handleBack}
+        showBack
       />
+      <View style={styles.htmlContent}>
+        <WebView
+          source={{ html: wrappedHtml }}
+          style={styles.webview}
+          startInLoadingState
+          renderLoading={() => (
+            <View style={styles.loader}>
+              <ActivityIndicator size="large" color="#0d8e62" />
+            </View>
+          )}
+        />
+        {renderCta()}
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  htmlContent: { flex: 1 },
   webview: { flex: 1 },
   loader: {
     position: 'absolute',
@@ -162,11 +232,6 @@ const styles = StyleSheet.create({
   blocksContainer: {
     padding: 20,
     gap: 12,
-  },
-  blocksTitle: {
-    fontSize: 22,
-    fontFamily: 'Cairo-Bold',
-    marginBottom: 8,
   },
   blockItem: {
     alignItems: 'center',
@@ -187,5 +252,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     fontFamily: 'Cairo-Regular',
+  },
+  ctaContainer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 22,
+    paddingHorizontal: 20,
+  },
+  ctaButton: {
+    minHeight: 52,
+    minWidth: 190,
+    maxWidth: '100%',
+    paddingHorizontal: 22,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  ctaText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Cairo-Bold',
+    textAlign: 'center',
   },
 });

@@ -245,7 +245,7 @@ export default function BackupScreen() {
   const loadEstimatedSize = async () => {
     try {
       const data = await gatherBackupData();
-      const jsonStr = JSON.stringify(data);
+      const jsonStr = JSON.stringify(data, null, 2);
       const bytes = new Blob([jsonStr]).size;
       setEstimatedSize(formatSize(bytes));
     } catch {
@@ -271,6 +271,9 @@ export default function BackupScreen() {
       const result = await uploadToCloud(authUser.openId);
       if (result.success && result.meta) {
         setCloudMeta(result.meta);
+        const now = new Date().toISOString();
+        await AsyncStorage.setItem('last_backup_date', now);
+        setLastBackup({ exists: true, date: now, size: result.meta.sizeFormatted });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
           t('settings.success'),
@@ -393,7 +396,7 @@ export default function BackupScreen() {
       // حفظ تاريخ آخر نسخة
       const now = new Date().toISOString();
       await AsyncStorage.setItem('last_backup_date', now);
-      setLastBackup({ exists: true, date: now, size: `${(jsonString.length / 1024).toFixed(1)} KB` });
+      setLastBackup({ exists: true, date: now, size: formatSize(new Blob([jsonString]).size) });
 
       // مشاركة الملف
       if (await Sharing.isAvailableAsync()) {

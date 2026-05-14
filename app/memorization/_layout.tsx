@@ -15,6 +15,7 @@ export default function MemorizationLayout() {
       <Stack.Screen name="hide" />
       <Stack.Screen name="test" />
       <Stack.Screen name="review" />
+      <Stack.Screen name="mistakes" />
       <Stack.Screen name="progress" />
       <Stack.Screen name="certificate" />
     </Stack>

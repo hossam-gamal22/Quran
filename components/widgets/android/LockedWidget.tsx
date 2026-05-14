@@ -18,18 +18,20 @@ export function LockedWidget({ widgetName: _widgetName }: LockedWidgetProps) {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: GLASS.bg,
+        // Use fully opaque dark background — some Android launchers strip alpha
+        // from widget backgrounds causing the "no background" bug.
+        backgroundColor: '#1A1A2E',
         borderRadius: GLASS.radius,
         padding: GLASS.padding,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://subscription' }}
     >
-      <ImageWidget image={APP_ICON} imageWidth={32} imageHeight={32} radius={8} />
-      <TextWidget text="🔒" style={{ fontSize: 26, color: GLASS.text, marginTop: 8 }} />
+      <ImageWidget image={APP_ICON} imageWidth={36} imageHeight={36} radius={8} />
+      <TextWidget text="🔒" style={{ fontSize: 22, color: GLASS.text, marginTop: 8 }} />
       <TextWidget
         text="اشترك للحصول على هذه الودجت"
-        style={{ fontSize: 12, color: GLASS.textMuted, fontFamily: FONT.amiri, marginTop: 6, textAlign: 'center' }}
+        style={{ fontSize: 11, color: GLASS.textMuted, marginTop: 6, textAlign: 'center' }}
         maxLines={2}
         truncate="END"
       />

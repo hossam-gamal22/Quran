@@ -638,6 +638,11 @@ export interface TranslationKeys {
     dhikrUnit: string;
     enterDhikrText: string;
     enterTextError: string;
+    logExternal?: string;
+    externalCount?: string;
+    externalCountPlaceholder?: string;
+    addToCounter?: string;
+    externalCountError?: string;
     myCustomDhikr: string;
     myStats: string;
     noDataYet: string;
@@ -656,6 +661,7 @@ export interface TranslationKeys {
     todayBreakdown: string;
     todaysCount: string;
     last7Days: string;
+    last30Days?: string;
     virtue1: string;
     virtue2: string;
     virtue3: string;
@@ -1215,8 +1221,9 @@ export interface TranslationKeys {
     preview: string;
     stopPreview: string;
     minutesBefore: string;
+    advanceReminderBody: string;
     minutes: string;
-  
+
     additionalSounds: string;
     adhanSound: string;
     adhkar: string;
@@ -1331,6 +1338,8 @@ export interface TranslationKeys {
     addTime: string;
     testPrayerBody: string;
     testPrayerTitle: string;
+    advanceReminderTestTitle: string;
+    advanceReminderTestPrayer: string;
     testSalawatBody: string;
     testSalawatTitle: string;
     testScheduledBody: string;
@@ -1347,6 +1356,25 @@ export interface TranslationKeys {
     wakeupAzkar: string;
     wakeupAzkarTime: string;
     timezoneChanged: string;
+  };
+  // Full Adhan player — used by app/full-adhan.tsx + prayer-notifications full-adhan body.
+  // Optional: keys missing in a non-English language fall back to the English block via t().
+  fullAdhan?: {
+    tapToOpen: string;
+    tapToOpenTest: string;
+    prayerTitle: string;          // "أذان {{prayer}}"
+    testTitle: string;            // "إشعار تجريبي لصلاة" — literal, no interpolation
+    testBadge: string;            // "تجريبي" chip
+    completed: string;            // shown when audio finishes
+    voicePickerTitle: string;
+    voicePickerSubtitle: string;
+    loadError: string;
+    retry: string;
+    voiceMakkah: string;
+    voiceMadinah: string;
+    voiceAlAqsa: string;
+    voiceMishary: string;
+    voiceAbdulbasit: string;
   };
   ramadan: {
     blessedRamadan: string;
@@ -2198,6 +2226,9 @@ export interface TranslationKeys {
     dateFormat: string;
     dateFormatNone: string;
     openSystemSettings: string;
+    refreshTitle: string;
+    refreshBtn: string;
+    refreshing: string;
   };
   names: {
     evidence: string;
@@ -3269,6 +3300,11 @@ const ar: TranslationKeys = {
     dhikrUnit: 'ذكر',
     enterDhikrText: 'أدخل نص الذكر',
     enterTextError: 'أدخل نص الذكر أولاً',
+    logExternal: 'تسجيل خارجي',
+    externalCount: 'العدد',
+    externalCountPlaceholder: 'ادخل عدد التسبيحات الخارجية التي قمت بها',
+    addToCounter: 'إضافة للعداد',
+    externalCountError: 'أدخل عدداً صحيحاً بين 1 و99999',
     myCustomDhikr: 'أذكاري المخصصة',
     myStats: 'إحصائياتي',
     noDataYet: 'لا توجد بيانات بعد',
@@ -3288,6 +3324,7 @@ const ar: TranslationKeys = {
     todaysCount: 'عدد اليوم',
   
     last7Days: 'آخر 7 أيام',
+    last30Days: 'آخر 30 يوم',
     virtue1: 'أحب الكلام إلى الله أربع: سبحان الله، والحمد لله، ولا إله إلا الله، والله أكبر',
     virtue2: 'الحمد لله تملأ الميزان، وسبحان الله والحمد لله تملآن ما بين السموات والأرض',
     virtue3: 'أحب الكلام إلى الله أربع: سبحان الله، والحمد لله، ولا إله إلا الله، والله أكبر',
@@ -3536,7 +3573,7 @@ const ar: TranslationKeys = {
     enableReminder: 'تفعيل التذكير',
     adhanType: 'نوع الأذان',
     fullAdhan: 'الأذان الكامل',
-    fullAdhanDesc: 'الأذان الكامل من المسجد الحرام',
+    fullAdhanDesc: 'تشغيل تسجيل أذان كامل عند فتح الإشعار',
     simpleAdhan: 'أذان بسيط',
     simpleAdhanDesc: 'نسخة مختصرة من الأذان',
     atAdhanTime: 'في وقت الأذان',
@@ -3828,7 +3865,8 @@ const ar: TranslationKeys = {
     useFullAdhanIosNotice: 'على iOS سيقوم النظام بإيقاف الصوت تلقائياً بعد 29 ثانية',
     preview: 'معاينة',
     stopPreview: 'إيقاف المعاينة',
-    minutesBefore: '{count} دقائق قبل',
+    minutesBefore: 'قبل {count} دقائق',
+    advanceReminderBody: 'متبقي {count} دقائق على {prayer}، استعد وتوضأ',
     minutes: 'دقائق',
     additionalSounds: 'أصوات إضافية',
     adhanSound: 'صوت الأذان',
@@ -3944,6 +3982,8 @@ const ar: TranslationKeys = {
     addTime: 'إضافة وقت',
     testPrayerBody: 'الإشعار يعمل بنجاح.. حان وقت الصلاة',
     testPrayerTitle: 'اختبار وصول الإشعار ✅',
+    advanceReminderTestTitle: 'اختبار وصول إشعار تذكير قبل الصلاة',
+    advanceReminderTestPrayer: 'الصلاة القادمة',
     testSalawatBody: 'الإشعار يعمل بنجاح.. اللهم صل وسلم على نبينا محمد',
     testSalawatTitle: 'اختبار وصول الإشعار ✅',
     testScheduledBody: 'تم جدولة الإشعار بنجاح',
@@ -3960,6 +4000,23 @@ const ar: TranslationKeys = {
     wakeupAzkar: 'أذكار الاستيقاظ',
     wakeupAzkarTime: 'وقت أذكار الاستيقاظ',
     timezoneChanged: 'تم تحديث مواعيد الإشعارات بعد تغيير المنطقة الزمنية',
+  },
+  fullAdhan: {
+    tapToOpen: 'افتح هذا الإشعار لسماع الأذان كاملاً',
+    tapToOpenTest: 'افتح هذا الإشعار لسماع الأذان التجريبي',
+    prayerTitle: 'أذان {prayer}',
+    testTitle: 'إشعار تجريبي لصلاة',
+    testBadge: 'تجريبي',
+    completed: 'اكتمل الأذان .. انقر زر التشغيل بالأعلى للإعادة',
+    voicePickerTitle: 'صوت الأذان',
+    voicePickerSubtitle: 'اختر الصوت — يطبق الآن وعلى الصلوات القادمة',
+    loadError: 'تعذر تشغيل الأذان الكامل، يرجى المحاولة لاحقًا',
+    retry: 'إعادة المحاولة',
+    voiceMakkah: 'أذان الحرم المكي',
+    voiceMadinah: 'أذان الحرم النبوي',
+    voiceAlAqsa: 'أذان المسجد الأقصى',
+    voiceMishary: 'الأذان بصوت مشاري العفاسي',
+    voiceAbdulbasit: 'الأذان بصوت عبد الباسط عبد الصمد',
   },
   ramadan: {
     blessedRamadan: 'شهر رمضان المبارك',
@@ -4811,6 +4868,9 @@ const ar: TranslationKeys = {
     dateFormat: 'صيغة التاريخ',
     dateFormatNone: 'بدون',
     openSystemSettings: 'فتح إعدادات النظام',
+    refreshTitle: 'تحديث الودجات',
+    refreshBtn: 'تحديث الودجات الآن',
+    refreshing: 'جاري التحديث...',
   },
   names: {
     evidence: 'الدليل',
@@ -5866,6 +5926,11 @@ const en: TranslationKeys = {
     dhikrUnit: 'dhikr',
     enterDhikrText: 'Enter dhikr text',
     enterTextError: 'Enter dhikr text first',
+    logExternal: 'Log External',
+    externalCount: 'Count',
+    externalCountPlaceholder: 'Enter the external tasbih count you completed',
+    addToCounter: 'Add to Counter',
+    externalCountError: 'Enter a valid number from 1 to 99999',
     myCustomDhikr: 'My Custom Dhikr',
     myStats: 'My Statistics',
     noDataYet: 'No data yet',
@@ -5885,6 +5950,7 @@ const en: TranslationKeys = {
     todaysCount: 'Today\'s Count',
   
     last7Days: 'Last 7 Days',
+    last30Days: 'Last 30 Days',
     virtue1: 'The most beloved words to Allah are four: SubhanAllah, Alhamdulillah, La ilaha illa Allah, and Allahu Akbar',
     virtue2: 'Alhamdulillah fills the scales, and SubhanAllah and Alhamdulillah fill what is between the heavens and the earth',
     virtue3: 'The most beloved words to Allah are four: SubhanAllah, Alhamdulillah, La ilaha illa Allah, and Allahu Akbar',
@@ -6133,7 +6199,7 @@ const en: TranslationKeys = {
     enableReminder: 'Enable Reminder',
     adhanType: 'Adhan Type',
     fullAdhan: 'Full Adhan',
-    fullAdhanDesc: 'Complete adhan from the Holy Mosque',
+    fullAdhanDesc: 'Play a complete bundled adhan recording when opening the notification',
     simpleAdhan: 'Simple Adhan',
     simpleAdhanDesc: 'Shortened version of adhan',
     atAdhanTime: 'At Adhan Time',
@@ -6426,6 +6492,7 @@ const en: TranslationKeys = {
     preview: 'Preview',
     stopPreview: 'Stop preview',
     minutesBefore: '{count} minutes before',
+    advanceReminderBody: '{count} minutes until {prayer} — prepare and make wudu',
     minutes: 'minutes',
     additionalSounds: 'Additional Sounds',
     adhanSound: 'Adhan Sound',
@@ -6541,6 +6608,8 @@ const en: TranslationKeys = {
     addTime: 'Add Time',
     testPrayerBody: 'It\'s time for prayer',
     testPrayerTitle: 'Prayer Notification Test',
+    advanceReminderTestTitle: 'Advance Prayer Reminder Test',
+    advanceReminderTestPrayer: 'the next prayer',
     testSalawatBody: 'O Allah, send blessings upon our Prophet Muhammad',
     testSalawatTitle: 'Salawat Notification Test',
     testScheduledBody: 'Notification scheduled successfully',
@@ -6557,6 +6626,23 @@ const en: TranslationKeys = {
     wakeupAzkar: 'Wakeup Adhkar',
     wakeupAzkarTime: 'Wakeup Adhkar Time',
     timezoneChanged: 'Notification times updated after timezone change',
+  },
+  fullAdhan: {
+    tapToOpen: 'Tap this notification to hear the complete adhan',
+    tapToOpenTest: 'Tap this notification to hear the test adhan',
+    prayerTitle: '{prayer} Adhan',
+    testTitle: 'Test Prayer Notification',
+    testBadge: 'Test',
+    completed: 'Adhan completed — tap the play button above to replay',
+    voicePickerTitle: 'Adhan Voice',
+    voicePickerSubtitle: 'Choose a voice — applies now and to future prayers',
+    loadError: 'Could not play the complete adhan. Please try again later.',
+    retry: 'Retry',
+    voiceMakkah: 'أذان الحرم المكي',
+    voiceMadinah: 'أذان الحرم النبوي',
+    voiceAlAqsa: 'أذان المسجد الأقصى',
+    voiceMishary: 'الأذان بصوت مشاري العفاسي',
+    voiceAbdulbasit: 'الأذان بصوت عبد الباسط عبد الصمد',
   },
   ramadan: {
     blessedRamadan: 'Blessed Ramadan',
@@ -7408,6 +7494,9 @@ const en: TranslationKeys = {
     dateFormat: 'Date Format',
     dateFormatNone: 'None',
     openSystemSettings: 'Open System Settings',
+    refreshTitle: 'Refresh Widgets',
+    refreshBtn: 'Refresh Widgets Now',
+    refreshing: 'Refreshing...',
   },
   names: {
     evidence: 'Evidence',
@@ -8731,7 +8820,7 @@ const fr: TranslationKeys = {
     enableReminder: 'Activer le rappel',
     adhanType: 'Type d\'adhan',
     fullAdhan: 'Adhan complet',
-    fullAdhanDesc: 'Adhan complet de la Sainte Mosquée',
+    fullAdhanDesc: 'Lire un enregistrement complet d’adhan inclus',
     simpleAdhan: 'Adhan simple',
     simpleAdhanDesc: 'Version raccourcie de l\'adhan',
     atAdhanTime: 'À l\'heure de l\'adhan',
@@ -9024,6 +9113,7 @@ const fr: TranslationKeys = {
     preview: 'Aperçu',
     stopPreview: "Arrêter l'aperçu",
     minutesBefore: '{count} minutes avant',
+    advanceReminderBody: '{count} minutes avant {prayer} — préparez-vous et faites vos ablutions',
     minutes: 'minutes',
     additionalSounds: 'Sons supplémentaires',
     adhanSound: 'Son de l\'Adhan',
@@ -9139,6 +9229,8 @@ const fr: TranslationKeys = {
     addTime: 'Ajouter un horaire',
     testPrayerBody: 'C\'est l\'heure de la prière',
     testPrayerTitle: 'Test de notification de prière',
+    advanceReminderTestTitle: 'Test de rappel avant la prière',
+    advanceReminderTestPrayer: 'la prochaine prière',
     testSalawatBody: 'Ô Allah, envoie Tes bénédictions sur notre Prophète Muhammad',
     testSalawatTitle: 'Test de notification Salawat',
     testScheduledBody: 'Notification planifiée avec succès',
@@ -10005,6 +10097,9 @@ const fr: TranslationKeys = {
     dateFormat: 'Format de date',
     dateFormatNone: 'Aucun',
     openSystemSettings: 'Ouvrir les paramètres',
+    refreshTitle: 'Actualiser les widgets',
+    refreshBtn: 'Actualiser maintenant',
+    refreshing: 'Actualisation...',
   },
   names: {
     evidence: 'Preuve',
@@ -11329,7 +11424,7 @@ const de: TranslationKeys = {
     enableReminder: 'Erinnerung aktivieren',
     adhanType: 'Adhan-Typ',
     fullAdhan: 'Vollständiger Adhan',
-    fullAdhanDesc: 'Vollständiger Adhan aus der Heiligen Moschee',
+    fullAdhanDesc: 'Vollständige gebündelte Adhan-Aufnahme abspielen',
     simpleAdhan: 'Einfacher Adhan',
     simpleAdhanDesc: 'Gekürzte Version des Adhan',
     atAdhanTime: 'Zur Adhan-Zeit',
@@ -11622,6 +11717,7 @@ const de: TranslationKeys = {
     preview: 'Vorschau',
     stopPreview: 'Vorschau stoppen',
     minutesBefore: '{count} Minuten vorher',
+    advanceReminderBody: 'Noch {count} Minuten bis {prayer} — bereite dich vor und mache Wudu',
     minutes: 'Minuten',
     additionalSounds: 'Zusätzliche Töne',
     adhanSound: 'Adhan-Ton',
@@ -11737,6 +11833,8 @@ const de: TranslationKeys = {
     addTime: 'Zeit hinzufügen',
     testPrayerBody: 'Es ist Zeit für das Gebet',
     testPrayerTitle: 'Gebets-Benachrichtigungstest',
+    advanceReminderTestTitle: 'Test der Gebetserinnerung',
+    advanceReminderTestPrayer: 'dem nächsten Gebet',
     testSalawatBody: 'O Allah, segne unseren Propheten Muhammad',
     testSalawatTitle: 'Salawat-Benachrichtigungstest',
     testScheduledBody: 'Benachrichtigung erfolgreich geplant',
@@ -12603,6 +12701,9 @@ const de: TranslationKeys = {
     dateFormat: 'Datumsformat',
     dateFormatNone: 'Keiner',
     openSystemSettings: 'Systemeinstellungen öffnen',
+    refreshTitle: 'Widgets aktualisieren',
+    refreshBtn: 'Jetzt aktualisieren',
+    refreshing: 'Wird aktualisiert...',
   },
   names: {
     evidence: 'Beweis',
@@ -13927,7 +14028,7 @@ const tr: TranslationKeys = {
     enableReminder: 'Hatırlatmayı Etkinleştir',
     adhanType: 'Ezan Türü',
     fullAdhan: 'Tam Ezan',
-    fullAdhanDesc: 'Harem-i Şerif\'ten tam ezan',
+    fullAdhanDesc: 'Bildirim açıldığında tam ezan kaydını çal',
     simpleAdhan: 'Kısa Ezan',
     simpleAdhanDesc: 'Ezanın kısa versiyonu',
     atAdhanTime: 'Ezan Vaktinde',
@@ -14220,6 +14321,7 @@ const tr: TranslationKeys = {
     preview: 'Önizleme',
     stopPreview: 'Önizlemeyi durdur',
     minutesBefore: '{count} dakika önce',
+    advanceReminderBody: '{prayer} için {count} dakika kaldı — hazırlan ve abdest al',
     minutes: 'dakika',
     additionalSounds: 'Ek Sesler',
     adhanSound: 'Ezan Sesi',
@@ -14335,6 +14437,8 @@ const tr: TranslationKeys = {
     addTime: 'Zaman Ekle',
     testPrayerBody: 'Namaz vakti geldi',
     testPrayerTitle: 'Namaz Bildirim Testi',
+    advanceReminderTestTitle: 'Namaz öncesi hatırlatma testi',
+    advanceReminderTestPrayer: 'bir sonraki namaz',
     testSalawatBody: 'Allahım, Peygamberimiz Muhammed\'e salat eyle',
     testSalawatTitle: 'Salavat Bildirim Testi',
     testScheduledBody: 'Bildirim başarıyla zamanlandı',
@@ -15201,6 +15305,9 @@ const tr: TranslationKeys = {
     dateFormat: 'Tarih Formatı',
     dateFormatNone: 'Yok',
     openSystemSettings: 'Sistem Ayarlarını Aç',
+    refreshTitle: 'Widget\'ları yenile',
+    refreshBtn: 'Şimdi yenile',
+    refreshing: 'Yenileniyor...',
   },
   names: {
     evidence: 'Delil',
@@ -16525,7 +16632,7 @@ const es: TranslationKeys = {
     enableReminder: 'Activar recordatorio',
     adhanType: 'Tipo de adhan',
     fullAdhan: 'Adhan completo',
-    fullAdhanDesc: 'Adhan completo de la Mezquita Sagrada',
+    fullAdhanDesc: 'Reproducir una grabación completa de adhan incluida',
     simpleAdhan: 'Adhan simple',
     simpleAdhanDesc: 'Versión abreviada del adhan',
     atAdhanTime: 'A la hora del adhan',
@@ -16818,6 +16925,7 @@ const es: TranslationKeys = {
     preview: 'Vista previa',
     stopPreview: 'Detener vista previa',
     minutesBefore: '{count} minutos antes',
+    advanceReminderBody: '{count} minutos para {prayer} — prepárate y realiza el wudu',
     minutes: 'minutos',
     additionalSounds: 'Sonidos adicionales',
     adhanSound: 'Sonido del Adhan',
@@ -16933,6 +17041,8 @@ const es: TranslationKeys = {
     addTime: 'Agregar hora',
     testPrayerBody: 'Es hora de la oración',
     testPrayerTitle: 'Prueba de notificación de oración',
+    advanceReminderTestTitle: 'Prueba de recordatorio previo a la oración',
+    advanceReminderTestPrayer: 'la próxima oración',
     testSalawatBody: 'Oh Allah, envía bendiciones sobre nuestro Profeta Muhammad',
     testSalawatTitle: 'Prueba de notificación Salawat',
     testScheduledBody: 'Notificación programada exitosamente',
@@ -17799,6 +17909,9 @@ const es: TranslationKeys = {
     dateFormat: 'Formato de fecha',
     dateFormatNone: 'Ninguno',
     openSystemSettings: 'Abrir ajustes',
+    refreshTitle: 'Actualizar widgets',
+    refreshBtn: 'Actualizar ahora',
+    refreshing: 'Actualizando...',
   },
   names: {
     evidence: 'Evidencia',
@@ -19122,7 +19235,7 @@ const ur: TranslationKeys = {
     enableReminder: 'یاددہانی فعال',
     adhanType: 'اذان کی قسم',
     fullAdhan: 'مکمل اذان',
-    fullAdhanDesc: 'مسجد الحرام سے مکمل اذان',
+    fullAdhanDesc: 'اطلاع کھولنے پر مکمل اذان کی شامل ریکارڈنگ چلائیں',
     simpleAdhan: 'مختصر اذان',
     simpleAdhanDesc: 'اذان کا مختصر ورژن',
     atAdhanTime: 'اذان کے وقت',
@@ -19415,6 +19528,7 @@ const ur: TranslationKeys = {
     preview: 'پیش نظر',
     stopPreview: 'پیش نظر بند کریں',
     minutesBefore: '{count} منٹ پہلے',
+    advanceReminderBody: '{prayer} میں {count} منٹ باقی — تیاری کریں اور وضو کریں',
     minutes: 'منٹ',
     additionalSounds: 'اضافی آوازیں',
     adhanSound: 'اذان کی آواز',
@@ -19530,6 +19644,8 @@ const ur: TranslationKeys = {
     addTime: 'وقت شامل کریں',
     testPrayerBody: 'نماز کا وقت ہو گیا ہے',
     testPrayerTitle: 'نماز نوٹیفکیشن ٹیسٹ',
+    advanceReminderTestTitle: 'نماز سے پہلے یاددہانی کا ٹیسٹ',
+    advanceReminderTestPrayer: 'اگلی نماز',
     testSalawatBody: 'اے اللہ ہمارے نبی محمد ﷺ پر درود بھیج',
     testSalawatTitle: 'درود نوٹیفکیشن ٹیسٹ',
     testScheduledBody: 'نوٹیفکیشن کامیابی سے شیڈول ہو گئی',
@@ -20396,6 +20512,9 @@ const ur: TranslationKeys = {
     dateFormat: 'تاریخ کی شکل',
     dateFormatNone: 'کوئی نہیں',
     openSystemSettings: 'سسٹم ترتیبات کھولیں',
+    refreshTitle: 'ویجٹس کو تازہ کریں',
+    refreshBtn: 'ابھی تازہ کریں',
+    refreshing: 'تازہ ہو رہا ہے...',
   },
   names: {
     evidence: 'دلیل',
@@ -21720,7 +21839,7 @@ const id: TranslationKeys = {
     enableReminder: 'Aktifkan Pengingat',
     adhanType: 'Jenis Adzan',
     fullAdhan: 'Adzan Lengkap',
-    fullAdhanDesc: 'Adzan lengkap dari Masjidil Haram',
+    fullAdhanDesc: 'Putar rekaman adzan lengkap bawaan saat notifikasi dibuka',
     simpleAdhan: 'Adzan Singkat',
     simpleAdhanDesc: 'Versi singkat adzan',
     atAdhanTime: 'Saat Waktu Adzan',
@@ -22013,6 +22132,7 @@ const id: TranslationKeys = {
     preview: 'Pratinjau',
     stopPreview: 'Hentikan pratinjau',
     minutesBefore: '{count} menit sebelum',
+    advanceReminderBody: '{count} menit lagi untuk {prayer} — bersiaplah dan berwudhu',
     minutes: 'menit',
     additionalSounds: 'Suara Tambahan',
     adhanSound: 'Suara Adzan',
@@ -22128,6 +22248,8 @@ const id: TranslationKeys = {
     addTime: 'Tambah Waktu',
     testPrayerBody: 'Sudah waktunya sholat',
     testPrayerTitle: 'Uji Notifikasi Sholat',
+    advanceReminderTestTitle: 'Uji Pengingat Sebelum Sholat',
+    advanceReminderTestPrayer: 'sholat berikutnya',
     testSalawatBody: 'Ya Allah, limpahkanlah sholawat kepada Nabi Muhammad',
     testSalawatTitle: 'Uji Notifikasi Sholawat',
     testScheduledBody: 'Notifikasi berhasil dijadwalkan',
@@ -22994,6 +23116,9 @@ const id: TranslationKeys = {
     dateFormat: 'Format Tanggal',
     dateFormatNone: 'Tanpa',
     openSystemSettings: 'Buka Pengaturan Sistem',
+    refreshTitle: 'Perbarui widget',
+    refreshBtn: 'Perbarui sekarang',
+    refreshing: 'Memperbarui...',
   },
   names: {
     introHadith: 'Nabi ﷺ bersabda: "Allah memiliki sembilan puluh sembilan nama, seratus kurang satu. Siapa yang menghafalnya akan masuk Surga."',
@@ -24318,7 +24443,7 @@ const ms: TranslationKeys = {
     enableReminder: 'Aktifkan Peringatan',
     adhanType: 'Jenis Azan',
     fullAdhan: 'Azan Penuh',
-    fullAdhanDesc: 'Azan penuh dari Masjidil Haram',
+    fullAdhanDesc: 'Mainkan rakaman azan penuh terbina apabila notifikasi dibuka',
     simpleAdhan: 'Azan Ringkas',
     simpleAdhanDesc: 'Versi ringkas azan',
     atAdhanTime: 'Pada Waktu Azan',
@@ -24611,6 +24736,7 @@ const ms: TranslationKeys = {
     preview: 'Pratonton',
     stopPreview: 'Hentikan pratonton',
     minutesBefore: '{count} minit sebelum',
+    advanceReminderBody: '{count} minit lagi untuk {prayer} — bersiap dan ambil wudhu',
     minutes: 'minit',
     additionalSounds: 'Bunyi Tambahan',
     adhanSound: 'Bunyi Azan',
@@ -24726,6 +24852,8 @@ const ms: TranslationKeys = {
     addTime: 'Tambah Masa',
     testPrayerBody: 'Sudah tiba waktu solat',
     testPrayerTitle: 'Ujian Pemberitahuan Solat',
+    advanceReminderTestTitle: 'Ujian Peringatan Sebelum Solat',
+    advanceReminderTestPrayer: 'solat seterusnya',
     testSalawatBody: 'Ya Allah, limpahkanlah selawat ke atas Nabi Muhammad',
     testSalawatTitle: 'Ujian Pemberitahuan Selawat',
     testScheduledBody: 'Pemberitahuan berjaya dijadualkan',
@@ -25592,6 +25720,9 @@ const ms: TranslationKeys = {
     dateFormat: 'Format Tarikh',
     dateFormatNone: 'Tiada',
     openSystemSettings: 'Buka Tetapan Sistem',
+    refreshTitle: 'Kemas kini widget',
+    refreshBtn: 'Kemas kini sekarang',
+    refreshing: 'Mengemas kini...',
   },
   names: {
     evidence: 'Dalil',
@@ -26915,7 +27046,7 @@ const hi: TranslationKeys = {
     enableReminder: 'अनुस्मारक सक्षम',
     adhanType: 'अज़ान प्रकार',
     fullAdhan: 'पूरी अज़ान',
-    fullAdhanDesc: 'मस्जिद अल-हरम से पूरी अज़ान',
+    fullAdhanDesc: 'सूचना खोलने पर शामिल पूरी अज़ान रिकॉर्डिंग चलाएं',
     simpleAdhan: 'सरल अज़ान',
     simpleAdhanDesc: 'अज़ान का संक्षिप्त संस्करण',
     atAdhanTime: 'अज़ान के समय',
@@ -27209,6 +27340,7 @@ const hi: TranslationKeys = {
     preview: 'पूर्वावलोकन',
     stopPreview: 'पूर्वावलोकन रोकें',
     minutesBefore: '{count} मिनट पहले',
+    advanceReminderBody: '{prayer} में {count} मिनट बाकी — तैयारी करें और वजू करें',
     minutes: 'मिनट',
     additionalSounds: 'अतिरिक्त ध्वनियाँ',
     adhanSound: 'अज़ान की आवाज़',
@@ -27324,6 +27456,8 @@ const hi: TranslationKeys = {
     addTime: 'समय जोड़ें',
     testPrayerBody: 'नमाज़ का समय हो गया है',
     testPrayerTitle: 'नमाज़ अधिसूचना परीक्षण',
+    advanceReminderTestTitle: 'नमाज़ से पहले अनुस्मारक परीक्षण',
+    advanceReminderTestPrayer: 'अगली नमाज़',
     testSalawatBody: 'ऐ अल्लाह, हमारे नबी मुहम्मद पर दरूद भेज',
     testSalawatTitle: 'सलवात अधिसूचना परीक्षण',
     testScheduledBody: 'अधिसूचना सफलतापूर्वक शेड्यूल हुई',
@@ -28190,6 +28324,9 @@ const hi: TranslationKeys = {
     dateFormat: 'दिनांक प्रारूप',
     dateFormatNone: 'कोई नहीं',
     openSystemSettings: 'सिस्टम सेटिंग्स खोलें',
+    refreshTitle: 'विजेट अपडेट करें',
+    refreshBtn: 'अभी अपडेट करें',
+    refreshing: 'अपडेट हो रहा है...',
   },
   names: {
     evidence: 'प्रमाण',
@@ -29514,7 +29651,7 @@ const bn: TranslationKeys = {
     enableReminder: 'রিমাইন্ডার সক্রিয়',
     adhanType: 'আযানের ধরন',
     fullAdhan: 'পূর্ণ আযান',
-    fullAdhanDesc: 'মসজিদুল হারাম থেকে পূর্ণ আযান',
+    fullAdhanDesc: 'নোটিফিকেশন খুললে অন্তর্ভুক্ত পূর্ণ আযান রেকর্ডিং চালান',
     simpleAdhan: 'সংক্ষিপ্ত আযান',
     simpleAdhanDesc: 'আযানের সংক্ষিপ্ত সংস্করণ',
     atAdhanTime: 'আযানের সময়',
@@ -29807,6 +29944,7 @@ const bn: TranslationKeys = {
     preview: 'প্রিভিউ',
     stopPreview: 'প্রিভিউ বন্ধ করুন',
     minutesBefore: '{count} মিনিট আগে',
+    advanceReminderBody: '{prayer} আর {count} মিনিট — প্রস্তুত হন এবং অযু করুন',
     minutes: 'মিনিট',
     additionalSounds: 'অতিরিক্ত শব্দ',
     adhanSound: 'আযানের শব্দ',
@@ -29922,6 +30060,8 @@ const bn: TranslationKeys = {
     addTime: 'সময় যোগ করুন',
     testPrayerBody: 'নামাজের সময় হয়েছে',
     testPrayerTitle: 'নামাজ নোটিফিকেশন পরীক্ষা',
+    advanceReminderTestTitle: 'নামাজের আগে অনুস্মারক পরীক্ষা',
+    advanceReminderTestPrayer: 'পরবর্তী নামাজ',
     testSalawatBody: 'হে আল্লাহ, আমাদের নবী মুহাম্মদের উপর দরূদ পাঠান',
     testSalawatTitle: 'সালাওয়াত নোটিফিকেশন পরীক্ষা',
     testScheduledBody: 'নোটিফিকেশন সফলভাবে নির্ধারিত হয়েছে',
@@ -30788,6 +30928,9 @@ const bn: TranslationKeys = {
     dateFormat: 'তারিখ বিন্যাস',
     dateFormatNone: 'নেই',
     openSystemSettings: 'সিস্টেম সেটিংস খুলুন',
+    refreshTitle: 'উইজেট আপডেট করুন',
+    refreshBtn: 'এখন আপডেট করুন',
+    refreshing: 'আপডেট হচ্ছে...',
   },
   names: {
     evidence: 'প্রমাণ',
@@ -32111,7 +32254,7 @@ const ru: TranslationKeys = {
     enableReminder: 'Включить напоминание',
     adhanType: 'Тип азана',
     fullAdhan: 'Полный азан',
-    fullAdhanDesc: 'Полный азан из Священной Мечети',
+    fullAdhanDesc: 'Воспроизводить встроенную полную запись азана при открытии уведомления',
     simpleAdhan: 'Короткий азан',
     simpleAdhanDesc: 'Сокращённая версия азана',
     atAdhanTime: 'Во время азана',
@@ -32404,6 +32547,7 @@ const ru: TranslationKeys = {
     preview: 'Предпросмотр',
     stopPreview: 'Остановить предпросмотр',
     minutesBefore: '{count} минут до',
+    advanceReminderBody: 'До {prayer} {count} минут — приготовьтесь и совершите омовение',
     minutes: 'минут',
     additionalSounds: 'Дополнительные звуки',
     adhanSound: 'Звук азана',
@@ -32519,6 +32663,8 @@ const ru: TranslationKeys = {
     addTime: 'Добавить время',
     testPrayerBody: 'Время молитвы',
     testPrayerTitle: 'Тест уведомления о молитве',
+    advanceReminderTestTitle: 'Тест напоминания о молитве',
+    advanceReminderTestPrayer: 'следующей молитвы',
     testSalawatBody: 'О Аллах, благослови нашего Пророка Мухаммада',
     testSalawatTitle: 'Тест уведомления о салавате',
     testScheduledBody: 'Уведомление успешно запланировано',
@@ -33385,6 +33531,9 @@ const ru: TranslationKeys = {
     dateFormat: 'Формат даты',
     dateFormatNone: 'Нет',
     openSystemSettings: 'Открыть настройки',
+    refreshTitle: 'Обновить виджеты',
+    refreshBtn: 'Обновить сейчас',
+    refreshing: 'Обновление...',
   },
   names: {
     evidence: 'Доказательство',

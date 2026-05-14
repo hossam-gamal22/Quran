@@ -13,6 +13,7 @@ import {
   Platform,
   FlatList,
   AppState,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -43,6 +44,7 @@ import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
 import { copyToClipboard } from '../../lib/clipboard';
 import { APP_CONFIG } from '../../constants/app';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { Share } from 'react-native';
 import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
@@ -247,6 +249,14 @@ function getTodayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function parseTasbihAmount(value: string): number {
+  const normalized = value
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[^\d]/g, '');
+  return Number(normalized);
+}
+
 // ============================================
 // المكون الرئيسي
 // ============================================
@@ -295,12 +305,15 @@ export default function TasbihScreen() {
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const typeStatsRef = useRef<Record<string, Record<string, number>>>({});
   const rewardsSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tasbihAdShownThisSessionRef = useRef(false);
+  const tasbihAdInFlightRef = useRef(false);
   // Per-tasbih count memory: remembers count for each tasbih when switching
   const perTasbihCountsRef = useRef<Record<number | string, number>>({});
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showTasbihList, setShowTasbihList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const { showStats } = useLocalSearchParams<{ showStats?: string }>();
 
@@ -323,6 +336,7 @@ export default function TasbihScreen() {
   const [customTasbihat, setCustomTasbihat] = useState<CustomTasbih[]>([]);
   const [customText, setCustomText] = useState('');
   const [customTarget, setCustomTarget] = useState('33');
+  const [manualCountInput, setManualCountInput] = useState('');
   const [dailyStats, setDailyStats] = useState<Record<string, number>>({});
   const [showVirtue, setShowVirtue] = useState(true);
   const isArabic = getLanguage() === 'ar';
@@ -634,17 +648,48 @@ export default function TasbihScreen() {
     await AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({ vibrationEnabled, showVirtue, autoAdvance, showTranslation }));
   };
 
-  const trackTypeIncrement = useCallback(async (tasbihText: string) => {
+  const trackTypeIncrement = useCallback(async (tasbihText: string, amount: number = 1) => {
+    if (amount <= 0) return;
     try {
       const today = getTodayISO();
       const updated = { ...typeStatsRef.current };
       updated[today] = { ...(updated[today] || {}) };
-      updated[today][tasbihText] = (updated[today][tasbihText] || 0) + 1;
+      updated[today][tasbihText] = (updated[today][tasbihText] || 0) + amount;
       typeStatsRef.current = updated;
       setTypeStats(updated);
       await AsyncStorage.setItem(STORAGE_KEYS.typeStats, JSON.stringify(updated));
     } catch (e) { console.error(e); }
   }, []);
+
+  const showTasbihCompletionAd = useCallback(async () => {
+    if (tasbihAdShownThisSessionRef.current || tasbihAdInFlightRef.current) return;
+    tasbihAdInFlightRef.current = true;
+    try {
+      const didShow = await showInterstitial({
+        allowInSacredContext: true,
+        ignoreSmartFrequencyCaps: true,
+        ignoreSmartSessionDelay: true,
+      });
+      if (didShow) {
+        tasbihAdShownThisSessionRef.current = true;
+      }
+    } finally {
+      tasbihAdInFlightRef.current = false;
+    }
+  }, []);
+
+  const maybeShowCompletionAd = useCallback((
+    previousRounds: number,
+    nextRounds: number,
+  ) => {
+    const crossedFiveRounds = Math.floor(previousRounds / 5) < Math.floor(nextRounds / 5);
+
+    if (crossedFiveRounds) {
+      setTimeout(() => {
+        showTasbihCompletionAd().catch(() => {});
+      }, 650);
+    }
+  }, [showTasbihCompletionAd]);
 
   // ===== HANDLERS =====
   const handlePress = useCallback(async () => {
@@ -688,6 +733,7 @@ export default function TasbihScreen() {
       AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
         date: getTodayISO(), completed: newCompleted,
       }));
+      maybeShowCompletionAd(rounds, rounds + 1);
 
       // Log completion to worship tracker
       try {
@@ -730,7 +776,7 @@ export default function TasbihScreen() {
       setTotalCount(newTotal);
       saveProgress(newCount, newTotal, rounds);
     }
-  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, customTasbihat, completedTasbihat, saveProgress, trackTypeIncrement, scheduleRewardsSync]);
+  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, PRESET_TASBIHAT, customTasbihat, completedTasbihat, saveProgress, trackTypeIncrement, scheduleRewardsSync, maybeShowCompletionAd]);
 
   const handleReset = () => {
     Alert.alert(t('tasbih.reset'), t('tasbih.resetConfirm'), [
@@ -805,6 +851,70 @@ export default function TasbihScreen() {
     saveProgress(0, totalCount, rounds);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }, [count, totalCount, rounds, saveProgress]);
+
+  const addManualTasbihCount = useCallback(async () => {
+    const amount = parseTasbihAmount(manualCountInput);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 99999) {
+      Alert.alert(t('common.error'), t('tasbih.externalCountError'));
+      return;
+    }
+
+    const previousCount = countRef.current;
+    const previousTotal = totalCountRef.current;
+    const previousRounds = roundsRef.current;
+    const target = Math.max(1, selectedTasbih.target || 1);
+    const combinedCount = previousCount + amount;
+    const completedRoundsDelta = Math.floor(combinedCount / target);
+    const nextCount = combinedCount % target;
+    const nextTotal = previousTotal + amount;
+    const nextRounds = previousRounds + completedRoundsDelta;
+
+    await trackTypeIncrement(selectedTasbih.text, amount);
+    scheduleRewardsSync();
+
+    setCount(nextCount);
+    setTotalCount(nextTotal);
+    setRounds(nextRounds);
+    perTasbihCountsRef.current[selectedTasbih.id] = nextCount;
+    saveProgress(nextCount, nextTotal, nextRounds);
+
+    if (completedRoundsDelta > 0) {
+      if (vibrationEnabled) {
+        Platform.OS === 'ios'
+          ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+          : Vibration.vibrate([0, 100, 100, 100]);
+      }
+      playPageSound('tasbihComplete', EFFECT_SOUNDS.success).catch(() => {});
+      trackTasbih(amount, selectedTasbih.text, nextRounds).catch(() => {});
+
+      const nextCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
+      setCompletedTasbihat(nextCompleted);
+      AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
+        date: getTodayISO(), completed: nextCompleted,
+      }));
+
+      try {
+        const today = getTodayDate();
+        const azkarRecord = await getAzkarRecord(today);
+        const record = azkarRecord || { date: today, morning: false, evening: false, sleep: false, wakeup: false, afterPrayer: false };
+        record.afterPrayer = true;
+        await saveAzkarRecord(record);
+      } catch (e) { console.error('Error logging to worship tracker:', e); }
+    }
+
+    maybeShowCompletionAd(previousRounds, nextRounds);
+    setManualCountInput('');
+    setShowManualModal(false);
+  }, [
+    manualCountInput,
+    selectedTasbih,
+    completedTasbihat,
+    vibrationEnabled,
+    saveProgress,
+    trackTypeIncrement,
+    scheduleRewardsSync,
+    maybeShowCompletionAd,
+  ]);
 
   const handleShare = async () => {
     const dhikrDisplay = isArabic ? stripTashkeel(selectedTasbih.text) : (selectedTasbih.transliteration || stripTashkeel(selectedTasbih.text));
@@ -1127,6 +1237,15 @@ export default function TasbihScreen() {
             ))}
           </View>
 
+          <TouchableOpacity
+            style={[s.externalCountBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            onPress={() => setShowManualModal(true)}
+            activeOpacity={0.75}
+          >
+            <MaterialCommunityIcons name="plus-box-outline" size={18} color="#fff" />
+            <Text style={s.externalCountBtnText}>{t('tasbih.logExternal')}</Text>
+          </TouchableOpacity>
+
           {/* Reset button */}
           <TouchableOpacity
             style={[s.resetBtn, {
@@ -1298,6 +1417,57 @@ export default function TasbihScreen() {
         </View>
       </Modal>
 
+      {/* ===== MANUAL COUNT MODAL ===== */}
+      <Modal visible={showManualModal} animationType="slide" transparent onRequestClose={() => setShowManualModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, {
+            height: 'auto',
+            backgroundColor: colors.modalSurface,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          }]}>
+            <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.logExternal')}</Text>
+              <TouchableOpacity onPress={() => setShowManualModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[s.inputLabel, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.dhikrText')}</Text>
+            <View style={[s.manualDhikrBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(6,79,47,0.08)' }]}>
+              <Text style={[s.manualDhikrText, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>
+                {isArabic ? stripTashkeel(selectedTasbih.text) : (selectedTasbih.transliteration || stripTashkeel(selectedTasbih.text))}
+              </Text>
+            </View>
+
+            <Text style={[s.inputLabel, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.externalCount')}</Text>
+            <TextInput
+              style={[s.stepperInput, s.manualInput, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(120,120,128,0.16)', color: C.text }]}
+              value={manualCountInput}
+              onChangeText={setManualCountInput}
+              placeholder={t('tasbih.externalCountPlaceholder')}
+              placeholderTextColor={C.textSec}
+              keyboardType="number-pad"
+              textAlign={isRTL ? 'right' : 'left'}
+              autoFocus
+            />
+
+            <View style={[s.manualQuickRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              {[33, 100, selectedTasbih.target].filter((value, index, arr) => arr.indexOf(value) === index).map(value => (
+                <TouchableOpacity key={value} style={s.manualQuickBtn} onPress={() => setManualCountInput(String(value))}>
+                  <Text style={s.manualQuickText}>{String(value)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={s.saveBtn} onPress={addManualTasbihCount}>
+              <Text style={s.saveBtnText}>{t('tasbih.addToCounter')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ===== SETTINGS MODAL ===== */}
       <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
         <View style={s.modalOverlay}>
@@ -1369,9 +1539,9 @@ export default function TasbihScreen() {
                 </>
               )}
 
-              {/* Last 7 days */}
-              <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.last7Days')}</Text>
-              {Object.entries(dailyStats).slice(-7).reverse().map(([date, cnt]) => {
+              {/* Last 30 days */}
+              <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.last30Days')}</Text>
+              {Object.entries(dailyStats).slice(-30).reverse().map(([date, cnt]) => {
                 const dayTypeStats = typeStats[date];
                 return (
                   <View key={date} style={[s.statsRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', flexDirection: 'column', alignItems: 'stretch' }]}>
@@ -1574,6 +1744,16 @@ const _s = StyleSheet.create({
     fontSize: 11, fontFamily: fontRegular(), marginTop: 4, textAlign: 'center' as const,
     lineHeight: 18, includeFontPadding: false,
   },
+  externalCountBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: GREEN,
+    paddingHorizontal: 20, paddingVertical: 10,
+    borderRadius: 20, marginBottom: 8,
+  },
+  externalCountBtnText: {
+    fontSize: 13, fontFamily: fontSemiBold(), color: '#fff',
+    lineHeight: 20, includeFontPadding: false,
+  },
 
   // Modal
   modalOverlay: {
@@ -1654,6 +1834,45 @@ const _s = StyleSheet.create({
   stepperInput: {
     flex: 1, height: 44, borderRadius: 12,
     fontSize: 18, fontFamily: fontSemiBold(),
+  },
+  manualDhikrBox: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  manualDhikrText: {
+    fontSize: 14,
+    fontFamily: fontMedium(),
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
+  manualInput: {
+    flex: 0,
+    width: '100%',
+    fontSize: 15,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  manualQuickRow: {
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  manualQuickBtn: {
+    minWidth: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: GREEN + '18',
+  },
+  manualQuickText: {
+    color: GREEN,
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   saveBtn: {
     backgroundColor: GREEN, padding: 14, borderRadius: 14, alignItems: 'center', marginTop: 4,

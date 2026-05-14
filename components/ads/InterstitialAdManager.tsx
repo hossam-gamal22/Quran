@@ -21,6 +21,13 @@ interface UseInterstitialAdReturn {
   isLoaded: boolean;
 }
 
+interface ShowInterstitialOptions {
+  ignoreSmartFrequencyCaps?: boolean;
+  ignoreSmartSessionDelay?: boolean;
+  allowInSacredContext?: boolean;
+  onShown?: () => void | Promise<void>;
+}
+
 export const useInterstitialAd = (): UseInterstitialAdReturn => {
   const { getInterstitialAdUnitId, canShowInterstitial, recordInterstitialShown } = useAds();
   const interstitialRef = useRef<any>(null);
@@ -84,7 +91,7 @@ export const useInterstitialAd = (): UseInterstitialAdReturn => {
 };
 
 // Standalone function for non-hook usage (e.g., PDF export)
-export const showInterstitial = async (): Promise<boolean> => {
+export const showInterstitial = async (options: ShowInterstitialOptions = {}): Promise<boolean> => {
   if (!InterstitialAdClass || Platform.OS === 'web') return false;
 
   try {
@@ -100,8 +107,12 @@ export const showInterstitial = async (): Promise<boolean> => {
     // Smart ad manager checks
     try {
       const { canShowInterstitial: smartCheck, isInSacredContext } = require('@/lib/smart-ad-manager');
-      if (isInSacredContext()) return false;
-      if (!(await smartCheck())) return false;
+      if (!options.allowInSacredContext && isInSacredContext()) return false;
+      if (!(await smartCheck({
+        ignoreFrequencyCaps: options.ignoreSmartFrequencyCaps,
+        ignoreSessionDelay: options.ignoreSmartSessionDelay,
+        allowInSacredContext: options.allowInSacredContext,
+      }))) return false;
     } catch {}
 
     const adUnitId = getAdUnitId('INTERSTITIAL', config);
@@ -112,27 +123,40 @@ export const showInterstitial = async (): Promise<boolean> => {
         requestNonPersonalizedAdsOnly: true,
       });
 
-      const timeout = setTimeout(() => resolve(false), 10000);
+      let didResolve = false;
+      let didRecordShown = false;
+
+      const resolveOnce = (value: boolean) => {
+        if (didResolve) return;
+        didResolve = true;
+        clearTimeout(timeout);
+        resolve(value);
+      };
+
+      const recordShownOnce = async () => {
+        if (didRecordShown) return;
+        didRecordShown = true;
+        try { recordGlobalAdShown(); } catch {}
+        try { await options.onShown?.(); } catch {}
+      };
+
+      const timeout = setTimeout(() => resolveOnce(false), 10000);
 
       ad.addAdEventListener(AdEventType.LOADED, () => {
-        ad.show().then(() => {
-          clearTimeout(timeout);
-          try { recordGlobalAdShown(); } catch {}
-          resolve(true);
+        ad.show().then(async () => {
+          await recordShownOnce();
+          resolveOnce(true);
         }).catch(() => {
-          clearTimeout(timeout);
-          resolve(false);
+          resolveOnce(false);
         });
       });
 
       ad.addAdEventListener(AdEventType.ERROR, () => {
-        clearTimeout(timeout);
-        resolve(false);
+        resolveOnce(false);
       });
 
       ad.addAdEventListener(AdEventType.CLOSED, () => {
-        clearTimeout(timeout);
-        resolve(true);
+        recordShownOnce().finally(() => resolveOnce(true));
       });
 
       ad.load();

@@ -349,6 +349,7 @@ export default function Rewards() {
             granted: true,
             grantedBy: 'reward_system',
             grantedAt: new Date().toISOString(),
+            plan: 'monthly',
             expiresAt: expiresAt.toISOString(),
             reason: `فائز في مسابقة الشهر ${currentMonth}`,
           },

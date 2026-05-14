@@ -27,6 +27,7 @@ import {
   calculateFastingStats,
   calculatePrayerStats,
   calculateQuranStats,
+  addQuranPages,
   getMonthlyActivityStats,
 } from '../lib/worship-storage';
 
@@ -96,6 +97,32 @@ describe('worship-storage monthly activity stats', () => {
       quranPages: 3,
       azkar: 2,
       tasbih: 15,
+    });
+  });
+
+  it('counts manual azkar checklist marks when no per-zikr counter exists', async () => {
+    setJson('worship_azkar_records', {
+      '2026-05-01': {
+        date: '2026-05-01',
+        morning: true,
+        evening: true,
+        sleep: false,
+        wakeup: true,
+        afterPrayer: false,
+      },
+    });
+
+    await expect(getMonthlyActivityStats(2026, 5)).resolves.toMatchObject({
+      azkar: 3,
+    });
+  });
+
+  it('clamps quran page updates to a valid daily range', async () => {
+    await addQuranPages('2026-05-07', 700);
+    await addQuranPages('2026-05-07', -800);
+
+    await expect(getMonthlyActivityStats(2026, 5)).resolves.toMatchObject({
+      quranPages: 0,
     });
   });
 });

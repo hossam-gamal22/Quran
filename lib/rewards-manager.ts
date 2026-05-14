@@ -755,6 +755,7 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
             granted: true,
             grantedBy: 'auto_reward_system',
             grantedAt: new Date().toISOString(),
+            plan: 'monthly',
             expiresAt: expiresAt.toISOString(),
             reason: `فائز في مسابقة الشهر ${previousMonth}`,
           },
@@ -772,7 +773,11 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
           {
             title: '🏆 مبروك! أنت في لوحة الشرف',
             body: 'حصلت على اشتراك مجاني هذا الشهر مكافأة لك',
-            data: { type: 'honor_board_winner' },
+            data: {
+              type: 'honor_board_winner',
+              actionType: 'screen',
+              actionUrl: '/honor-board',
+            },
           },
           null // immediate trigger
         );
@@ -794,9 +799,10 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
       currentMonth: previousMonth,
       currentWinners: winners,
       history: [historyEntry, ...config.history.slice(0, 11)],
+      processedMonth: previousMonth,
     };
 
-    await setDoc(doc(db, 'config', 'rewards-settings'), updatedConfig);
+    await setDoc(doc(db, 'config', 'rewards-settings'), updatedConfig, { merge: true });
     cachedConfig = updatedConfig;
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updatedConfig));
     await AsyncStorage.setItem(`@winners_processed_${previousMonth}`, 'true');

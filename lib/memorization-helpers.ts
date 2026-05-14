@@ -23,6 +23,20 @@ export function getSurahName(surahNumber: number): string {
   return getSurahMeta(surahNumber)?.name ?? `سورة ${surahNumber}`;
 }
 
+export function getAllSurahOptions(): {
+  number: number;
+  name: string;
+  englishName?: string;
+  ayahCount: number;
+}[] {
+  return QURAN.map((s) => ({
+    number: s.number,
+    name: s.name ?? `سورة ${s.number}`,
+    englishName: s.englishName,
+    ayahCount: s.ayahs?.length ?? 0,
+  }));
+}
+
 export function getAyahCount(surahNumber: number): number {
   return getSurahMeta(surahNumber)?.ayahs?.length ?? 0;
 }

@@ -49,38 +49,19 @@ interface StatCardProps {
   title: string;
   value: string;
   subtitle?: string;
-  details?: { label: string; done: boolean }[];
+  details?: { label: string; done: boolean; value?: string }[];
   delay: number;
   colors: any;
   isRTL: boolean;
   isDarkMode: boolean;
-  locked?: boolean;
+  detailsLocked?: boolean;
   onLockPress?: () => void;
 }
 
-function StatCard({ icon, iconColor, title, value, subtitle, details, delay, colors, isRTL, isDarkMode, locked, onLockPress }: StatCardProps) {
+function StatCard({ icon, iconColor, title, value, subtitle, details, delay, colors, isRTL, isDarkMode, detailsLocked, onLockPress }: StatCardProps) {
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(400)}>
       <GlassCard style={styles.statCard}>
-        {locked && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onLockPress}
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              zIndex: 10,
-              backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)',
-              borderRadius: 16,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <MaterialCommunityIcons name="lock" size={28} color={isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'} />
-            <Text style={{ color: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)', fontFamily: fontSemiBold(), fontSize: 13, marginTop: 4 }}>
-              {t('common.premiumFeature') || 'ميزة مميزة'}
-            </Text>
-          </TouchableOpacity>
-        )}
         <View style={[styles.statHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.statIconContainer, { backgroundColor: `${iconColor}20` }]}>
             <MaterialCommunityIcons name={icon as any} size={24} color={iconColor} />
@@ -109,6 +90,7 @@ function StatCard({ icon, iconColor, title, value, subtitle, details, delay, col
                   color={item.done ? ACCENT : colors.textSecondary}
                 />
                 <Text style={[styles.detailText, {
+                  flex: 1,
                   color: item.done ? colors.text : colors.textSecondary,
                   textAlign: isRTL ? 'right' : 'left',
                   fontFamily: fontRegular(),
@@ -116,9 +98,26 @@ function StatCard({ icon, iconColor, title, value, subtitle, details, delay, col
                 }]}>
                   {item.label}
                 </Text>
+                {item.value ? (
+                  <Text style={[styles.detailValue, { color: item.done ? iconColor : colors.textSecondary }]}>
+                    {item.value}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
+        )}
+        {detailsLocked && (
+          <TouchableOpacity
+            style={[styles.lockedDetails, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+            activeOpacity={0.78}
+            onPress={onLockPress}
+          >
+            <MaterialCommunityIcons name="lock" size={20} color={colors.textSecondary} />
+            <Text style={[styles.lockedDetailsText, { color: colors.textSecondary }]}>
+              {t('common.premiumFeature') || 'تفاصيل مميزة'}
+            </Text>
+          </TouchableOpacity>
         )}
       </GlassCard>
     </Animated.View>
@@ -193,6 +192,9 @@ export default function DailySummaryScreen() {
 
   // Quran pages
   const pagesRead = todayQuran?.pagesRead || 0;
+  const quranDetails = [
+    { label: t('worship.dailyPages'), value: localizeNumber(pagesRead), done: pagesRead > 0 },
+  ];
 
   // Azkar stats
   const azkarItems = [
@@ -208,6 +210,10 @@ export default function DailySummaryScreen() {
     label: a.label,
     done: todayAzkar ? !!todayAzkar[a.key] : false,
   }));
+  const tasbihDetails = [
+    { label: t('tabs.tasbih') || 'التسبيح', value: localizeNumber(tasbihCount), done: tasbihCount > 0 },
+    { label: t('worship.types') || 'أنواع', value: localizeNumber(tasbihTypes), done: tasbihTypes > 0 },
+  ];
 
   // Listening time display
   const listeningDisplay = listeningMinutes >= 60
@@ -257,7 +263,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={statsLocked}
+          details={statsLocked ? undefined : quranDetails}
+          detailsLocked={statsLocked}
           onLockPress={handleStatsLockPress}
         />
 
@@ -267,12 +274,12 @@ export default function DailySummaryScreen() {
           iconColor="#0d8e62"
           title={t('tabs.azkar') || 'الأذكار'}
           value={`${localizeNumber(azkarDone)}/${localizeNumber(azkarItems.length)}`}
-          details={azkarDetails}
           delay={300}
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={statsLocked}
+          details={statsLocked ? undefined : azkarDetails}
+          detailsLocked={statsLocked}
           onLockPress={handleStatsLockPress}
         />
 
@@ -287,7 +294,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={statsLocked}
+          details={statsLocked ? undefined : tasbihDetails}
+          detailsLocked={statsLocked}
           onLockPress={handleStatsLockPress}
         />
 
@@ -302,7 +310,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={statsLocked}
+          details={statsLocked ? undefined : [{ label: t('worship.quranListening') || 'سماع القرآن', value: listeningDisplay, done: listeningMinutes > 0 }]}
+          detailsLocked={statsLocked}
           onLockPress={handleStatsLockPress}
         />
 
@@ -398,6 +407,29 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 14,
+  },
+  detailValue: {
+    minWidth: 52,
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+    textAlign: 'center',
+  },
+  lockedDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    paddingBottom: 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+  },
+  lockedDetailsText: {
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   detailsButton: {
     flexDirection: 'row',

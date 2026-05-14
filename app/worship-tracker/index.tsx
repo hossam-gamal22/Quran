@@ -230,6 +230,50 @@ const QuickAction: React.FC<QuickActionProps> = ({
   );
 };
 
+interface ReportShortcutProps {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  subtitle: string;
+  color: string;
+  onPress: () => void;
+}
+
+const ReportShortcut: React.FC<ReportShortcutProps> = ({
+  icon,
+  title,
+  subtitle,
+  color,
+  onPress,
+}) => {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
+  const isRTL = useIsRTL();
+
+  return (
+    <TouchableOpacity
+      style={[styles.reportShortcut, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.78}
+    >
+      <View style={[styles.reportIconBg, { backgroundColor: `${color}22` }]}>
+        <MaterialCommunityIcons name={icon} size={22} color={color} />
+      </View>
+      <View style={styles.reportText}>
+        <Text style={[styles.reportTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+          {title}
+        </Text>
+        <Text style={[styles.reportSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+          {subtitle}
+        </Text>
+      </View>
+      <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.textLight} />
+    </TouchableOpacity>
+  );
+};
+
 // ========================================
 // المكون الرئيسي
 // ========================================
@@ -456,8 +500,31 @@ export default function WorshipTrackerScreen() {
           </View>
         </Animated.View>
 
+        {/* التقارير */}
+        <Animated.View entering={FadeInDown.delay(250).duration(500)}>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.yourStats')}
+          </Text>
+          <View style={styles.reportsContainer}>
+            <ReportShortcut
+              icon="calendar-today"
+              title={t('worship.dailySummary')}
+              subtitle={t('worship.todaySummary')}
+              color="#0d8e62"
+              onPress={() => router.push('/daily-summary' as any)}
+            />
+            <ReportShortcut
+              icon="chart-timeline-variant"
+              title={t('worship.weeklyReport')}
+              subtitle={t('worship.weeklyReportDesc')}
+              color="#3a7ca5"
+              onPress={() => router.push('/weekly-summary' as any)}
+            />
+          </View>
+        </Animated.View>
+
         {/* متتبعات العبادات */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+        <Animated.View entering={FadeInDown.delay(350).duration(500)}>
           <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('home.worshipTracker')}
           </Text>
@@ -508,7 +575,7 @@ export default function WorshipTrackerScreen() {
         </Animated.View>
 
         {/* نصيحة اليوم */}
-        <Animated.View entering={FadeInDown.delay(400).duration(500)}>
+        <Animated.View entering={FadeInDown.delay(450).duration(500)}>
           <GlassCard style={styles.tipCard}>
             <View style={[styles.tipHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="lightbulb-outline" size={20} color="#c07b10" />
@@ -633,6 +700,43 @@ const _styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // التقارير
+  reportsContainer: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  reportShortcut: {
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: 12,
+  },
+  reportIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  reportTitle: {
+    fontSize: 15,
+    fontFamily: fontBold(),
+    lineHeight: 25,
+    includeFontPadding: false,
+  },
+  reportSubtitle: {
+    fontSize: 11,
+    fontFamily: fontRegular(),
+    marginTop: 2,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   // متتبعات
   trackersContainer: {

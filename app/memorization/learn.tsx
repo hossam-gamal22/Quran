@@ -10,6 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
   Modal,
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { useColors } from '@/hooks/use-colors';
 import { GlassCard, UniversalHeader } from '@/components/ui';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -27,6 +29,8 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { mt } from '@/lib/memorization-i18n';
 import {
   formatAyahMarker,
+  getAllSurahOptions,
+  getAyahCount,
   getAyahText,
   getSurahName,
   splitAyahSegments,
@@ -40,6 +44,29 @@ import { rtlChevronBack, rtlChevronForward } from '@/lib/rtl-utils';
 const REPEAT_OPTIONS = [3, 5, 7, 10];
 const SPEED_OPTIONS = [0.75, 1, 1.25];
 const GAP_OPTIONS = [1000, 3000, 5000];
+const ARABIC_DIGIT_MAP: Record<string, string> = {
+  '٠': '0',
+  '١': '1',
+  '٢': '2',
+  '٣': '3',
+  '٤': '4',
+  '٥': '5',
+  '٦': '6',
+  '٧': '7',
+  '٨': '8',
+  '٩': '9',
+};
+
+function normalizeDigits(value: string): string {
+  return value.replace(/[٠-٩]/g, (d) => ARABIC_DIGIT_MAP[d] ?? d);
+}
+
+function parsePositiveInput(value: string): number | null {
+  const normalized = normalizeDigits(value).trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 export default function LearnScreen() {
   const router = useRouter();
@@ -69,23 +96,66 @@ export default function LearnScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [iter, setIter] = useState(0);
   const [iterTotal, setIterTotal] = useState(0);
+  const [learnMode, setLearnMode] = useState<'menu' | 'daily' | 'range' | 'recital'>('menu');
+  const [listenSurah, setListenSurah] = useState('67');
+  const [recitalSurah, setRecitalSurah] = useState('67');
+  const [recitalAyahNumber, setRecitalAyahNumber] = useState('1');
+  const [surahPickerOpen, setSurahPickerOpen] = useState(false);
+  const [surahPickerTarget, setSurahPickerTarget] = useState<'range' | 'recital'>('range');
+  const [surahSearch, setSurahSearch] = useState('');
+  const [listenFrom, setListenFrom] = useState('1');
+  const [listenTo, setListenTo] = useState('1');
+  const [rangeProgressLabel, setRangeProgressLabel] = useState('');
+  const [rangePlayingAyah, setRangePlayingAyah] = useState<{
+    surahNumber: number;
+    ayahNumber: number;
+  } | null>(null);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [isPlayingRecording, setIsPlayingRecording] = useState(false);
   const [step, setStep] = useState<'idle' | 'listen' | 'recite_with' | 'recite_alone' | 'done'>('idle');
 
   const current = ayahs[index];
+  const defaultRangeSurah = useMemo(() => {
+    return (
+      current?.surahNumber ??
+      activePlan?.ayahRange?.surahNumber ??
+      activePlan?.surahNumbers?.[0] ??
+      67
+    );
+  }, [activePlan, current]);
   const totalRepeatRounds = 3; // listen / recite_with / recite_alone
   const subscriptionRef = useRef<(() => void) | null>(null);
   const flowCancelledRef = useRef(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingSoundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     return () => {
       if (subscriptionRef.current) subscriptionRef.current();
       memorizationPlayer.stop();
+      recordingSoundRef.current?.unloadAsync().catch(() => {});
+      recordingRef.current?.stopAndUnloadAsync().catch(() => {});
     };
   }, []);
+
+  useEffect(() => {
+    const from = activePlan?.ayahRange?.fromAyah ?? current?.ayahNumber ?? 1;
+    const to = activePlan?.ayahRange?.toAyah ?? Math.min(getAyahCount(defaultRangeSurah) || from, from + 4);
+    setListenSurah(String(defaultRangeSurah));
+    setListenFrom(String(from));
+    setListenTo(String(to));
+    setRecitalSurah(String(defaultRangeSurah));
+    setRecitalAyahNumber(String(from));
+    setRangeProgressLabel('');
+    setRangePlayingAyah(null);
+  }, [activePlan?.id, defaultRangeSurah]);
 
   const playOnce = useCallback(
     async (times: number) => {
       if (!current || !activePlan) return;
+      setRangePlayingAyah(null);
+      setRangeProgressLabel('');
       setIsPlaying(true);
       if (subscriptionRef.current) {
         subscriptionRef.current();
@@ -135,6 +205,77 @@ export default function LearnScreen() {
     setStep('done');
   }, [current, playOnce, repeats]);
 
+  const onPlayListeningRange = useCallback(async () => {
+    if (!activePlan) return;
+    const surah = parsePositiveInput(listenSurah) ?? defaultRangeSurah;
+    const from = parsePositiveInput(listenFrom);
+    const to = parsePositiveInput(listenTo);
+    const maxAyah = getAyahCount(surah);
+    if (!maxAyah) {
+      Alert.alert(mt('errSave'), mt('errInvalidSurah'));
+      return;
+    }
+    if (!from || !to || from > to || to > maxAyah) {
+      Alert.alert(mt('errSave'), mt('errInvalidRange'));
+      return;
+    }
+
+    flowCancelledRef.current = false;
+    setStep('listen');
+    setIsPlaying(true);
+    setRangeProgressLabel(`${toArabicDigits(from)}-${toArabicDigits(to)}`);
+    if (subscriptionRef.current) {
+      subscriptionRef.current();
+      subscriptionRef.current = null;
+    }
+
+    const rangeAyahs = Array.from({ length: to - from + 1 }, (_, offset) => ({
+      surah,
+      ayah: from + offset,
+    }));
+    setRangePlayingAyah({ surahNumber: surah, ayahNumber: from });
+    setRangeProgressLabel(`${getSurahName(surah)} ${formatAyahMarker(from)}`);
+
+    const unsub = memorizationPlayer.subscribe((e: MemoPlayerEvent) => {
+      if (e.kind === 'started') {
+        setIter(e.iteration);
+        setIterTotal(e.total);
+      }
+      if (e.kind === 'all_done' || e.kind === 'stopped' || e.kind === 'error') {
+        setIsPlaying(false);
+        setIter(0);
+        setIterTotal(0);
+        setStep('idle');
+        setRangePlayingAyah(null);
+      }
+    });
+    subscriptionRef.current = unsub;
+
+    try {
+      await memorizationPlayer.playSequence(rangeAyahs, {
+        times: repeats,
+        gapMs: gap,
+        speed,
+        reciterId: activePlan.reciterId,
+        onAdvance: (ayahIndex) => {
+          const ayah = rangeAyahs[ayahIndex];
+          setRangePlayingAyah({
+            surahNumber: surah,
+            ayahNumber: ayah.ayah,
+          });
+          setRangeProgressLabel(
+            `${getSurahName(surah)} ${formatAyahMarker(ayah.ayah)}`,
+          );
+        },
+      });
+    } finally {
+      unsub();
+      if (subscriptionRef.current === unsub) subscriptionRef.current = null;
+      setRangeProgressLabel('');
+      setRangePlayingAyah(null);
+    }
+  }, [activePlan, defaultRangeSurah, gap, listenFrom, listenSurah, listenTo, repeats, speed]);
+
   const onStop = useCallback(async () => {
     flowCancelledRef.current = true;
     await memorizationPlayer.stop();
@@ -145,8 +286,96 @@ export default function LearnScreen() {
     setIsPlaying(false);
     setIter(0);
     setIterTotal(0);
+    setRangeProgressLabel('');
+    setRangePlayingAyah(null);
     setStep('idle');
   }, []);
+
+  const startRecording = useCallback(async () => {
+    try {
+      await onStop();
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(mt('recordPermissionTitle'), mt('recordPermissionDesc'));
+        return;
+      }
+      await recordingSoundRef.current?.unloadAsync().catch(() => {});
+      recordingSoundRef.current = null;
+      setRecordedUri(null);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const { recording: nextRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      );
+      recordingRef.current = nextRecording;
+      setRecording(nextRecording);
+    } catch (e: any) {
+      Alert.alert(mt('errSave'), String(e?.message ?? e));
+    }
+  }, [onStop]);
+
+  const stopRecording = useCallback(async () => {
+    const currentRecording = recordingRef.current;
+    if (!currentRecording) return;
+    try {
+      await currentRecording.stopAndUnloadAsync();
+      const uri = currentRecording.getURI();
+      recordingRef.current = null;
+      setRecording(null);
+      setRecordedUri(uri);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (e: any) {
+      recordingRef.current = null;
+      setRecording(null);
+      Alert.alert(mt('errSave'), String(e?.message ?? e));
+    }
+  }, []);
+
+  const playRecording = useCallback(async () => {
+    if (!recordedUri) return;
+    try {
+      await onStop();
+      await recordingSoundRef.current?.unloadAsync().catch(() => {});
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recordedUri },
+        {
+          shouldPlay: true,
+          volume: 1,
+          isMuted: false,
+        },
+      );
+      await sound.setVolumeAsync(1);
+      recordingSoundRef.current = sound;
+      setIsPlayingRecording(true);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) {
+          setIsPlayingRecording(false);
+          return;
+        }
+        if (status.didJustFinish) {
+          setIsPlayingRecording(false);
+          sound.unloadAsync().catch(() => {});
+          if (recordingSoundRef.current === sound) recordingSoundRef.current = null;
+        }
+      });
+    } catch (e: any) {
+      setIsPlayingRecording(false);
+      Alert.alert(mt('errLoad'), String(e?.message ?? e));
+    }
+  }, [onStop, recordedUri]);
 
   const onMarkMemorized = useCallback(async () => {
     if (!current) return;
@@ -163,10 +392,70 @@ export default function LearnScreen() {
     setIndex((i) => Math.min(i + 1, ayahs.length - 1));
   }, [current, markFailed, ayahs.length]);
 
-  const ayahText = current
+  const rangeSurahNumber = parsePositiveInput(listenSurah) ?? defaultRangeSurah;
+  const recitalSurahNumber = parsePositiveInput(recitalSurah) ?? defaultRangeSurah;
+  const surahOptions = useMemo(() => getAllSurahOptions(), []);
+  const selectedSurahOption = useMemo(
+    () => surahOptions.find((s) => s.number === rangeSurahNumber),
+    [rangeSurahNumber, surahOptions],
+  );
+  const selectedRecitalSurahOption = useMemo(
+    () => surahOptions.find((s) => s.number === recitalSurahNumber),
+    [recitalSurahNumber, surahOptions],
+  );
+  const recitalAyahMax = Math.max(1, getAyahCount(recitalSurahNumber));
+  const filteredSurahOptions = useMemo(() => {
+    const q = normalizeDigits(surahSearch).trim().toLowerCase();
+    if (!q) return surahOptions;
+    return surahOptions.filter((s) => {
+      return (
+        String(s.number).includes(q) ||
+        s.name.toLowerCase().includes(q) ||
+        (s.englishName ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [surahOptions, surahSearch]);
+  const rangeFromAyah = parsePositiveInput(listenFrom) ?? 1;
+  const rangePreviewAyah =
+    learnMode === 'range' && getAyahCount(rangeSurahNumber) >= rangeFromAyah
+      ? { surahNumber: rangeSurahNumber, ayahNumber: rangeFromAyah }
+      : null;
+  const recitalAyahValue = parsePositiveInput(recitalAyahNumber) ?? 1;
+  const setRecitalAyahClamped = useCallback((next: number) => {
+    const clamped = Math.max(1, Math.min(recitalAyahMax, next));
+    setRecitalAyahNumber(String(clamped));
+    setRecordedUri(null);
+  }, [recitalAyahMax]);
+  const recitalAyah =
+    getAyahCount(recitalSurahNumber) >= recitalAyahValue
+      ? { surahNumber: recitalSurahNumber, ayahNumber: recitalAyahValue }
+      : { surahNumber: recitalSurahNumber, ayahNumber: 1 };
+  const displayAyah =
+    learnMode === 'recital'
+      ? recitalAyah
+      : rangePlayingAyah ?? rangePreviewAyah ?? current;
+  const displayRef = displayAyah
+    ? `${getSurahName(displayAyah.surahNumber)} ${formatAyahMarker(displayAyah.ayahNumber)}`
+    : '';
+  const isListeningRangeActive = Boolean(rangePlayingAyah || rangeProgressLabel);
+
+  const playSheikhForRecital = useCallback(async () => {
+    if (!activePlan || !recitalAyah) return;
+    await recordingSoundRef.current?.unloadAsync().catch(() => {});
+    recordingSoundRef.current = null;
+    setIsPlayingRecording(false);
+    await memorizationPlayer.playAyahWithRepeat(recitalAyah.surahNumber, recitalAyah.ayahNumber, {
+      times: 1,
+      gapMs: 0,
+      speed,
+      reciterId: activePlan.reciterId,
+    });
+  }, [activePlan, recitalAyah, speed]);
+
+  const ayahText = displayAyah
     ? settings.showTashkeel
-      ? stripQuranicMarks(getAyahText(current.surahNumber, current.ayahNumber))
-      : stripTashkeel(getAyahText(current.surahNumber, current.ayahNumber))
+      ? stripQuranicMarks(getAyahText(displayAyah.surahNumber, displayAyah.ayahNumber))
+      : stripTashkeel(getAyahText(displayAyah.surahNumber, displayAyah.ayahNumber))
     : '';
 
   const segments = useMemo(
@@ -194,7 +483,7 @@ export default function LearnScreen() {
     );
   }
 
-  if (!current) {
+  if (learnMode === 'menu') {
     return (
       <BackgroundWrapper
         backgroundKey={appSettings.display.appBackground}
@@ -204,6 +493,47 @@ export default function LearnScreen() {
       >
         <SafeAreaView style={styles.safe} edges={['top']}>
           <UniversalHeader title={mt('learnTitle')} onBack={() => router.back()} />
+          <ScrollView contentContainerStyle={styles.scroll}>
+            <ModeChoiceCard
+              icon="calendar-check-outline"
+              title={mt('learnDailyWird')}
+              description={mt('learnDailyWirdDesc')}
+              colors={colors}
+              isRTL={isRTL}
+              onPress={() => setLearnMode('daily')}
+            />
+            <ModeChoiceCard
+              icon="repeat-variant"
+              title={mt('learnListeningRange')}
+              description={mt('learnListeningRangeDesc')}
+              colors={colors}
+              isRTL={isRTL}
+              onPress={() => setLearnMode('range')}
+            />
+            <ModeChoiceCard
+              icon="microphone-outline"
+              title={mt('recorderTitle')}
+              description={`${mt('recordStart')} • ${mt('compareWithSheikh')}`}
+              colors={colors}
+              isRTL={isRTL}
+              onPress={() => setLearnMode('recital')}
+            />
+          </ScrollView>
+        </SafeAreaView>
+      </BackgroundWrapper>
+    );
+  }
+
+  if (learnMode === 'daily' && !current) {
+    return (
+      <BackgroundWrapper
+        backgroundKey={appSettings.display.appBackground}
+        backgroundUrl={appSettings.display.appBackgroundUrl}
+        opacity={appSettings.display.backgroundOpacity ?? 1}
+        style={{ flex: 1 }}
+      >
+        <SafeAreaView style={styles.safe} edges={['top']}>
+          <UniversalHeader title={mt('learnDailyWird')} onBack={() => setLearnMode('menu')} />
           <View style={styles.empty}>
             <Text style={styles.emptyText}>{mt('noAyahsToday')}</Text>
           </View>
@@ -220,10 +550,27 @@ export default function LearnScreen() {
       style={{ flex: 1 }}
     >
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <UniversalHeader title={mt('learnTitle')} onBack={() => router.back()} />
+        <UniversalHeader
+          title={
+            learnMode === 'range'
+              ? mt('learnListeningRange')
+              : learnMode === 'recital'
+                ? mt('recorderTitle')
+                : mt('learnDailyWird')
+          }
+          onBack={() => setLearnMode('menu')}
+        />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.position}>
-          {mt('ayahOf', { n: index + 1, total: ayahs.length })} • {getSurahName(current.surahNumber)}
+          {learnMode === 'range'
+            ? isListeningRangeActive
+            ? mt('listeningRangeProgress', { ref: displayRef || rangeProgressLabel })
+              : `${mt('previewAyah')}: ${displayRef}`
+            : learnMode === 'recital'
+              ? displayRef
+            : current
+              ? `${mt('currentWirdPosition', { n: index + 1, total: ayahs.length })} • ${getSurahName(current.surahNumber)}`
+              : ''}
         </Text>
 
         {/* Quran text */}
@@ -233,11 +580,11 @@ export default function LearnScreen() {
               {seg}
             </Text>
           ))}
-          <Text style={styles.ayahNumber}>{formatAyahMarker(current.ayahNumber)}</Text>
+          {!!displayAyah && <Text style={styles.ayahNumber}>{formatAyahMarker(displayAyah.ayahNumber)}</Text>}
         </GlassCard>
 
         {/* Status / step indicator */}
-        {step !== 'idle' && (
+        {learnMode === 'daily' && step !== 'idle' && (
           <View style={styles.stepRow}>
             <StepBadge active={step === 'listen'} label={mt('listenStep')} />
             <StepBadge active={step === 'recite_with'} label={mt('recitWithStep')} />
@@ -249,13 +596,278 @@ export default function LearnScreen() {
           <View style={styles.playingRow}>
             <ActivityIndicator color={colors.primary} />
             <Text style={styles.playingText}>
+              {isListeningRangeActive ? `${mt('listeningRangeProgress', { ref: displayRef || rangeProgressLabel })} • ` : ''}
               {toArabicDigits(iter)} / {toArabicDigits(iterTotal || repeats)}
             </Text>
           </View>
         )}
 
+        {learnMode === 'recital' && (
+          <GlassCard style={styles.recorderCard}>
+            <View style={styles.rangeHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rangeTitle}>{mt('recorderTitle')}</Text>
+                <Text style={styles.rangeHint}>{mt('compareWithSheikh')}</Text>
+              </View>
+              <MaterialCommunityIcons
+                name={recording ? 'record-circle' : 'microphone-outline'}
+                size={24}
+                color={recording ? '#b00020' : colors.primary}
+              />
+            </View>
+
+            <View style={styles.rangeInputs}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  setSurahSearch('');
+                  setSurahPickerTarget('recital');
+                  setSurahPickerOpen(true);
+                }}
+                style={styles.surahPickerButton}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rangeLabel}>{mt('chooseRecitalAyah')}</Text>
+                  <Text style={styles.surahPickerName} numberOfLines={1}>
+                    {selectedRecitalSurahOption?.name ?? mt('errInvalidSurah')}
+                  </Text>
+                  {!!selectedRecitalSurahOption && (
+                    <Text style={styles.surahPickerMeta} numberOfLines={1}>
+                      {toArabicDigits(selectedRecitalSurahOption.ayahCount)} {mt('ayahsUnit')}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.surahNumberPill}>
+                  <Text style={styles.surahNumberPillText}>{toArabicDigits(recitalSurahNumber)}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-down" size={20} color={colors.textLight} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.rangeInputs}>
+              <View style={styles.ayahStepperBox}>
+                <Text style={styles.rangeLabel}>{mt('ayahNumber')}</Text>
+                <View style={styles.ayahStepperRow}>
+                  <TouchableOpacity
+                    style={styles.ayahStepBtn}
+                    onPress={() => setRecitalAyahClamped((parsePositiveInput(recitalAyahNumber) ?? 1) - 1)}
+                  >
+                    <MaterialCommunityIcons name="minus" size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.ayahStepInput}
+                    value={toArabicDigits(recitalAyahNumber)}
+                    onChangeText={(v) => {
+                      const normalized = normalizeDigits(v).replace(/[^0-9]/g, '').slice(0, 3);
+                      const parsed = parsePositiveInput(normalized);
+                      setRecitalAyahNumber(
+                        parsed ? String(Math.min(parsed, recitalAyahMax)) : normalized,
+                      );
+                      setRecordedUri(null);
+                    }}
+                    onBlur={() => setRecitalAyahClamped(parsePositiveInput(recitalAyahNumber) ?? 1)}
+                    keyboardType="number-pad"
+                  />
+                  <TouchableOpacity
+                    style={styles.ayahStepBtn}
+                    onPress={() => setRecitalAyahClamped((parsePositiveInput(recitalAyahNumber) ?? 1) + 1)}
+                  >
+                    <MaterialCommunityIcons name="plus" size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.quickAyahRow}>
+                  <TouchableOpacity
+                    style={styles.quickAyahBtn}
+                    onPress={() => setRecitalAyahClamped(1)}
+                  >
+                    <Text style={styles.quickAyahText}>{mt('firstAyah')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.quickAyahBtn}
+                    onPress={() => setRecitalAyahClamped(recitalAyahMax)}
+                  >
+                    <Text style={styles.quickAyahText}>{mt('lastAyah')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.recordBtn, recording && { backgroundColor: '#b00020' }]}
+              onPress={recording ? stopRecording : startRecording}
+            >
+              <MaterialCommunityIcons
+                name={recording ? 'stop-circle' : 'record-circle-outline'}
+                size={20}
+                color="#fff"
+              />
+              <Text style={styles.rangePlayText}>
+                {recording ? mt('recordStop') : recordedUri ? mt('recordAgain') : mt('recordStart')}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.recorderActions}>
+              <TouchableOpacity
+                style={[styles.recorderSecondaryBtn, !recordedUri && { opacity: 0.45 }]}
+                disabled={!recordedUri || isPlayingRecording}
+                onPress={playRecording}
+              >
+                <MaterialCommunityIcons name="play-circle-outline" size={18} color={colors.text} />
+                <Text style={styles.recorderSecondaryText}>
+                  {recordedUri ? mt('recordPlay') : mt('noRecordingYet')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.recorderSecondaryBtn} onPress={playSheikhForRecital}>
+                <MaterialCommunityIcons name="account-voice" size={18} color={colors.text} />
+                <Text style={styles.recorderSecondaryText}>{mt('compareWithSheikh')}</Text>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
+        )}
+
+        {learnMode === 'range' && <GlassCard style={styles.rangeCard}>
+          <View style={styles.rangeHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rangeTitle}>{mt('listeningRange')}</Text>
+              <Text style={styles.rangeHint}>{mt('listeningRangeHint')}</Text>
+            </View>
+            <MaterialCommunityIcons name="repeat-variant" size={22} color={colors.primary} />
+          </View>
+          <View style={styles.rangeInputs}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                setSurahSearch('');
+                setSurahPickerTarget('range');
+                setSurahPickerOpen(true);
+              }}
+              style={styles.surahPickerButton}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rangeLabel}>{mt('chooseSurah')}</Text>
+                <Text style={styles.surahPickerName} numberOfLines={1}>
+                  {selectedSurahOption?.name ?? mt('errInvalidSurah')}
+                </Text>
+                {!!selectedSurahOption && (
+                  <Text style={styles.surahPickerMeta} numberOfLines={1}>
+                    {toArabicDigits(selectedSurahOption.ayahCount)} {mt('ayahsUnit')}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.surahNumberPill}>
+                <Text style={styles.surahNumberPillText}>{toArabicDigits(rangeSurahNumber)}</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-down" size={20} color={colors.textLight} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.rangeSurah}>{getSurahName(rangeSurahNumber)}</Text>
+          <View style={styles.rangeInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rangeLabel}>{mt('ayahFrom')}</Text>
+              <TextInput
+                style={styles.rangeInput}
+                value={toArabicDigits(listenFrom)}
+                onChangeText={(v) =>
+                  setListenFrom(normalizeDigits(v).replace(/[^0-9]/g, '').slice(0, 3))
+                }
+                keyboardType="number-pad"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rangeLabel}>{mt('ayahTo')}</Text>
+              <TextInput
+                style={styles.rangeInput}
+                value={toArabicDigits(listenTo)}
+                onChangeText={(v) =>
+                  setListenTo(normalizeDigits(v).replace(/[^0-9]/g, '').slice(0, 3))
+                }
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.rangePlayBtn, isPlaying && { backgroundColor: '#b00020' }]}
+            onPress={isPlaying ? onStop : onPlayListeningRange}
+          >
+            <MaterialCommunityIcons name={isPlaying ? 'stop' : 'play'} size={18} color="#fff" />
+            <Text style={styles.rangePlayText}>{isPlaying ? 'إيقاف' : mt('playRange')}</Text>
+          </TouchableOpacity>
+        </GlassCard>}
+
+        <Modal
+          visible={surahPickerOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSurahPickerOpen(false)}
+        >
+          <Pressable style={modalStyles.backdrop} onPress={() => setSurahPickerOpen(false)}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={modalStyles.center}
+            >
+              <Pressable
+                onPress={(e) => e.stopPropagation()}
+                style={[modalStyles.card, styles.surahPickerModal]}
+              >
+                <Text style={[modalStyles.title, { color: colors.text }]}>
+                  {mt('chooseSurah')}
+                </Text>
+                <TextInput
+                  value={surahSearch}
+                  onChangeText={setSurahSearch}
+                  placeholder={mt('searchSurah')}
+                  placeholderTextColor={colors.textLight}
+                  style={styles.surahSearchInput}
+                />
+                <ScrollView style={styles.surahList} keyboardShouldPersistTaps="handled">
+                  {filteredSurahOptions.map((surah) => (
+                    <TouchableOpacity
+                      key={surah.number}
+                      onPress={() => {
+                        const max = Math.max(1, surah.ayahCount);
+                        if (surahPickerTarget === 'range') {
+                          setListenSurah(String(surah.number));
+                          const from = Math.min(parsePositiveInput(listenFrom) ?? 1, max);
+                          const to = Math.min(Math.max(parsePositiveInput(listenTo) ?? from, from), max);
+                          setListenFrom(String(from));
+                          setListenTo(String(to));
+                          setRangePlayingAyah(null);
+                          setRangeProgressLabel('');
+                        } else {
+                          setRecitalSurah(String(surah.number));
+                          const ayah = Math.min(parsePositiveInput(recitalAyahNumber) ?? 1, max);
+                          setRecitalAyahNumber(String(ayah));
+                          setRecordedUri(null);
+                        }
+                        setSurahPickerOpen(false);
+                      }}
+                      style={[
+                        styles.surahOption,
+                        surah.number === (surahPickerTarget === 'range' ? rangeSurahNumber : recitalSurahNumber) &&
+                          styles.surahOptionActive,
+                      ]}
+                    >
+                      <View style={styles.surahOptionNumber}>
+                        <Text style={styles.surahOptionNumberText}>
+                          {toArabicDigits(surah.number)}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.surahOptionName}>{surah.name}</Text>
+                        <Text style={styles.surahOptionMeta}>
+                          {toArabicDigits(surah.ayahCount)} {mt('ayahsUnit')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Modal>
+
         {/* Controls */}
-        <GlassCard style={styles.controlsCard}>
+        {learnMode !== 'recital' && <GlassCard style={styles.controlsCard}>
           <ControlRow label={mt('repeatCount')} colors={colors} isRTL={isRTL}>
             {REPEAT_OPTIONS.map((n) => (
               <Chip
@@ -306,10 +918,10 @@ export default function LearnScreen() {
               colors={colors}
             />
           </View>
-        </GlassCard>
+        </GlassCard>}
 
         {/* Magic Start */}
-        {!isPlaying ? (
+        {learnMode === 'daily' && (!isPlaying ? (
           <TouchableOpacity style={styles.magicBtn} onPress={onMagicStart}>
             <MaterialCommunityIcons name="play-circle" size={22} color="#fff" />
             <Text style={styles.magicText}>{mt('startMemorize')}</Text>
@@ -319,10 +931,10 @@ export default function LearnScreen() {
             <MaterialCommunityIcons name="stop-circle" size={22} color="#fff" />
             <Text style={styles.magicText}>إيقاف</Text>
           </TouchableOpacity>
-        )}
+        ))}
 
         {/* Mark buttons */}
-        <View style={styles.markRow}>
+        {learnMode === 'daily' && <View style={styles.markRow}>
           <Pressable
             onPress={onMarkNeedsReview}
             style={({ pressed }) => [
@@ -367,10 +979,10 @@ export default function LearnScreen() {
               </>
             )}
           </Pressable>
-        </View>
+        </View>}
 
         {/* Nav */}
-        <View style={styles.navRow}>
+        {learnMode === 'daily' && <View style={styles.navRow}>
           <TouchableOpacity
             onPress={() => {
               if (index > 0) {
@@ -399,7 +1011,7 @@ export default function LearnScreen() {
             <Text style={styles.navText}>{mt('next')}</Text>
             <MaterialCommunityIcons name={rtlChevronForward(isRTL) as any} size={22} color={colors.text} />
           </TouchableOpacity>
-        </View>
+        </View>}
       </ScrollView>
       </SafeAreaView>
     </BackgroundWrapper>
@@ -426,6 +1038,69 @@ function StepBadge({ active, label }: { active: boolean; label: string }) {
         {label}
       </Text>
     </View>
+  );
+}
+
+function ModeChoiceCard({
+  icon,
+  title,
+  description,
+  colors,
+  isRTL,
+  onPress,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  description: string;
+  colors: ReturnType<typeof useColors>;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress}>
+      {({ pressed }) => (
+        <GlassCard
+          style={{
+            padding: 18,
+            opacity: pressed ? 0.75 : 1,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            gap: 14,
+          }}
+        >
+          <MaterialCommunityIcons name={icon} size={30} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontFamily: 'Cairo-Bold',
+                fontSize: 17,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }}
+            >
+              {title}
+            </Text>
+            <Text
+              style={{
+                color: colors.textLight,
+                fontFamily: 'Cairo-Regular',
+                fontSize: 13,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }}
+            >
+              {description}
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name={rtlChevronForward(isRTL) as any}
+            size={22}
+            color={colors.textLight}
+          />
+        </GlassCard>
+      )}
+    </Pressable>
   );
 }
 
@@ -778,8 +1453,273 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       color: colors.text,
       fontFamily: 'Cairo-SemiBold',
       fontSize: 14,
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     controlsCard: { padding: 14, gap: 12 },
+    recorderCard: { padding: 14, gap: 12 },
+    recordBtn: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 13,
+      borderRadius: 12,
+    },
+    recorderActions: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      gap: 8,
+    },
+    recorderSecondaryBtn: {
+      flex: 1,
+      minHeight: 50,
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.14)',
+      backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    recorderSecondaryText: {
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 12,
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    ayahStepperBox: { flex: 1, gap: 8 },
+    ayahStepperRow: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    ayahStepBtn: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(13,142,98,0.14)',
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    ayahStepInput: {
+      flex: 1,
+      minHeight: 58,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 24,
+      textAlign: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.14)',
+    },
+    quickAyahRow: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      gap: 8,
+    },
+    quickAyahBtn: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.12)',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    quickAyahText: {
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 12,
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    rangeCard: { padding: 14, gap: 12 },
+    rangeHeader: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    rangeTitle: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 14,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    rangeHint: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 12,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    rangeSurah: {
+      color: colors.primary,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    rangeInputs: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 },
+    rangeLabel: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 12,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+      marginBottom: 4,
+    },
+    rangeInput: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 14,
+      textAlign: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    rangeReadOnly: {
+      minHeight: 47,
+      backgroundColor: 'rgba(255,255,255,0.04)',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    rangeReadOnlyText: {
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahPickerButton: {
+      flex: 1,
+      minHeight: 74,
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.12)',
+    },
+    surahPickerName: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 18,
+      lineHeight: 32,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahPickerMeta: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      lineHeight: 22,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahNumberPill: {
+      minWidth: 38,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(13,142,98,0.18)',
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    surahNumberPillText: {
+      color: colors.primary,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 13,
+    },
+    surahPickerModal: {
+      maxHeight: '78%',
+      backgroundColor: colors.card,
+    },
+    surahSearchInput: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.12)',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontFamily: 'Cairo-Regular',
+      fontSize: 14,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahList: { maxHeight: 420 },
+    surahOption: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.08)',
+    },
+    surahOptionActive: {
+      backgroundColor: 'rgba(13,142,98,0.12)',
+      borderRadius: 10,
+      paddingHorizontal: 8,
+    },
+    surahOptionNumber: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    surahOptionNumberText: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 12,
+    },
+    surahOptionName: {
+      color: colors.text,
+      fontFamily: 'Cairo-Bold',
+      fontSize: 18,
+      lineHeight: 32,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    surahOptionMeta: {
+      color: colors.textLight,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      lineHeight: 22,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    rangePlayBtn: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    rangePlayText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 14 },
     toggleRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 },
     magicBtn: {
       flexDirection: isRTL ? 'row-reverse' : 'row',

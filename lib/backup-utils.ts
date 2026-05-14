@@ -149,9 +149,19 @@ export async function restoreBackupData(backupData: BackupData): Promise<Restore
   try {
   if (backupData.version === '2.0') {
     // V2: Raw dump of all keys
-    const entries = Object.entries(backupData.data);
+    const entries = Object.entries(backupData.data).filter(([key]) => !EXCLUDED_KEYS.includes(key));
+    try {
+      const currentKeys = await AsyncStorage.getAllKeys();
+      const restorableKeys = currentKeys.filter((key) => !EXCLUDED_KEYS.includes(key));
+      if (restorableKeys.length > 0) {
+        await AsyncStorage.multiRemove(restorableKeys as string[]);
+      }
+    } catch (e) {
+      failed++;
+      failedKeys.push('__clear_existing_restorable_keys__');
+      console.warn('⚠️ Failed to clear existing restorable keys before restore', e);
+    }
     for (const [key, value] of entries) {
-      if (EXCLUDED_KEYS.includes(key)) continue;
       try {
         const strValue = typeof value === 'string' ? value : JSON.stringify(value);
         await AsyncStorage.setItem(key, strValue);

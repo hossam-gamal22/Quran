@@ -10,12 +10,18 @@ import { getPrayerLocation } from './storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t, getLanguage } from './i18n';
 import { getNotifText, fetchNotificationTexts } from './notification-texts';
-import { getAdhanChannelId, getReminderChannelId } from '../services/notifications/channels';
+import { getAdhanChannelId, getReminderChannelId, ANDROID_FULL_ADHAN_CHANNEL_ID } from '../services/notifications/channels';
 import { registerDidYouPrayCategory, DID_YOU_PRAY_CATEGORY } from './did-you-pray-handler';
 import { dirText } from './notification-text-direction';
 import { validatePrayerTimings } from './prayer-time-validator';
 import { resolveNotificationSound } from './resolve-notification-sound';
 import { getNotificationIconAttachment } from './notification-icons';
+import {
+  completeAdhanVoiceToIosNotificationSoundFile,
+  completeAdhanVoiceToNotificationSoundKey,
+  normalizeCompleteAdhanVoice,
+  normalizeFullAdhanNotificationVoice,
+} from './sound-manager';
 import { 
   NotificationSettings, 
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -104,7 +110,13 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   if (existingStatus === 'granted') return true;
 
-  const { status } = await Notifications.requestPermissionsAsync();
+  const { status } = await Notifications.requestPermissionsAsync({
+    ios: {
+      allowAlert: true,
+      allowBadge: true,
+      allowSound: true,
+    },
+  });
   return status === 'granted';
 }
 
@@ -153,10 +165,64 @@ function applyTimingAdjustments(
   return result;
 }
 
-// عدد الأيام المجدولة مسبقاً — 7 days (default).
+// عدد الأيام المجدولة مسبقاً — 4 days (default).
+// Kept at 4 (not 7) to limit seasonal prayer-time drift: over 7 days a prayer
+// can shift ~13 min, causing the stale d6/d7 slot to fire before the app
+// reschedules with the correct time, resulting in a duplicate notification.
+// 4 days caps drift to ~5-6 min, and the background task reliably refreshes
+// within that window.
 // iOS budget allocator may override this via notifSettings.iosScheduleDays.
 // App reschedules on every foreground resume via ensurePrayerNotificationsExist().
-const DEFAULT_PRAYER_SCHEDULE_DAYS = 7;
+const DEFAULT_PRAYER_SCHEDULE_DAYS = 4;
+
+async function schedulePrayerVisualFirstNotification(args: {
+  identifier: string;
+  prayerKey: PrayerKey;
+  content: Notifications.NotificationContentInput;
+  trigger: Notifications.NotificationTriggerInput;
+}): Promise<{ id: string; usedSilentFallback: boolean }> {
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: args.identifier,
+      content: args.content,
+      trigger: args.trigger,
+    });
+    return { id, usedSilentFallback: false };
+  } catch (primaryError) {
+    console.warn(
+      `[prayer-notif] Sounded notification scheduling failed for ${args.prayerKey}; retrying visual-only fallback`,
+      primaryError,
+    );
+
+    const fallbackContent: Notifications.NotificationContentInput = {
+      ...args.content,
+      sound: false,
+      data: {
+        ...(args.content.data ?? {}),
+        visualFallback: '1',
+        soundFallbackReason: 'schedule_error',
+      },
+      ...(Platform.OS === 'android' && {
+        channelId: 'silent',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      }),
+      ...(Platform.OS === 'ios' && {
+        interruptionLevel: 'timeSensitive' as const,
+      }),
+    };
+    const fallbackTrigger = {
+      ...(args.trigger as Record<string, unknown>),
+      ...(Platform.OS === 'android' && { channelId: 'silent' }),
+    } as Notifications.NotificationTriggerInput;
+
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: args.identifier,
+      content: fallbackContent,
+      trigger: fallbackTrigger,
+    });
+    return { id, usedSilentFallback: true };
+  }
+}
 
 // ─── جدولة إشعارات الصلاة لـ 7 أيام ─────────────────────────────────────────
 export async function schedulePrayerNotifications(
@@ -328,9 +394,51 @@ export async function schedulePrayerNotifications(
       if (triggerMs !== null) {
         const msUntilFire = triggerMs - cancelCheckNow;
         if (msUntilFire > 0 && msUntilFire <= IMMINENT_WINDOW_MS) {
-          preservedImminentCount++;
-          console.log(`[prayer-notif] 🛡️ PRESERVE imminent ${n.identifier} (fires in ${Math.round(msUntilFire / 1000)}s)`);
-          continue; // Skip cancellation — keep this notification intact
+          // Check if freshly-calculated time differs by more than 10 min.
+          // If it does, the stored notification is stale (prayer time shifted
+          // seasonally) — cancel it so the correct time fires instead.
+          // This prevents the "double adhan" bug where an old d6/d7 slot fires
+          // at the wrong time, then the app reschedules the correct notification.
+          const DRIFT_TOLERANCE_MS = 5 * 60 * 1000;
+          let freshTriggerMs: number | null = null;
+          // Support both old dayOffset IDs (prayer_maghrib, prayer_maghrib_d3)
+          // and new date-based IDs (prayer_maghrib_20260513).
+          const idPartsOld = n.identifier.match(/^prayer_([a-z]+)(?:_d(\d+))?$/);
+          const idPartsDate = n.identifier.match(/^prayer_([a-z]+)_(\d{8})$/);
+          if (idPartsOld) {
+            const pKey = idPartsOld[1] as PrayerKey;
+            const dayIdx = idPartsOld[2] ? parseInt(idPartsOld[2], 10) : 0;
+            const dayData = scheduleDays[dayIdx];
+            if (dayData && PRAYER_KEY_TO_API[pKey]) {
+              const apiKey = PRAYER_KEY_TO_API[pKey];
+              const timeStr = dayData.timings[apiKey];
+              if (timeStr) {
+                freshTriggerMs = prayerTimeToDateForDay(timeStr, dayData.date, notifSettings.advanceMinutes).getTime();
+              }
+            }
+          } else if (idPartsDate) {
+            const pKey = idPartsDate[1] as PrayerKey;
+            const dateTag = idPartsDate[2]; // e.g. "20260513"
+            const dayData = scheduleDays.find(d => {
+              const t = d.date;
+              return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}` === dateTag;
+            });
+            if (dayData && PRAYER_KEY_TO_API[pKey]) {
+              const apiKey = PRAYER_KEY_TO_API[pKey];
+              const timeStr = dayData.timings[apiKey];
+              if (timeStr) {
+                freshTriggerMs = prayerTimeToDateForDay(timeStr, dayData.date, notifSettings.advanceMinutes).getTime();
+              }
+            }
+          }
+          if (freshTriggerMs !== null && Math.abs(freshTriggerMs - triggerMs) > DRIFT_TOLERANCE_MS) {
+            console.log(`[prayer-notif] 🔄 CANCEL drifted imminent ${n.identifier} (stored=${new Date(triggerMs).toISOString()}, fresh=${new Date(freshTriggerMs).toISOString()}, drift=${Math.round((freshTriggerMs - triggerMs) / 60000)}min)`);
+            // Fall through to cancel
+          } else {
+            preservedImminentCount++;
+            console.log(`[prayer-notif] 🛡️ PRESERVE imminent ${n.identifier} (fires in ${Math.round(msUntilFire / 1000)}s)`);
+            continue; // Skip cancellation — keep this notification intact
+          }
         }
       }
       await Notifications.cancelScheduledNotificationAsync(n.identifier);
@@ -345,6 +453,8 @@ export async function schedulePrayerNotifications(
     const soundType = notifSettings.soundType;
     const rawSoundType = adhanSoundType ? adhanSoundType : (soundType || 'makkah');
     const effectiveSoundType = (!rawSoundType || rawSoundType === 'default') ? 'makkah' : rawSoundType;
+    const fullAdhanVoice = normalizeFullAdhanNotificationVoice(notifSettings.fullAdhanSoundType || effectiveSoundType);
+    const fullAdhanNotificationSound = completeAdhanVoiceToNotificationSoundKey(fullAdhanVoice);
     const adhanSoundEnabled = notifSettings.adhanSound !== false;
     // Full adhan playback is OPT-IN via the user-facing toggle.
     //
@@ -367,20 +477,33 @@ export async function schedulePrayerNotifications(
       adhanSoundEnabled &&
       effectiveSoundType !== 'silent' &&
       notifSettings.useFullAdhan === true;
+    // On Android with full adhan, use the silent visual channel so ONLY the
+    // AlarmManager service plays audio (35s full adhan). Using the regular adhan
+    // channel would add a second 15s short-adhan sound on top — the user chose
+    // full adhan, so we respect that choice and keep audio clean.
     const prayerChannelId = !adhanSoundEnabled || effectiveSoundType === 'silent'
       ? 'silent'
-      : getAdhanChannelId(effectiveSoundType);
+      : (Platform.OS === 'android' && shouldUseFullAdhan)
+        ? ANDROID_FULL_ADHAN_CHANNEL_ID
+        : getAdhanChannelId(effectiveSoundType);
     const regularChannelId = prayerChannelId;
     const fajrChannelId = prayerChannelId;
 
     // Resolve sound using the unified function (single source of truth in channels.ts).
-    // iOS can bundle full files with unique basenames in app.json; the OS cuts
-    // notification audio automatically at ~29s.
+    // iOS: full adhan plays via attached CAF file (~29s, OS hard cap).
+    // Android full adhan: silent notification — AlarmManager handles all audio.
+    // Android short adhan: regular adhan channel sound (~15s).
     const soundValue = !adhanSoundEnabled
       ? false
       : (Platform.OS === 'ios' && shouldUseFullAdhan)
-        ? `adhan_full_${effectiveSoundType}.mp3`
-        : resolveNotificationSound(effectiveSoundType, true);
+        ? completeAdhanVoiceToIosNotificationSoundFile(fullAdhanVoice)
+        : (Platform.OS === 'android' && shouldUseFullAdhan)
+          ? false
+          : resolveNotificationSound(effectiveSoundType, true);
+    console.log('[FullAdhan] loaded settings:', notifSettings);
+    console.log('[FullAdhan] selected voice:', fullAdhanVoice);
+    console.log('[FullAdhan] selected sound file:', soundValue);
+    console.log('[FullAdhan] permission status:', 'schedulePrayerNotifications reached after permission gate');
 
     // Cancel any previously-scheduled native AlarmManager triggers for the
     // foreground service. Safe to call even when the toggle is off — clears stale alarms.
@@ -426,29 +549,56 @@ export async function schedulePrayerNotifications(
         const prayerName = (prayerKey === 'dhuhr' && isFriday) ? t('prayer.jumuah') : t(`prayer.${prayerKey}`);
         const notifTitle = getPrayerNotifTitle(prayerKey, lang, isFriday);
         const cleanTime = timeStr.replace(/\s*\([^)]*\)\s*/, '').trim();
-        const message = notifSettings.advanceMinutes > 0
-          ? `${t('notificationSounds.minutesBefore').replace('{count}', String(notifSettings.advanceMinutes))} ${prayerName} (${cleanTime})`
-          : getPrayerMessage(prayerKey, lang, isFriday);
+        // Use date-based identifiers so a notification scheduled days ago for
+        // "today" shares the same id as one freshly scheduled for today.
+        const dateStr = `${targetDate.getFullYear()}${String(targetDate.getMonth() + 1).padStart(2, '0')}${String(targetDate.getDate()).padStart(2, '0')}`;
+        const identifier = `prayer_${prayerKey}_${dateStr}`;
 
         try {
-          const channelId = prayerKey === 'fajr' ? fajrChannelId : regularChannelId;
-          const identifier = dayOffset === 0 ? `prayer_${prayerKey}` : `prayer_${prayerKey}_d${dayOffset}`;
+          // Advance reminder uses a gentle notification sound, not the full adhan.
+          // The actual adhan notification (advanceMinutes=0) uses the adhan channel.
+          const isAdvanceReminder = notifSettings.advanceMinutes > 0;
+          // Full adhan only applies when the notification fires AT prayer time.
+          // Advance reminders use the regular reminder sound and route to the prayer tab.
+          const useFullAdhanForThisNotif = shouldUseFullAdhan && !isAdvanceReminder;
+          const channelId = isAdvanceReminder
+            ? getReminderChannelId('notif_after_prayer')
+            : (prayerKey === 'fajr' ? fajrChannelId : regularChannelId);
+          const notifSound = isAdvanceReminder
+            ? resolveNotificationSound('general_reminder', true)
+            : soundValue;
+          const message = useFullAdhanForThisNotif
+            ? t('fullAdhan.tapToOpen')
+            : (notifSettings.advanceMinutes > 0
+                ? t('notificationSounds.advanceReminderBody')
+                    .replace('{count}', String(notifSettings.advanceMinutes))
+                    .replace('{prayer}', prayerName)
+                : getPrayerMessage(prayerKey, lang, isFriday));
           console.log(`[prayer-notif] SCHEDULING ${prayerKey}${isFriday && prayerKey === 'dhuhr' ? ' (JUMUAH)' : ''} d+${dayOffset} → ${triggerDate.toISOString()} | id=${identifier} | ch=${channelId}`);
-          const id = await Notifications.scheduleNotificationAsync({
+          const { id, usedSilentFallback } = await schedulePrayerVisualFirstNotification({
             identifier,
+            prayerKey,
             content: {
               title: dirText(notifTitle),
               body: dirText(message),
               data: {
-                type: 'prayer',
+                // Route taps to full-adhan.tsx only when firing at actual prayer time.
+                // Advance reminders always route to the prayer tab.
+                type: useFullAdhanForThisNotif ? 'full_adhan' : 'prayer',
                 prayer: prayerKey,
+                voice: fullAdhanVoice,
+                test: '0',
                 time: cleanTime,
-                soundType: effectiveSoundType,
+                soundType: useFullAdhanForThisNotif ? fullAdhanNotificationSound : effectiveSoundType,
+                regularSoundType: effectiveSoundType,
+                fullAdhanSoundType: fullAdhanVoice,
                 iconType: 'mosque',
-                ...(Platform.OS === 'android' && shouldUseFullAdhan && { androidFullAdhan: 'true' }),
+                ...(Platform.OS === 'android' && useFullAdhanForThisNotif && { androidFullAdhan: 'true' }),
               },
-              sound: soundValue,
-              priority: Notifications.AndroidNotificationPriority.MAX,
+              sound: notifSound,
+              priority: isAdvanceReminder
+                ? Notifications.AndroidNotificationPriority.HIGH
+                : Notifications.AndroidNotificationPriority.MAX,
               // iOS: bypass Focus mode for prayer notifications
               // NOTE: 'timeSensitive' does NOT require Apple's critical-alerts entitlement.
               // 'critical' silently drops the notification without the entitlement.
@@ -470,20 +620,31 @@ export async function schedulePrayerNotifications(
             },
           });
           scheduledIds.push(id);
-          console.log(`[prayer-notif] ✅ ${prayerKey} d+${dayOffset} scheduled OK (id=${id})`);
+          if (useFullAdhanForThisNotif) {
+            console.log('[FullAdhan] schedule result:', {
+              identifier,
+              id,
+              prayerKey,
+              triggerAt: triggerDate.toISOString(),
+              soundValue,
+              usedSilentFallback,
+            });
+          }
+          console.log(`[prayer-notif] ✅ ${prayerKey} d+${dayOffset} scheduled OK (id=${id}${usedSilentFallback ? ', visual-only fallback' : ''}${isAdvanceReminder ? ', advance-reminder' : ''})`);
 
-          // When full-adhan mode is enabled on Android, also schedule a native
-          // AlarmManager exact-time trigger that wakes the device and starts
-          // the foreground media service. This is required because the visual
-          // notification above is silent and JS listeners do not fire reliably
-          // when the app is cold-killed.
-          if (Platform.OS === 'android' && shouldUseFullAdhan) {
+          // When full-adhan mode fires AT prayer time on Android, also schedule a native
+          // AlarmManager trigger. Not used for advance reminders (wrong timing).
+          if (Platform.OS === 'android' && useFullAdhanForThisNotif) {
             try {
               const FullAdhanModule = (NativeModules as any)?.FullAdhanModule;
               if (FullAdhanModule?.scheduleFullAdhan) {
+                // Add 1-second offset so the service starts AFTER the system notification
+                // sound channel has begun playing. Without this, both compete for audio
+                // focus at the exact same millisecond, causing the service to get
+                // AUDIOFOCUS_LOSS_TRANSIENT immediately and stop after 2-3 seconds.
                 await FullAdhanModule.scheduleFullAdhan(
-                  triggerDate.getTime(),
-                  effectiveSoundType,
+                  triggerDate.getTime() + 1000,
+                  fullAdhanNotificationSound,
                   prayerName,
                   fullAdhanRequestCode++,
                 );
@@ -515,9 +676,7 @@ export async function schedulePrayerNotifications(
           reminderDate.setMinutes(reminderDate.getMinutes() + didYouPrayDelay);
           if (reminderDate > now) {
             try {
-              const didYouPrayId = dayOffset === 0
-                ? `did_you_pray_${prayerKey}`
-                : `did_you_pray_${prayerKey}_d${dayOffset}`;
+              const didYouPrayId = `did_you_pray_${prayerKey}_${dateStr}`;
               const didYouPrayChannelId = getReminderChannelId('notif_after_prayer');
               const didYouPraySound = resolveNotificationSound('notif_after_prayer', true);
               await Notifications.scheduleNotificationAsync({

@@ -477,8 +477,8 @@ export default function FastingTrackerScreen() {
             text: t('worship.vow'),
             onPress: async () => {
               const isToday_ = isToday(day);
-              if (isToday_) await toggleTodayFasting('voluntary');
-              else await toggleFastingForDate(dateStr, 'voluntary');
+              if (isToday_) await toggleTodayFasting('vow');
+              else await toggleFastingForDate(dateStr, 'vow');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               await loadMonthFastingData();
             },

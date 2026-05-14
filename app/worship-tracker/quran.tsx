@@ -279,6 +279,16 @@ export default function QuranTrackerScreen() {
     setDailyGoal(pages);
   };
 
+  const setTodayPages = useCallback(async (pages: number) => {
+    const nextPages = Math.max(0, Math.min(TOTAL_PAGES, pages));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await updateQuranRecord({ pagesRead: nextPages });
+  }, [updateQuranRecord]);
+
+  const addPages = useCallback((pages: number) => {
+    setTodayPages(todayPages + pages).catch(() => {});
+  }, [setTodayPages, todayPages]);
+
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
@@ -370,6 +380,39 @@ export default function QuranTrackerScreen() {
                 <Text style={styles.completedText}>{t('worship.todayGoalComplete')}</Text>
               </View>
             )}
+            <View style={[styles.quickAddContainer, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 16, paddingHorizontal: 0 }]}>
+              <TouchableOpacity
+                style={[
+                  styles.quickAddButton,
+                  { backgroundColor: colors.card, opacity: todayPages <= 0 ? 0.45 : 1 },
+                ]}
+                onPress={() => addPages(-1)}
+                disabled={todayPages <= 0}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name="minus" size={20} color={todayPages <= 0 ? colors.textLight : '#c17f59'} />
+                <Text style={[styles.quickAddTitle, { color: colors.text }]}>تراجع</Text>
+                <Text style={[styles.quickAddLabel, { color: colors.textLight }]}>صفحة -1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickAddButton, { backgroundColor: '#c17f5918', borderColor: '#c17f59' }]}
+                onPress={() => addPages(1)}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name="book-plus" size={20} color="#c17f59" />
+                <Text style={[styles.quickAddTitle, { color: '#c17f59' }]}>إضافة صفحة</Text>
+                <Text style={[styles.quickAddLabel, { color: '#c17f59' }]}>+1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickAddButton, { backgroundColor: colors.card }]}
+                onPress={() => addPages(dailyGoal)}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name="target" size={20} color="#c17f59" />
+                <Text style={[styles.quickAddTitle, { color: colors.text }]}>إكمال الهدف</Text>
+                <Text style={[styles.quickAddLabel, { color: colors.textLight }]}>+{dailyGoal}</Text>
+              </TouchableOpacity>
+            </View>
           </GlassCard>
         </Animated.View>
 
@@ -666,8 +709,11 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   quickAddButton: {
-    width: 60,
-    height: 70,
+    flex: 1,
+    minHeight: 90,
+    marginHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -683,10 +729,19 @@ const _styles = StyleSheet.create({
     lineHeight: 30,
     includeFontPadding: false,
   },
+  quickAddTitle: {
+    marginTop: 4,
+    fontSize: 12,
+    fontFamily: fontBold(),
+    lineHeight: 16,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
   quickAddLabel: {
+    marginTop: 2,
     fontSize: 10,
     fontFamily: fontRegular(),
-    lineHeight: 16,
+    lineHeight: 14,
     includeFontPadding: false,
   },
   // إدخال مخصص

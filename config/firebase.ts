@@ -1,6 +1,6 @@
 // config/firebase.ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -24,7 +24,24 @@ const firebaseConfig = {
 // Initialize app once
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const db = getFirestore(app);
+// Force HTTP long-polling instead of WebSockets. WebSocket streaming in the
+// Firebase JS SDK causes "INTERNAL ASSERTION FAILED: Unexpected state" errors
+// in React Native when the connection transitions (network change, background
+// resume). Long-polling is more reliable in React Native's networking layer.
+// The globalThis guard prevents Fast Refresh from re-calling initializeFirestore.
+export const db = (() => {
+  if ((globalThis as any).__firestoreInitialized) {
+    return getFirestore(app);
+  }
+  (globalThis as any).__firestoreInitialized = true;
+  try {
+    return initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
+  } catch {
+    return getFirestore(app);
+  }
+})();
 export const storage = getStorage(app);
 
 // Initialize Auth with React Native persistence (survives app restarts)

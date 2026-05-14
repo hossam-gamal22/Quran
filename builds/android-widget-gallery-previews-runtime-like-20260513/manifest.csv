@@ -1,0 +1,33 @@
+index,category,label,class,minWidth,minHeight,preview,file,locked
+1,home_screen,اليوم,RoohDaySimpleSmall,110dp,110dp,@drawable/widget_preview_daysimple_small,images/01_home_RoohDaySimpleSmall.png,False
+2,home_screen,اليوم,RoohDaySimpleMedium,250dp,110dp,@drawable/widget_preview_daysimple_medium,images/02_home_RoohDaySimpleMedium.png,False
+3,home_screen,اليوم - ثلث,RoohDayThuluthSmall,110dp,110dp,@drawable/widget_preview_daythuluth_small,images/03_home_RoohDayThuluthSmall.png,False
+4,home_screen,اليوم - ثلث,RoohDayThuluthMedium,250dp,110dp,@drawable/widget_preview_daythuluth_medium_locked,images/04_home_RoohDayThuluthMedium.png,True
+5,home_screen,اليوم - رقمي,RoohDayDigitalSmall,110dp,110dp,@drawable/widget_preview_daydigital_small,images/05_home_RoohDayDigitalSmall.png,False
+6,home_screen,الشهر,RoohMonthSimpleSmall,110dp,110dp,@drawable/widget_preview_monthsimple_small,images/06_home_RoohMonthSimpleSmall.png,False
+7,home_screen,الشهر - ثلث,RoohMonthThuluthMedium,250dp,110dp,@drawable/widget_preview_monththuluth_medium_locked,images/07_home_RoohMonthThuluthMedium.png,True
+8,home_screen,الصلاة القادمة,RoohPrayerSingleSmall,110dp,110dp,@drawable/widget_preview_prayersingle_small,images/08_home_RoohPrayerSingleSmall.png,False
+9,home_screen,جدول الصلاة,RoohPrayerTableSmall,110dp,110dp,@drawable/widget_preview_prayertable_small,images/09_home_RoohPrayerTableSmall.png,False
+10,home_screen,جدول الصلاة,RoohPrayerTableMedium,250dp,110dp,@drawable/widget_preview_prayertable_medium,images/10_home_RoohPrayerTableMedium.png,False
+11,home_screen,جدول الصلاة,RoohPrayerTableLarge,250dp,250dp,@drawable/widget_preview_prayertable_large,images/11_home_RoohPrayerTableLarge.png,False
+12,home_screen,الصلاة السابقة والقادمة,RoohPrayerNextPreviousMedium,250dp,110dp,@drawable/widget_preview_prayernextprevious_medium,images/12_home_RoohPrayerNextPreviousMedium.png,False
+13,home_screen,آية اليوم,RoohVerseOfDaySmall,110dp,110dp,@drawable/widget_preview_verseofday_small_locked,images/13_home_RoohVerseOfDaySmall.png,True
+14,home_screen,آية اليوم,RoohVerseOfDayMedium,250dp,110dp,@drawable/widget_preview_verseofday_medium_locked,images/14_home_RoohVerseOfDayMedium.png,True
+15,home_screen,آية اليوم,RoohVerseOfDayLarge,250dp,250dp,@drawable/widget_preview_verseofday_large_locked,images/15_home_RoohVerseOfDayLarge.png,True
+16,home_screen,أذكار الصباح,RoohAzkarMorningSmall,110dp,110dp,@drawable/widget_preview_azkarmorning_small_locked,images/16_home_RoohAzkarMorningSmall.png,True
+17,home_screen,أذكار الصباح,RoohAzkarMorningMedium,250dp,110dp,@drawable/widget_preview_azkarmorning_medium_locked,images/17_home_RoohAzkarMorningMedium.png,True
+18,home_screen,أذكار المساء,RoohAzkarEveningSmall,110dp,110dp,@drawable/widget_preview_azkarevening_small_locked,images/18_home_RoohAzkarEveningSmall.png,True
+19,home_screen,أذكار المساء,RoohAzkarEveningMedium,250dp,110dp,@drawable/widget_preview_azkarevening_medium_locked,images/19_home_RoohAzkarEveningMedium.png,True
+20,home_screen,الذكر اليومي,RoohDailyDhikrSmall,110dp,110dp,@drawable/widget_preview_dailydhikr_small_locked,images/20_home_RoohDailyDhikrSmall.png,True
+21,home_screen,الذكر اليومي,RoohDailyDhikrMedium,250dp,110dp,@drawable/widget_preview_dailydhikr_medium_locked,images/21_home_RoohDailyDhikrMedium.png,True
+22,home_screen,الهجري,RoohHijriDateSmall,110dp,110dp,@drawable/widget_preview_hijridate_small_locked,images/22_home_RoohHijriDateSmall.png,True
+23,home_screen,الهجري,RoohHijriDateMedium,250dp,110dp,@drawable/widget_preview_hijridate_medium_locked,images/23_home_RoohHijriDateMedium.png,True
+24,home_screen,Small Widget,RoohSmall,110dp,110dp,@drawable/widget_preview_daysimple_small,images/24_home_RoohSmall.png,False
+25,home_screen,Medium Widget,RoohMedium,250dp,110dp,@drawable/widget_preview_daysimple_medium,images/25_home_RoohMedium.png,False
+26,home_screen,Large Widget,RoohLarge,250dp,250dp,@drawable/widget_preview_prayertable_large,images/26_home_RoohLarge.png,False
+27,keyguard,اليوم - ثلث,RoohLockDayThuluth,110dp,110dp,@drawable/widget_preview_daythuluth_small,images/27_lock_RoohLockDayThuluth.png,False
+28,keyguard,التاريخ الهجري,RoohLockMonthThuluth,250dp,110dp,@drawable/widget_preview_monththuluth_medium,images/28_lock_RoohLockMonthThuluth.png,False
+29,keyguard,الصلاة القادمة,RoohLockNextPrayer,110dp,110dp,@drawable/widget_preview_prayersingle_small,images/29_lock_RoohLockNextPrayer.png,False
+30,keyguard,مواقيت الصلاة,RoohLockAllPrayers,250dp,110dp,@drawable/widget_preview_prayertable_medium,images/30_lock_RoohLockAllPrayers.png,False
+31,keyguard,التاريخ الهجري,RoohLockHijriCircular,110dp,110dp,@drawable/widget_preview_hijridate_small,images/31_lock_RoohLockHijriCircular.png,False
+32,keyguard,عدّاد الصلاة القادمة,RoohLockNextPrayerCountdown,110dp,110dp,@drawable/widget_preview_prayersingle_small,images/32_lock_RoohLockNextPrayerCountdown.png,False

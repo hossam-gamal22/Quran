@@ -66,6 +66,20 @@ export function handleNotificationNavigation(
       router.push('/(tabs)/prayer');
       return { navigated: true };
 
+    // ─── Full Adhan Player ───
+    // Fired when the user taps a prayer notification that was scheduled with
+    // `useFullAdhan` enabled, OR taps the test notification while the toggle
+    // is on. Opens the in-app full-screen player which plays the complete
+    // 2–4 min recording on STREAM_MUSIC (no OS time cap).
+    case 'full_adhan': {
+      const prayer = typeof data.prayer === 'string' ? data.prayer : 'dhuhr';
+      const voice = typeof data.voice === 'string' ? data.voice : 'makkah';
+      const test = data.test === '1' || data.test === 1 ? '1' : '0';
+      if (__DEV__) console.log('[notification-router] navigating to full-adhan', { prayer, voice, test });
+      router.push({ pathname: '/full-adhan', params: { prayer, voice, test } } as any);
+      return { navigated: true };
+    }
+
     // ─── Adhkar Wird (morning / evening / sleep / wakeup) ───
     case 'wird': {
       const period = data.period as string | undefined;
@@ -157,7 +171,7 @@ export function handleNotificationNavigation(
       return { navigated: true };
 
     case 'worship_weekly':
-      router.push('/worship-tracker' as any);
+      router.push((data.screen || '/weekly-summary') as any);
       return { navigated: true };
 
     // ─── Admin push — azkar category ───
@@ -205,6 +219,12 @@ export function handleNotificationNavigation(
 
     // ─── Premium granted (honor board / admin) ───
     case 'premium_granted':
+      router.push('/honor-board' as any);
+      return { navigated: true };
+
+    // ─── Honor board prize ───
+    case 'honor_board_winner':
+    case 'prize':
       router.push('/honor-board' as any);
       return { navigated: true };
 

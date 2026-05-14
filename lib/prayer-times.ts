@@ -184,6 +184,21 @@ const DEFAULT_SETTINGS: PrayerSettings = {
   },
 };
 
+const LOCATION_STABILITY_KM = 5;
+
+const distanceKm = (a: Location, b: Location): number => {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const earthKm = 6371;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return 2 * earthKm * Math.asin(Math.sqrt(h));
+};
+
 // ========================================
 // دوال API
 // ========================================
@@ -541,6 +556,24 @@ export const getPrayerSettings = async (): Promise<PrayerSettings> => {
  */
 export const saveLocation = async (location: Location): Promise<void> => {
   try {
+    const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.LOCATION);
+    if (existingRaw) {
+      const existing = JSON.parse(existingRaw) as Location;
+      if (existing?.latitude && existing?.longitude) {
+        const driftKm = distanceKm(existing, location);
+        if (driftKm < LOCATION_STABILITY_KM) {
+          const stableLocation: Location = {
+            ...existing,
+            city: location.city || existing.city,
+            country: location.country || existing.country,
+          };
+          console.log(`[PrayerCanonical] location drift ignored: ${driftKm.toFixed(2)}km < ${LOCATION_STABILITY_KM}km`);
+          await AsyncStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(stableLocation));
+          return;
+        }
+        console.log(`[PrayerCanonical] location changed: ${driftKm.toFixed(2)}km >= ${LOCATION_STABILITY_KM}km`);
+      }
+    }
     await AsyncStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(location));
   } catch (error) {
     console.error('Error saving location:', error);

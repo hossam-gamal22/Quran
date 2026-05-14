@@ -52,6 +52,15 @@ interface ContentBlock {
   translations?: Record<string, string>;
 }
 
+interface TempPageCtaButton {
+  enabled: boolean;
+  label: string;
+  labelEn?: string;
+  labels?: Record<string, string>;
+  route: string;
+  color?: string;
+}
+
 interface TempPage {
   id: string;
   title: string;
@@ -74,12 +83,42 @@ interface TempPage {
     inHighlights: boolean;
     inNavMenu: boolean;
   };
+  ctaButton?: TempPageCtaButton;
   customRouteKey?: string;
   autoRemove?: boolean;
   titleTranslations?: Record<string, string>;
 }
 
+interface TempPageTemplate {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  title: string;
+  titleEn: string;
+  blocks: Array<Omit<ContentBlock, 'id'>>;
+  ctaButton?: Omit<TempPageCtaButton, 'labels'> & {
+    labels?: Record<string, string>;
+  };
+}
+
 const COLOR_PRESETS = ['#0f987f', '#1e3a5f', '#6366f1', '#e11d48', '#f59e0b', '#8b5cf6', '#059669', '#1c1c1e'];
+
+const normalizeCtaRoute = (route: string) => {
+  const trimmed = route.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+};
+
+const getDefaultCtaButton = (color = '#0f987f'): TempPageCtaButton => ({
+  enabled: false,
+  label: '',
+  labelEn: '',
+  labels: { ar: '', en: '' },
+  route: '',
+  color,
+});
 
 const BLOCK_ICON_OPTIONS = [
   { value: 'moon-waning-crescent', label: '🌙 هلال' },
@@ -104,6 +143,93 @@ const BLOCK_ICON_OPTIONS = [
   { value: 'map-marker', label: '📍 موقع' },
 ];
 
+const TEMP_PAGE_TEMPLATES: TempPageTemplate[] = [
+  {
+    id: 'announcement',
+    name: 'إعلان سريع',
+    description: 'عنوان واضح + نقاط قصيرة + زر انتقال',
+    color: '#0f987f',
+    title: 'تحديث جديد في روح المسلم',
+    titleEn: 'New update in Rooh Al-Muslim',
+    blocks: [
+      { icon: 'star-four-points', text: 'أضف هنا أهم خبر أو رسالة تريد أن يراها المستخدم أولاً.', translations: { en: 'Add the main update or message users should see first.' } },
+      { icon: 'check-circle', text: 'اكتب نقطة مختصرة توضّح الفائدة أو التغيير الجديد.', translations: { en: 'Write a short point explaining the benefit or change.' } },
+      { icon: 'bell', text: 'يمكن إرسال هذه الصفحة مباشرة مع إشعار وربطها بالزر في الأسفل.', translations: { en: 'You can send this page with a notification and link it to the button below.' } },
+    ],
+    ctaButton: {
+      enabled: true,
+      label: 'جرّب الآن',
+      labelEn: 'Try now',
+      labels: { ar: 'جرّب الآن', en: 'Try now' },
+      route: '/(tabs)',
+      color: '#0f987f',
+    },
+  },
+  {
+    id: 'challenge',
+    name: 'تحدي عبادة',
+    description: 'مناسب للتسبيح، الصلاة، القرآن، أو ورد يومي',
+    color: '#8b5cf6',
+    title: 'تحدي اليوم',
+    titleEn: 'Today’s challenge',
+    blocks: [
+      { icon: 'circle-multiple', text: 'ابدأ اليوم بذكر قصير واحتسب الأجر بنية صادقة.', translations: { en: 'Start today with a short dhikr and a sincere intention.' } },
+      { icon: 'book-open-variant', text: 'اقرأ صفحة من القرآن أو آية بتدبر قبل نهاية اليوم.', translations: { en: 'Read one Quran page or one verse mindfully before the day ends.' } },
+      { icon: 'check-circle', text: 'سجّل إنجازك من صفحة متابعة العبادة حتى تراه في التقرير.', translations: { en: 'Log your progress from worship tracking so it appears in your report.' } },
+    ],
+    ctaButton: {
+      enabled: true,
+      label: 'افتح متابعة العبادة',
+      labelEn: 'Open worship tracker',
+      labels: { ar: 'افتح متابعة العبادة', en: 'Open worship tracker' },
+      route: '/worship-tracker',
+      color: '#8b5cf6',
+    },
+  },
+  {
+    id: 'premium',
+    name: 'عرض اشتراك',
+    description: 'رسالة لطيفة للتحويل إلى صفحة الاشتراك',
+    color: '#f59e0b',
+    title: 'افتح تجربة أهدأ',
+    titleEn: 'Unlock a calmer experience',
+    blocks: [
+      { icon: 'gift', text: 'استمتع بالمزايا الإضافية وادعم استمرار تطوير التطبيق.', translations: { en: 'Enjoy extra features and support ongoing app development.' } },
+      { icon: 'shield-check', text: 'تجربة أكثر تركيزاً وخصائص مميزة للمستخدمين الداعمين.', translations: { en: 'A calmer, more focused experience with premium features.' } },
+      { icon: 'heart', text: 'يمكنك تعديل النص ليناسب العرض الحالي قبل إرسال الإشعار.', translations: { en: 'Edit this text to match the current offer before sending.' } },
+    ],
+    ctaButton: {
+      enabled: true,
+      label: 'افتح الاشتراك',
+      labelEn: 'Open subscription',
+      labels: { ar: 'افتح الاشتراك', en: 'Open subscription' },
+      route: '/subscription',
+      color: '#f59e0b',
+    },
+  },
+  {
+    id: 'seasonal',
+    name: 'موسم أو مناسبة',
+    description: 'رمضان، العشر، الجمعة، الحج، أو مناسبة خاصة',
+    color: '#1e3a5f',
+    title: 'محتوى هذا الموسم',
+    titleEn: 'Seasonal content',
+    blocks: [
+      { icon: 'moon-waning-crescent', text: 'اكتب نبذة قصيرة عن المناسبة والفضل المرتبط بها.', translations: { en: 'Write a short intro about the occasion and its virtue.' } },
+      { icon: 'hands-pray', text: 'أضف دعاء أو عمل بسيط يناسب اليوم أو الموسم.', translations: { en: 'Add a dua or simple action suitable for this season.' } },
+      { icon: 'calendar-month', text: 'اربط الزر بصفحة مناسبة داخل التطبيق ليستكمل المستخدم التجربة.', translations: { en: 'Link the button to a relevant app page so users can continue.' } },
+    ],
+    ctaButton: {
+      enabled: true,
+      label: 'افتح المحتوى',
+      labelEn: 'Open content',
+      labels: { ar: 'افتح المحتوى', en: 'Open content' },
+      route: '/seasonal',
+      color: '#1e3a5f',
+    },
+  },
+];
+
 const getStatus = (page: TempPage): { label: string; color: string } => {
   if (!page.enabled) return { label: 'معطّل', color: 'bg-admin-surface-light' };
   if (page.isPermanent) return { label: 'دائمي', color: 'bg-blue-600' };
@@ -114,6 +240,90 @@ const getStatus = (page: TempPage): { label: string; color: string } => {
   if (now > end) return { label: 'منتهي', color: 'bg-red-600' };
   return { label: 'نشط', color: 'bg-accent-dark' };
 };
+
+const getBlockIconSymbol = (icon: string) => (
+  BLOCK_ICON_OPTIONS.find(opt => opt.value === icon)?.label.split(' ')[0] || '✨'
+);
+
+function TempPageMobilePreview({ page }: { page: TempPage }) {
+  const title = page.titles?.ar || page.title || 'عنوان الصفحة';
+  const ctaLabel = page.ctaButton?.labels?.ar || page.ctaButton?.label || '';
+  const showCta = Boolean(page.ctaButton?.enabled && ctaLabel && page.ctaButton?.route);
+  const isBlocks = (page.contentMode || 'html') === 'blocks';
+
+  return (
+    <div className="border border-admin-border rounded-2xl p-4 bg-admin-surface/30">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-white font-bold">معاينة داخل التطبيق</h3>
+          <p className="text-slate-500 text-xs mt-0.5">شكل تقريبي قبل الحفظ أو الإرسال</p>
+        </div>
+        <span className="text-xs px-2 py-1 rounded-full bg-admin-surface-light text-slate-300">
+          {isBlocks ? 'Native' : 'HTML'}
+        </span>
+      </div>
+
+      <div className="mx-auto w-full max-w-[360px] rounded-[2rem] border border-slate-700 bg-[#07111f] p-3 shadow-2xl">
+        <div className="rounded-[1.5rem] min-h-[520px] overflow-hidden bg-gradient-to-b from-[#101b2d] via-[#102a2d] to-[#0f3a2b]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+            <span className="text-slate-300 text-lg">→</span>
+            <span className="text-white font-bold text-lg text-right">{title}</span>
+          </div>
+
+          <div className="p-5 space-y-3" dir="rtl">
+            <div className="flex justify-center py-3">
+              <Styled
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl text-white"
+                css={{ backgroundColor: page.color || '#0f987f' }}
+              >
+                {getBlockIconSymbol(page.icon || 'star-four-points')}
+              </Styled>
+            </div>
+
+            {isBlocks ? (
+              <>
+                {(page.blocks?.length ? page.blocks : [{ id: 'empty', icon: 'information', text: 'أضف بلوكات من القوالب أو من زر إضافة عنصر.' }]).map(block => (
+                  <div key={block.id} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 flex gap-3 items-start">
+                    <Styled
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                      css={{ backgroundColor: `${page.color || '#0f987f'}33` }}
+                    >
+                      <span>{getBlockIconSymbol(block.icon)}</span>
+                    </Styled>
+                    <p className="text-slate-100 text-sm leading-7 flex-1 text-right">
+                      {block.text || 'نص العنصر سيظهر هنا'}
+                    </p>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] overflow-hidden">
+                <iframe
+                  title="html-mobile-preview"
+                  srcDoc={page.htmlContent}
+                  sandbox="allow-same-origin"
+                  className="w-full h-72 bg-white"
+                />
+              </div>
+            )}
+
+            {showCta && (
+              <div className="flex justify-center pt-2">
+                <Styled
+                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-white font-bold shadow-lg"
+                  css={{ backgroundColor: page.ctaButton?.color || page.color || '#0f987f' }}
+                >
+                  <span>{ctaLabel}</span>
+                  <span>←</span>
+                </Styled>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const TempPagesManager: React.FC = () => {
   const [pages, setPages] = useState<TempPage[]>([]);
@@ -145,6 +355,7 @@ const TempPagesManager: React.FC = () => {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       placement: { inHighlights: true, inNavMenu: false },
+      ctaButton: getDefaultCtaButton('#0f987f'),
       customRouteKey: '',
       autoRemove: true,
     };
@@ -182,6 +393,18 @@ const TempPagesManager: React.FC = () => {
         if (!b.text?.trim()) errors.push(`العنصر ${i + 1}: النص (عربي) مطلوب`);
       });
     }
+    if (editing.ctaButton?.enabled) {
+      const ctaLabel = (editing.ctaButton.labels?.ar ?? editing.ctaButton.label ?? '').trim();
+      const ctaRoute = normalizeCtaRoute(editing.ctaButton.route ?? '');
+      if (!ctaLabel) errors.push('نص زر الإجراء (عربي) مطلوب');
+      if (!ctaRoute) errors.push('مسار زر الإجراء مطلوب');
+      if (ctaRoute && !/^\/|^https?:\/\//i.test(ctaRoute)) {
+        errors.push('مسار زر الإجراء يجب أن يبدأ بـ / أو https://');
+      }
+      if (/\s/.test(ctaRoute)) {
+        errors.push('مسار زر الإجراء لا يمكن أن يحتوي على مسافات');
+      }
+    }
     if (!editing.isPermanent) {
       if (!editing.startDate) errors.push('تاريخ البدء مطلوب');
       if (!editing.endDate) errors.push('تاريخ الانتهاء مطلوب');
@@ -199,6 +422,29 @@ const TempPagesManager: React.FC = () => {
     if (syncedEditing.titles) {
       syncedEditing.title = syncedEditing.titles.ar || syncedEditing.title;
       syncedEditing.titleEn = syncedEditing.titles.en || syncedEditing.titleEn;
+    }
+    if (syncedEditing.ctaButton?.enabled) {
+      const ctaLabel = (syncedEditing.ctaButton.labels?.ar ?? syncedEditing.ctaButton.label ?? '').trim();
+      const ctaLabelEn = (syncedEditing.ctaButton.labels?.en ?? syncedEditing.ctaButton.labelEn ?? '').trim();
+      syncedEditing.ctaButton = {
+        ...syncedEditing.ctaButton,
+        enabled: true,
+        label: ctaLabel,
+        labelEn: ctaLabelEn,
+        labels: {
+          ...syncedEditing.ctaButton.labels,
+          ar: ctaLabel,
+          en: ctaLabelEn,
+        },
+        route: normalizeCtaRoute(syncedEditing.ctaButton.route ?? ''),
+        color: syncedEditing.ctaButton.color || syncedEditing.color,
+      };
+    } else if (syncedEditing.ctaButton) {
+      syncedEditing.ctaButton = {
+        ...syncedEditing.ctaButton,
+        enabled: false,
+        route: normalizeCtaRoute(syncedEditing.ctaButton.route ?? ''),
+      };
     }
     // Use customRouteKey as doc ID if provided, otherwise fallback
     const id = syncedEditing.id || (syncedEditing.customRouteKey?.trim() ? syncedEditing.customRouteKey.trim() : `tp_${Date.now()}`);
@@ -239,6 +485,63 @@ const TempPagesManager: React.FC = () => {
       console.error('Error toggling:', error);
       alert('❗ فشل تغيير حالة الصفحة. تأكد من الاتصال بالإنترنت.');
     }
+  };
+
+  const updateCtaButton = (patch: Partial<TempPageCtaButton>) => {
+    setEditing(prev => {
+      if (!prev) return prev;
+      const current = {
+        ...getDefaultCtaButton(prev.color),
+        ...prev.ctaButton,
+        labels: {
+          ...getDefaultCtaButton(prev.color).labels,
+          ...prev.ctaButton?.labels,
+        },
+      };
+      return {
+        ...prev,
+        ctaButton: {
+          ...current,
+          ...patch,
+          labels: {
+            ...current.labels,
+            ...patch.labels,
+          },
+        },
+      };
+    });
+  };
+
+  const applyTemplate = (template: TempPageTemplate) => {
+    if (!editing) return;
+    const hasContent = (editing.blocks?.some(block => block.text.trim()) || editing.htmlContent?.trim());
+    if (hasContent && !confirm('سيتم استبدال محتوى الصفحة الحالي بالقالب المختار. هل تريد المتابعة؟')) return;
+
+    const stamp = Date.now();
+    const blocks = template.blocks.map((block, index) => ({
+      ...block,
+      id: `tpl_${template.id}_${stamp}_${index}`,
+    }));
+
+    setEditing({
+      ...editing,
+      title: template.title,
+      titleEn: template.titleEn,
+      titles: { ar: template.title, en: template.titleEn },
+      color: template.color,
+      icon: blocks[0]?.icon || editing.icon,
+      contentMode: 'blocks',
+      blocks,
+      ctaButton: template.ctaButton
+        ? {
+            ...template.ctaButton,
+            labels: {
+              ar: template.ctaButton.labels?.ar || template.ctaButton.label,
+              en: template.ctaButton.labels?.en || template.ctaButton.labelEn || '',
+            },
+          }
+        : getDefaultCtaButton(template.color),
+    });
   };
 
   return (
@@ -348,6 +651,9 @@ const TempPagesManager: React.FC = () => {
                   {page.customRouteKey && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-900/40 text-cyan-400 border border-cyan-700/40">🔗 {page.customRouteKey}</span>
                   )}
+                  {page.ctaButton?.enabled && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-accent-light border border-emerald-700/40">زر إجراء</span>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
@@ -393,7 +699,7 @@ const TempPagesManager: React.FC = () => {
       {/* نافذة التعديل/الإضافة */}
       {showModal && editing && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-admin-bg rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+          <div className="bg-admin-bg rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">
                 {editing.id ? 'تعديل الصفحة' : 'صفحة جديدة'}
@@ -636,6 +942,35 @@ const TempPagesManager: React.FC = () => {
                 </div>
               </div>
               )}
+
+              {/* قوالب جاهزة */}
+              <div className="border border-admin-border rounded-xl p-4 space-y-3">
+                <div>
+                  <label className="text-slate-300 text-sm font-medium block">قوالب جاهزة</label>
+                  <p className="text-slate-500 text-xs mt-1">اختار قالب يبدأ لك الصفحة بعنوان وبلوكات وزر مناسب، وبعدها عدّل النصوص براحتك.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  {TEMP_PAGE_TEMPLATES.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => applyTemplate(template)}
+                      className="text-right rounded-xl border border-admin-border bg-admin-surface/50 hover:bg-admin-surface hover:border-accent/60 p-3 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <Styled
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-white"
+                          css={{ backgroundColor: template.color }}
+                        >
+                          {getBlockIconSymbol(template.blocks[0]?.icon || 'star-four-points')}
+                        </Styled>
+                        <span className="text-white font-bold text-sm">{template.name}</span>
+                      </div>
+                      <p className="text-slate-400 text-xs leading-5">{template.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* ===== نوع المحتوى: بلوكات أصلية أو HTML ===== */}
               <div className="border border-admin-border rounded-xl p-4 space-y-4">
@@ -915,6 +1250,116 @@ const TempPagesManager: React.FC = () => {
               </div>
                 )}
               </div>
+
+              {/* زر الإجراء */}
+              <div className="border border-admin-border rounded-xl p-4 space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div
+                    onClick={() => updateCtaButton({ enabled: !(editing.ctaButton?.enabled ?? false) })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      editing.ctaButton?.enabled ? 'bg-accent' : 'bg-admin-surface-light'
+                    }`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                      editing.ctaButton?.enabled ? 'right-1' : 'left-1'
+                    }`} />
+                  </div>
+                  <div>
+                    <span className="text-slate-300 text-sm font-medium block">زر إجراء أسفل الصفحة</span>
+                    <span className="text-slate-500 text-xs">يظهر Native في التطبيق ويحوّل لمسار داخلي أو رابط ويب</span>
+                  </div>
+                </label>
+
+                {editing.ctaButton?.enabled && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-slate-300 text-sm block mb-1">نص الزر (عربي) *</label>
+                        <input
+                          className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border"
+                          value={editing.ctaButton.labels?.ar ?? editing.ctaButton.label ?? ''}
+                          onChange={e => updateCtaButton({
+                            label: e.target.value,
+                            labels: { ar: e.target.value },
+                          })}
+                          placeholder="ابدأ الآن"
+                          aria-label="نص زر الإجراء عربي"
+                          dir="rtl"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-300 text-sm block mb-1">Button text (English)</label>
+                        <input
+                          className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border"
+                          value={editing.ctaButton.labels?.en ?? editing.ctaButton.labelEn ?? ''}
+                          onChange={e => updateCtaButton({
+                            labelEn: e.target.value,
+                            labels: { en: e.target.value },
+                          })}
+                          placeholder="Start now"
+                          aria-label="Button text English"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 text-sm block mb-1">المسار عند الضغط *</label>
+                      <input
+                        className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border font-mono text-sm"
+                        value={editing.ctaButton.route ?? ''}
+                        onChange={e => updateCtaButton({ route: e.target.value })}
+                        onBlur={e => updateCtaButton({ route: normalizeCtaRoute(e.target.value) })}
+                        placeholder="/subscription"
+                        aria-label="مسار زر الإجراء"
+                        dir="ltr"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        أمثلة: <code className="text-emerald-400">/subscription</code> أو <code className="text-emerald-400">/settings/notifications</code> أو رابط <code className="text-emerald-400">https://</code>
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 text-sm block mb-2">لون الزر</label>
+                      <div className="flex gap-2 items-center">
+                        {COLOR_PRESETS.map(c => (
+                          <Styled
+                            as="button"
+                            key={c}
+                            onClick={() => updateCtaButton({ color: c })}
+                            title={c}
+                            aria-label={`اختيار لون الزر ${c}`}
+                            className={`w-8 h-8 rounded-full border-2 transition-all ${
+                              (editing.ctaButton?.color || editing.color) === c ? 'border-white scale-110' : 'border-transparent'
+                            }`}
+                            css={{ backgroundColor: c }}
+                          />
+                        ))}
+                        <input
+                          type="color"
+                          title="لون مخصص"
+                          aria-label="لون زر مخصص"
+                          className="w-9 h-9 bg-transparent border border-admin-border rounded-lg"
+                          value={editing.ctaButton.color || editing.color || '#0f987f'}
+                          onChange={e => updateCtaButton({ color: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center pt-1">
+                      <Styled
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-lg"
+                        css={{ backgroundColor: editing.ctaButton.color || editing.color || '#0f987f' }}
+                      >
+                        <span>{editing.ctaButton.labels?.ar || editing.ctaButton.label || 'نص الزر'}</span>
+                        <Link size={16} />
+                      </Styled>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <TempPageMobilePreview page={editing} />
             </div>
 
             <div className="flex justify-end gap-3 mt-6">

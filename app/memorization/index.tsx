@@ -1,7 +1,7 @@
 // app/memorization/index.tsx
 // شاشة Hub رئيسية لوضع الحفظ — تعرض ورد اليوم + 4 أوضاع + إحصائيات سريعة.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -25,10 +25,8 @@ import { getSurahName, toArabicDigits } from '@/lib/memorization-helpers';
 import { DurationRing } from '@/components/memorization/DurationRing';
 import { StatsTimeline } from '@/components/memorization/StatsTimeline';
 import { rtlChevronForward } from '@/lib/rtl-utils';
-import type { MemorizationMode } from '@/types/memorization';
-
 interface ModeCardData {
-  mode: MemorizationMode;
+  mode: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   titleKey: string;
   descKey: string;
@@ -40,6 +38,7 @@ const MODES: ModeCardData[] = [
   { mode: 'hide', icon: 'eye-off-outline', titleKey: 'modeHide', descKey: 'modeHideDesc', route: '/memorization/hide' },
   { mode: 'test', icon: 'help-circle-outline', titleKey: 'modeTest', descKey: 'modeTestDesc', route: '/memorization/test' },
   { mode: 'review', icon: 'refresh', titleKey: 'modeReview', descKey: 'modeReviewDesc', route: '/memorization/review' },
+  { mode: 'mistakes', icon: 'alert-circle-outline', titleKey: 'mistakesTitle', descKey: 'mistakesDesc', route: '/memorization/mistakes' },
 ];
 
 export default function MemorizationHub() {
@@ -47,7 +46,7 @@ export default function MemorizationHub() {
   const colors = useColors();
   const { settings: appSettings } = useSettings();
   const isRTL = useIsRTL();
-  const { activePlan, todayPlan, stats, streak, isLoading } = useMemorization();
+  const { activePlan, todayPlan, stats, streak, ayahStates, isLoading } = useMemorization();
 
   const goNew = useCallback(() => router.push('/memorization/new'), [router]);
   const goProgress = useCallback(
@@ -122,6 +121,27 @@ export default function MemorizationHub() {
 
   const initialNew = Math.max(initialCounts?.newAyahs ?? todayPlan.newAyahs.length, 1);
   const initialReview = Math.max(initialCounts?.reviewAyahs ?? todayPlan.reviewAyahs.length, 1);
+  const mistakesCount = Object.values(ayahStates).filter(
+    (state) => state.status === 'needs_review',
+  ).length;
+  const nextReviewLabel = useMemo(() => {
+    if (todayPlan.reviewAyahs.length > 0) {
+      return mt('reviewTodayCount', { n: toArabicDigits(todayPlan.reviewAyahs.length) });
+    }
+    const dates = Object.values(ayahStates)
+      .filter((state) => state.status !== 'new')
+      .map((state) => state.nextReviewDate)
+      .filter(Boolean)
+      .sort();
+    const nextDate = dates[0];
+    if (!nextDate) return mt('noReviewToday');
+    const today = new Date(`${todayPlan.date}T00:00:00`);
+    const next = new Date(`${nextDate}T00:00:00`);
+    const diff = Math.round((next.getTime() - today.getTime()) / 86400000);
+    if (diff <= 0) return mt('today');
+    if (diff === 1) return mt('tomorrow');
+    return mt('inDays', { n: toArabicDigits(diff) });
+  }, [ayahStates, todayPlan.date, todayPlan.reviewAyahs.length]);
 
   const styles = makeStyles(colors, isRTL);
 
@@ -187,6 +207,12 @@ export default function MemorizationHub() {
                   strokeWidth={7}
                 />
               </View>
+              <View style={styles.nextReviewBox}>
+                <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.primary} />
+                <Text style={styles.nextReviewText}>
+                  {mt('nextReview')}: {nextReviewLabel}
+                </Text>
+              </View>
               {todayPlan.newAyahs.length === 0 && todayPlan.reviewAyahs.length === 0 ? (
                 <Text style={styles.muted}>{mt('noAyahsToday')}</Text>
               ) : (
@@ -250,6 +276,11 @@ export default function MemorizationHub() {
               }}
             >
               <MaterialCommunityIcons name={m.icon} size={32} color={colors.primary} />
+              {m.mode === 'mistakes' && mistakesCount > 0 && (
+                <View style={styles.mistakeBadge}>
+                  <Text style={styles.mistakeBadgeText}>{toArabicDigits(mistakesCount)}</Text>
+                </View>
+              )}
               <Text style={styles.modeTitle}>{mt(m.titleKey)}</Text>
               <Text style={styles.modeDesc}>{mt(m.descKey)}</Text>
             </Pressable>
@@ -433,6 +464,25 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
+    nextReviewBox: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 12,
+      backgroundColor: 'rgba(13,142,98,0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(13,142,98,0.28)',
+    },
+    nextReviewText: {
+      color: colors.text,
+      fontFamily: 'Cairo-SemiBold',
+      fontSize: 13,
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
     chipsBox: {
       flexDirection: isRTL ? 'row-reverse' : 'row',
       flexWrap: 'wrap',
@@ -490,7 +540,21 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       gap: 6,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.08)',
+      position: 'relative',
     },
+    mistakeBadge: {
+      position: 'absolute',
+      top: 10,
+      [isRTL ? 'right' : 'left']: 10,
+      minWidth: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#b00020',
+      paddingHorizontal: 6,
+    },
+    mistakeBadgeText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 12 },
     modeCardDisabled: { opacity: 0.55 },
     modeTitle: {
       color: colors.text,

@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.2.3",
+    "version": "1.2.4",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
@@ -25,7 +25,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "99",
+      "buildNumber": "103",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.rooh.almuslim"
@@ -82,7 +82,7 @@
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 76,
+      "versionCode": 77,
       "permissions": [
         "INTERNET",
         "VIBRATE",
@@ -186,7 +186,21 @@
             "./assets/sounds/adhan_full/adhan_full_naqshbandi.mp3",
             "./assets/sounds/adhan_full/adhan_full_sharif.mp3",
             "./assets/sounds/adhan_full/adhan_full_mansoor_zahrani.mp3",
-            "./assets/sounds/adhan_full/adhan_full_haramain.mp3"
+            "./assets/sounds/adhan_full/adhan_full_haramain.mp3",
+            "./assets/sounds/adhan_full_ios/adhan_full_makkah.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_madinah.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_alaqsa.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_mishary.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_abdulbasit.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_sudais.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_egypt.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_dosari.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_ajman.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_ali_mulla.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_naqshbandi.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_sharif.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_mansoor_zahrani.caf",
+            "./assets/sounds/adhan_full_ios/adhan_full_haramain.caf"
           ]
         }
       ],

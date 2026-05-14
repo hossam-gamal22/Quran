@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '@/config/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
 const RATE_LIMIT_KEY = '@qa_last_question_time';
-const RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_MS = 0;
 
 export interface QuestionSubmission {
   userName?: string;
@@ -13,9 +13,27 @@ export interface QuestionSubmission {
   userId?: string;
   language: string;
   registeredName?: string;
+  requestMode?: 'assistant' | 'manual';
+  notifyByEmail?: boolean;
+  updateRateLimit?: boolean;
+}
+
+export interface AutoAnswerSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+export interface AutoAnswerResult {
+  answer: string;
+  disclaimer?: string;
+  sources: AutoAnswerSource[];
+  status: 'answered' | 'no_results' | 'failed' | 'unconfigured' | 'disabled' | 'daily_limit';
 }
 
 export async function checkRateLimit(): Promise<boolean> {
+  if (RATE_LIMIT_MS <= 0) return true;
+
   try {
     const last = await AsyncStorage.getItem(RATE_LIMIT_KEY);
     if (last) {
@@ -28,9 +46,9 @@ export async function checkRateLimit(): Promise<boolean> {
   }
 }
 
-export async function submitQuestion(data: QuestionSubmission): Promise<void> {
+export async function submitQuestion(data: QuestionSubmission): Promise<string> {
   // Save to Firestore (primary)
-  await addDoc(collection(db, 'userQuestions'), {
+  const docRef = await addDoc(collection(db, 'userQuestions'), {
     userName: data.userName || '',
     userEmail: data.userEmail || '',
     question: data.question,
@@ -40,10 +58,13 @@ export async function submitQuestion(data: QuestionSubmission): Promise<void> {
     registeredName: data.registeredName || '',
     platform: Platform.OS,
     language: data.language,
+    requestMode: data.requestMode || 'manual',
   });
 
-  // Save rate limit timestamp
-  await AsyncStorage.setItem(RATE_LIMIT_KEY, String(Date.now()));
+  // Save rate limit timestamp only when a cooldown is configured.
+  if (RATE_LIMIT_MS > 0 && data.updateRateLimit !== false) {
+    await AsyncStorage.setItem(RATE_LIMIT_KEY, String(Date.now()));
+  }
 
   // Send email via EmailJS (best-effort, non-blocking)
   try {
@@ -51,7 +72,7 @@ export async function submitQuestion(data: QuestionSubmission): Promise<void> {
     const templateId = process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID;
     const publicKey = process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY;
 
-    if (serviceId && templateId && publicKey) {
+    if (data.notifyByEmail !== false && serviceId && templateId && publicKey) {
       console.log('[Email] Sending notification email...');
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
         method: 'POST',
@@ -75,4 +96,55 @@ export async function submitQuestion(data: QuestionSubmission): Promise<void> {
   } catch (e) {
     console.warn('[Email] Send failed (non-critical):', e);
   }
+
+  return docRef.id;
+}
+
+export function waitForAutoAnswer(
+  questionId: string,
+  timeoutMs = 15000
+): Promise<AutoAnswerResult | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    const finish = (result: AutoAnswerResult | null) => {
+      if (settled) return;
+      settled = true;
+      if (unsubscribe) unsubscribe();
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => finish(null), timeoutMs);
+
+    unsubscribe = onSnapshot(
+      doc(db, 'userQuestions', questionId),
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        const status = data.autoAnswerStatus;
+        if (!status || status === 'searching') return;
+
+        if (status === 'answered' || status === 'no_results' || status === 'daily_limit') {
+          finish({
+            answer: String(data.autoAnswer || ''),
+            disclaimer: data.autoAnswerDisclaimer ? String(data.autoAnswerDisclaimer) : undefined,
+            sources: Array.isArray(data.autoAnswerSources) ? data.autoAnswerSources : [],
+            status,
+          });
+          return;
+        }
+
+        if (status === 'failed' || status === 'unconfigured' || status === 'disabled') {
+          finish({
+            answer: '',
+            sources: [],
+            status,
+          });
+        }
+      },
+      () => finish(null)
+    );
+  });
 }

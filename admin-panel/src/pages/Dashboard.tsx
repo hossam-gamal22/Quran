@@ -18,6 +18,11 @@ interface Stats {
   totalUsers: number;
   activeUsers: number;
   dailyActiveUsers: number;
+  pushReachableUsers: number;
+  namedUsers: number;
+  unnamedUsers: number;
+  withoutTokens: number;
+  firestoreUsers: number;
   avgSessionDuration: number;
   totalAzkar: number;
   totalAzkarRead: number;
@@ -36,8 +41,8 @@ interface ActivityItem {
 }
 
 const QUICK_ACTIONS = [
-  { id: '1', title: 'شاشات البداية', icon: Sparkles, path: '/splash-screens', color: 'bg-purple-500/20 text-purple-400' },
-  { id: '2', title: 'إدارة المحتوى', icon: FileText, path: '/content', color: 'bg-blue-500/20 text-blue-400' },
+  { id: '1', title: 'شاشات البداية', icon: Sparkles, path: '/onboarding', color: 'bg-purple-500/20 text-purple-400' },
+  { id: '2', title: 'إدارة المحتوى', icon: FileText, path: '/content-manager', color: 'bg-blue-500/20 text-blue-400' },
   { id: '3', title: 'الأذكار', icon: Moon, path: '/azkar', color: 'bg-accent/20 text-accent-light' },
   { id: '4', title: 'الإشعارات', icon: Bell, path: '/notifications', color: 'bg-amber-500/20 text-amber-400' },
   { id: '5', title: 'المستخدمين', icon: Users, path: '/users', color: 'bg-pink-500/20 text-pink-400' },
@@ -73,6 +78,11 @@ const Dashboard: React.FC = () => {
     totalUsers: 0,
     activeUsers: 0,
     dailyActiveUsers: 0,
+    pushReachableUsers: 0,
+    namedUsers: 0,
+    unnamedUsers: 0,
+    withoutTokens: 0,
+    firestoreUsers: 0,
     avgSessionDuration: 0,
     totalAzkar: 0,
     totalAzkarRead: 0,
@@ -107,7 +117,9 @@ const Dashboard: React.FC = () => {
       });
       if (azkarResponse.ok) {
         const azkarData = await azkarResponse.json();
-        totalAzkar = azkarData.totalCount || azkarData.azkar?.length || 0;
+        totalAzkar = Array.isArray(azkarData)
+          ? azkarData.length
+          : azkarData.totalCount || azkarData.azkar?.length || 0;
         setAzkarLoaded(true);
       }
     } catch (azkarError) {
@@ -116,7 +128,18 @@ const Dashboard: React.FC = () => {
     }
 
     // 2. محاولة تحميل البيانات من Firebase
-    let usersData = { total: 0, active: 0, daily: 0, ios: 0, android: 0 };
+    let usersData = {
+      total: 0,
+      active: 0,
+      daily: 0,
+      pushReachable: 0,
+      named: 0,
+      unnamed: 0,
+      withoutTokens: 0,
+      firestore: 0,
+      ios: 0,
+      android: 0,
+    };
     let statsData = { azkarRead: 0, quranPages: 0, prayers: 0, avgSession: 0 };
     let activityData: ActivityItem[] = [];
 
@@ -125,11 +148,16 @@ const Dashboard: React.FC = () => {
       const { stats: deviceStats } = await fetchActiveDevices();
 
       usersData = {
-        total: deviceStats.total,
-        active: deviceStats.active,
-        daily: deviceStats.daily,
-        ios: deviceStats.ios,
-        android: deviceStats.android,
+        total: deviceStats.storeRegistered,
+        active: deviceStats.storeActive,
+        daily: deviceStats.storeDaily,
+        pushReachable: deviceStats.withTokens,
+        named: deviceStats.namedUsers,
+        unnamed: deviceStats.unnamedUsers,
+        withoutTokens: deviceStats.withoutTokens,
+        firestore: deviceStats.firestoreUsers,
+        ios: deviceStats.storeIos,
+        android: deviceStats.storeAndroid,
       };
 
       // تحميل الإحصائيات
@@ -177,6 +205,11 @@ const Dashboard: React.FC = () => {
       totalUsers: usersData.total,
       activeUsers: usersData.active,
       dailyActiveUsers: usersData.daily,
+      pushReachableUsers: usersData.pushReachable,
+      namedUsers: usersData.named,
+      unnamedUsers: usersData.unnamed,
+      withoutTokens: usersData.withoutTokens,
+      firestoreUsers: usersData.firestore,
       avgSessionDuration: statsData.avgSession,
       totalAzkar: totalAzkar,
       totalAzkarRead: statsData.azkarRead,
@@ -269,11 +302,11 @@ const Dashboard: React.FC = () => {
       {/* Stats Row 1 - Users */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="إجمالي المستخدمين"
+          title="مسجلون من المتاجر"
           value={stats.totalUsers}
           icon={<Users className="w-6 h-6 text-blue-400" />}
           iconBg="bg-blue-500/20"
-          subtitle={stats.totalUsers === 0 ? "انتظار النشر" : undefined}
+          subtitle={stats.firestoreUsers > stats.totalUsers ? `يشمل Firebase ${stats.firestoreUsers.toLocaleString()} سجل` : undefined}
         />
         <StatCard
           title="المستخدمين النشطين"
@@ -287,17 +320,49 @@ const Dashboard: React.FC = () => {
           value={stats.dailyActiveUsers}
           icon={<Eye className="w-6 h-6 text-amber-400" />}
           iconBg="bg-amber-500/20"
+          subtitle="آخر 24 ساعة"
+        />
+        <StatCard
+          title="قابلون للإشعارات"
+          value={stats.pushReachableUsers}
+          icon={<Bell className="w-6 h-6 text-cyan-400" />}
+          iconBg="bg-cyan-500/20"
+          subtitle="لديهم Expo push token"
+        />
+      </div>
+
+      {/* Stats Row 2 - Content */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="لديهم اسم"
+          value={stats.namedUsers}
+          icon={<CheckCircle className="w-6 h-6 text-accent-light" />}
+          iconBg="bg-accent/20"
+        />
+        <StatCard
+          title="بدون اسم"
+          value={stats.unnamedUsers}
+          icon={<AlertCircle className="w-6 h-6 text-orange-400" />}
+          iconBg="bg-orange-500/20"
+          subtitle="يظهرون في الإجمالي ولا يظهرون في قائمة المستخدمين"
+        />
+        <StatCard
+          title="بدون توكن إشعارات"
+          value={stats.withoutTokens}
+          icon={<Bell className="w-6 h-6 text-slate-400" />}
+          iconBg="bg-slate-500/20"
+          subtitle="فتحوا التطبيق لكن لا يمكن إرسال Push لهم"
         />
         <StatCard
           title="الأذكار المتاحة"
           value={stats.totalAzkar}
           icon={<Moon className="w-6 h-6 text-purple-400" />}
           iconBg="bg-purple-500/20"
-          subtitle={azkarLoaded ? "من ملف JSON ✅" : "جاري التحميل..."}
+          subtitle={azkarLoaded ? "من ملف JSON" : "جاري التحميل..."}
         />
       </div>
 
-      {/* Stats Row 2 - Content */}
+      {/* Stats Row 3 - Content */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           title="الأذكار المقروءة"
