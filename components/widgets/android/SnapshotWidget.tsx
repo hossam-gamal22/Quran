@@ -96,19 +96,35 @@ function LiveDateWidget({
   }
 
   if (widgetId === 'dayThuluth') {
+    const wmDay = applyNumerals(useHijri ? hijriDay : now.getDate(), numerals, true);
+    // Faint watermark color: low-alpha text — ARGB hex (#1A = ~10% opacity)
+    const wmColor = p.isLight ? '#1A000000' : '#1AFFFFFF';
     return (
-      <FlexWidget
-        style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: radius }}
+      <OverlapWidget
+        style={{ width: 'match_parent', height: 'match_parent', backgroundColor: p.bg, borderRadius: radius }}
         clickAction={clickAction}
         clickActionData={clickUri ? { uri: clickUri } : undefined}
       >
-        <TextWidget text={WEEKDAYS_AR[now.getDay()]} style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 34 : 52, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-      </FlexWidget>
+        {/* Watermark digit — medium size only (mirrors DayThuluthView SwiftUI) */}
+        {size !== 'small' ? (
+          <TextWidget
+            text={wmDay}
+            style={{ fontFamily: widgetFont, fontSize: 130, color: wmColor, textAlign: 'center', width: 'match_parent', marginTop: 30 }}
+            allowFontScaling={false}
+            maxLines={1}
+          />
+        ) : null}
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center' }}>
+          <TextWidget text={WEEKDAYS_AR[now.getDay()]} style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 34 : 52, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+        </FlexWidget>
+      </OverlapWidget>
     );
   }
 
   if (widgetId === 'monthSimple' || widgetId === 'monthThuluth') {
     const mDay = applyNumerals(useMonthHijri ? hijriDay : now.getDate(), numerals, isAr);
+    const wmDay = applyNumerals(useMonthHijri ? hijriDay : now.getDate(), numerals, true);
+    const wmColor = p.isLight ? '#1A000000' : '#1AFFFFFF';
     const mName = useMonthHijri
       ? hijriMonthName
       : (isAr ? MONTHS_AR[now.getMonth()] : now.toLocaleDateString('en', { month: 'long' }));
@@ -116,14 +132,23 @@ function LiveDateWidget({
       ? `${applyNumerals(hijriDay, numerals, isAr)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, isAr)}`
       : `${applyNumerals(now.getDate(), numerals, isAr)} / ${applyNumerals(now.getMonth() + 1, numerals, isAr)} / ${applyNumerals(now.getFullYear(), numerals, isAr)}`;
     return (
-      <FlexWidget
-        style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: radius }}
+      <OverlapWidget
+        style={{ width: 'match_parent', height: 'match_parent', backgroundColor: p.bg, borderRadius: radius }}
         clickAction={clickAction}
         clickActionData={clickUri ? { uri: clickUri } : undefined}
       >
-        <TextWidget text={mName} style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 26 : 38, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-        <TextWidget text={mSubtitle} style={{ fontFamily: FONT.rubik, fontSize: 11, color: p.muted, textAlign: 'center', marginTop: 6 }} allowFontScaling={false} maxLines={1} />
-      </FlexWidget>
+        {/* Watermark day digit behind the month name */}
+        <TextWidget
+          text={wmDay}
+          style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 90 : 140, color: wmColor, textAlign: 'center', width: 'match_parent', marginTop: size === 'small' ? 30 : 20 }}
+          allowFontScaling={false}
+          maxLines={1}
+        />
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <TextWidget text={mName} style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 26 : 38, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+          <TextWidget text={mSubtitle} style={{ fontFamily: FONT.rubik, fontSize: 11, color: p.muted, textAlign: 'center', marginTop: 6 }} allowFontScaling={false} maxLines={1} />
+        </FlexWidget>
+      </OverlapWidget>
     );
   }
 

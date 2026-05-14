@@ -970,7 +970,8 @@ export default function HomeScreen() {
       AsyncStorage.getItem('@quick_access_migration_qa_v2'),
       AsyncStorage.getItem('@quick_access_migration_qa_v3'),
       AsyncStorage.getItem('@quick_access_migration_qa_v4'),
-    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done]) => {
+      AsyncStorage.getItem('@quick_access_migration_qa_v5'),
+    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done, qaMigrationV5Done]) => {
       // Check if user has ever customized their Quick Access
       const userHasCustomized = customizedFlag === 'true';
       setHasUserCustomized(userHasCustomized);
@@ -1003,12 +1004,24 @@ export default function HomeScreen() {
             }
 
             // v4: Force question_answer at position 2 (3rd slot) on Android for all users
-            // regardless of previous customization — user can re-customize afterwards
             if (!qaMigrationV4Done && Platform.OS === 'android') {
               ids = ids.filter(id => id !== 'question_answer');
               ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
               AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
               AsyncStorage.setItem('@quick_access_migration_qa_v4', 'true');
+            }
+
+            // v5: Force question_answer on ALL platforms so it's always visible
+            // until the user explicitly removes it via customisation.
+            if (!qaMigrationV5Done) {
+              ids = ids.filter(id => id !== 'question_answer');
+              ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+              AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+              AsyncStorage.setItem('@quick_access_migration_qa_v5', 'true');
+              if (!userHasCustomized) {
+                AsyncStorage.setItem('@quick_access_customized', 'true');
+                setHasUserCustomized(true);
+              }
             }
 
             setSelectedQuickAccessIds(ids);
@@ -1057,6 +1070,17 @@ export default function HomeScreen() {
         setSelectedQuickAccessIds(ids);
         AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
         AsyncStorage.setItem('@quick_access_migration_qa_v4', 'true');
+        AsyncStorage.setItem('@quick_access_customized', 'true');
+      }
+
+      // v5 fallback: no stored items on any platform — force question_answer
+      if (!stored && !qaMigrationV5Done) {
+        const defaultIds = QUICK_ACCESS.slice(0, 4).map(i => i.id);
+        let ids = defaultIds.filter(id => id !== 'question_answer');
+        ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+        setSelectedQuickAccessIds(ids);
+        AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+        AsyncStorage.setItem('@quick_access_migration_qa_v5', 'true');
         AsyncStorage.setItem('@quick_access_customized', 'true');
       }
     });

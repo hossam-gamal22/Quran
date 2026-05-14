@@ -930,7 +930,10 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
   ];
   return (
     <GlassTile size={size} padding={isAndroid ? 18 : undefined} palette={p}>
-      <View style={{ flex: 1, flexDirection: 'row', gap: isAndroid ? 8 : 10 }}>
+      {/* direction:'ltr' fixes snapshot PNG so القادمة is always LEFT and
+          السابقة always RIGHT — matching the LTR overlay anchor positions
+          (x=91 for next, x=238 for previous) in SnapshotWidget.tsx */}
+      <View style={{ flex: 1, flexDirection: 'row', gap: isAndroid ? 8 : 10, direction: 'ltr' }}>
         {items.map((item, i) => (
           <View
             key={i}
