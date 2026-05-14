@@ -443,11 +443,14 @@ export async function schedulePrayerNotifications(
           }
           if (freshTriggerMs !== null && Math.abs(freshTriggerMs - triggerMs) > DRIFT_TOLERANCE_MS) {
             console.log(`[prayer-notif] 🔄 CANCEL drifted imminent ${n.identifier} (stored=${new Date(triggerMs).toISOString()}, fresh=${new Date(freshTriggerMs).toISOString()}, drift=${Math.round((freshTriggerMs - triggerMs) / 60000)}min)`);
-            // Fall through to cancel
           } else {
-            preservedImminentCount++;
-            console.log(`[prayer-notif] 🛡️ PRESERVE imminent ${n.identifier} (fires in ${Math.round(msUntilFire / 1000)}s)`);
-            continue; // Skip cancellation — keep this notification intact
+            // Previously: preserved imminent notifications (fires in < 15min) to avoid
+            // a gap. But this caused a double-notification bug when useFullAdhan changed
+            // while a notification was imminent: drift=0 → preserved with OLD content,
+            // then scheduleNotificationAsync was called with same identifier → iOS
+            // sometimes kept BOTH. Fix: always cancel and reschedule unconditionally;
+            // scheduleNotificationAsync with same identifier replaces correctly.
+            console.log(`[prayer-notif] 🔄 CANCEL imminent (will reschedule) ${n.identifier} (fires in ${Math.round(msUntilFire / 1000)}s)`);
           }
         }
       }
