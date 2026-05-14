@@ -1879,6 +1879,16 @@ const PRAYER_NAMES_AR: Record<string, string> = {
   isha: 'العشاء',
 };
 
+// Titles matching the app's prayer-notifications.ts getPrayerNotifTitle()
+// so FCM fallback and local notifications look identical to the user.
+const PRAYER_TITLES_AR: Record<string, string> = {
+  fajr:    'الفجر.. وقت الصفاء والإشراق 🌅',
+  dhuhr:   'الظهر.. استراحة المؤمن ☀️',
+  asr:     'العصر.. لحظة العودة إلى الله 🌤️',
+  maghrib: 'المغرب.. وقت الشكر والامتنان 🌅',
+  isha:    'العشاء.. ختام اليوم بذكر الله 🌙',
+};
+
 /**
  * Scheduled Cloud Function: runs every 15 minutes.
  * For every user with fcmToken + prayerLocation in Firestore:
@@ -1936,8 +1946,10 @@ export const sendPrayerPushFallback = onSchedule(
           if (!nextTime) continue;
 
           const minutesUntil = (nextTime.getTime() - now.getTime()) / 60000;
-          // ضمن 15 دقيقة قبل الصلاة بالضبط (نحن نشتغل كل 15 دقيقة → exactly one match)
-          if (minutesUntil < 0 || minutesUntil > 15) continue;
+          // Send 5-15 minutes before prayer time so FCM delivery delay (≤10 min)
+          // keeps the notification arriving around prayer time, not after it.
+          // Sending at minutesUntil=0 caused 18+ minute post-prayer delivery.
+          if (minutesUntil < 5 || minutesUntil > 15) continue;
 
           // De-duplication: تجاهل لو أرسلنا نفس الصلاة لنفس المستخدم خلال 30 دقيقة
           const prayerKey = String(next).toLowerCase();
@@ -1947,10 +1959,12 @@ export const sendPrayerPushFallback = onSchedule(
           if (dedupeSnap.exists) continue;
 
           const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
+          // Title matches app's getPrayerNotifTitle() so FCM and local look identical
+          const titleAr = PRAYER_TITLES_AR[prayerKey] ?? `${nameAr} 🕌`;
           messages.push({
             to: fcmToken,
-            title: `🕌 ${nameAr}`,
-            body: `حان الآن وقت صلاة ${nameAr}`,
+            title: titleAr,
+            body: `حان وقت صلاة ${nameAr}`,
             sound: 'default',
             priority: 'high',
             data: {
