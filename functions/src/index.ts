@@ -1959,8 +1959,8 @@ export const sendPrayerPushFallback = onSchedule(
           if (dedupeSnap.exists) continue;
 
           const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
-          // Title matches app's getPrayerNotifTitle() so FCM and local look identical
-          const titleAr = PRAYER_TITLES_AR[prayerKey] ?? `${nameAr} 🕌`;
+          // Title: 🕌 + full prayer title matching app's getPrayerNotifTitle()
+          const titleAr = `🕌 ${PRAYER_TITLES_AR[prayerKey] ?? nameAr}`;
           messages.push({
             to: fcmToken,
             title: titleAr,
