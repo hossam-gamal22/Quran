@@ -260,6 +260,7 @@
       ],
       "./plugins/with-alarm-clock-scheduling",
       "./plugins/with-ios-widgets",
+      "./plugins/with-ios-adhan-sounds",
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
       "./plugins/with-android-full-adhan",
