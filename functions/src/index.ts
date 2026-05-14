@@ -1879,14 +1879,26 @@ const PRAYER_NAMES_AR: Record<string, string> = {
   isha: 'العشاء',
 };
 
-// Titles matching the app's prayer-notifications.ts getPrayerNotifTitle()
-// so FCM fallback and local notifications look identical to the user.
+// Bodies matching constants/translations.ts notifications.*Body (Arabic)
+const PRAYER_BODIES_AR: Record<string, string> = {
+  fajr:    'حي على الصلاة.. الفجر مطلع السكينة.',
+  dhuhr:   'حان وقت صلاة الظهر.. جدد طاقتك بالوقوف بين يدي الله.',
+  asr:     'حان وقت صلاة العصر.. حافظ عليها لتنال عظيم الأجر.',
+  maghrib: 'حان وقت صلاة المغرب.. بارك الله في يومك.',
+  isha:    'حان وقت صلاة العشاء.. اختم يومك بصلاة تريح قلبك.',
+  jumuah:  'حان وقت صلاة الجمعة.. أكثِر من الصلاة على النبي ﷺ.',
+};
+
+// Titles exactly matching constants/translations.ts notifications.*NotifTitle (Arabic)
+// so FCM and local notifications are visually identical to the user.
 const PRAYER_TITLES_AR: Record<string, string> = {
-  fajr:    'الفجر.. وقت الصفاء والإشراق 🌅',
+  fajr:    'الفجر.. نورٌ في قلبك 🌙',
   dhuhr:   'الظهر.. استراحة المؤمن ☀️',
-  asr:     'العصر.. لحظة العودة إلى الله 🌤️',
-  maghrib: 'المغرب.. وقت الشكر والامتنان 🌅',
-  isha:    'العشاء.. ختام اليوم بذكر الله 🌙',
+  asr:     'العصر.. الصلاة الوسطى 🌤️',
+  maghrib: 'المغرب.. ختام النهار الطاهر 🌇',
+  isha:    'العشاء.. سكنٌ وطمأنينة ✨',
+  // Friday Dhuhr
+  jumuah:  'الجمعة.. خير يوم طلعت عليه الشمس 🕌',
 };
 
 /**
@@ -1959,12 +1971,16 @@ export const sendPrayerPushFallback = onSchedule(
           if (dedupeSnap.exists) continue;
 
           const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
-          // Title: 🕌 + full prayer title matching app's getPrayerNotifTitle()
-          const titleAr = `🕌 ${PRAYER_TITLES_AR[prayerKey] ?? nameAr}`;
+          // Friday Dhuhr → Jumuah
+          const isFriday = now.getDay() === 5;
+          const effectiveKey = (prayerKey === 'dhuhr' && isFriday) ? 'jumuah' : prayerKey;
+          // Title: 🕌 + full prayer title exactly matching app's getPrayerNotifTitle()
+          const titleAr = `🕌 ${PRAYER_TITLES_AR[effectiveKey] ?? nameAr}`;
+          const bodyAr = PRAYER_BODIES_AR[effectiveKey] ?? `حان وقت صلاة ${nameAr}`;
           messages.push({
             to: fcmToken,
             title: titleAr,
-            body: `حان وقت صلاة ${nameAr}`,
+            body: bodyAr,
             sound: 'default',
             priority: 'high',
             data: {
