@@ -62,6 +62,10 @@ export async function syncPrayerDataToFirestore(uid: string, force = false): Pro
         adjustments: settings.adjustments ?? {},
         timezoneOffsetMinutes: -new Date().getTimezoneOffset(), // مثلاً +180 لمصر
         updatedAt: serverTimestamp(),
+        // Marks that the app was opened and local notifications are active.
+        // FCM fallback skips users updated within the last 7 days so they
+        // don't receive a duplicate alongside their local notification.
+        localNotificationsActiveAt: serverTimestamp(),
       },
       { merge: true },
     );

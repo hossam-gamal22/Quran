@@ -1931,6 +1931,14 @@ export const sendPrayerPushFallback = onSchedule(
         if (s.disabled) continue;
         if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number') continue;
 
+        // Skip users whose app was opened in the last 7 days — their local
+        // notifications are active, so FCM would create a duplicate.
+        const localActiveAt = s.localNotificationsActiveAt?.toDate?.() as Date | undefined;
+        if (localActiveAt) {
+          const daysSinceActive = (now.getTime() - localActiveAt.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceActive < 7) continue;
+        }
+
         // اقرأ FCM token من users/{uid}
         let fcmToken: string | undefined;
         try {
