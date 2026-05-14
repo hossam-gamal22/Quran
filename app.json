@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.2.4",
+    "version": "1.2.3",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
