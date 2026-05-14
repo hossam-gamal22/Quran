@@ -383,6 +383,16 @@ export async function schedulePrayerNotifications(
       const isPrayerNotif = n.identifier.startsWith('prayer_') || n.identifier.startsWith('did_you_pray_');
       if (!isPrayerNotif) continue;
 
+      // Old-format identifiers (prayer_dhuhr, prayer_dhuhr_d2, etc.) are always
+      // cancelled unconditionally — they are superseded by date-based identifiers
+      // (prayer_dhuhr_20260514). Preserving them as "imminent" caused a double-
+      // notification bug: the old format fired alongside the new one at prayer time.
+      const isOldFormat = /^prayer_[a-z]+(?:_d\d+)?$/.test(n.identifier);
+      if (isOldFormat) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+        continue;
+      }
+
       // Extract trigger date if this is a DATE trigger (expo-notifications shape)
       const trig: any = n.trigger;
       const triggerMs: number | null =
