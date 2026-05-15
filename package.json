@@ -17,6 +17,7 @@
     "translate": "node scripts/islamic-translator.js",
     "sync-sounds": "node scripts/sync-sounds.js",
     "verify:adhan-assets": "node scripts/verify-adhan-assets.js",
+    "build-prayer-imagesets": "node scripts/build-prayer-static-imagesets.mjs",
     "postinstall": "node scripts/patch-expo-notifications.js || true"
   },
   "dependencies": {

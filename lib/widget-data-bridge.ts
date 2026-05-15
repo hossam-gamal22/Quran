@@ -26,9 +26,20 @@ import {
   type CanonicalPrayerSnapshot,
 } from './canonical-prayer-snapshot';
 import { getEffectivePrayerCalcSettings } from './prayer-settings-source';
+import type {
+  PrayerWidgetInputs,
+  CalculationMethodId,
+  HighLatRuleId,
+} from './widget-prayer-calculator';
+import { PRAYER_INPUTS_KEY, PRAYER_INPUTS_VERSION } from './widget-prayer-calculator';
 
 const APP_GROUP = 'group.com.rooh.almuslim';
 const WIDGET_DATA_KEY = 'widget_shared_data';
+/** App-Group / AsyncStorage key for the small inputs JSON read by both the iOS
+ *  widget extension (Swift PrayerInputs) and the Android headless JS task
+ *  (lib/widget-prayer-calculator.ts). */
+const WIDGET_PRAYER_INPUTS_KEY_IOS = 'widget_prayer_inputs';
+const WIDGET_PRAYER_INPUTS_KEY_ANDROID = PRAYER_INPUTS_KEY; // '@widget_prayer_inputs'
 const SNAPSHOT_VERSION_KEY = '@widget_snapshot_version';
 const WIDGET_DISPLAY_PREFS_KEY = '@widget_display_preferences';
 
@@ -174,6 +185,103 @@ async function writeToSharedStorage(key: string, value: string): Promise<void> {
   } else {
     // Android: AsyncStorage is the primary storage
     await AsyncStorage.setItem(key, value);
+  }
+}
+
+/**
+ * Build the small prayer-inputs record from current app state and write it to
+ * the platform-appropriate shared storage. This is the single contract the
+ * widget extensions read for offline prayer-time computation — once written,
+ * both iOS WidgetKit and Android headless tasks can compute prayer times
+ * indefinitely without the app being open.
+ *
+ * Returns the inputs object on success, null if location is unknown (in which
+ * case the widget falls back to legacy cached data or its setup-needed view).
+ */
+export async function writePrayerInputs(): Promise<PrayerWidgetInputs | null> {
+  try {
+    const location = await getStoredLocation();
+    if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
+      if (__DEV__) console.log('[writePrayerInputs] no stored location — skipping inputs write');
+      return null;
+    }
+
+    const calc = await getEffectivePrayerCalcSettings();
+
+    // Time format + numerals preference — fall back to defaults if not set.
+    let timeFormat: '12h' | '24h' = '12h';
+    let numerals: 'western' | 'arabic' = 'western';
+    try {
+      const raw = await AsyncStorage.getItem('app_settings');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const display = parsed?.display ?? {};
+        if (display.timeFormat === '24h' || display.timeFormat === '24-hour') timeFormat = '24h';
+        if (display.numerals === 'arabic' || display.numerals === 'arabic-indic') numerals = 'arabic';
+      }
+    } catch {
+      // keep defaults
+    }
+
+    // Timezone — IANA identifier from Intl. Falls back to UTC on platforms
+    // that don't expose it.
+    let timezone = 'UTC';
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) timezone = tz;
+    } catch {
+      // keep UTC
+    }
+
+    const inputs: PrayerWidgetInputs = {
+      version: PRAYER_INPUTS_VERSION,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      timezone,
+      calculationMethod: calc.calculationMethod as CalculationMethodId,
+      madhab: calc.asrJuristic === 1 ? 'hanafi' : 'shafi',
+      highLatitudeRule: undefined as HighLatRuleId | undefined,
+      timeFormat,
+      numerals,
+      adjustments: calc.adjustments as PrayerWidgetInputs['adjustments'],
+      writtenAt: new Date().toISOString(),
+    };
+
+    const json = JSON.stringify(inputs);
+
+    if (Platform.OS === 'ios') {
+      // App Group UserDefaults — read by Swift PrayerInputs.read()
+      try {
+        const SharedGroupPreferences = require('react-native-shared-group-preferences').default;
+        await SharedGroupPreferences.setItem(WIDGET_PRAYER_INPUTS_KEY_IOS, json, APP_GROUP);
+      } catch (e) {
+        if (__DEV__) console.warn('[writePrayerInputs] iOS App Group write failed:', e);
+      }
+      // Mirror to AsyncStorage too so the in-app gallery preview can read it.
+      try {
+        await AsyncStorage.setItem(WIDGET_PRAYER_INPUTS_KEY_ANDROID, json);
+      } catch {}
+    } else if (Platform.OS === 'android') {
+      try {
+        await AsyncStorage.setItem(WIDGET_PRAYER_INPUTS_KEY_ANDROID, json);
+      } catch (e) {
+        if (__DEV__) console.warn('[writePrayerInputs] Android AsyncStorage write failed:', e);
+      }
+    }
+
+    if (__DEV__) {
+      console.log('[writePrayerInputs] wrote inputs', {
+        method: inputs.calculationMethod,
+        madhab: inputs.madhab,
+        location: `${inputs.latitude.toFixed(4)},${inputs.longitude.toFixed(4)}`,
+        timezone: inputs.timezone,
+      });
+    }
+
+    return inputs;
+  } catch (e) {
+    if (__DEV__) console.warn('[writePrayerInputs] failed:', e);
+    return null;
   }
 }
 
@@ -455,6 +563,11 @@ export async function updateWidgetData(
       location = location || 'مكة المكرمة';
       canonicalSnapshot = null;
     }
+
+    // Write small inputs JSON for offline widget calculation (iOS App Group +
+    // Android AsyncStorage). Best-effort — falls through to legacy cached
+    // prayer epochs if location/settings aren't set yet.
+    writePrayerInputs().catch(() => {});
 
     const settledResults = await Promise.allSettled([
       preparePrayerWidgetData(effectivePrayerTimes, location, lang, canonicalSnapshot),

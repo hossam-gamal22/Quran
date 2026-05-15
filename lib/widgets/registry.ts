@@ -142,6 +142,14 @@ export interface WidgetDefinition<TPreviewProps = { size: PreviewSize; language?
     kind: WidgetOverlayKind;
     anchors: Partial<Record<PreviewSize, WidgetOverlayAnchor>>;
   };
+  /**
+   * When true on iOS, the widget extension renders this kind via baked
+   * per-state PNGs in `widgets/ios/Assets.xcassets/PrayerStatic/` plus a
+   * native numeric overlay (`PrayerStaticOverlay.swift`). The snapshot pump
+   * skips capturing runtime PNGs for this kind on iOS. Android continues to
+   * consume runtime snapshots until it adopts the same architecture.
+   */
+  iosStaticPng?: boolean;
   /** Deep link opened when the user taps the widget. */
   deepLink: string;
   /** Optional iOS WidgetKit App Intent enum raw value. Codegen will use definition.id when omitted. */
@@ -255,6 +263,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     sizes: ['small'],
     platforms: ['ios', 'android'],
     isPremium: false,
+    iosStaticPng: true,
     Preview: P.PrayerSimplePreview,
     deepLink: 'rooh-almuslim://prayer',
     overlay: {
@@ -274,6 +283,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     sizes: ['small', 'medium', 'large'],
     platforms: ['ios', 'android'],
     isPremium: false,
+    iosStaticPng: true,
     Preview: P.PrayerTablePreview,
     deepLink: 'rooh-almuslim://prayer',
     overlay: {
@@ -295,6 +305,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     sizes: ['medium'],
     platforms: ['ios', 'android'],
     isPremium: false,
+    iosStaticPng: true,
     Preview: P.PrayerNextPrevPreview,
     deepLink: 'rooh-almuslim://prayer',
     overlay: {
@@ -369,7 +380,8 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     titleEn: 'Hijri',
     sizes: ['small', 'medium'],
     platforms: ['ios', 'android'],
-    isPremium: true,
+    isPremium: false,
+    premiumSizes: ['medium'],
     Preview: P.HijriPreview,
     deepLink: 'rooh-almuslim://hijri',
     androidProvider: 'RoohHijriSmall',

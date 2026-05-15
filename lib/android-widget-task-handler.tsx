@@ -214,6 +214,91 @@ function resolveTarget(widgetName: string): { id: string; size: AndroidSize } | 
   return { id: t.id, size: t.size as AndroidSize };
 }
 
+const PRAYER_WIDGET_IDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
+
+function isPrayerWidget(widgetName: string): boolean {
+  const t = resolveTarget(widgetName);
+  return !!t && PRAYER_WIDGET_IDS.has(t.id);
+}
+
+/**
+ * Offline refresh for prayer widgets — reads small `@widget_prayer_inputs`
+ * record and computes today's prayer times locally via the adhan npm package.
+ * Merges the freshly-computed fields into `data.prayer` so the snapshot widget
+ * renders accurate values even if the user hasn't opened the app for weeks.
+ *
+ * Falls through silently if inputs aren't set yet (returns input data
+ * unchanged). The task handler then renders with whatever was cached.
+ */
+async function refreshPrayerWidgetData(
+  widgetName: string,
+  data: SharedWidgetData,
+): Promise<SharedWidgetData> {
+  if (!isPrayerWidget(widgetName)) return data;
+  try {
+    const {
+      readPrayerInputs,
+      computeFlatSnapshot,
+      PRAYER_ORDER,
+    } = require('./widget-prayer-calculator');
+    const inputs = await readPrayerInputs();
+    if (!inputs) return data;
+    const now = new Date();
+    const snapshot = computeFlatSnapshot(inputs, now, 7);
+    // Map prayer keys to display names.
+    const nameMap: Record<string, { en: string; ar: string }> = {
+      fajr:    { en: 'Fajr',    ar: 'الفجر' },
+      sunrise: { en: 'Sunrise', ar: 'الشروق' },
+      dhuhr:   { en: 'Dhuhr',   ar: 'الظهر' },
+      asr:     { en: 'Asr',     ar: 'العصر' },
+      maghrib: { en: 'Maghrib', ar: 'المغرب' },
+      isha:    { en: 'Isha',    ar: 'العشاء' },
+    };
+    const formatHHMM = (ms: number) => {
+      const d = new Date(ms);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    const nextNames = nameMap[snapshot.next] ?? nameMap.fajr;
+    const prevNames = nameMap[snapshot.previous] ?? nameMap.isha;
+    const allPrayers = (PRAYER_ORDER as string[]).map((key) => ({
+      name: nameMap[key].en,
+      nameAr: nameMap[key].ar,
+      time: formatHHMM(snapshot.todayTimes[key]),
+      epochMs: snapshot.todayTimes[key],
+      isPassed: snapshot.todayTimes[key] <= now.getTime(),
+      isNext: key === snapshot.next,
+    }));
+    const merged: SharedWidgetData = {
+      ...data,
+      prayer: {
+        ...(data.prayer ?? {}),
+        nextPrayer: snapshot.next,
+        nextPrayerName: nextNames.en,
+        nextPrayerNameAr: nextNames.ar,
+        nextPrayerTime: formatHHMM(snapshot.nextAtEpochMs),
+        nextPrayerAtEpochMs: snapshot.nextAtEpochMs,
+        previousPrayerName: prevNames.en,
+        previousPrayerNameAr: prevNames.ar,
+        previousPrayerAtEpochMs: snapshot.previousAtEpochMs,
+        allPrayers,
+        allPrayerEpochs: snapshot.allPrayerEpochs,
+        source: 'widget-local-adhan',
+        prayerDataUpdatedAt: new Date().toISOString(),
+      } as SharedWidgetData['prayer'],
+    };
+    if (__DEV__) {
+      console.log('[widget/android] refreshed prayer data offline', {
+        next: snapshot.next,
+        nextAt: new Date(snapshot.nextAtEpochMs).toISOString(),
+      });
+    }
+    return merged;
+  } catch (e) {
+    if (__DEV__) console.warn('[widget/android] offline prayer refresh failed:', e);
+    return data;
+  }
+}
+
 function widgetDeepLink(widgetId: string): string {
   switch (widgetId) {
     case 'prayerSingle':
@@ -342,7 +427,10 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         } catch {}
       }
 
-      await renderSnapshotWidget(widgetName, data, renderWidget);
+      // Prayer widgets: recompute prayer times locally via adhan so the widget
+      // stays accurate for weeks without the main app being opened.
+      const fresh = await refreshPrayerWidgetData(widgetName, data);
+      await renderSnapshotWidget(widgetName, fresh, renderWidget);
       return;
     }
 
@@ -381,7 +469,10 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         } catch {}
       }
 
-      await renderSnapshotWidget(widgetName, data, renderWidget);
+      // Prayer widgets: recompute prayer times locally via adhan so the widget
+      // stays accurate for weeks without the main app being opened.
+      const fresh = await refreshPrayerWidgetData(widgetName, data);
+      await renderSnapshotWidget(widgetName, fresh, renderWidget);
       return;
     }
 

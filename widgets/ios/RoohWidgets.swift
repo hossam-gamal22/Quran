@@ -184,7 +184,7 @@ private let compiledWidgetRegistryById: [String: RegistryDef] = [
     "azkarMorning": RegistryDef(id: "azkarMorning", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
     "azkarEvening": RegistryDef(id: "azkarEvening", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
     "dailyDhikr": RegistryDef(id: "dailyDhikr", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
-    "hijriDate": RegistryDef(id: "hijriDate", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
+    "hijriDate": RegistryDef(id: "hijriDate", sizes: ["small", "medium"], isPremium: false, premiumSizes: ["medium"]),
 ]
 
 private let widgetRegistryById: [String: RegistryDef] = loadWidgetRegistryDict()
@@ -365,6 +365,11 @@ struct SmallProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SmallWidgetIntent, in context: Context) async -> RoohEntry<SmallWidgetIntent> {
+        // Widget gallery preview must always render real-looking content so users
+        // can see what the widget does — never the "open the app" placeholder.
+        if context.isPreview {
+            return RoohEntry(date: Date(), configuration: configuration, data: sampleSharedData(), hasRealData: true)
+        }
         let real = sharedDataIfAvailable()
         return RoohEntry(date: Date(), configuration: configuration, data: real ?? sampleSharedData(), hasRealData: real != nil)
     }
@@ -386,6 +391,9 @@ struct MediumProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: MediumWidgetIntent, in context: Context) async -> RoohEntry<MediumWidgetIntent> {
+        if context.isPreview {
+            return RoohEntry(date: Date(), configuration: configuration, data: sampleSharedData(), hasRealData: true)
+        }
         let real = sharedDataIfAvailable()
         return RoohEntry(date: Date(), configuration: configuration, data: real ?? sampleSharedData(), hasRealData: real != nil)
     }
@@ -407,6 +415,9 @@ struct LargeProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: LargeWidgetIntent, in context: Context) async -> RoohEntry<LargeWidgetIntent> {
+        if context.isPreview {
+            return RoohEntry(date: Date(), configuration: configuration, data: sampleSharedData(), hasRealData: true)
+        }
         let real = sharedDataIfAvailable()
         return RoohEntry(date: Date(), configuration: configuration, data: real ?? sampleSharedData(), hasRealData: real != nil)
     }
@@ -459,6 +470,10 @@ struct StaticHomeProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (StaticRoohEntry) -> Void) {
+        if context.isPreview {
+            completion(StaticRoohEntry(date: Date(), data: sampleSharedData(), hasRealData: true, widgetId: widgetId, family: family))
+            return
+        }
         let real = sharedDataIfAvailable()
         completion(StaticRoohEntry(date: Date(), data: real ?? sampleSharedData(), hasRealData: real != nil, widgetId: widgetId, family: family))
     }
@@ -496,6 +511,11 @@ struct AppearanceIntentProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: RoohWidgetAppearanceIntent, in context: Context) async -> StaticRoohEntry {
+        if context.isPreview {
+            var sample = sampleSharedData()
+            applyIntent(configuration, to: &sample)
+            return StaticRoohEntry(date: Date(), data: sample, hasRealData: true, widgetId: widgetId, family: family)
+        }
         let real = sharedDataIfAvailable()
         var data = real ?? sampleSharedData()
         applyIntent(configuration, to: &data)
@@ -863,7 +883,7 @@ struct WidgetContext {
                let resolved = RoohCalendar(rawValue: raw), resolved != .auto {
                 self.calendar = resolved
             } else {
-                self.calendar = isAr ? .hijri : .gregorian
+                self.calendar = .hijri
             }
         } else {
             self.calendar = calendar
@@ -902,21 +922,9 @@ struct WidgetContext {
         return isArabic
     }
 
-    /// Per-widget-type calendar: for Day widgets (DaySimple, DayThuluth, DayDigital).
-    var dayCalendar: RoohCalendar {
-        if let raw = data.widgetDayCalendar, raw != "auto" {
-            return RoohCalendar(rawValue: raw) ?? calendar
-        }
-        return calendar
-    }
-
-    /// Per-widget-type calendar: for Month widgets (MonthSimple, MonthThuluth).
-    var monthCalendar: RoohCalendar {
-        if let raw = data.widgetMonthCalendar, raw != "auto" {
-            return RoohCalendar(rawValue: raw) ?? calendar
-        }
-        return calendar
-    }
+    /// Single source of truth: widgetCalendar. Both day and month widgets use the same value.
+    var dayCalendar: RoohCalendar { calendar }
+    var monthCalendar: RoohCalendar { calendar }
 
     /// Date format string from shared container (Glassify sample-style key).
     /// One of: "none" | "gregorian-ar" | "hijri-ar" | "gregorian-en" | "hijri-en".
@@ -1479,35 +1487,48 @@ struct MonthElegantEnView: View {
 struct PrayerSingleView: View {
     let context: WidgetContext
 
-    private var displayData: (palette: ThemePalette, name: String, time: String, countdown: String) {
+    private var displayData: (palette: ThemePalette, name: String, timeDigits: String, ampm: String) {
         let pal = palette(context.theme)
         let prayer = context.data.prayer
-        let next = nextPrayerItem(prayer, now: context.date)
+        // Phase D: use 7-day epoch-derived next prayer so the widget stays
+        // accurate for 7+ days without the app being opened.
+        let next = todaysNextPrayer(context)
         let name = context.isArabic
-            ? (next?.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر")
-            : (next?.name ?? prayer?.nextPrayerName ?? "Fajr")
-        let time = applyNumeralsTo(next?.time ?? prayer?.nextPrayerTime ?? "04:15", context)
-        let countdown = widgetLiveText(kind: .prayerNextCountdown, context: context)
-        return (pal, name, time, countdown)
+            ? (next.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر")
+            : (next.name ?? prayer?.nextPrayerName ?? "Fajr")
+        let timeDigits = prayerTimeDigitsFromEpoch(next.epochMs, context)
+        let ampm = prayerAMPMFromEpoch(next.epochMs, context)
+        return (pal, name, timeDigits, ampm)
     }
 
     var body: some View {
         let d = displayData
+        let timerDate = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
         VStack(spacing: 8) {
             Text(context.isArabic ? "الصلاة القادمة" : "Next Prayer")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.custom("Rubik-Medium", size: 13))
                 .foregroundStyle(d.palette.muted)
             Text(d.name)
                 .font(prayerNameFont(size: 26))
                 .foregroundStyle(d.palette.text)
-            Text(d.time)
+            // AM/PM above the large digits to avoid truncation at 50pt
+            Text(d.ampm)
+                .font(.custom("Rubik-Medium", size: 16))
+                .foregroundStyle(d.palette.muted)
+            Text(d.timeDigits)
                 .font(.custom("Rubik-Bold", size: 50))
                 .foregroundStyle(d.palette.text)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
-            Text(d.countdown)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(d.palette.muted)
+            HStack(spacing: 3) {
+                Text(context.isArabic ? "بعد" : "in")
+                Text(timerDate, style: .timer)
+                    .multilineTextAlignment(.center)
+                    .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
+            }
+            .font(.custom("Rubik-Medium", size: 12))
+            .foregroundStyle(d.palette.muted)
+            .environment(\.layoutDirection, .leftToRight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(12)
@@ -1523,8 +1544,10 @@ struct PrayerTableView: View {
     var body: some View {
         let p = palette(context.theme)
         let prayer = context.data.prayer
-        let prayers = normalizedPrayers(prayer, now: context.date)
-        let next = prayers.first { $0.isNext ?? false } ?? nextPrayerItem(prayer, now: context.date)
+        // Phase D: derive today's six prayers from the 7-day flat epoch list so
+        // the widget keeps showing correct times for 7+ days without an app open.
+        let prayers = todaysPrayersFromContext(context)
+        let next = prayers.first { $0.isNext ?? false } ?? todaysNextPrayer(context)
         let activeBg = p.isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.12)
 
         Group {
@@ -1547,12 +1570,19 @@ struct PrayerTableView: View {
     private func smallLayout(prayers: [WidgetPrayerItem], prayer: WidgetPrayerData?, palette p: ThemePalette, activeBg: Color) -> some View {
         VStack(spacing: 0) {
             HStack {
-                Text(widgetLiveText(kind: .prayerNextCountdown, context: context).replacingOccurrences(of: " ", with: ""))
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(p.muted)
+                let timerDate = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
+                HStack(spacing: 1) {
+                    Text(context.isArabic ? "بعد" : "in")
+                    Text(timerDate, style: .timer)
+                        .multilineTextAlignment(.center)
+                        .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
+                }
+                .font(.custom("Rubik-Medium", size: 9))
+                .foregroundStyle(p.muted)
+                .environment(\.layoutDirection, .leftToRight)
                 Spacer()
                 Text(context.isArabic ? "الصلاة القادمة" : "Next Prayer")
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .font(.custom("Rubik-Medium", size: 9))
                     .foregroundStyle(p.muted)
             }
             .padding(.bottom, 3)
@@ -1569,7 +1599,7 @@ struct PrayerTableView: View {
     private func mediumLayout(prayers: [WidgetPrayerItem], prayer: WidgetPrayerData?, next: WidgetPrayerItem?, palette p: ThemePalette, activeBg: Color) -> some View {
         let nextNameAr = next?.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر"
         let nextName   = next?.name ?? prayer?.nextPrayerName ?? "Fajr"
-        let nextTime   = applyNumeralsTo(next?.time ?? prayer?.nextPrayerTime ?? "04:15", context)
+        let nextTime   = prayerTimeFromEpoch(next?.epochMs, context)
         HStack(spacing: 8) {
             // List (left)
             VStack(spacing: 1) {
@@ -1582,7 +1612,7 @@ struct PrayerTableView: View {
             // Hero (right)
             VStack(spacing: 2) {
                 Text(context.isArabic ? "الصلاة القادمة" : "Next Prayer")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.custom("Rubik-Medium", size: 10))
                     .foregroundStyle(p.muted)
                 Text(context.isArabic ? nextNameAr : nextName)
                     .font(.custom("Rubik-Bold", size: 20))
@@ -1591,9 +1621,16 @@ struct PrayerTableView: View {
                     .font(.custom("Rubik-Bold", size: 32))
                     .foregroundStyle(p.text)
                     .kerning(-1)
-                Text(widgetLiveText(kind: .prayerNextCountdown, context: context))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(p.muted)
+                let timerDateMed = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
+                HStack(spacing: 3) {
+                    Text(context.isArabic ? "بعد" : "in")
+                    Text(timerDateMed, style: .timer)
+                        .multilineTextAlignment(.center)
+                        .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
+                }
+                .font(.custom("Rubik-Medium", size: 9))
+                .foregroundStyle(p.muted)
+                .environment(\.layoutDirection, .leftToRight)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -1605,35 +1642,49 @@ struct PrayerTableView: View {
     private func largeLayout(prayers: [WidgetPrayerItem], prayer: WidgetPrayerData?, next: WidgetPrayerItem?, palette p: ThemePalette, activeBg: Color) -> some View {
         let nextNameAr = next?.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر"
         let nextName   = next?.name ?? prayer?.nextPrayerName ?? "Fajr"
-        let nextTime   = applyNumeralsTo(next?.time ?? prayer?.nextPrayerTime ?? "04:15", context)
+        let nextTime   = prayerTimeFromEpoch(next?.epochMs, context)
         let heroBg = p.isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08)
 
         VStack(spacing: 10) {
-            HStack(alignment: .center, spacing: 14) {
-                Image(systemName: prayerSymbol(next?.name ?? prayer?.nextPrayer ?? "fajr"))
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(p.muted)
-                    .frame(width: 36)
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 5) {
-                    Text(context.isArabic ? nextNameAr : nextName)
-                        .font(.custom("Rubik-Bold", size: 22))
-                        .foregroundStyle(p.text)
-                    Text(nextTime)
-                        .font(.custom("Rubik-Bold", size: 36))
-                        .foregroundStyle(p.text)
-                    Text(
-                        context.isArabic
-                            ? "الصلاة القادمة " + widgetLiveText(kind: .prayerNextCountdown, context: context)
-                            : "Next prayer " + widgetLiveText(kind: .prayerNextCountdown, context: context)
-                    )
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(p.muted)
+            ZStack(alignment: .bottomTrailing) {
+                // Watermark first → renders behind hero content (matches gallery preview position: bottom-right of hero card)
+                Text("الصلاة")
+                    .font(.custom("DecoTypeThuluth2", size: 46))
+                    .foregroundStyle(p.isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.05))
+                    .padding(.trailing, 12)
+                    .padding(.bottom, 14)
+                    .allowsTightening(true)
+                    .lineLimit(1)
+                HStack(alignment: .center, spacing: 14) {
+                    Image(systemName: prayerSymbol(next?.name ?? prayer?.nextPrayer ?? "fajr"))
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(p.muted)
+                        .frame(width: 36)
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 5) {
+                        Text(context.isArabic ? nextNameAr : nextName)
+                            .font(.custom("Rubik-Bold", size: 22))
+                            .foregroundStyle(p.text)
+                        Text(nextTime)
+                            .font(.custom("Rubik-Bold", size: 36))
+                            .foregroundStyle(p.text)
+                        let timerDateLg = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
+                        HStack(spacing: 4) {
+                            Text(context.isArabic ? "الصلاة القادمة بعد" : "Next prayer in")
+                            Text(timerDateLg, style: .timer)
+                                .multilineTextAlignment(.trailing)
+                                .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
+                        }
+                        .font(.custom("Rubik-Medium", size: 12))
+                        .foregroundStyle(p.muted)
+                        .environment(\.layoutDirection, .leftToRight)
+                    }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
             .background(RoundedRectangle(cornerRadius: 16).fill(heroBg))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
 
             VStack(spacing: 3) {
                 ForEach(prayers) { item in
@@ -1649,7 +1700,7 @@ struct PrayerTableView: View {
     @ViewBuilder
     private func prayerRow(item: WidgetPrayerItem, palette p: ThemePalette, activeBg: Color, fontSize: CGFloat, padH: CGFloat, padV: CGFloat) -> some View {
         let active = item.isNext ?? false
-        let timeText = applyNumeralsTo(item.time ?? "--:--", context)
+        let timeText = prayerTimeFromEpoch(item.epochMs, context)
         HStack(spacing: 8) {
             Text(timeText)
                 .font(.custom("Rubik-Bold", size: fontSize))
@@ -1670,65 +1721,62 @@ struct PrayerNextPreviousView: View {
     let context: WidgetContext
     var body: some View {
         let p = palette(context.theme)
-        let prayer = context.data.prayer
-        let prayers = normalizedPrayers(prayer, now: context.date)
-        let nextIndex = prayers.firstIndex { $0.isNext ?? false } ?? 0
-        let prevIndex = (nextIndex - 1 + prayers.count) % max(prayers.count, 1)
-        let next = prayers.isEmpty ? nil : prayers[nextIndex]
-        let previous = prayers.isEmpty ? nil : prayers[prevIndex]
+        // Phase D: 7-day-aware next/previous prayer derivation.
+        let next = todaysNextPrayer(context)
+        let previous = todaysPreviousPrayer(context)
+        let nextEpochMs = next.epochMs ?? resolvedNextPrayerEpochMs(context)
+        let prevEpochMs = previous.epochMs ?? resolvedPreviousPrayerEpochMs(context)
 
-        HStack(spacing: 14) {
-            prayerBox(item: next, subtitle: widgetLiveText(kind: .prayerNextCountdown, context: context), palette: p)
-            prayerBox(item: previous, subtitle: widgetLiveText(kind: .prayerPreviousCountdown, context: context), palette: p)
+        HStack(spacing: 10) {
+            prayerBox(item: previous, epochMs: prevEpochMs, isNext: false, palette: p)
+            prayerBox(item: next, epochMs: nextEpochMs, isNext: true, palette: p)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Pin LTR so previous is on the LEFT and next on the RIGHT — matches
+        // the gallery preview which uses `direction: 'ltr'` for the same reason.
+        .environment(\.layoutDirection, .leftToRight)
     }
 
-    /// Computes "Xh Ym" duration between a prayer time string ("HH:mm") and now.
-    /// Falls back to "—" when the time can't be parsed.
-    func elapsedSince(_ timeString: String?, now: Date) -> String {
-        guard let raw = timeString, !raw.isEmpty else { return "—" }
-        let parts = raw.split(separator: ":")
-        guard parts.count >= 2,
-              let h = Int(parts[0]),
-              let m = Int(parts[1]) else { return raw }
-        let cal = Calendar(identifier: .gregorian)
-        var comp = cal.dateComponents([.year, .month, .day], from: now)
-        comp.hour = h
-        comp.minute = m
-        guard let prayerDate = cal.date(from: comp) else { return raw }
-        // If the prayer time is later in the day than "now", it's actually yesterday's prayer.
-        let target = prayerDate > now ? cal.date(byAdding: .day, value: -1, to: prayerDate) ?? prayerDate : prayerDate
-        let mins = max(0, Int(now.timeIntervalSince(target) / 60))
-        let hours = mins / 60
-        let minutes = mins % 60
-        if context.isArabic {
-            let h = formatNumber(hours, context)
-            let m = formatNumber(minutes, context)
-            return "\(h) س \(m) د"
-        }
-        return "\(hours)h \(minutes)m"
-    }
+    func prayerBox(item: WidgetPrayerItem?, epochMs: Double, isNext: Bool, palette p: ThemePalette) -> some View {
+        let timerDate = Date(timeIntervalSince1970: epochMs / 1000)
+        let prefix = context.isArabic ? (isNext ? "بعد" : "منذ") : (isNext ? "in" : "ago")
+        let valid = epochMs > 1000
+        let boxBg = p.isLight ? Color.black.opacity(0.05) : Color.white.opacity(0.06)
+        let boxBorder = p.isLight ? Color.black.opacity(0.08) : Color.white.opacity(0.10)
 
-    func prayerBox(item: WidgetPrayerItem?, subtitle: String, palette p: ThemePalette) -> some View {
-        VStack(spacing: 6) {
+        return VStack(spacing: 2) {
             Image(systemName: prayerSymbol(item?.name ?? "fajr"))
-                .font(.system(size: 25, weight: .bold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(p.muted)
             Text(context.isArabic ? (item?.nameAr ?? "الفجر") : (item?.name ?? "Fajr"))
-                .font(prayerNameFont(size: 18))
+                .font(prayerNameFont(size: 16))
                 .foregroundStyle(p.text)
-            Text(applyNumeralsTo(item?.time ?? "--:--", context))
-                .font(.custom("Rubik-Bold", size: 33))
+                .padding(.top, 2)
+            Text(prayerTimeFromEpoch(item?.epochMs, context))
+                .font(.custom("Rubik-Bold", size: 28))
+                .kerning(-0.5)
                 .foregroundStyle(p.text)
-            Text(subtitle)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .padding(.top, 2)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+            if valid {
+                HStack(spacing: 3) {
+                    Text(prefix)
+                    Text(timerDate, style: .timer)
+                        .multilineTextAlignment(.center)
+                        .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
+                }
+                .font(.custom("Rubik-Medium", size: 9))
+                .environment(\.layoutDirection, .leftToRight)
                 .foregroundStyle(p.muted)
+                .padding(.top, 2)
+            }
         }
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: 18).fill(p.surface))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(p.isLight ? Color.black.opacity(0.08) : Color.white.opacity(0.12), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 18).fill(boxBg))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(boxBorder, lineWidth: 0.5))
     }
 }
 
@@ -1890,11 +1938,14 @@ struct LockNextPrayerView: View {
         if let shared = sharedDataIfAvailable() {
             let context = lockWidgetContext(date: date, shared: shared)
             let prayer = shared.prayer
+            let trueNext = nextPrayerItem(prayer, now: Date())
             let nextName = context.isArabic
-                ? (prayer?.nextPrayerNameAr ?? "الفجر")
-                : (prayer?.nextPrayerName ?? "Fajr")
-            let nextTime = applyNumeralsTo(prayer?.nextPrayerTime ?? "--:--", context)
-            let countdown = formatCountdown(prayer?.timeRemaining ?? "--:--", context)
+                ? (trueNext?.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر")
+                : (trueNext?.name ?? prayer?.nextPrayerName ?? "Fajr")
+            let nextTime = prayerTimeFromEpoch(trueNext?.epochMs ?? prayer?.nextPrayerAtEpochMs, context)
+            let nextEpochMs = resolvedNextPrayerEpochMs(context)
+            let nextPrayerDate = Date(timeIntervalSince1970: nextEpochMs / 1000)
+            let prefix = context.isArabic ? "بعد" : "in"
             let alignment: HorizontalAlignment = context.isArabic ? .trailing : .leading
             let frameAlignment: Alignment = context.isArabic ? .trailing : .leading
             VStack(alignment: alignment, spacing: 3) {
@@ -1910,11 +1961,17 @@ struct LockNextPrayerView: View {
                     .font(lockRubik(size: 26))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                Text(countdown)
-                    .font(lockRubik(size: 14, weight: "Rubik-Medium"))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .opacity(0.85)
+                HStack(spacing: 3) {
+                    Text(prefix)
+                        .font(lockRubik(size: 14, weight: "Rubik-Medium"))
+                    Text(nextPrayerDate, style: .timer)
+                        .font(lockRubik(size: 14, weight: "Rubik-Medium"))
+                        .multilineTextAlignment(.leading)
+                }
+                .environment(\.layoutDirection, .leftToRight)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .opacity(0.85)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: frameAlignment)
             .environment(\.layoutDirection, context.isArabic ? .rightToLeft : .leftToRight)
@@ -1931,19 +1988,20 @@ struct LockAllPrayersView: View {
     var body: some View {
         if let shared = sharedDataIfAvailable() {
             let context = lockWidgetContext(date: date, shared: shared)
-            let allPrayers = shared.prayer?.allPrayers ?? []
-            let mainFive = allPrayers.filter { ($0.name ?? "").lowercased() != "sunrise" }
+            let liveprayers = normalizedPrayers(shared.prayer, now: Date())
+            let mainFive = liveprayers.filter { ($0.name ?? "").lowercased() != "sunrise" }
             let prayers = Array(mainFive.prefix(5))
             HStack(spacing: 4) {
                 ForEach(Array(prayers.enumerated()), id: \.offset) { _, p in
+                    let isActiveRow = p.isNext ?? false
                     VStack(spacing: 2) {
                         Text(context.isArabic ? (p.nameAr ?? "") : (p.name ?? ""))
                             .font(lockRubik(size: 13))
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                            .opacity((p.isNext ?? false) ? 1.0 : 0.85)
-                        Text(applyNumeralsTo(p.time ?? "--:--", context))
-                            .font(lockRubik(size: 14, weight: (p.isNext ?? false) ? "Rubik-Bold" : "Rubik-Medium"))
+                            .opacity(isActiveRow ? 1.0 : 0.85)
+                        Text(prayerTimeFromEpoch(p.epochMs, context))
+                            .font(lockRubik(size: 14, weight: isActiveRow ? "Rubik-Bold" : "Rubik-Medium"))
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     }
@@ -2009,22 +2067,22 @@ struct LockNextPrayerCountdownView: View {
             let context = lockWidgetContext(date: date, shared: shared)
             let prayer = shared.prayer
             let totalWindowMinutes: Double = 6 * 60
-            let remaining = Double(prayer?.timeRemainingMinutes ?? 0)
-            let progress = max(0.0, min(1.0, 1.0 - (remaining / totalWindowMinutes)))
-            // Full prayer name (no truncation) and bare-time countdown without
-            // the "بعد" / "in" prefix — keeps the small circular gauge readable
-            // while showing the entire next-prayer name.
+            let nextEpochMs = resolvedNextPrayerEpochMs(context)
+            let nextPrayerDate = Date(timeIntervalSince1970: nextEpochMs / 1000)
+            let nowMs = Date().timeIntervalSince1970 * 1000
+            let remainingMins = max(0, (nextEpochMs - nowMs) / 60000)
+            let liveProgress = max(0.0, min(1.0, 1.0 - (remainingMins / totalWindowMinutes)))
+            let trueNextCircular = nextPrayerItem(prayer, now: Date())
             let nextFull = context.isArabic
-                ? (prayer?.nextPrayerNameAr ?? "الفجر")
-                : (prayer?.nextPrayerName ?? "Fajr")
-            let countdown = bareCountdown(prayer?.timeRemaining ?? "--:--", context)
-            Gauge(value: progress) {
+                ? (trueNextCircular?.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر")
+                : (trueNextCircular?.name ?? prayer?.nextPrayerName ?? "Fajr")
+            Gauge(value: liveProgress) {
                 Text(nextFull)
                     .font(lockRubik(size: 9, weight: "Rubik-Medium"))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
             } currentValueLabel: {
-                Text(countdown)
+                Text(nextPrayerDate, style: .timer)
                     .font(lockRubik(size: 12))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -2215,40 +2273,53 @@ func applyNumeralsTo(_ value: String, _ context: WidgetContext) -> String {
     return context.usesArabicNumerals ? latinToArabicDigits(value) : value
 }
 
+func prayerTimeFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String {
+    guard let ms = epochMs, ms > 1000 else { return "--:--" }
+    let date = Date(timeIntervalSince1970: ms / 1000)
+    let f = DateFormatter()
+    f.locale = Locale(identifier: context.isArabic ? "ar_AE" : "en_US")
+    f.dateFormat = "h:mm a"
+    let result = f.string(from: date)
+    return context.usesArabicNumerals ? latinToArabicDigits(result) : result
+}
+
+/// Returns only the digits+colon part (e.g. "٤:١١") without AM/PM — for large displays.
+func prayerTimeDigitsFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String {
+    guard let ms = epochMs, ms > 1000 else { return "--:--" }
+    let date = Date(timeIntervalSince1970: ms / 1000)
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.dateFormat = "h:mm"
+    let result = f.string(from: date)
+    return context.usesArabicNumerals ? latinToArabicDigits(result) : result
+}
+
+/// Returns only the AM/PM indicator (e.g. "ص" or "م") — displayed separately at small size.
+func prayerAMPMFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String {
+    guard let ms = epochMs, ms > 1000 else { return "" }
+    let date = Date(timeIntervalSince1970: ms / 1000)
+    let f = DateFormatter()
+    f.locale = Locale(identifier: context.isArabic ? "ar_AE" : "en_US")
+    f.dateFormat = "a"
+    return f.string(from: date)
+}
+
 func formatCountdown(_ remaining: String, _ context: WidgetContext) -> String {
     if remaining == "--:--" || remaining.isEmpty { return context.isArabic ? "بعد —" : "in —" }
-    let parts = remaining.split(separator: ":")
-    if parts.count >= 2 {
-        let h = applyNumeralsTo(String(parts[0]), context)
-        let m = applyNumeralsTo(String(parts[1]), context)
-        return context.isArabic ? "بعد \(h) س \(m) د" : "in \(h)h \(m)m"
-    }
-    return context.isArabic ? "بعد \(applyNumeralsTo(remaining, context))" : "in \(remaining)"
+    let formatted = applyNumeralsTo(remaining, context)
+    return context.isArabic ? "بعد \(formatted)" : "in \(formatted)"
 }
 
 /// Tighter countdown variant for the small Prayer Table header.
 func compactCountdown(_ remaining: String, _ context: WidgetContext) -> String {
     if remaining == "--:--" || remaining.isEmpty { return context.isArabic ? "بعد —" : "in —" }
-    let parts = remaining.split(separator: ":")
-    if parts.count >= 2 {
-        let h = applyNumeralsTo(String(parts[0]), context)
-        let m = applyNumeralsTo(String(parts[1]), context)
-        return context.isArabic ? "بعد \(h)س \(m)د" : "in \(h)h \(m)m"
-    }
-    return context.isArabic ? "بعد \(applyNumeralsTo(remaining, context))" : "in \(remaining)"
+    let formatted = applyNumeralsTo(remaining.replacingOccurrences(of: " ", with: ""), context)
+    return context.isArabic ? "بعد \(formatted)" : "in \(formatted)"
 }
 
-/// Like `compactCountdown` but without the "بعد" / "in" prefix — used in tight
-/// lock-screen views where the prefix wastes vertical space and the value's
-/// "س / د" / "h / m" suffix already conveys "time remaining".
+/// Bare countdown without prefix — used in tight lock-screen views.
 func bareCountdown(_ remaining: String, _ context: WidgetContext) -> String {
     if remaining == "--:--" || remaining.isEmpty { return "—" }
-    let parts = remaining.split(separator: ":")
-    if parts.count >= 2 {
-        let h = applyNumeralsTo(String(parts[0]), context)
-        let m = applyNumeralsTo(String(parts[1]), context)
-        return context.isArabic ? "\(h)س \(m)د" : "\(h)h \(m)m"
-    }
     return applyNumeralsTo(remaining, context)
 }
 
@@ -2357,14 +2428,25 @@ private struct LiveOverlayAnchor {
     let compact: Bool
 }
 
-private enum LiveOverlayKind {
+private enum LiveOverlayKind: Hashable {
     case none
     case prayerNextCountdown
     case prayerPreviousCountdown
     case currentTime
+    // Hybrid overlay kinds — render the dynamic numbers/names on top of the
+    // PNG snapshot so prayer widgets stay correct for 7+ days without the app
+    // being opened. Times are derived live from SharedWidgetData.prayer.allPrayerEpochs.
+    case prayerHeroName       // big prayer name in single/table hero (next prayer)
+    case prayerHeroTime       // big prayer time in single/table hero (next prayer)
+    case prayerPreviousName   // previous-prayer name in next/previous widget
+    case prayerPreviousTime   // previous-prayer time in next/previous widget
+    case prayerRowTime(Int)   // row index 0..5 (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha)
+    case prayerRowHighlight(Int) // active-row background tint at row 0..5
 }
 
-/// Anchor table — keep in sync with lib/widgets/registry.ts overlay.anchors.
+/// Anchor table — countdown / current-time overlays drawn on top of the PNG
+/// snapshot. Anchor coordinates match the transparent rectangles the RN
+/// preview leaves when `forSnapshot=true`.
 private func widgetOverlayAnchors(id: String, family: WidgetFamily) -> [(LiveOverlayKind, LiveOverlayAnchor)] {
     let size = widgetSnapshotSizeString(family)
     switch (id, size) {
@@ -2390,8 +2472,20 @@ private func widgetOverlayAnchors(id: String, family: WidgetFamily) -> [(LiveOve
 
 private func overlaySwiftUIColor(kind: LiveOverlayKind, _ p: ThemePalette) -> Color {
     switch kind {
-    case .prayerNextCountdown, .prayerPreviousCountdown: return p.muted
-    default: return p.text
+    case .prayerNextCountdown, .prayerPreviousCountdown:
+        return p.muted
+    case .prayerRowTime(let idx):
+        // Active row is the "next" prayer — slightly emphasized. Without
+        // pre-computing which idx is active here we'd need a closure; use a
+        // single color and let the eye pick out the highlight from layout.
+        // We cannot easily branch on isNext at color-resolution time (kind only
+        // knows the index), so render all rows as text color and accept that
+        // muted/active distinction comes from the underlying PNG (which keeps
+        // the active highlight tint from the gallery snapshot).
+        _ = idx
+        return p.text
+    default:
+        return p.text
     }
 }
 
@@ -2408,8 +2502,119 @@ private func prayerEpochs(_ context: WidgetContext) -> [Double] {
         .sorted()
 }
 
+/// Returns today's six prayers (Fajr → Isha) computed live from the 7-day
+/// flat epoch list in shared widget data. This is the source of truth for the
+/// hybrid overlay so the home-screen widget shows correct times for any day
+/// covered by `allPrayerEpochs` even if the app hasn't been opened in days.
+///
+/// The flat epoch list is sorted; for any given calendar day in the device's
+/// local timezone we take the first 6 epochs falling on that day and map them
+/// to the canonical prayer order: [Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha].
+/// If the count for "today" is less than 6 (edge case after install), we fall
+/// back to `allPrayers` for the missing slots so the widget never goes empty.
+private func todaysPrayersFromContext(_ context: WidgetContext) -> [WidgetPrayerItem] {
+    let fallback = context.data.prayer?.allPrayers ?? []
+    let prayerOrder: [(en: String, ar: String)] = [
+        ("Fajr", "الفجر"),
+        ("Sunrise", "الشروق"),
+        ("Dhuhr", "الظهر"),
+        ("Asr", "العصر"),
+        ("Maghrib", "المغرب"),
+        ("Isha", "العشاء")
+    ]
+
+    let epochs = prayerEpochs(context) // sorted ascending
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    let tomorrow = cal.date(byAdding: .day, value: 1, to: today) ?? today
+
+    let todaysEpochs = epochs.filter { ms in
+        let d = Date(timeIntervalSince1970: ms / 1000)
+        return d >= today && d < tomorrow
+    }
+
+    let nowMs = Date().timeIntervalSince1970 * 1000
+    let nextEpoch = epochs.first { $0 > nowMs }
+
+    var items: [WidgetPrayerItem] = []
+    for (idx, info) in prayerOrder.enumerated() {
+        if idx < todaysEpochs.count {
+            let ms = todaysEpochs[idx]
+            items.append(WidgetPrayerItem(
+                name: info.en,
+                nameAr: info.ar,
+                time: prayerTimeFromEpoch(ms, context),
+                epochMs: ms,
+                isPassed: ms <= nowMs,
+                isNext: ms == nextEpoch
+            ))
+        } else if idx < fallback.count {
+            // Fall back to per-day items if today's epoch list is short
+            var it = fallback[idx]
+            it.name = it.name ?? info.en
+            it.nameAr = it.nameAr ?? info.ar
+            items.append(it)
+        } else {
+            items.append(WidgetPrayerItem(
+                name: info.en,
+                nameAr: info.ar,
+                time: "--:--",
+                epochMs: nil,
+                isPassed: false,
+                isNext: false
+            ))
+        }
+    }
+    return items
+}
+
+/// Returns the prayer currently considered "next" — the first today's prayer
+/// whose epoch is strictly after now, or the first prayer of tomorrow if Isha
+/// has already passed.
+private func todaysNextPrayer(_ context: WidgetContext) -> WidgetPrayerItem {
+    let items = todaysPrayersFromContext(context)
+    let nowMs = Date().timeIntervalSince1970 * 1000
+    if let next = items.first(where: { ($0.epochMs ?? 0) > nowMs }) {
+        return next
+    }
+    // After Isha: surface tomorrow's Fajr if we have its epoch.
+    let nextEpoch = prayerEpochs(context).first { $0 > nowMs }
+    if let nextEpoch = nextEpoch {
+        return WidgetPrayerItem(
+            name: "Fajr",
+            nameAr: "الفجر",
+            time: prayerTimeFromEpoch(nextEpoch, context),
+            epochMs: nextEpoch,
+            isPassed: false,
+            isNext: true
+        )
+    }
+    return items.last ?? WidgetPrayerItem(name: "Fajr", nameAr: "الفجر", time: "--:--", epochMs: nil, isPassed: false, isNext: true)
+}
+
+/// Returns the prayer immediately before `todaysNextPrayer` — used by the
+/// next/previous widget.
+private func todaysPreviousPrayer(_ context: WidgetContext) -> WidgetPrayerItem {
+    let items = todaysPrayersFromContext(context)
+    let nowMs = Date().timeIntervalSince1970 * 1000
+    if let prev = items.last(where: { ($0.epochMs ?? 0) <= nowMs }) {
+        return prev
+    }
+    // Before today's Fajr: surface yesterday's Isha at minimum (epoch unknown,
+    // fall back to context.data.prayer.previousPrayer*).
+    let p = context.data.prayer
+    return WidgetPrayerItem(
+        name: p?.previousPrayerName,
+        nameAr: p?.previousPrayerNameAr,
+        time: prayerTimeFromEpoch(p?.previousPrayerAtEpochMs, context),
+        epochMs: p?.previousPrayerAtEpochMs,
+        isPassed: true,
+        isNext: false
+    )
+}
+
 private func resolvedNextPrayerEpochMs(_ context: WidgetContext) -> Double {
-    let nowMs = context.date.timeIntervalSince1970 * 1000
+    let nowMs = Date().timeIntervalSince1970 * 1000
     if let next = prayerEpochs(context).first(where: { $0 > nowMs }) {
         return next
     }
@@ -2417,7 +2622,7 @@ private func resolvedNextPrayerEpochMs(_ context: WidgetContext) -> Double {
 }
 
 private func resolvedPreviousPrayerEpochMs(_ context: WidgetContext) -> Double {
-    let nowMs = context.date.timeIntervalSince1970 * 1000
+    let nowMs = Date().timeIntervalSince1970 * 1000
     if let previous = prayerEpochs(context).last(where: { $0 <= nowMs }) {
         return previous
     }
@@ -2435,24 +2640,32 @@ private func widgetLiveText(kind: LiveOverlayKind, context: WidgetContext) -> St
         let raw = f.string(from: context.date)
         return context.usesArabicNumerals ? latinToArabicDigits(raw) : raw
     case .prayerNextCountdown:
-        let nowMs = context.date.timeIntervalSince1970 * 1000
+        let nowMs = Date().timeIntervalSince1970 * 1000
         let targetMs = resolvedNextPrayerEpochMs(context)
         let remainingSeconds = max(0, Int((targetMs - nowMs) / 1000))
-        let hoursRaw = remainingSeconds / 3600
-        let minutesRaw = (remainingSeconds % 3600) / 60
-        let h = context.usesArabicNumerals ? latinToArabicDigits(String(hoursRaw)) : String(hoursRaw)
-        let m = context.usesArabicNumerals ? latinToArabicDigits(String(minutesRaw)) : String(minutesRaw)
+        let h = remainingSeconds / 3600
+        let m = (remainingSeconds % 3600) / 60
+        let s = remainingSeconds % 60
+        let timeStr = String(format: "%d:%02d:%02d", h, m, s)
+        let formatted = context.usesArabicNumerals ? latinToArabicDigits(timeStr) : timeStr
         NSLog("[widget/ios] countdown nowMs=%.0f nextPrayerAtEpochMs=%.0f widgetRemainingSeconds=%d prayerDataUpdatedAt=%@", nowMs, targetMs, remainingSeconds, context.data.prayer?.prayerDataUpdatedAt ?? "n/a")
-        return context.isArabic ? "بعد \(h) س \(m) د" : "in \(h)h \(m)m"
+        return context.isArabic ? "بعد \(formatted)" : "in \(formatted)"
     case .prayerPreviousCountdown:
-        let nowMs = context.date.timeIntervalSince1970 * 1000
+        let nowMs = Date().timeIntervalSince1970 * 1000
         let targetMs = resolvedPreviousPrayerEpochMs(context)
         let elapsedSeconds = max(0, Int((nowMs - targetMs) / 1000))
-        let hoursRaw = elapsedSeconds / 3600
-        let minutesRaw = (elapsedSeconds % 3600) / 60
-        let h = context.usesArabicNumerals ? latinToArabicDigits(String(hoursRaw)) : String(hoursRaw)
-        let m = context.usesArabicNumerals ? latinToArabicDigits(String(minutesRaw)) : String(minutesRaw)
-        return context.isArabic ? "منذ \(h) س \(m) د" : "\(h)h \(m)m ago"
+        let h = elapsedSeconds / 3600
+        let m = (elapsedSeconds % 3600) / 60
+        let s = elapsedSeconds % 60
+        let timeStr = String(format: "%d:%02d:%02d", h, m, s)
+        let formatted = context.usesArabicNumerals ? latinToArabicDigits(timeStr) : timeStr
+        return context.isArabic ? "منذ \(formatted)" : "\(formatted) ago"
+    case .prayerHeroName, .prayerHeroTime, .prayerPreviousName, .prayerPreviousTime,
+         .prayerRowTime, .prayerRowHighlight:
+        // These kinds are rendered directly by liveOverlayView using helper
+        // functions (todaysPrayersFromContext / todaysNextPrayer / etc).
+        // widgetLiveText is only used for the default static-text path.
+        return ""
     }
 }
 
@@ -2505,9 +2718,96 @@ private func dynamicDateHomeView(widgetId: String, family: WidgetFamily, context
     }
 }
 
-@ViewBuilder
-private func dynamicPrayerHomeView(widgetId: String, family: WidgetFamily, context: WidgetContext, palette p: ThemePalette) -> some View {
-    ZStack {
+/// Check whether the baked Asset Catalog ships an asset for the given
+/// (kind, size, theme, language, state) combination. When true, the widget
+/// renders via `PrayerStaticOverlay`. Otherwise it falls back to the existing
+/// pure-SwiftUI prayer views below — the user never sees a broken layout
+/// while the bake matrix is being filled in.
+private func prayerStaticAssetExists(widgetId: String,
+                                     family: WidgetFamily,
+                                     theme: RoohTheme,
+                                     language: String,
+                                     active: PrayerKey,
+                                     previous: PrayerKey?) -> Bool {
+    let name = PrayerAssetResolver.assetName(
+        widgetId: widgetId,
+        family: family,
+        theme: theme,
+        language: language,
+        active: active,
+        previous: previous
+    )
+    return UIImage(named: name) != nil
+}
+
+/// Returns a configured `PrayerStaticOverlay` for the given prayer widget IF
+/// AND ONLY IF the static-PNG path is fully ready:
+///   • `widgetId` is one of the prayer kinds
+///   • `widget_prayer_inputs` exists in the App Group (calculator can load)
+///   • the bake matrix includes an asset for (kind, size, theme, lang, state)
+/// Otherwise returns nil so the caller falls back to its existing render path.
+private func makePrayerStaticOverlay(widgetId: String,
+                                     family: WidgetFamily,
+                                     resolvedTheme: RoohTheme,
+                                     context: WidgetContext) -> PrayerStaticOverlay? {
+    guard isPrayerHomeWidget(widgetId),
+          let calculator = PrayerCalculator.loadFromAppGroup() else { return nil }
+    let now = context.date
+    let state = calculator.state(at: now)
+    let active = state?.previous ?? .fajr
+    let previous = state?.previous
+    let langKey = context.isArabic ? "ar" : "en"
+    guard prayerStaticAssetExists(widgetId: widgetId,
+                                  family: family,
+                                  theme: resolvedTheme,
+                                  language: langKey,
+                                  active: active,
+                                  previous: previous) else { return nil }
+    return PrayerStaticOverlay(
+        widgetId: widgetId,
+        family: family,
+        theme: resolvedTheme,
+        language: langKey,
+        usesArabicNumerals: context.usesArabicNumerals,
+        uses24HourClock: false,
+        calculator: calculator,
+        now: now
+    )
+}
+
+private func dynamicPrayerHomeView(widgetId: String, family: WidgetFamily, context: WidgetContext, palette p: ThemePalette) -> AnyView {
+    // Attempt the new static-PNG + numeric-overlay path first. Requires both:
+    //   (a) PrayerInputs in the App Group (written by lib/widget-data-bridge.ts
+    //       → writePrayerInputs() once the user has set location)
+    //   (b) the baked Asset Catalog asset for this state/theme/language
+    // If either is missing, fall through to the existing SwiftUI views which
+    // already read the 7-day epoch cache via todaysNextPrayer / todaysPrayersFromContext.
+    if let calculator = PrayerCalculator.loadFromAppGroup() {
+        let now = context.date
+        let state = calculator.state(at: now)
+        let active = state?.previous ?? .fajr
+        let previous = state?.previous
+        let langKey = context.isArabic ? "ar" : "en"
+        if prayerStaticAssetExists(widgetId: widgetId,
+                                   family: family,
+                                   theme: context.theme,
+                                   language: langKey,
+                                   active: active,
+                                   previous: previous) {
+            return AnyView(PrayerStaticOverlay(
+                widgetId: widgetId,
+                family: family,
+                theme: context.theme,
+                language: langKey,
+                usesArabicNumerals: context.usesArabicNumerals,
+                uses24HourClock: false,
+                calculator: calculator,
+                now: now
+            ))
+        }
+    }
+
+    return AnyView(ZStack {
         RoundedRectangle(cornerRadius: family == .systemSmall ? 28 : 32)
             .fill(p.background)
         switch widgetId {
@@ -2518,7 +2818,7 @@ private func dynamicPrayerHomeView(widgetId: String, family: WidgetFamily, conte
         default:
             PrayerTableView(context: context, family: family)
         }
-    }
+    })
 }
 
 /// Branded loading card shown when no PNG snapshot exists yet for the placed
@@ -2564,6 +2864,147 @@ struct BrandedFallbackView: View {
     }
 }
 
+/// Builds a single overlay view (live countdown / current time / static label)
+/// positioned and scaled to match the PNG snapshot's anchor coordinates.
+/// Prayer countdowns use `Text(date, style: .timer)` so they tick live without
+/// waiting on timeline reloads. Pinned LTR + Arabic locale → "بعد ٢:١٩:١٧".
+@ViewBuilder
+private func liveOverlayView(
+    kind: LiveOverlayKind,
+    anchor: LiveOverlayAnchor,
+    context: WidgetContext,
+    palette pal: ThemePalette,
+    geoSize: CGSize,
+    dims: CGSize
+) -> some View {
+    let scaleX = geoSize.width / dims.width
+    let scaleY = geoSize.height / dims.height
+    let scaledFont = anchor.fontSize * min(scaleX, scaleY)
+    let arabicLocale = context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX")
+    let baseFont = Font.custom(anchor.fontFamily, size: scaledFont)
+    let fg = overlaySwiftUIColor(kind: kind, pal)
+
+    switch kind {
+    case .prayerNextCountdown:
+        let epochMs = resolvedNextPrayerEpochMs(context)
+        if epochMs > 1000 {
+            let timerDate = Date(timeIntervalSince1970: epochMs / 1000)
+            HStack(spacing: anchor.compact ? 1 : 3) {
+                Text(context.isArabic ? "بعد" : "in")
+                Text(timerDate, style: .timer)
+                    .environment(\.locale, arabicLocale)
+            }
+            .font(baseFont)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .multilineTextAlignment(anchor.textAlignment)
+            .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+            .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+            .environment(\.layoutDirection, .leftToRight)
+        }
+    case .prayerPreviousCountdown:
+        let epochMs = resolvedPreviousPrayerEpochMs(context)
+        if epochMs > 1000 {
+            let timerDate = Date(timeIntervalSince1970: epochMs / 1000)
+            HStack(spacing: anchor.compact ? 1 : 3) {
+                if context.isArabic {
+                    Text("منذ")
+                    Text(timerDate, style: .timer).environment(\.locale, arabicLocale)
+                } else {
+                    Text(timerDate, style: .timer).environment(\.locale, arabicLocale)
+                    Text("ago")
+                }
+            }
+            .font(baseFont)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .multilineTextAlignment(anchor.textAlignment)
+            .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+            .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+            .environment(\.layoutDirection, .leftToRight)
+        }
+    case .prayerHeroName:
+        let item = todaysNextPrayer(context)
+        let name = context.isArabic ? (item.nameAr ?? "الفجر") : (item.name ?? "Fajr")
+        Text(name)
+            .font(baseFont)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .multilineTextAlignment(anchor.textAlignment)
+            .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+            .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+    case .prayerHeroTime:
+        let item = todaysNextPrayer(context)
+        let timeStr = prayerTimeFromEpoch(item.epochMs, context)
+        Text(timeStr)
+            .font(baseFont)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .kerning(-0.5)
+            .multilineTextAlignment(anchor.textAlignment)
+            .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+            .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+    case .prayerPreviousName:
+        let item = todaysPreviousPrayer(context)
+        let name = context.isArabic ? (item.nameAr ?? "العشاء") : (item.name ?? "Isha")
+        Text(name)
+            .font(baseFont)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .multilineTextAlignment(anchor.textAlignment)
+            .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+            .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+    case .prayerPreviousTime:
+        let item = todaysPreviousPrayer(context)
+        let timeStr = prayerTimeFromEpoch(item.epochMs, context)
+        Text(timeStr)
+            .font(baseFont)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .kerning(-0.5)
+            .multilineTextAlignment(anchor.textAlignment)
+            .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+            .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+    case .prayerRowTime(let idx):
+        let items = todaysPrayersFromContext(context)
+        if idx >= 0 && idx < items.count {
+            let timeStr = prayerTimeFromEpoch(items[idx].epochMs, context)
+            Text(timeStr)
+                .font(baseFont)
+                .foregroundStyle(fg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .kerning(-0.3)
+                .multilineTextAlignment(anchor.textAlignment)
+                .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+                .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+        }
+    case .prayerRowHighlight:
+        // Highlight not yet wired up — left as placeholder for follow-up.
+        EmptyView()
+    default:
+        let raw = widgetLiveText(kind: kind, context: context)
+        let str = anchor.compact ? raw.replacingOccurrences(of: " ", with: "") : raw
+        if !str.isEmpty {
+            Text(str)
+                .font(baseFont)
+                .foregroundStyle(fg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .multilineTextAlignment(anchor.textAlignment)
+                .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
+                .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
+                .environment(\.layoutDirection, .leftToRight)
+        }
+    }
+}
+
 struct WidgetImageView: View {
     let widgetId: String
     let family: WidgetFamily
@@ -2595,15 +3036,32 @@ struct WidgetImageView: View {
             let overlays = widgetOverlayAnchors(id: widgetId, family: family)
             let pal = palette(resolvedTheme)
 
-            if isDateHomeWidget(widgetId) {
+            if let prayerOverlay = makePrayerStaticOverlay(
+                widgetId: widgetId,
+                family: family,
+                resolvedTheme: resolvedTheme,
+                context: context
+            ) {
+                // Glassify-style path: offline adhan-swift calculator + baked
+                // per-state PNG from the Asset Catalog + numeric-only overlay.
+                // `makePrayerStaticOverlay` returns nil unless BOTH
+                // `widget_prayer_inputs` exists in the App Group AND the bake
+                // matrix includes an asset for this (state, theme, lang).
+                // When nil, we fall through to the existing PNG-snapshot path.
+                prayerOverlay
+                    .widgetURL(URL(string: widgetDeepLink(widgetId)))
+            } else if isDateHomeWidget(widgetId) {
                 // Native SwiftUI — reads context.date directly so the date is
                 // always correct even after weeks without app open. No PNG needed.
                 dynamicDateHomeView(widgetId: widgetId, family: family, context: context, palette: pal)
                     .widgetURL(URL(string: widgetDeepLink(widgetId)))
-            } else if isPrayerHomeWidget(widgetId) {
-                dynamicPrayerHomeView(widgetId: widgetId, family: family, context: context, palette: pal)
-                    .widgetURL(URL(string: widgetDeepLink(widgetId)))
             } else {
+                // All other widgets (including prayer): PNG snapshot for full
+                // visual fidelity with the in-app gallery preview, with the live
+                // countdown drawn on top as a SwiftUI overlay. Trade-off: prayer
+                // TIMES baked into the PNG go stale by minutes if the user doesn't
+                // open the app for several days, but the countdown to the next
+                // prayer stays accurate (uses the 7-day allPrayerEpochs).
 
                 // Use GeometryReader so the image fills the entire widget frame
                 // (eliminates the empty padding visible in earlier screenshots) AND
@@ -2635,22 +3093,14 @@ struct WidgetImageView: View {
 
                         if img != nil {
                             ForEach(Array(overlays.enumerated()), id: \.offset) { _, overlay in
-                                let (kind, anchor) = overlay
-                                let raw = widgetLiveText(kind: kind, context: context)
-                                let str = anchor.compact ? raw.replacingOccurrences(of: " ", with: "") : raw
-                                if !str.isEmpty {
-                                    let scaleX = geo.size.width / dims.width
-                                    let scaleY = geo.size.height / dims.height
-                                    Text(str)
-                                        .font(.custom(anchor.fontFamily, size: anchor.fontSize * min(scaleX, scaleY)))
-                                        .foregroundStyle(overlaySwiftUIColor(kind: kind, pal))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.85)
-                                        .multilineTextAlignment(anchor.textAlignment)
-                                        .frame(width: anchor.width * scaleX, alignment: anchor.alignment)
-                                        .position(x: anchor.x * scaleX, y: anchor.y * scaleY)
-                                        .environment(\.layoutDirection, .leftToRight)
-                                }
+                                liveOverlayView(
+                                    kind: overlay.0,
+                                    anchor: overlay.1,
+                                    context: context,
+                                    palette: pal,
+                                    geoSize: geo.size,
+                                    dims: dims
+                                )
                             }
                         }
                     }

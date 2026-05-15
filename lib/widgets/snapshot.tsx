@@ -557,10 +557,20 @@ async function runSnapshotPass(
   // to fall outside the host's bounds — Android then skipped the rendering pass
   // for the clipped views, producing transparent capture buffers. One-at-a-time
   // is slower but the only way to guarantee every variant gets a real PNG.
+  // Prayer widgets on iOS now read pre-baked PNGs from the widget extension's
+  // Asset Catalog (widgets/ios/Assets.xcassets/PrayerStatic/*) and overlay
+  // dynamic numeric values via PrayerStaticOverlay.swift. They no longer
+  // consume runtime-captured snapshots — skip them here on iOS so the cached
+  // manifest never references stale per-state PNGs that the new pipeline
+  // ignores. Android continues to capture as before (until Android also
+  // adopts the static-PNG architecture in a follow-up).
+  const IOS_STATIC_PRAYER_KINDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
+
   for (const theme of themes) {
     for (const def of WIDGET_REGISTRY) {
       if (platform === 'ios' && !def.platforms.includes('ios')) continue;
       if (platform === 'android' && !def.platforms.includes('android')) continue;
+      if (platform === 'ios' && IOS_STATIC_PRAYER_KINDS.has(def.id)) continue;
       for (const size of def.sizes) {
         const key = `${def.id}_${size}_${theme}`;
         const routeKey = snapshotRouteKey(def.id, size, theme);

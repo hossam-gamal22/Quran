@@ -45,7 +45,28 @@ const WIDGET_SWIFT_FILES = [
   'PrayerLiveActivity.swift',
   'AppIntents.swift',
   'ControlWidgets.swift',
+  // Offline prayer-time calculation + static-PNG overlay rendering.
+  // Compiled together with the vendored adhan-swift sources from
+  // widgets/ios/Adhan/ (auto-discovered below).
+  'PrayerInputs.swift',
+  'PrayerCalculator.swift',
+  'PrayerStaticOverlay.swift',
 ];
+
+/**
+ * Discover the vendored adhan-swift source files in widgets/ios/Adhan/ and
+ * return their basenames. Source-pinned at batoulapps/adhan-swift 1.4.0
+ * (Apache 2.0). Adding/removing a file in that folder automatically updates
+ * the widget extension build phase next prebuild.
+ */
+function discoverAdhanSwiftFiles(projectRoot) {
+  const adhanDir = path.join(projectRoot, 'widgets', 'ios', 'Adhan');
+  if (!fs.existsSync(adhanDir)) return [];
+  return fs
+    .readdirSync(adhanDir)
+    .filter((name) => name.endsWith('.swift'))
+    .sort();
+}
 
 // Swift files copied from widgets/ios/ into the main app target so that
 // App Shortcuts (Spotlight / Siri / Shortcuts app) can be registered and
@@ -103,6 +124,20 @@ const withIOSWidgets = (config) => {
     const sourceDir = path.join(projectRoot, 'widgets', 'ios');
     for (const fileName of WIDGET_SWIFT_FILES) {
       const src = path.join(sourceDir, fileName);
+      const dst = path.join(widgetDir, fileName);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+      }
+    }
+
+    // Copy the vendored adhan-swift source files into the widget extension
+    // directory (flat — Xcode build phases don't care about subfolder
+    // structure). They become part of the extension's Swift module and are
+    // referenced by PrayerCalculator.swift directly (no `import Adhan`).
+    const adhanFiles = discoverAdhanSwiftFiles(projectRoot);
+    const adhanSourceDir = path.join(sourceDir, 'Adhan');
+    for (const fileName of adhanFiles) {
+      const src = path.join(adhanSourceDir, fileName);
       const dst = path.join(widgetDir, fileName);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, dst);
@@ -200,9 +235,20 @@ const withIOSWidgets = (config) => {
     // Add widget extension target to Xcode project
     const groupName = WIDGET_EXTENSION_NAME;
 
+    // Re-discover adhan files at this point so the group includes them.
+    const adhanFilesForGroup = discoverAdhanSwiftFiles(projectRoot);
+
     // Create PBXGroup for widget files (all files including Swift sources)
     const widgetGroup = xcodeProject.addPbxGroup(
-      [...WIDGET_SWIFT_FILES, ...SHARED_SWIFT_FILES, ...WIDGET_FONT_FILES, 'Assets.xcassets', `${WIDGET_EXTENSION_NAME}.entitlements`, 'Info.plist'],
+      [
+        ...WIDGET_SWIFT_FILES,
+        ...adhanFilesForGroup,
+        ...SHARED_SWIFT_FILES,
+        ...WIDGET_FONT_FILES,
+        'Assets.xcassets',
+        `${WIDGET_EXTENSION_NAME}.entitlements`,
+        'Info.plist',
+      ],
       groupName,
       groupName
     );
@@ -286,9 +332,14 @@ const withIOSWidgets = (config) => {
 
     // Add Swift source files to the widget target's compile sources
     const groupChildren = objects['PBXGroup'][widgetGroup.uuid].children;
+    const compilableSwiftFiles = new Set([
+      ...WIDGET_SWIFT_FILES,
+      ...SHARED_SWIFT_FILES,
+      ...adhanFilesForGroup,
+    ]);
     for (const child of groupChildren) {
       const fileName = child.comment;
-      if (!WIDGET_SWIFT_FILES.includes(fileName) && !SHARED_SWIFT_FILES.includes(fileName)) continue;
+      if (!compilableSwiftFiles.has(fileName)) continue;
 
       const buildFileUuid = xcodeProject.generateUuid();
       objects['PBXBuildFile'][buildFileUuid] = {
