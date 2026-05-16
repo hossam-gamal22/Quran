@@ -3,12 +3,11 @@
 // Each preview mirrors the corresponding SwiftUI/Android view at real proportions
 // so the in-app gallery matches what the user will see on their home screen.
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Platform, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { getLanguage } from '@/lib/i18n';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -142,14 +141,9 @@ function usePreviewSettings(forced?: Lang) {
   const palette = paletteFor(themeKey);
   const numerals = (display.widgetNumerals ?? 'auto') as 'auto' | 'arabic' | 'western';
   const calendar = resolveCalendar(display.widgetCalendar as any, isArabic);
-  const dayCalendar = resolveCalendar(
-    (display.widgetDayCalendar ?? display.widgetCalendar ?? 'auto') as any,
-    isArabic,
-  );
-  const monthCalendar = resolveCalendar(
-    (display.widgetMonthCalendar ?? display.widgetCalendar ?? 'auto') as any,
-    isArabic,
-  );
+  // Single source of truth: widgetCalendar. Old day/month keys are ignored.
+  const dayCalendar = resolveCalendar((display.widgetCalendar ?? 'auto') as any, isArabic);
+  const monthCalendar = dayCalendar;
   const dateFormat = (display.widgetDateFormat ?? 'gregorian-ar') as WidgetDateFormat;
   const fontVariant = (display.widgetFontVariant ?? 'widget1') as 'widget1' | 'widget2';
   return { isArabic, numerals, calendar, dayCalendar, monthCalendar, dateFormat, palette, fontVariant };
@@ -179,7 +173,7 @@ export function DaySimplePreview({ size, language }: { size: PreviewSize; langua
         <Text
           numberOfLines={1}
           style={{
-            fontFamily: fontBold(),
+            fontFamily: 'Rubik-Bold',
             fontSize: size === 'small' ? 16 : 20,
             color: p.text,
             includeFontPadding: false,
@@ -201,7 +195,7 @@ export function DaySimplePreview({ size, language }: { size: PreviewSize; langua
         >
           {applyNumerals(dayNum, numerals, ar)}
         </Text>
-        <Text style={{ fontFamily: fontMedium(), fontSize: size === 'small' ? 14 : 18, color: p.muted }}>
+        <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 14 : 18, color: p.muted }}>
           {monthLabel}
         </Text>
       </View>
@@ -216,7 +210,7 @@ export function DayThuluthPreview({ size, language }: { size: PreviewSize; langu
   // clean (the calligraphy font has no Latin glyph shapes).
   // Native <Text> is used for the visible Arabic word (SvgText doesn't shape
   // Arabic letters correctly on Android — letters render disconnected).
-  const { numerals, dayCalendar, palette: p, fontVariant } = usePreviewSettings(language);
+  const { isArabic: ar, numerals, dayCalendar, palette: p, fontVariant } = usePreviewSettings(language);
   const info = getDateInfo();
   const widgetFont = useWidgetFontFamily(fontVariant);
   const dims = getSizeDims(size);
@@ -229,8 +223,8 @@ export function DayThuluthPreview({ size, language }: { size: PreviewSize; langu
       if (h) dayNum = h.day;
     } catch {}
   }
-  const watermark = applyNumerals(dayNum, numerals, true);
-  const watermarkFont = watermarkFontFor(numerals, true, widgetFont);
+  const watermark = applyNumerals(dayNum, numerals, ar);
+  const watermarkFont = watermarkFontFor(numerals, ar, widgetFont);
   const fillStrong = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
   const fillFaint = p.isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
   return (
@@ -256,17 +250,17 @@ export function DayThuluthPreview({ size, language }: { size: PreviewSize; langu
           minimumFontScale={0.75}
           allowFontScaling={false}
           style={{
-            fontFamily: widgetFont,
+            fontFamily: ar ? widgetFont : 'Rubik-Bold',
             fontSize: fs,
             color: fillStrong,
             textAlign: 'center',
-            writingDirection: 'rtl',
+            writingDirection: ar ? 'rtl' : 'ltr',
             paddingHorizontal: 8,
-            paddingTop: Math.round(fs * 0.55),
+            paddingTop: ar ? Math.round(fs * 0.55) : 0,
             includeFontPadding: false,
           }}
         >
-          {info.weekdayAr}
+          {ar ? info.weekdayAr : info.weekdayEn}
         </Text>
       </View>
     </GlassTile>
@@ -331,6 +325,12 @@ export function DayDigitalPreview({ size, language, forSnapshot }: { size: Previ
   );
 }
 
+const HIJRI_MONTHS_EN_CLEAN = [
+  'Muharram', 'Safar', "Rabi' al-Awwal", "Rabi' al-Thani",
+  "Jumada al-Awwal", "Jumada al-Thani", 'Rajab', "Sha'ban",
+  'Ramadan', 'Shawwal', "Dhu al-Qi'dah", 'Dhu al-Hijjah',
+];
+
 export function MonthSimplePreview({ size, language }: { size: PreviewSize; language?: Lang }) {
   const { isArabic: ar, monthCalendar, numerals, dateFormat, palette: p, fontVariant } = usePreviewSettings(language);
   const widgetFont = useWidgetFontFamily(fontVariant);
@@ -340,12 +340,14 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
   const fs = size === 'small' ? 26 : 38;
   const wmFs = size === 'small' ? 90 : 140;
   let hijriMonth = '';
+  let hijriMonthIndex = 11;
   let hijriDayNum = 9;
   let hijriYear = 1447;
   try {
     const h = getLocalizedHijriDate();
     if (h) {
       hijriMonth = h.monthName;
+      hijriMonthIndex = h.month - 1;
       hijriDayNum = h.day;
       hijriYear = h.year;
     }
@@ -353,11 +355,11 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
   const now = new Date();
   const useHijri = monthCalendar === 'hijri';
   const monthLabel = useHijri
-    ? (hijriMonth || 'ذو القعدة')
+    ? (ar ? (hijriMonth || 'ذو القعدة') : (HIJRI_MONTHS_EN_CLEAN[hijriMonthIndex] ?? "Dhu al-Qi'dah"))
     : now.toLocaleString(ar ? 'ar' : 'en', { month: 'long' });
   const wmDay = useHijri ? hijriDayNum : now.getDate();
-  const watermark = applyNumerals(wmDay, numerals, true);
-  const watermarkFont = watermarkFontFor(numerals, true, widgetFont);
+  const watermark = applyNumerals(wmDay, numerals, ar);
+  const watermarkFont = watermarkFontFor(numerals, ar, widgetFont);
   const dateBottom = size === 'small' ? 16 : 22;
   // For an Arabic Hijri small/medium card we prefer the natural "DD من MONTH YEAR" form
   // (e.g. "٢٢ من ذو القعدة ١٤٤٧") which reads better than slash-style. For everything else
@@ -381,7 +383,7 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
             fontFamily={watermarkFont}
             fontSize={wmFs}
             x={svgW / 2}
-            y={svgH * 0.85}
+            y={ar ? svgH * 0.85 : svgH * 0.68}
             textAnchor="middle"
           >
             {watermark}
@@ -406,12 +408,12 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
             minimumFontScale={0.75}
             allowFontScaling={false}
             style={{
-              fontFamily: widgetFont,
+              fontFamily: ar ? widgetFont : 'Rubik-Bold',
               fontSize: fs,
               color: fillStrong,
               textAlign: 'center',
-              writingDirection: 'rtl',
-              paddingTop: Math.round(fs * 0.55),
+              writingDirection: ar ? 'rtl' : 'ltr',
+              paddingTop: ar ? Math.round(fs * 0.55) : 0,
               includeFontPadding: false,
             }}
           >
@@ -428,7 +430,7 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
               left: 12,
               right: 12,
               textAlign: 'center',
-              fontFamily: fontMedium(),
+              fontFamily: 'Rubik-Medium',
               fontSize: size === 'small' ? 11 : 13,
               color: p.muted,
               letterSpacing: 0.3,
@@ -443,8 +445,6 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
 }
 
 export function MonthThuluthPreview({ size, language }: { size: PreviewSize; language?: Lang }) {
-  // Thuluth calligraphy — always Arabic script. The month name + watermark day
-  // respect the user's `monthCalendar` preference (Hijri vs Gregorian).
   const { isArabic: ar, numerals, monthCalendar, palette: p, fontVariant } = usePreviewSettings(language);
   const widgetFont = useWidgetFontFamily(fontVariant);
   const dims = getSizeDims(size);
@@ -457,19 +457,21 @@ export function MonthThuluthPreview({ size, language }: { size: PreviewSize; lan
   const wmFs = size === 'small' ? 64 : 130;
   const now = new Date();
   const useHijri = monthCalendar === 'hijri';
-  let monthLabel = now.toLocaleString('ar', { month: 'long' });
+  let monthLabel = now.toLocaleString(ar ? 'ar' : 'en', { month: 'long' });
   let wmDay = now.getDate();
   if (useHijri) {
     try {
       const h = getLocalizedHijriDate();
       if (h) {
-        monthLabel = h.monthName || 'ذو القعدة';
+        monthLabel = ar
+          ? (h.monthName || 'ذو القعدة')
+          : (HIJRI_MONTHS_EN_CLEAN[h.month - 1] ?? "Dhu al-Qi'dah");
         wmDay = h.day;
       }
     } catch {}
   }
-  const watermark = applyNumerals(wmDay, numerals, true);
-  const watermarkFont = watermarkFontFor(numerals, true, widgetFont);
+  const watermark = applyNumerals(wmDay, numerals, ar);
+  const watermarkFont = watermarkFontFor(numerals, ar, widgetFont);
   const fillStrong = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
   const fillFaint = p.isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
   // Watermark vertical position: small widgets push the baseline up so the
@@ -497,13 +499,13 @@ export function MonthThuluthPreview({ size, language }: { size: PreviewSize; lan
           minimumFontScale={0.75}
           allowFontScaling={false}
           style={{
-            fontFamily: widgetFont,
+            fontFamily: ar ? widgetFont : 'Rubik-Bold',
             fontSize: fs,
             color: fillStrong,
             textAlign: 'center',
-            writingDirection: 'rtl',
+            writingDirection: ar ? 'rtl' : 'ltr',
             paddingHorizontal: 10,
-            paddingTop: Math.round(fs * 0.55),
+            paddingTop: ar ? Math.round(fs * 0.55) : 0,
             maxWidth: svgW - 16,
             includeFontPadding: false,
           }}
@@ -537,7 +539,7 @@ export function MonthElegantEnPreview({ size, language: _language }: { size: Pre
           <Text
             numberOfLines={1}
             style={{
-              fontFamily: fontBold(),
+              fontFamily: 'Rubik-Bold',
               fontSize: size === 'small' ? 34 : 48,
               color: faintFill,
               letterSpacing: 1.5,
@@ -547,7 +549,7 @@ export function MonthElegantEnPreview({ size, language: _language }: { size: Pre
           >
             {monthLabel}
           </Text>
-          <Text style={{ fontFamily: fontBold(), fontSize: size === 'small' ? 40 : 58, color: p.text }}>
+          <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 40 : 58, color: p.text }}>
             {applyNumerals(dayNum, numerals, false)}
           </Text>
         </View>
@@ -560,18 +562,48 @@ export function MonthElegantEnPreview({ size, language: _language }: { size: Pre
 // Prayer previews
 // ────────────────────────────────────────────────────────
 
+function useLiveTick() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+}
+
+function resolvePreviewEpoch(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean): number | undefined {
+  const now = Date.now();
+  const epochs = (sharedData?.prayer?.allPrayers ?? [])
+    .map((p) => (p as any).epochMs as number)
+    .filter((e) => Number.isFinite(e) && e > 0)
+    .sort((a, b) => a - b);
+  if (isNext) {
+    return epochs.find((e) => e > now) ?? sharedData?.prayer?.nextPrayerAtEpochMs;
+  }
+  return [...epochs].reverse().find((e) => e <= now) ?? sharedData?.prayer?.previousPrayerAtEpochMs;
+}
+
+function resolvePreviewPrayerItem(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean) {
+  const epoch = resolvePreviewEpoch(sharedData, isNext);
+  if (!epoch) return undefined;
+  return (sharedData?.prayer?.allPrayers ?? []).find(
+    (p) => Math.abs(((p as any).epochMs as number) - epoch) < 90000
+  );
+}
+
 export function PrayerSimplePreview({ size, language, forSnapshot }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
   const sharedData = useWidgetPreviewData();
+  useLiveTick();
   const digitFont = 'Rubik-Bold';
-  const time = noWrapPrayerTime(applyNumerals(sharedData?.prayer?.nextPrayerTime ?? '04:14', numerals, ar));
-  const name = ar ? (sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (sharedData?.prayer?.nextPrayerName ?? 'Fajr');
-  const countdown = compactRemainingFromEpoch(sharedData?.prayer?.nextPrayerAtEpochMs, (s) => applyNumerals(s, numerals, ar), ar);
+  const trueNextItem = resolvePreviewPrayerItem(sharedData, true);
+  const time = noWrapPrayerTime(applyNumerals(trueNextItem?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14', numerals, ar));
+  const name = ar ? (trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
+  const countdown = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), (s) => applyNumerals(s, numerals, ar), ar);
   const timeFs = Platform.OS === 'android' && size === 'small' ? 38 : size === 'small' ? 42 : 56;
   return (
     <GlassTile size={size} palette={p}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: size === 'small' ? 11 : 13, lineHeight: size === 'small' ? 14 : 16, color: p.muted, marginBottom: 2, includeFontPadding: false }}>
+        <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 13, lineHeight: size === 'small' ? 14 : 16, color: p.muted, marginBottom: 2, includeFontPadding: false }}>
           {ar ? 'الصلاة القادمة' : 'Next Prayer'}
         </Text>
         <Text
@@ -586,11 +618,17 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
         >
           {name}
         </Text>
+        {/* Phase 2: when capturing for the static-PNG bake, the time digits
+            also become a transparent placeholder so the native shell can draw
+            today's actual numeric value on top of the baked card. Layout (font
+            metrics, line height, flex slot) stays IDENTICAL — only opacity
+            changes — so the anchor coordinates measured against the bake are
+            exact. */}
         <Text
           adjustsFontSizeToFit
           numberOfLines={1}
           minimumFontScale={0.7}
-          style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+          style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}
         >
           {time}
         </Text>
@@ -599,7 +637,7 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
         {forSnapshot ? (
           <View style={{ height: size === 'small' ? 14 : 16, marginTop: 4 }} />
         ) : (
-          <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: size === 'small' ? 10 : 12, lineHeight: size === 'small' ? 13 : 16, color: p.muted, marginTop: 4, includeFontPadding: false }}>
+          <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 10 : 12, lineHeight: size === 'small' ? 13 : 16, color: p.muted, marginTop: 4, includeFontPadding: false }}>
             {countdown}
           </Text>
         )}
@@ -654,20 +692,21 @@ function compactRemainingFromEpoch(
   ar: boolean,
   prefix: 'next' | 'previous' = 'next',
 ) {
+  const isNext = prefix === 'next';
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const toTimer = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    return fmt(`${h}:${pad2(m)}:${pad2(s)}`);
+  };
   if (!epochMs || !Number.isFinite(epochMs)) {
-    const h = fmt(prefix === 'next' ? 2 : 4);
-    const m = fmt(prefix === 'next' ? 47 : 1);
-    return ar
-      ? (prefix === 'next' ? `بعد ${h} س ${m} د` : `منذ ${h} س ${m} د`)
-      : (prefix === 'next' ? `in ${h}h ${m}m` : `${h}h ${m}m ago`);
+    const sample = toTimer(isNext ? 9900 : 14460);
+    return ar ? (isNext ? `بعد ${sample}` : `منذ ${sample}`) : (isNext ? `in ${sample}` : `${sample} ago`);
   }
-  const diff = prefix === 'next' ? epochMs - Date.now() : Date.now() - epochMs;
-  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
-  const h = fmt(Math.floor(totalSeconds / 3600));
-  const m = fmt(Math.floor((totalSeconds % 3600) / 60));
-  return ar
-    ? (prefix === 'next' ? `بعد ${h} س ${m} د` : `منذ ${h} س ${m} د`)
-    : (prefix === 'next' ? `in ${h}h ${m}m` : `${h}h ${m}m ago`);
+  const diff = isNext ? epochMs - Date.now() : Date.now() - epochMs;
+  const time = toTimer(Math.max(0, Math.floor(diff / 1000)));
+  return ar ? (isNext ? `بعد ${time}` : `منذ ${time}`) : (isNext ? `in ${time}` : `${time} ago`);
 }
 
 function noWrapPrayerTime(value: string | number): string {
@@ -678,12 +717,13 @@ function noWrapPrayerTime(value: string | number): string {
 export function PrayerTablePreview({ size, language, forSnapshot }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
   const { isArabic: ar, numerals, palette: p, fontVariant } = usePreviewSettings(language);
   const sharedData = useWidgetPreviewData();
+  useLiveTick();
   const timeFont = 'Rubik-Bold';
   const widgetFontL = useWidgetFontFamily(fontVariant);
   const prayerRows = prayerRowsFromShared(sharedData);
   const nextPrayer = prayerRows.find((r) => r.isNext) ?? prayerRows[0] ?? PRAYER_ROWS[0];
   const fmt = (s: string | number) => applyNumerals(s, numerals, ar);
-  const remainingText = compactRemainingFromEpoch(sharedData?.prayer?.nextPrayerAtEpochMs, fmt, ar);
+  const remainingText = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar);
   const remainingTight = remainingText.replace(/\s/g, '');
   // Highlight overlay for the active prayer row — light tint on light themes,
   // white tint on dark, so it stays legible across all 8 palettes.
@@ -725,20 +765,20 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               })}
             </View>
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: 10, lineHeight: 13, color: p.muted, marginBottom: 2, includeFontPadding: false }}>
+              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 10, lineHeight: 13, color: p.muted, marginBottom: 2, includeFontPadding: false }}>
                 {ar ? 'الصلاة القادمة' : 'Next Prayer'}
               </Text>
               <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
                 {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
               </Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
                 {noWrapPrayerTime(fmt(nextPrayer.time))}
               </Text>
               {/* Phase B C2: countdown is drawn by the native shell; skip in snapshot. */}
               {forSnapshot ? (
                 <View style={{ height: 12, marginTop: 2 }} />
               ) : (
-                <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>
+                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>
                   {remainingText}
                 </Text>
               )}
@@ -760,11 +800,11 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
             {forSnapshot ? (
               <View style={{ width: 80, height: 12 }} />
             ) : (
-              <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
+              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
                 {remainingTight}
               </Text>
             )}
-            <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
+            <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
               {ar ? 'الصلاة القادمة' : 'Next Prayer'}
             </Text>
           </View>
@@ -785,7 +825,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   backgroundColor: active ? activeBg : 'transparent',
                 }}
               >
-                <Text numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
+                <Text numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
                   {timeStr}
                 </Text>
                 <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, includeFontPadding: false }}>
@@ -799,7 +839,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
     );
   }
 
-  const remainingLarge = compactRemainingFromEpoch(sharedData?.prayer?.nextPrayerAtEpochMs, fmt, ar);
+  const remainingLarge = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar);
   const heroBg = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
   const watermarkFill = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
   const isAndroid = Platform.OS === 'android';
@@ -835,7 +875,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               bottom: 14,
               width: 200,
               textAlign: 'center',
-              fontFamily: widgetFontL,
+              fontFamily: 'WidgetFont',
               fontSize: 48,
               color: watermarkFill,
               writingDirection: 'rtl',
@@ -843,20 +883,20 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               includeFontPadding: false,
             }}
           >
-            {ar ? 'الصــلاة' : 'Prayer'}
+            {'الصلاة'}
           </Text>
           <MaterialCommunityIcons name={nextPrayer.icon} size={isAndroid ? 28 : 32} color={p.muted} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
               {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
             </Text>
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
               {noWrapPrayerTime(fmt(nextPrayer.time))}
             </Text>
             {forSnapshot ? (
               <View style={{ height: isAndroid ? 14 : 16, marginTop: isAndroid ? 2 : 4 }} />
             ) : (
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontFamily: fontMedium(), fontSize: isAndroid ? 11 : 12, lineHeight: isAndroid ? 14 : 16, color: p.muted, marginTop: isAndroid ? 2 : 4, includeFontPadding: false }}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontFamily: 'Rubik-Medium', fontSize: isAndroid ? 11 : 12, lineHeight: isAndroid ? 14 : 16, color: p.muted, marginTop: isAndroid ? 2 : 4, includeFontPadding: false }}>
                 {ar ? `الصلاة القادمة ${remainingLarge}` : `Next prayer ${remainingLarge}`}
               </Text>
             )}
@@ -881,7 +921,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   marginBottom: isAndroid ? 0 : 1,
                 }}
               >
-                <Text numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
+                <Text numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
                   {timeStr}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -902,29 +942,29 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
 export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
   const sharedData = useWidgetPreviewData();
+  useLiveTick();
   const timeFont = 'Rubik-Bold';
   const boxBg = p.isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)';
   const boxBorder = p.isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.10)';
   const fmt = (s: string | number) => applyNumerals(s, numerals, ar);
   const isAndroid = Platform.OS === 'android';
-  const previousName = ar ? (sharedData?.prayer?.previousPrayerNameAr ?? 'العشاء') : (sharedData?.prayer?.previousPrayerName ?? 'Isha');
-  const nextName = ar ? (sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (sharedData?.prayer?.nextPrayerName ?? 'Fajr');
-  const previousItem = sharedData?.prayer?.allPrayers?.find((item) =>
-    item.name === sharedData?.prayer?.previousPrayerName || item.nameAr === sharedData?.prayer?.previousPrayerNameAr
-  );
+  const trueNextPrev = resolvePreviewPrayerItem(sharedData, true);
+  const truePrevPrev = resolvePreviewPrayerItem(sharedData, false);
+  const nextName = ar ? (trueNextPrev?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextPrev?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
+  const previousName = ar ? (truePrevPrev?.nameAr ?? sharedData?.prayer?.previousPrayerNameAr ?? 'العشاء') : (truePrevPrev?.name ?? sharedData?.prayer?.previousPrayerName ?? 'Isha');
   const items = [
     {
       label: ar ? 'الصلاة القادمة' : 'Next Prayer',
       name: nextName,
-      time: noWrapPrayerTime(fmt(sharedData?.prayer?.nextPrayerTime ?? '04:14')),
-      sub: compactRemainingFromEpoch(sharedData?.prayer?.nextPrayerAtEpochMs, fmt, ar),
+      time: noWrapPrayerTime(fmt(trueNextPrev?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14')),
+      sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar),
       icon: 'weather-sunset-up' as const,
     },
     {
       label: ar ? 'الصلاة السابقة' : 'Previous Prayer',
       name: previousName,
-      time: noWrapPrayerTime(fmt(previousItem?.time ?? '08:18')),
-      sub: compactRemainingFromEpoch(sharedData?.prayer?.previousPrayerAtEpochMs, fmt, ar, 'previous'),
+      time: noWrapPrayerTime(fmt(truePrevPrev?.time ?? '08:18')),
+      sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, false), fmt, ar, 'previous'),
       icon: 'weather-night' as const,
     },
   ];
@@ -975,6 +1015,7 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
                 marginTop: 2,
                 letterSpacing: -0.5,
                 includeFontPadding: false,
+                opacity: forSnapshot ? 0 : 1,
               }}
             >
               {item.time}
@@ -984,7 +1025,7 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
             {forSnapshot ? (
               <View style={{ height: 12, marginTop: 2 }} />
             ) : (
-              <Text numberOfLines={1} style={{ fontFamily: fontMedium(), fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>{item.sub}</Text>
+              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>{item.sub}</Text>
             )}
           </View>
         ))}
@@ -1026,11 +1067,11 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
               right: 0,
               bottom: dims.height * 0.12,
               textAlign: 'center',
-              fontFamily: widgetFont,
+              fontFamily: ar ? widgetFont : 'Rubik-Bold',
               fontSize: wmFs,
               color: wmFill,
-              writingDirection: 'rtl',
-              paddingTop: Math.round(wmFs * 0.55),
+              writingDirection: ar ? 'rtl' : 'ltr',
+              paddingTop: ar ? Math.round(wmFs * 0.55) : 0,
               includeFontPadding: false,
             }}
           >
@@ -1063,7 +1104,7 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
             <Text
               numberOfLines={2}
               style={{
-                fontFamily: fontRegular(),
+                fontFamily: 'Rubik-Regular',
                 fontSize: size === 'medium' ? 11 : 13,
                 color: p.muted,
                 textAlign: 'center',
@@ -1074,7 +1115,7 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
               {SAMPLE_TRANSLATION}
             </Text>
           ) : null}
-          <Text style={{ fontFamily: fontMedium(), fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: 8 }}>
+          <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: 8 }}>
             {ar ? `${SAMPLE_SURAH_AR} · ${ayahLabel}` : `${SAMPLE_SURAH_EN} · ${ayahLabel}`}
           </Text>
         </View>
@@ -1094,6 +1135,7 @@ export function AzkarMorningPreview({ size, language }: { size: PreviewSize; lan
       title="أذكار الصباح"
       titleEn="Morning Adhkar"
       sample="أصبحنا وأصبح الملك لله والحمد لله"
+      sampleEn="We have reached the morning and at this very time unto Allah belongs all sovereignty"
       language={language}
     />
   );
@@ -1106,26 +1148,24 @@ export function AzkarEveningPreview({ size, language }: { size: PreviewSize; lan
       title="أذكار المساء"
       titleEn="Evening Adhkar"
       sample="اللهم صل وسلم على نبينا محمد"
+      sampleEn="O Allah, send blessings and peace upon our Prophet Muhammad"
       language={language}
     />
   );
 }
 
-function AzkarPreview({ size, title, titleEn, sample, language }: { size: PreviewSize; title: string; titleEn: string; sample: string; language?: Lang }) {
-  // Phase E (C1): Azkar uses Amiri-Regular (clean Naskh).
-  // Native <Text> with multi-line + auto-shrink so the dhikr always fits the
-  // tile cleanly across small/medium/large — replaces SvgText, which cropped
-  // long phrases to a single line and broke Arabic letter joining on Android.
+function AzkarPreview({ size, title, titleEn, sample, sampleEn, language }: { size: PreviewSize; title: string; titleEn: string; sample: string; sampleEn?: string; language?: Lang }) {
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
   const azkarFs = size === 'small' ? 15 : 20;
   const fillText = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
   const lines = size === 'small' ? 3 : 4;
+  const displaySample = ar ? sample : (sampleEn ?? sample);
   return (
     <GlassTile size={size} palette={p}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Text
           numberOfLines={1}
-          style={{ fontFamily: fontBold(), fontSize: size === 'small' ? 11 : 13, color: p.muted, marginBottom: 6 }}
+          style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, marginBottom: 6 }}
         >
           {ar ? title : titleEn}
         </Text>
@@ -1136,24 +1176,21 @@ function AzkarPreview({ size, title, titleEn, sample, language }: { size: Previe
             minimumFontScale={0.55}
             allowFontScaling={false}
             style={{
-              fontFamily: 'Amiri',
+              fontFamily: ar ? 'Amiri' : 'Rubik-Regular',
               fontSize: azkarFs,
               color: fillText,
               textAlign: 'center',
-              writingDirection: 'rtl',
-              // Tighter lineHeight on Android prevents Amiri from consuming extra
-              // vertical space and cutting the last dhikr word.
-              lineHeight: Platform.select({
-                android: Math.round(azkarFs * 1.25),
-                default: Math.round(azkarFs * 1.5),
-              }),
+              writingDirection: ar ? 'rtl' : 'ltr',
+              lineHeight: ar
+                ? Platform.select({ android: Math.round(azkarFs * 1.25), default: Math.round(azkarFs * 1.5) })
+                : Math.round(azkarFs * 1.15),
               includeFontPadding: false,
             }}
           >
-            {sample}
+            {displaySample}
           </Text>
         </View>
-        <Text style={{ fontFamily: fontBold(), fontSize: size === 'small' ? 11 : 13, color: p.muted, marginTop: 6 }}>
+        <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, marginTop: 6 }}>
           {`${applyNumerals(10, numerals, ar)}×`}
         </Text>
       </View>
@@ -1217,11 +1254,11 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
               top: '50%',
               marginTop: -watermarkFs * 0.55,
               textAlign: 'center',
-              fontFamily: widgetFont,
+              fontFamily: ar ? widgetFont : 'Rubik-Bold',
               fontSize: watermarkFs,
               color: watermarkFill,
-              writingDirection: 'rtl',
-              paddingTop: Math.round(watermarkFs * 0.55),
+              writingDirection: ar ? 'rtl' : 'ltr',
+              paddingTop: ar ? Math.round(watermarkFs * 0.55) : 0,
               includeFontPadding: false,
             }}
           >
@@ -1234,13 +1271,13 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
           minimumFontScale={0.75}
           allowFontScaling={false}
           style={{
-            fontFamily: ar ? widgetFont : fontBold(),
+            fontFamily: ar ? widgetFont : 'Rubik-Bold',
             fontSize: monthFs,
             color: fillStrong,
             textAlign: 'center',
-            writingDirection: 'rtl',
+            writingDirection: ar ? 'rtl' : 'ltr',
             paddingHorizontal: 4,
-            paddingTop: Math.round(monthFs * 0.55),
+            paddingTop: ar ? Math.round(monthFs * 0.55) : 0,
             includeFontPadding: false,
           }}
         >
@@ -1250,7 +1287,7 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
           numberOfLines={1}
           adjustsFontSizeToFit
           style={{
-            fontFamily: fontMedium(),
+            fontFamily: 'Rubik-Medium',
             fontSize: size === 'small' ? 11 : 13,
             color: p.muted,
             marginTop: 4,
@@ -1298,7 +1335,7 @@ export function DailyDhikrPreview({ size, language }: { size: PreviewSize; langu
           <Text
             numberOfLines={2}
             style={{
-              fontFamily: fontMedium(),
+              fontFamily: 'Rubik-Medium',
               fontSize: size === 'small' ? 10 : 12,
               color: p.muted,
               marginTop: 4,
@@ -1310,7 +1347,7 @@ export function DailyDhikrPreview({ size, language }: { size: PreviewSize; langu
             Glory be to Allah and praise Him
           </Text>
         ) : null}
-        <Text style={{ fontFamily: fontMedium(), fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: 6 }}>
+        <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: 6 }}>
           {`${applyNumerals(100, numerals, ar)}×`}
         </Text>
       </View>

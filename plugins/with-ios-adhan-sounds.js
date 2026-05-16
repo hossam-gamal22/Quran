@@ -31,7 +31,29 @@ module.exports = function withIosAdhanSounds(config) {
     }
 
     const project = cfg.modResults;
-    const mainTarget = project.getFirstTarget()?.uuid;
+
+    // Find the main app target by name for reliability (getFirstTarget may
+    // return the widget extension target when multiple targets exist).
+    let mainTarget = null;
+    try {
+      const nativeTargets = project.pbxNativeTargetSection();
+      for (const [uuid, target] of Object.entries(nativeTargets)) {
+        if (uuid.endsWith('_comment')) continue;
+        const name = typeof target.name === 'string'
+          ? target.name.replace(/^"|"$/g, '')
+          : '';
+        if (name === appName) {
+          mainTarget = uuid;
+          break;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback to first target
+    if (!mainTarget) {
+      mainTarget = project.getFirstTarget()?.uuid;
+    }
+
     if (!mainTarget) {
       console.warn('[with-ios-adhan-sounds] Could not find main Xcode target');
       return cfg;
@@ -42,14 +64,25 @@ module.exports = function withIosAdhanSounds(config) {
     for (const file of cafFiles) {
       const src = path.join(sourceDir, file);
       const dst = path.join(targetDir, file);
-      fs.copyFileSync(src, dst);
+      if (!fs.existsSync(dst)) {
+        fs.copyFileSync(src, dst);
+      }
 
-      // Add to Xcode project as a resource so it's copied into the app bundle.
-      // skip if already registered to avoid duplicate PBXFileReference entries.
-      const alreadyAdded = project.hasFile(`${appName}/${file}`);
+      const filePath = `${appName}/${file}`;
+      const alreadyAdded = project.hasFile(filePath);
       if (!alreadyAdded) {
-        project.addResourceFile(`${appName}/${file}`, { target: mainTarget });
-        added++;
+        try {
+          project.addResourceFile(filePath, { target: mainTarget });
+          added++;
+        } catch (e) {
+          // Some versions of the xcode library crash if addFile returns null
+          // (e.g. when the file reference already exists under a different UUID).
+          // The file is already copied to the correct location; if Xcode finds it
+          // in the target folder it will still bundle it — log and continue.
+          console.warn(
+            `[with-ios-adhan-sounds] addResourceFile failed for ${file}: ${e.message}`
+          );
+        }
       }
     }
 

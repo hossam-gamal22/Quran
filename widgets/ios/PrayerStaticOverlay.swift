@@ -259,7 +259,10 @@ struct PrayerStaticOverlay: View {
         let pal = palette(theme)
         let state = calculator.state(at: now)
         let today = calculator.times(for: now)
-        let primary = state?.previous ?? .fajr  // active = recently-passed prayer
+        // The "primary" prayer for asset-name purposes is the NEXT upcoming
+        // prayer (whose row is highlighted and whose name is baked big in the
+        // hero panel). Matches `makePrayerStaticOverlay` in RoohWidgets.swift.
+        let primary = state?.next ?? .fajr
         let previous = state?.previous ?? .isha
         let assetName = PrayerAssetResolver.assetName(
             widgetId: widgetId,

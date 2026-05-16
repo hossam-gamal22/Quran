@@ -126,16 +126,39 @@ TaskManager.defineTask(TASK_NAME, async () => {
       kahfReminder: n.kahfReminder,
     });
 
-    // ── Widget data refresh ───────────────────────────────────────────────────
-    // Refresh widget shared data (prayer times, hijri date, etc.) in the
-    // background so home-screen widgets stay current even when the app is closed.
-    // We only update the AsyncStorage data layer here; full PNG snapshot
-    // regeneration requires the app UI and is deferred to foreground opens.
-    // Prayer-countdown overlays are already updated hourly by PrayerWidgetRefreshReceiver.
+    // ── Widget data + snapshot refresh ────────────────────────────────────────
+    // Refresh shared widget data AND attempt to regenerate PNG snapshots in
+    // the background. The countdown overlay on iOS is already live (SwiftUI
+    // Text.timer), so even if snapshot regeneration is skipped here, countdowns
+    // stay accurate. Snapshot regen updates the baked-in "next prayer" highlight
+    // and any prayer-time changes (new day, new location).
+    //
+    // pumpFromCurrentState requires <SnapshotHost> to be mounted in the React
+    // tree. In iOS background mode it usually still is (process not killed);
+    // in cold-start headless mode iOS mounts the tree before invoking the task
+    // so it should still succeed. If it returns 'skipped' the foreground pump
+    // will catch up on the next app open.
     try {
       const { refreshWidgetsNow } = await import('./widget-data-bridge');
-      await refreshWidgetsNow();
-      console.log('[background-task] Widget data refreshed');
+      const result = await refreshWidgetsNow();
+      console.log(
+        `[background-task] Widget refresh ok (snapshots=${result.snapshotCount} version=${result.snapshotVersion ?? 'n/a'} at=${result.snapshotUpdatedAt ?? 'n/a'})`,
+      );
+
+      // Belt-and-braces: also call the pump directly in case refreshWidgetsNow
+      // hit the "snapshot generation skipped" branch silently. Force=true
+      // ensures the hash check doesn't short-circuit us.
+      try {
+        const { pumpFromCurrentState } = await import('./widgets/pump');
+        const pumpResult = await pumpFromCurrentState({ force: true, debounceMs: 0 });
+        if (pumpResult) {
+          console.log(
+            `[background-task] Pump direct: ran=${pumpResult.ran} reason=${pumpResult.reason} entries=${pumpResult.entries?.length ?? 0} errors=${pumpResult.errors?.length ?? 0}`,
+          );
+        }
+      } catch (pe) {
+        console.warn('[background-task] Direct pump failed (non-fatal):', pe);
+      }
     } catch (we) {
       console.warn('[background-task] Widget refresh failed (non-fatal):', we);
     }

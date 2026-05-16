@@ -575,10 +575,10 @@ export async function schedulePrayerNotifications(
           // Advance reminders use the regular reminder sound and route to the prayer tab.
           const useFullAdhanForThisNotif = shouldUseFullAdhan && !isAdvanceReminder;
           const channelId = isAdvanceReminder
-            ? getReminderChannelId('notif_after_prayer')
+            ? 'general'
             : (prayerKey === 'fajr' ? fajrChannelId : regularChannelId);
           const notifSound = isAdvanceReminder
-            ? resolveNotificationSound('general_reminder', true)
+            ? 'default'
             : soundValue;
           const message = useFullAdhanForThisNotif
             ? t('fullAdhan.tapToOpen')

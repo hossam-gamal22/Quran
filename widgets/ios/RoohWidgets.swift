@@ -1130,6 +1130,104 @@ struct EmptyPlaceholderView: View {
 // branch on it and render `AppNotOpenedView` (home) or `LockAppNotOpenedView`
 // (accessory families) when it returns nil.
 
+/// Build a fresh `WidgetPrayerData` from the offline `PrayerCalculator`, or
+/// return nil if `widget_prayer_inputs` isn't in the App Group yet. Used by
+/// the lock-screen prayer views (and any other surface that wants prayer
+/// times not dependent on a recent app open).
+///
+/// The output shape is intentionally identical to what `preparePrayerWidgetData`
+/// writes from JS — `nextPrayer*`, `previousPrayer*`, `allPrayers[]`, and the
+/// flat `allPrayerEpochs[]` — so existing reading code keeps working unchanged.
+func buildFreshPrayerData(now: Date = Date()) -> WidgetPrayerData? {
+    guard let calc = PrayerCalculator.loadFromAppGroup(),
+          let state = calc.state(at: now),
+          let today = calc.times(for: now) else { return nil }
+
+    let order: [PrayerKey] = [.fajr, .sunrise, .dhuhr, .asr, .maghrib, .isha]
+    let formatHHMM: (Date) -> String = { d in
+        let comps = Calendar(identifier: .gregorian).dateComponents([.hour, .minute], from: d)
+        return String(format: "%02d:%02d", comps.hour ?? 0, comps.minute ?? 0)
+    }
+
+    let items: [WidgetPrayerItem] = order.map { key in
+        WidgetPrayerItem(
+            name: key.englishName,
+            nameAr: key.arabicName,
+            time: formatHHMM(today[key]),
+            epochMs: today[key].timeIntervalSince1970 * 1000,
+            isPassed: today[key] <= now,
+            isNext: key == state.next
+        )
+    }
+
+    let epochs: [Double] = calc.allPrayerEpochsMs(from: now, days: 7).map { Double($0) }
+
+    return WidgetPrayerData(
+        nextPrayer: state.next.rawValue,
+        nextPrayerName: state.next.englishName,
+        nextPrayerNameAr: state.next.arabicName,
+        nextPrayerTime: formatHHMM(state.nextAt),
+        nextPrayerAtEpochMs: state.nextAt.timeIntervalSince1970 * 1000,
+        previousPrayerName: state.previous.englishName,
+        previousPrayerNameAr: state.previous.arabicName,
+        previousPrayerAtEpochMs: state.previousAt.timeIntervalSince1970 * 1000,
+        calculationLocation: nil,
+        timezone: calc.inputs.timezone,
+        prayerDataUpdatedAt: ISO8601DateFormatter().string(from: now),
+        latitude: calc.inputs.latitude,
+        longitude: calc.inputs.longitude,
+        calculationMethod: calc.inputs.calculationMethod.rawValue,
+        madhab: calc.inputs.madhab == .hanafi ? 1 : 0,
+        source: "widget-local-adhan",
+        timeRemaining: nil,
+        timeRemainingMinutes: nil,
+        allPrayers: items,
+        allPrayerEpochs: epochs,
+        hijriDate: nil,
+        hijriDay: nil,
+        hijriMonth: nil,
+        hijriMonthEn: nil,
+        hijriYear: nil,
+        gregorianDate: nil,
+        location: nil
+    )
+}
+
+/// Variant of `sharedDataIfAvailable()` that prefers fresh prayer times
+/// computed locally by `PrayerCalculator`. When `widget_prayer_inputs` is in
+/// the App Group:
+///   • If a cached SharedWidgetData exists, its `.prayer` is replaced with
+///     the fresh data (everything else — verse, azkar, theme, etc. — is kept).
+///   • If no cached SharedWidgetData exists yet, a minimal one is constructed
+///     with just `.prayer` populated so lock-screen views can still render
+///     without ever having seen a prior app launch's data write.
+/// When the calculator isn't available (no inputs set), falls back to the
+/// existing `sharedDataIfAvailable()` so behavior is identical to before.
+func sharedDataWithFreshPrayer(now: Date = Date()) -> SharedWidgetData? {
+    let fresh = buildFreshPrayerData(now: now)
+    if let existing = sharedDataIfAvailable() {
+        if let fresh = fresh {
+            var copy = existing
+            copy.prayer = fresh
+            return copy
+        }
+        return existing
+    }
+    if let fresh = fresh {
+        return SharedWidgetData(
+            prayer: fresh,
+            azkar: nil, verse: nil, dhikr: nil,
+            language: nil,
+            widgetCalendar: nil, widgetDayCalendar: nil, widgetMonthCalendar: nil,
+            widgetNumerals: nil, widgetTheme: nil, widgetLanguage: nil,
+            widgetDateFormat: nil, widgetFontVariant: nil,
+            isPremium: nil,
+            snapshotVersion: nil, snapshotUpdatedAt: nil, snapshotManifest: nil
+        )
+    }
+    return nil
+}
+
 /// Returns the decoded `SharedWidgetData` only if the app has actually written
 /// content to the App Group. A successfully-decoded but otherwise-empty
 /// payload is treated as "missing" too — the app always writes at least one of
@@ -1935,7 +2033,11 @@ private func lockWidgetContext(date: Date, shared: SharedWidgetData) -> WidgetCo
 struct LockNextPrayerView: View {
     let date: Date
     var body: some View {
-        if let shared = sharedDataIfAvailable() {
+        // Phase 2: prefer fresh prayer times from PrayerCalculator (offline
+        // adhan-swift); falls back to cached SharedWidgetData when inputs
+        // aren't set yet, and to LockAppNotOpenedView when nothing is
+        // available. Layout unchanged.
+        if let shared = sharedDataWithFreshPrayer(now: date) {
             let context = lockWidgetContext(date: date, shared: shared)
             let prayer = shared.prayer
             let trueNext = nextPrayerItem(prayer, now: Date())
@@ -1986,7 +2088,13 @@ struct LockNextPrayerView: View {
 struct LockAllPrayersView: View {
     let date: Date
     var body: some View {
-        if let shared = sharedDataIfAvailable() {
+        // Phase 2: prefer fresh prayer times from PrayerCalculator. Layout
+        // unchanged — the existing 5-column display continues to omit Sunrise
+        // because accessoryRectangular has no horizontal room for a 6th column.
+        // The calculator itself treats Sunrise as a first-class state for
+        // `LockNextPrayerView` / `LockNextPrayerCountdownView`; only this
+        // narrow lock-screen variant filters it out for display fit.
+        if let shared = sharedDataWithFreshPrayer(now: date) {
             let context = lockWidgetContext(date: date, shared: shared)
             let liveprayers = normalizedPrayers(shared.prayer, now: Date())
             let mainFive = liveprayers.filter { ($0.name ?? "").lowercased() != "sunrise" }
@@ -2063,7 +2171,9 @@ struct LockHijriCircularView: View {
 struct LockNextPrayerCountdownView: View {
     let date: Date
     var body: some View {
-        if let shared = sharedDataIfAvailable() {
+        // Phase 2: prefer fresh prayer times from PrayerCalculator. Layout
+        // and Gauge ring unchanged.
+        if let shared = sharedDataWithFreshPrayer(now: date) {
             let context = lockWidgetContext(date: date, shared: shared)
             let prayer = shared.prayer
             let totalWindowMinutes: Double = 6 * 60
@@ -2754,7 +2864,11 @@ private func makePrayerStaticOverlay(widgetId: String,
           let calculator = PrayerCalculator.loadFromAppGroup() else { return nil }
     let now = context.date
     let state = calculator.state(at: now)
-    let active = state?.previous ?? .fajr
+    // The state token in the PNG asset name = the NEXT (upcoming) prayer —
+    // i.e. the prayer whose row is highlighted in the schedule and whose
+    // name is baked large in the hero panel. This matches the gallery
+    // preview's `isNext` row highlight convention.
+    let active = state?.next ?? .fajr
     let previous = state?.previous
     let langKey = context.isArabic ? "ar" : "en"
     guard prayerStaticAssetExists(widgetId: widgetId,

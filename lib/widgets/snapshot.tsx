@@ -943,3 +943,205 @@ export async function snapshotInventory(): Promise<SnapshotInventoryEntry[]> {
   }
   return out;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2: Static-PNG bake for iOS prayer widgets
+//
+// Iterates the 5 × 6 × 7 × 2 state matrix (widget × state × theme × lang),
+// mounts each preview with `forSnapshot=true` and a state-specific fixture so
+// the highlight row + active prayer name match, captures via captureRef, and
+// writes flat PNGs into FileSystem.documentDirectory + 'prayer-static-bake/'.
+//
+// After running, the user pulls that folder out of the simulator and runs:
+//   pnpm build-prayer-imagesets <pulled-folder>
+// which converts the flat PNGs into proper iOS Asset Catalog imagesets.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PrayerStateKey = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+export const PRAYER_STATE_KEYS: ReadonlyArray<PrayerStateKey> = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+const PRAYER_NAME_AR: Record<PrayerStateKey, string> = {
+  fajr: 'الفجر', sunrise: 'الشروق', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء',
+};
+const PRAYER_NAME_EN: Record<PrayerStateKey, string> = {
+  fajr: 'Fajr', sunrise: 'Sunrise', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha',
+};
+/** Canonical 6-prayer schedule used by the bake fixture. Times are illustrative
+ *  only — they're rendered with `opacity: 0` (transparent placeholder) because
+ *  the home-screen overlay draws the user's actual time on top. */
+const BAKE_TIMES: Record<PrayerStateKey, string> = {
+  fajr: '04:14', sunrise: '05:35', dhuhr: '12:17', asr: '15:33', maghrib: '18:42', isha: '20:19',
+};
+const BAKE_BASE_EPOCH = Date.now();
+
+/** Build a `SharedWidgetData` fixture that asserts `nextState` is the next
+ *  prayer (highlighted, hero-baked). `previousState` is the one immediately
+ *  before in the prayer order, used by the next/prev widget. */
+function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateKey): SharedWidgetData {
+  const order = PRAYER_STATE_KEYS;
+  const nowMs = BAKE_BASE_EPOCH;
+  const allPrayers = order.map((k, i) => ({
+    name: PRAYER_NAME_EN[k],
+    nameAr: PRAYER_NAME_AR[k],
+    time: BAKE_TIMES[k],
+    epochMs: nowMs + (i - order.indexOf(nextState)) * 90 * 60 * 1000,
+    isPassed: i < order.indexOf(nextState),
+    isNext: k === nextState,
+  }));
+  return {
+    prayer: {
+      nextPrayer: nextState,
+      nextPrayerName: PRAYER_NAME_EN[nextState],
+      nextPrayerNameAr: PRAYER_NAME_AR[nextState],
+      nextPrayerTime: BAKE_TIMES[nextState],
+      nextPrayerAtEpochMs: nowMs + 30 * 60 * 1000,
+      previousPrayerName: PRAYER_NAME_EN[previousState],
+      previousPrayerNameAr: PRAYER_NAME_AR[previousState],
+      previousPrayerAtEpochMs: nowMs - 90 * 60 * 1000,
+      timeRemaining: '30:00',
+      timeRemainingMinutes: 30,
+      timeRemainingLabel: '30:00',
+      allPrayers,
+      allPrayerEpochs: allPrayers.map((p) => p.epochMs),
+      hijriDate: '', hijriDay: 1, hijriMonth: '', hijriMonthEn: '', hijriYear: 1447,
+      gregorianDate: '', location: '',
+      prayerDataUpdatedAt: new Date(nowMs).toISOString(),
+      lastUpdated: new Date(nowMs).toISOString(),
+    },
+    azkar: undefined,
+    verse: undefined,
+    dhikr: undefined,
+    language: undefined,
+  } as unknown as SharedWidgetData;
+}
+
+function defaultPreviousFor(next: PrayerStateKey): PrayerStateKey {
+  switch (next) {
+    case 'fajr':    return 'isha';
+    case 'sunrise': return 'fajr';
+    case 'dhuhr':   return 'sunrise';
+    case 'asr':     return 'dhuhr';
+    case 'maghrib': return 'asr';
+    case 'isha':    return 'maghrib';
+  }
+}
+
+export interface BakeEntry {
+  assetName: string;       // e.g. prayerTable_medium_dark_ar_dhuhr
+  widgetId: string;
+  size: PreviewSize;
+  theme: ResolvedWidgetTheme;
+  language: 'ar' | 'en';
+  state: PrayerStateKey;
+  previousState?: PrayerStateKey;
+  path: string;
+}
+
+export interface BakeResult {
+  outputDir: string;
+  manifestPath: string;
+  entries: BakeEntry[];
+  errors: string[];
+}
+
+/** Total combinations the bake will attempt. Used by the dev route to show a
+ *  progress bar. 5 widget×size configs × 6 next-states × 7 themes × 2 langs. */
+export const PRAYER_BAKE_TOTAL = 5 * 6 * 7 * 2;
+
+/** Run the full prayer-widget bake.  Caller must ensure `SnapshotHost` is
+ *  mounted (it is, at app root). Calls `onProgress` after each capture. */
+export async function bakePrayerStaticPNGs(
+  onProgress?: (done: number, total: number, lastAssetName: string) => void,
+): Promise<BakeResult> {
+  if (!hostSetSlots) {
+    return {
+      outputDir: '', manifestPath: '', entries: [],
+      errors: ['SnapshotHost not mounted'],
+    };
+  }
+  const outputDir = `${FileSystem.documentDirectory}prayer-static-bake/`;
+  await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true }).catch(() => {});
+
+  // Limit to prayer widgets only.
+  const prayerKinds = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
+  const prayerDefs = WIDGET_REGISTRY.filter((d) => prayerKinds.has(d.id));
+
+  const entries: BakeEntry[] = [];
+  const errors: string[] = [];
+
+  const total = PRAYER_BAKE_TOTAL;
+  let done = 0;
+
+  for (const def of prayerDefs) {
+    for (const size of def.sizes) {
+      for (const theme of RESOLVED_WIDGET_THEMES) {
+        for (const lang of ['ar', 'en'] as const) {
+          for (const nextState of PRAYER_STATE_KEYS) {
+            const prevState = defaultPreviousFor(nextState);
+            const fixture = buildBakeFixture(nextState, prevState);
+            const stateToken = def.id === 'prayerNextPrevious'
+              ? `${prevState}_${nextState}`
+              : nextState;
+            const assetName = `${def.id}_${size}_${theme}_${lang}_${stateToken}`;
+
+            // Mount this single slot via the existing SnapshotHost
+            // machinery, keyed by the rich assetName so each combination
+            // gets its own ref.
+            hostSetSlots({
+              [assetName]: {
+                def, size,
+                language: lang,
+                theme,
+                sharedData: fixture,
+              },
+            } as any);
+            await settleNextFrame(250);
+
+            try {
+              const ref = getOrCreateRef(assetName);
+              const tmpUri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile' });
+              const dst = `${outputDir}${assetName}.png`;
+              try { await FileSystem.deleteAsync(dst, { idempotent: true }); } catch {}
+              await FileSystem.copyAsync({ from: tmpUri, to: dst });
+              entries.push({ assetName, widgetId: def.id, size, theme, language: lang, state: nextState, previousState: def.id === 'prayerNextPrevious' ? prevState : undefined, path: dst });
+            } catch (e) {
+              errors.push(`${assetName}: ${(e as Error)?.message ?? 'capture_failed'}`);
+            }
+
+            done++;
+            onProgress?.(done, total, assetName);
+          }
+        }
+      }
+    }
+  }
+
+  // Clear slots so the host renders nothing after the bake.
+  hostSetSlots({} as any);
+
+  // Write a manifest JSON next to the PNGs.
+  const manifestPath = `${outputDir}manifest.json`;
+  const manifest = {
+    version: 1,
+    bakedAt: new Date().toISOString(),
+    total: PRAYER_BAKE_TOTAL,
+    written: entries.length,
+    errors,
+    entries: entries.map((e) => ({
+      assetName: e.assetName,
+      widgetId: e.widgetId,
+      size: e.size,
+      theme: e.theme,
+      language: e.language,
+      state: e.state,
+      previousState: e.previousState,
+    })),
+  };
+  try {
+    await FileSystem.writeAsStringAsync(manifestPath, JSON.stringify(manifest, null, 2));
+  } catch (e) {
+    errors.push(`manifest_write: ${(e as Error)?.message ?? 'unknown'}`);
+  }
+
+  return { outputDir, manifestPath, entries, errors };
+}

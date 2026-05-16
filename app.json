@@ -29,7 +29,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "103",
+      "buildNumber": "108",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.rooh.almuslim"
@@ -86,7 +86,7 @@
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 77,
+      "versionCode": 79,
       "permissions": [
         "INTERNET",
         "VIBRATE",

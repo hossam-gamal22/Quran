@@ -1850,7 +1850,18 @@ export const processScheduledAdminNotifications = onSchedule(
 /**
  * Map app calculation method ID to adhan lib CalculationParameters.
  */
-function buildAdhanParams(methodId: number, asrSchool: number) {
+function buildAdhanParams(
+  methodId: number,
+  asrSchool: number,
+  adjustments?: {
+    fajr?: number;
+    sunrise?: number;
+    dhuhr?: number;
+    asr?: number;
+    maghrib?: number;
+    isha?: number;
+  },
+) {
   // Lazy require so cold starts don't load adhan unless this function runs
   const adhan = require('adhan');
   let params;
@@ -1868,6 +1879,20 @@ function buildAdhanParams(methodId: number, asrSchool: number) {
     default: params = adhan.CalculationMethod.MuslimWorldLeague();
   }
   params.madhab = asrSchool === 1 ? adhan.Madhab.Hanafi : adhan.Madhab.Shafi;
+  // Apply per-prayer minute offsets the user configured in-app so server-side
+  // computed times match the client's. Without this the FCM fallback would
+  // fire at the unadjusted adhan time and feel "wrong" to anyone using
+  // manual adjustments.
+  if (adjustments) {
+    params.adjustments = {
+      fajr:    Number(adjustments.fajr    ?? 0),
+      sunrise: Number(adjustments.sunrise ?? 0),
+      dhuhr:   Number(adjustments.dhuhr   ?? 0),
+      asr:     Number(adjustments.asr     ?? 0),
+      maghrib: Number(adjustments.maghrib ?? 0),
+      isha:    Number(adjustments.isha    ?? 0),
+    };
+  }
   return params;
 }
 
@@ -1931,12 +1956,14 @@ export const sendPrayerPushFallback = onSchedule(
         if (s.disabled) continue;
         if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number') continue;
 
-        // Skip users whose app was opened in the last 7 days — their local
-        // notifications are active, so FCM would create a duplicate.
+        // Skip users whose app was opened in the last 3 days — their local
+        // notifications are active, so FCM would create a duplicate. Tightened
+        // from 7d so a long-dormant gap doesn't quietly resume FCM for an
+        // active user who happened to skip a few days.
         const localActiveAt = s.localNotificationsActiveAt?.toDate?.() as Date | undefined;
         if (localActiveAt) {
           const daysSinceActive = (now.getTime() - localActiveAt.getTime()) / (1000 * 60 * 60 * 24);
-          if (daysSinceActive < 7) continue;
+          if (daysSinceActive < 3) continue;
         }
 
         // اقرأ FCM token من users/{uid}
@@ -1952,7 +1979,11 @@ export const sendPrayerPushFallback = onSchedule(
 
         try {
           const coords = new adhan.Coordinates(s.latitude, s.longitude);
-          const params = buildAdhanParams(s.calculationMethod || 4, s.asrJuristic || 0);
+          const params = buildAdhanParams(
+            s.calculationMethod || 4,
+            s.asrJuristic || 0,
+            s.adjustments,
+          );
           const todayPrayers = new adhan.PrayerTimes(coords, now, params);
           const tomorrowPrayers = new adhan.PrayerTimes(
             coords,
@@ -1966,6 +1997,10 @@ export const sendPrayerPushFallback = onSchedule(
           if (!nextTime) continue;
 
           const minutesUntil = (nextTime.getTime() - now.getTime()) / 60000;
+          const prayerKeyPreview = String(next).toLowerCase();
+          logger.info(
+            `[fcm-prayer] uid=${uid} next=${prayerKeyPreview} nextTimeUTC=${nextTime.toISOString()} minutesUntil=${minutesUntil.toFixed(1)} adj=${JSON.stringify(s.adjustments ?? {})}`,
+          );
           // Send 5-15 minutes before prayer time so FCM delivery delay (≤10 min)
           // keeps the notification arriving around prayer time, not after it.
           // Sending at minutesUntil=0 caused 18+ minute post-prayer delivery.

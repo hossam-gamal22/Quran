@@ -716,14 +716,16 @@ export default function RootLayout() {
 
       // Phase 2: ارفع موقع وإعدادات الصلاة لـ Firestore عشان FCM Push fallback
       // (Cloud Function تحسب الصلاة محلياً وترسل push احتياطي لو local scheduling فشل)
-      setTimeout(() => {
-        getUserId().then((uid) => {
-          if (!uid) return;
-          import('@/lib/fcm-prayer-sync').then(({ syncPrayerDataToFirestore }) => {
-            syncPrayerDataToFirestore(uid).catch(() => {});
-          });
-        }).catch(() => {});
-      }, 8000);
+      // Fire IMMEDIATELY after auth (with force=true) so the server's
+      // "skip active users" check sees this device on its very next cron tick —
+      // the previous 8s timer left a window where the user could open + lock the
+      // app and still receive a duplicate FCM.
+      getUserId().then((uid) => {
+        if (!uid) return;
+        import('@/lib/fcm-prayer-sync').then(({ syncPrayerDataToFirestore }) => {
+          syncPrayerDataToFirestore(uid, /* force */ true).catch(() => {});
+        });
+      }).catch(() => {});
 
       // Initialize TrackPlayer in parallel (non-blocking) — runs alongside Firebase inits
       // so its startup cost doesn't gate the splash screen hide.
@@ -1022,6 +1024,18 @@ export default function RootLayout() {
           .then(uid => (uid ? syncMonthlyEngagementFromLocalWorship(uid) : null))
           .catch((e) => console.warn('⚠️ [AppResume] syncMonthlyEngagement:', e?.message));
         syncWidgetDataToNative().catch((e) => console.warn('⚠️ [AppResume] syncWidgetDataToNative:', e?.message));
+        // Refresh the "active user" marker on every foreground so the FCM
+        // fallback server keeps skipping duplicate notifications. The sync
+        // helper has its own 1-hour throttle so this is cheap on quick
+        // app-switches.
+        getUserId()
+          .then((uid) => {
+            if (!uid) return;
+            return import('@/lib/fcm-prayer-sync').then(({ syncPrayerDataToFirestore }) =>
+              syncPrayerDataToFirestore(uid),
+            );
+          })
+          .catch((e) => console.warn('⚠️ [AppResume] syncPrayerDataToFirestore:', e?.message));
         refreshLiveActivityIfEnabled().catch((e) => console.warn('⚠️ [AppResume] refreshLiveActivity:', e?.message));
         // Force-refresh sound settings from Firestore so admin sound assignment
         // changes propagate immediately when user returns to the app (instead

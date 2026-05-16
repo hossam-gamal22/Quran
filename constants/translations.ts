@@ -2206,6 +2206,7 @@ export interface TranslationKeys {
     calendarAuto: string;
     calendarGregorian: string;
     calendarHijri: string;
+    languageNotice: string;
     numerals: string;
     numeralsAuto: string;
     numeralsArabic: string;
@@ -4848,6 +4849,7 @@ const ar: TranslationKeys = {
     calendarAuto: 'تلقائي',
     calendarGregorian: 'ميلادي',
     calendarHijri: 'هجري',
+    languageNotice: 'الودجات متاحة باللغة العربية والإنجليزية فقط',
     numerals: 'الأرقام',
     numeralsAuto: 'تلقائي',
     numeralsArabic: '١٢٣',
@@ -7474,6 +7476,7 @@ const en: TranslationKeys = {
     calendarAuto: 'Auto',
     calendarGregorian: 'Gregorian',
     calendarHijri: 'Hijri',
+    languageNotice: 'Widgets are available in Arabic and English only.',
     numerals: 'Numerals',
     numeralsAuto: 'Auto',
     numeralsArabic: '١٢٣',
@@ -10077,6 +10080,7 @@ const fr: TranslationKeys = {
     calendarAuto: 'Auto',
     calendarGregorian: 'Grégorien',
     calendarHijri: 'Hijri',
+    languageNotice: 'Les widgets sont disponibles en arabe et en anglais uniquement.',
     numerals: 'Chiffres',
     numeralsAuto: 'Auto',
     numeralsArabic: '١٢٣',
@@ -12681,6 +12685,7 @@ const de: TranslationKeys = {
     calendarAuto: 'Auto',
     calendarGregorian: 'Gregorianisch',
     calendarHijri: 'Hijri',
+    languageNotice: 'Widgets sind nur auf Arabisch und Englisch verfügbar.',
     numerals: 'Ziffern',
     numeralsAuto: 'Auto',
     numeralsArabic: '١٢٣',
@@ -15285,6 +15290,7 @@ const tr: TranslationKeys = {
     calendarAuto: 'Otomatik',
     calendarGregorian: 'Miladi',
     calendarHijri: 'Hicri',
+    languageNotice: 'Widget\'lar yalnızca Arapça ve İngilizce olarak mevcuttur.',
     numerals: 'Rakamlar',
     numeralsAuto: 'Otomatik',
     numeralsArabic: '١٢٣',
@@ -17889,6 +17895,7 @@ const es: TranslationKeys = {
     calendarAuto: 'Auto',
     calendarGregorian: 'Gregoriano',
     calendarHijri: 'Hijri',
+    languageNotice: 'Los widgets solo están disponibles en árabe e inglés.',
     numerals: 'Numerales',
     numeralsAuto: 'Auto',
     numeralsArabic: '١٢٣',
@@ -20492,6 +20499,7 @@ const ur: TranslationKeys = {
     calendarAuto: 'خودکار',
     calendarGregorian: 'عیسوی',
     calendarHijri: 'ہجری',
+    languageNotice: 'ویجٹس صرف عربی اور انگریزی میں دستیاب ہیں۔',
     numerals: 'ہندسے',
     numeralsAuto: 'خودکار',
     numeralsArabic: '١٢٣',
@@ -23096,6 +23104,7 @@ const id: TranslationKeys = {
     calendarAuto: 'Otomatis',
     calendarGregorian: 'Masehi',
     calendarHijri: 'Hijriah',
+    languageNotice: 'Widget hanya tersedia dalam bahasa Arab dan Inggris.',
     numerals: 'Angka',
     numeralsAuto: 'Otomatis',
     numeralsArabic: '١٢٣',
@@ -25700,6 +25709,7 @@ const ms: TranslationKeys = {
     calendarAuto: 'Auto',
     calendarGregorian: 'Masihi',
     calendarHijri: 'Hijrah',
+    languageNotice: 'Widget hanya tersedia dalam bahasa Arab dan Inggeris.',
     numerals: 'Angka',
     numeralsAuto: 'Auto',
     numeralsArabic: '١٢٣',
@@ -28304,6 +28314,7 @@ const hi: TranslationKeys = {
     calendarAuto: 'स्वचालित',
     calendarGregorian: 'ग्रेगोरियन',
     calendarHijri: 'हिजरी',
+    languageNotice: 'विजेट केवल अरबी और अंग्रेजी में उपलब्ध हैं।',
     numerals: 'अंक',
     numeralsAuto: 'स्वचालित',
     numeralsArabic: '١٢٣',
@@ -30908,6 +30919,7 @@ const bn: TranslationKeys = {
     calendarAuto: 'স্বয়ংক্রিয়',
     calendarGregorian: 'গ্রেগরিয়ান',
     calendarHijri: 'হিজরি',
+    languageNotice: 'উইজেট শুধুমাত্র আরবি ও ইংরেজিতে পাওয়া যায়।',
     numerals: 'সংখ্যা',
     numeralsAuto: 'স্বয়ংক্রিয়',
     numeralsArabic: '১٢٣',
@@ -33511,6 +33523,7 @@ const ru: TranslationKeys = {
     calendarAuto: 'Авто',
     calendarGregorian: 'Григорианский',
     calendarHijri: 'Хиджри',
+    languageNotice: 'Виджеты доступны только на арабском и английском языках.',
     numerals: 'Цифры',
     numeralsAuto: 'Авто',
     numeralsArabic: '١٢٣',

@@ -48,8 +48,9 @@ function LiveDateWidget({
   const p = paletteFor(resolvedTheme);
   const isAr = resolveIsArabic(data.widgetLanguage, data.language);
   const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
-  const calPref = data.widgetDayCalendar ?? data.widgetCalendar ?? 'auto';
-  const monthCalPref = data.widgetMonthCalendar ?? data.widgetCalendar ?? 'auto';
+  // Single source of truth: widgetCalendar. Old day/month keys are ignored.
+  const calPref = data.widgetCalendar ?? 'auto';
+  const monthCalPref = calPref;
   const radius = TILE_RADIUS[size];
 
   // Hijri date (safe — falls back to Gregorian on error)
@@ -65,8 +66,8 @@ function LiveDateWidget({
     }
   } catch {}
 
-  const useHijri = calPref === 'hijri' || (calPref === 'auto' && isAr);
-  const useMonthHijri = monthCalPref === 'hijri' || (monthCalPref === 'auto' && isAr);
+  const useHijri = calPref !== 'gregorian';
+  const useMonthHijri = monthCalPref !== 'gregorian';
 
   const displayDay = applyNumerals(useHijri ? hijriDay : now.getDate(), numerals, isAr);
   const displayMonth = useHijri
@@ -294,17 +295,19 @@ function formatCountdownFromEpoch(
 ): string {
   if (!nextPrayerAtEpochMs || !Number.isFinite(nextPrayerAtEpochMs)) return '—';
   const remainingSeconds = Math.max(0, Math.floor((nextPrayerAtEpochMs - now.getTime()) / 1000));
-  const hours = Math.floor(remainingSeconds / 3600);
-  const minutes = Math.floor((remainingSeconds % 3600) / 60);
-  const h = applyNumerals(hours, numerals, isArabic);
-  const m = applyNumerals(minutes, numerals, isArabic);
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const h = Math.floor(remainingSeconds / 3600);
+  const m = Math.floor((remainingSeconds % 3600) / 60);
+  const s = remainingSeconds % 60;
+  const timeStr = `${h}:${pad2(m)}:${pad2(s)}`;
+  const formatted = applyNumerals(timeStr, numerals, isArabic);
   if (__DEV__) {
     console.log(
       `[widget/android] countdown nowMs=${now.getTime()} nextPrayerAtEpochMs=${nextPrayerAtEpochMs} widgetRemainingSeconds=${remainingSeconds} prayerDataUpdatedAt=${prayerDataUpdatedAt ?? 'n/a'}`,
     );
     console.log('[PrayerCanonical] widget countdown:', remainingSeconds);
   }
-  return isArabic ? `بعد ${h} س ${m} د` : `in ${h}h ${m}m`;
+  return isArabic ? `بعد ${formatted}` : `in ${formatted}`;
 }
 
 function formatPreviousFromEpoch(
@@ -315,11 +318,13 @@ function formatPreviousFromEpoch(
 ): string {
   if (!previousPrayerAtEpochMs || !Number.isFinite(previousPrayerAtEpochMs)) return '—';
   const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - previousPrayerAtEpochMs) / 1000));
-  const hours = Math.floor(elapsedSeconds / 3600);
-  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-  const h = applyNumerals(hours, numerals, isArabic);
-  const m = applyNumerals(minutes, numerals, isArabic);
-  return isArabic ? `منذ ${h} س ${m} د` : `${h}h ${m}m ago`;
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const h = Math.floor(elapsedSeconds / 3600);
+  const m = Math.floor((elapsedSeconds % 3600) / 60);
+  const s = elapsedSeconds % 60;
+  const timeStr = `${h}:${pad2(m)}:${pad2(s)}`;
+  const formatted = applyNumerals(timeStr, numerals, isArabic);
+  return isArabic ? `منذ ${formatted}` : `${formatted} ago`;
 }
 
 const SIZE_DIMS: Record<AndroidSize, { width: number; height: number }> = {

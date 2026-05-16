@@ -17,6 +17,17 @@
         "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a"
       }
     },
+    "simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release",
+        "image": "latest"
+      },
+      "env": {
+        "APP_ENV": "production"
+      }
+    },
     "local-ipa": {
       "distribution": "internal",
       "ios": {

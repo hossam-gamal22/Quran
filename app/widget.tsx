@@ -32,7 +32,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { t } from '@/lib/i18n';
+import { t, getLanguage } from '@/lib/i18n';
 import { requestAddWidget } from '@/lib/widget-add-helper';
 import { updateWidgetData, refreshWidgetsNow } from '@/lib/widget-data-bridge';
 import type { PreviewSize, WidgetDateFormat } from '@/components/widgets/previews/shared';
@@ -77,7 +77,7 @@ interface WidgetSection {
 // (see lib/widgets/registry.ts). Sections are grouped by category in a stable
 // display order; each definition × size becomes one variant tile.
 
-const CATEGORY_ORDER: WidgetCategory[] = ['date', 'prayer', 'quran', 'azkar', 'hijri'];
+const CATEGORY_ORDER: WidgetCategory[] = ['date', 'hijri', 'prayer', 'quran', 'azkar'];
 
 const CATEGORY_LABELS: Record<WidgetCategory, { ar: string; en: string }> = {
   date: { ar: 'الوقت والتاريخ', en: 'Time & Date' },
@@ -231,6 +231,8 @@ function GalleryTab({
   const styles = useScaledStyles(_styles, colors.fs);
   const sections = Platform.OS === 'android' ? SECTIONS_ANDROID : SECTIONS_IOS;
   const ar = isRTL;
+  const lang = getLanguage();
+  const showLangNotice = lang !== 'ar' && lang !== 'en';
   const [widgetPreviewData, setWidgetPreviewData] = useState<SharedWidgetData | null>(null);
 
   const loadPreviewData = useCallback(async (cancelled?: () => boolean) => {
@@ -274,48 +276,73 @@ function GalleryTab({
           {Platform.OS === 'ios' ? t('widgetPage.iosHint') : t('widgetPage.androidHint')}
         </Text>
 
-      {sections.map((section) => {
-        const filtered = ar
-          ? section.variants.filter((v) => v.forcedLanguage !== 'en')
-          : section.variants;
-        const smalls = filtered.filter((v) => v.size === 'small');
-        const mediums = filtered.filter((v) => v.size === 'medium');
-        const larges = filtered.filter((v) => v.size === 'large');
-        const smallPairs: WidgetVariant[][] = [];
-        for (let i = 0; i < smalls.length; i += 2) smallPairs.push(smalls.slice(i, i + 2));
+      {(() => {
+        const allVariants = sections.flatMap((s) =>
+          ar
+            ? s.variants.filter((v) => v.forcedLanguage !== 'en')
+            : s.variants.filter((v) => v.forcedLanguage !== 'ar')
+        );
+        const smalls = allVariants.filter((v) => v.size === 'small');
+        const mediums = allVariants.filter((v) => v.size === 'medium');
+        const larges = allVariants.filter((v) => v.size === 'large');
+        // In RTL (Arabic): free → index[1] = right = first in reading
+        // In LTR (English/others): free → index[0] = left = first in reading
+        const sortPair = (pair: WidgetVariant[]): WidgetVariant[] => {
+          if (pair.length !== 2) return pair;
+          const [a, b] = pair;
+          const aFree = !a.isPremium, bFree = !b.isPremium;
+          if (ar) {
+            if (aFree && !bFree) return [b, a]; // free to right (index 1)
+          } else {
+            if (!aFree && bFree) return [b, a]; // free to left (index 0)
+          }
+          return pair;
+        };
+        const rawPairs: WidgetVariant[][] = [];
+        for (let i = 0; i < smalls.length; i += 2) rawPairs.push(smalls.slice(i, i + 2));
+        const smallPairs = rawPairs.map(sortPair);
+        // Free mediums/larges appear before premium ones (top = first in any direction)
+        const sortByFree = (arr: WidgetVariant[]) =>
+          [...arr].sort((a, b) => (a.isPremium ? 1 : 0) - (b.isPremium ? 1 : 0));
+        const sortedMediums = sortByFree(mediums);
+        const sortedLarges = sortByFree(larges);
         return (
-          <View key={section.id} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: ar ? 'right' : 'left', writingDirection: ar ? 'rtl' : 'ltr' }]}>
-              {ar ? section.titleAr : section.titleEn}
-            </Text>
-            <View style={styles.sectionGrid}>
-              {smallPairs.map((pair, idx) => (
-                <View key={`smalls-${idx}`} style={styles.smallRow}>
-                  {pair.map((variant) => (
-                    <VariantCard
-                      key={variant.id}
-                      variant={variant}
-                      isPremium={isPremium}
-                      onPress={() => onAddWidget(variant)}
-                      isRTL={ar}
-                    />
-                  ))}
-                </View>
-              ))}
-              {mediums.map((variant) => (
-                <View key={variant.id} style={styles.fullRow}>
-                  <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} />
-                </View>
-              ))}
-              {larges.map((variant) => (
-                <View key={variant.id} style={styles.fullRow}>
-                  <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} />
-                </View>
-              ))}
-            </View>
+          <View>
+            {showLangNotice && (
+              <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ color: colors.text, fontSize: 14, textAlign: 'center', lineHeight: 22 }}>
+                  {t('widgetPage.languageNotice')}
+                </Text>
+              </View>
+            )}
+          <View style={styles.sectionGrid}>
+            {smallPairs.map((pair, idx) => (
+              <View key={`smalls-${idx}`} style={styles.smallRow}>
+                {pair.map((variant) => (
+                  <VariantCard
+                    key={variant.id}
+                    variant={variant}
+                    isPremium={isPremium}
+                    onPress={() => onAddWidget(variant)}
+                    isRTL={ar}
+                  />
+                ))}
+              </View>
+            ))}
+            {sortedMediums.map((variant) => (
+              <View key={variant.id} style={styles.fullRow}>
+                <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} />
+              </View>
+            ))}
+            {sortedLarges.map((variant) => (
+              <View key={variant.id} style={styles.fullRow}>
+                <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} />
+              </View>
+            ))}
+          </View>
           </View>
         );
-      })}
+      })()}
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -509,25 +536,14 @@ function SettingsTab({
       <SettingsGroup title={t('widgetPage.customize')} isRTL={isRTL}>
         <WidgetOptionRow
           isRTL={isRTL}
-          label={t('widgetPage.dayCalendar')}
-          value={settings.display.widgetDayCalendar}
+          label={t('widgetPage.calendar')}
+          value={settings.display.widgetCalendar ?? 'auto'}
           options={[
             { key: 'auto', label: t('widgetPage.calendarAuto') },
             { key: 'gregorian', label: t('widgetPage.calendarGregorian') },
             { key: 'hijri', label: t('widgetPage.calendarHijri') },
           ]}
-          onChange={(v) => applyWidgetSetting({ widgetDayCalendar: v as any })}
-        />
-        <WidgetOptionRow
-          isRTL={isRTL}
-          label={t('widgetPage.monthCalendar')}
-          value={settings.display.widgetMonthCalendar}
-          options={[
-            { key: 'auto', label: t('widgetPage.calendarAuto') },
-            { key: 'gregorian', label: t('widgetPage.calendarGregorian') },
-            { key: 'hijri', label: t('widgetPage.calendarHijri') },
-          ]}
-          onChange={(v) => applyWidgetSetting({ widgetMonthCalendar: v as any })}
+          onChange={(v) => applyWidgetSetting({ widgetCalendar: v as any, widgetDayCalendar: v as any, widgetMonthCalendar: v as any })}
         />
         <WidgetOptionRow
           isRTL={isRTL}

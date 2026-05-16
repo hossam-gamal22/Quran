@@ -971,7 +971,9 @@ export default function HomeScreen() {
       AsyncStorage.getItem('@quick_access_migration_qa_v3'),
       AsyncStorage.getItem('@quick_access_migration_qa_v4'),
       AsyncStorage.getItem('@quick_access_migration_qa_v5'),
-    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done, qaMigrationV5Done]) => {
+      AsyncStorage.getItem('@quick_access_migration_qa_v6'),
+      AsyncStorage.getItem('@quick_access_migration_qa_v7'),
+    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done, qaMigrationV5Done, qaMigrationV6Done, qaMigrationV7Done]) => {
       // Check if user has ever customized their Quick Access
       const userHasCustomized = customizedFlag === 'true';
       setHasUserCustomized(userHasCustomized);
@@ -1022,6 +1024,26 @@ export default function HomeScreen() {
                 AsyncStorage.setItem('@quick_access_customized', 'true');
                 setHasUserCustomized(true);
               }
+            }
+
+            // v6: Re-enforce question_answer at position 2 (3rd slot) for all users
+            if (!qaMigrationV6Done) {
+              ids = ids.filter(id => id !== 'question_answer');
+              ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+              AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+              AsyncStorage.setItem('@quick_access_migration_qa_v6', 'true');
+              if (!userHasCustomized) {
+                AsyncStorage.setItem('@quick_access_customized', 'true');
+                setHasUserCustomized(true);
+              }
+            }
+
+            // v7: Final enforcement — always inject question_answer at slot 3
+            if (!qaMigrationV7Done) {
+              ids = ids.filter(id => id !== 'question_answer');
+              ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+              AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+              AsyncStorage.setItem('@quick_access_migration_qa_v7', 'true');
             }
 
             setSelectedQuickAccessIds(ids);
@@ -1081,6 +1103,28 @@ export default function HomeScreen() {
         setSelectedQuickAccessIds(ids);
         AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
         AsyncStorage.setItem('@quick_access_migration_qa_v5', 'true');
+        AsyncStorage.setItem('@quick_access_customized', 'true');
+      }
+
+      // v6 fallback: no stored items — force question_answer at slot 3
+      if (!stored && !qaMigrationV6Done) {
+        const defaultIds = QUICK_ACCESS.slice(0, 4).map(i => i.id);
+        let ids = defaultIds.filter(id => id !== 'question_answer');
+        ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+        setSelectedQuickAccessIds(ids);
+        AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+        AsyncStorage.setItem('@quick_access_migration_qa_v6', 'true');
+        AsyncStorage.setItem('@quick_access_customized', 'true');
+      }
+
+      // v7 fallback: no stored items — final enforcement
+      if (!stored && !qaMigrationV7Done) {
+        const defaultIds = QUICK_ACCESS.slice(0, 4).map(i => i.id);
+        let ids = defaultIds.filter(id => id !== 'question_answer');
+        ids = [...ids.slice(0, 2), 'question_answer', ...ids.slice(2)];
+        setSelectedQuickAccessIds(ids);
+        AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+        AsyncStorage.setItem('@quick_access_migration_qa_v7', 'true');
         AsyncStorage.setItem('@quick_access_customized', 'true');
       }
     });

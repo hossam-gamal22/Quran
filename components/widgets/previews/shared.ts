@@ -302,7 +302,7 @@ export function resolveCalendar(
 ): 'gregorian' | 'hijri' {
   if (pref === 'gregorian') return 'gregorian';
   if (pref === 'hijri') return 'hijri';
-  return isArabic ? 'hijri' : 'gregorian';
+  return 'hijri';
 }
 
 // Helper used by hijri-date export consumers

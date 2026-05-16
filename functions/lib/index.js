@@ -1645,7 +1645,7 @@ exports.processScheduledAdminNotifications = (0, scheduler_1.onSchedule)({ sched
 /**
  * Map app calculation method ID to adhan lib CalculationParameters.
  */
-function buildAdhanParams(methodId, asrSchool) {
+function buildAdhanParams(methodId, asrSchool, adjustments) {
     // Lazy require so cold starts don't load adhan unless this function runs
     const adhan = require('adhan');
     let params;
@@ -1683,6 +1683,20 @@ function buildAdhanParams(methodId, asrSchool) {
         default: params = adhan.CalculationMethod.MuslimWorldLeague();
     }
     params.madhab = asrSchool === 1 ? adhan.Madhab.Hanafi : adhan.Madhab.Shafi;
+    // Apply per-prayer minute offsets the user configured in-app so server-side
+    // computed times match the client's. Without this the FCM fallback would
+    // fire at the unadjusted adhan time and feel "wrong" to anyone using
+    // manual adjustments.
+    if (adjustments) {
+        params.adjustments = {
+            fajr: Number(adjustments.fajr ?? 0),
+            sunrise: Number(adjustments.sunrise ?? 0),
+            dhuhr: Number(adjustments.dhuhr ?? 0),
+            asr: Number(adjustments.asr ?? 0),
+            maghrib: Number(adjustments.maghrib ?? 0),
+            isha: Number(adjustments.isha ?? 0),
+        };
+    }
     return params;
 }
 const PRAYER_NAMES_AR = {
@@ -1691,6 +1705,26 @@ const PRAYER_NAMES_AR = {
     asr: 'العصر',
     maghrib: 'المغرب',
     isha: 'العشاء',
+};
+// Bodies matching constants/translations.ts notifications.*Body (Arabic)
+const PRAYER_BODIES_AR = {
+    fajr: 'حي على الصلاة.. الفجر مطلع السكينة.',
+    dhuhr: 'حان وقت صلاة الظهر.. جدد طاقتك بالوقوف بين يدي الله.',
+    asr: 'حان وقت صلاة العصر.. حافظ عليها لتنال عظيم الأجر.',
+    maghrib: 'حان وقت صلاة المغرب.. بارك الله في يومك.',
+    isha: 'حان وقت صلاة العشاء.. اختم يومك بصلاة تريح قلبك.',
+    jumuah: 'حان وقت صلاة الجمعة.. أكثِر من الصلاة على النبي ﷺ.',
+};
+// Titles exactly matching constants/translations.ts notifications.*NotifTitle (Arabic)
+// so FCM and local notifications are visually identical to the user.
+const PRAYER_TITLES_AR = {
+    fajr: 'الفجر.. نورٌ في قلبك 🌙',
+    dhuhr: 'الظهر.. استراحة المؤمن ☀️',
+    asr: 'العصر.. الصلاة الوسطى 🌤️',
+    maghrib: 'المغرب.. ختام النهار الطاهر 🌇',
+    isha: 'العشاء.. سكنٌ وطمأنينة ✨',
+    // Friday Dhuhr
+    jumuah: 'الجمعة.. خير يوم طلعت عليه الشمس 🕌',
 };
 /**
  * Scheduled Cloud Function: runs every 15 minutes.
@@ -1719,6 +1753,16 @@ exports.sendPrayerPushFallback = (0, scheduler_1.onSchedule)({ schedule: '*/15 *
                 continue;
             if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number')
                 continue;
+            // Skip users whose app was opened in the last 3 days — their local
+            // notifications are active, so FCM would create a duplicate. Tightened
+            // from 7d so a long-dormant gap doesn't quietly resume FCM for an
+            // active user who happened to skip a few days.
+            const localActiveAt = s.localNotificationsActiveAt?.toDate?.();
+            if (localActiveAt) {
+                const daysSinceActive = (now.getTime() - localActiveAt.getTime()) / (1000 * 60 * 60 * 24);
+                if (daysSinceActive < 3)
+                    continue;
+            }
             // اقرأ FCM token من users/{uid}
             let fcmToken;
             try {
@@ -1736,7 +1780,7 @@ exports.sendPrayerPushFallback = (0, scheduler_1.onSchedule)({ schedule: '*/15 *
                 continue;
             try {
                 const coords = new adhan.Coordinates(s.latitude, s.longitude);
-                const params = buildAdhanParams(s.calculationMethod || 4, s.asrJuristic || 0);
+                const params = buildAdhanParams(s.calculationMethod || 4, s.asrJuristic || 0, s.adjustments);
                 const todayPrayers = new adhan.PrayerTimes(coords, now, params);
                 const tomorrowPrayers = new adhan.PrayerTimes(coords, new Date(now.getTime() + 24 * 60 * 60 * 1000), params);
                 const next = todayPrayers.nextPrayer();
@@ -1746,8 +1790,12 @@ exports.sendPrayerPushFallback = (0, scheduler_1.onSchedule)({ schedule: '*/15 *
                 if (!nextTime)
                     continue;
                 const minutesUntil = (nextTime.getTime() - now.getTime()) / 60000;
-                // ضمن 15 دقيقة قبل الصلاة بالضبط (نحن نشتغل كل 15 دقيقة → exactly one match)
-                if (minutesUntil < 0 || minutesUntil > 15)
+                const prayerKeyPreview = String(next).toLowerCase();
+                logger.info(`[fcm-prayer] uid=${uid} next=${prayerKeyPreview} nextTimeUTC=${nextTime.toISOString()} minutesUntil=${minutesUntil.toFixed(1)} adj=${JSON.stringify(s.adjustments ?? {})}`);
+                // Send 5-15 minutes before prayer time so FCM delivery delay (≤10 min)
+                // keeps the notification arriving around prayer time, not after it.
+                // Sending at minutesUntil=0 caused 18+ minute post-prayer delivery.
+                if (minutesUntil < 5 || minutesUntil > 15)
                     continue;
                 // De-duplication: تجاهل لو أرسلنا نفس الصلاة لنفس المستخدم خلال 30 دقيقة
                 const prayerKey = String(next).toLowerCase();
@@ -1757,10 +1805,16 @@ exports.sendPrayerPushFallback = (0, scheduler_1.onSchedule)({ schedule: '*/15 *
                 if (dedupeSnap.exists)
                     continue;
                 const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
+                // Friday Dhuhr → Jumuah
+                const isFriday = now.getDay() === 5;
+                const effectiveKey = (prayerKey === 'dhuhr' && isFriday) ? 'jumuah' : prayerKey;
+                // Title: 🕌 + full prayer title exactly matching app's getPrayerNotifTitle()
+                const titleAr = `🕌 ${PRAYER_TITLES_AR[effectiveKey] ?? nameAr}`;
+                const bodyAr = PRAYER_BODIES_AR[effectiveKey] ?? `حان وقت صلاة ${nameAr}`;
                 messages.push({
                     to: fcmToken,
-                    title: `🕌 ${nameAr}`,
-                    body: `حان الآن وقت صلاة ${nameAr}`,
+                    title: titleAr,
+                    body: bodyAr,
                     sound: 'default',
                     priority: 'high',
                     data: {
