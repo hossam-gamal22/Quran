@@ -12,10 +12,20 @@
 
 import React from 'react';
 import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
-import { bakePrayerStaticPNGs, PRAYER_BAKE_TOTAL, type BakeResult } from '@/lib/widgets/snapshot';
+import {
+  bakePrayerStaticPNGs,
+  bakePrayerStaticSamples,
+  bakePrayerTableMediumStates,
+  PRAYER_BAKE_TOTAL,
+  type BakeResult,
+} from '@/lib/widgets/snapshot';
+
+const SAMPLE_TOTAL = 5;
+const STATES_TOTAL = 6;
 
 export default function BakePrayerWidgetsScreen() {
   const [running, setRunning] = React.useState(false);
+  const [mode, setMode] = React.useState<'full' | 'sample' | 'states'>('full');
   const [done, setDone] = React.useState(0);
   const [last, setLast] = React.useState<string>('');
   const [result, setResult] = React.useState<BakeResult | null>(null);
@@ -30,12 +40,55 @@ export default function BakePrayerWidgetsScreen() {
         setLast(name);
       });
       setResult(r);
+      setMode('full');
     } finally {
       setRunning(false);
     }
   }, []);
 
-  const pct = Math.round((done / PRAYER_BAKE_TOTAL) * 100);
+  const startSample = React.useCallback(async () => {
+    setRunning(true);
+    setDone(0);
+    setResult(null);
+    try {
+      const r = await bakePrayerStaticSamples({
+        theme: 'green',
+        language: 'ar',
+        nextState: 'isha',
+        onProgress: (n, _total, name) => {
+          setDone(n);
+          setLast(name);
+        },
+      });
+      setResult(r);
+      setMode('sample');
+    } finally {
+      setRunning(false);
+    }
+  }, []);
+
+  const startStates = React.useCallback(async () => {
+    setRunning(true);
+    setDone(0);
+    setResult(null);
+    try {
+      const r = await bakePrayerTableMediumStates({
+        theme: 'green',
+        language: 'ar',
+        onProgress: (n, _total, name) => {
+          setDone(n);
+          setLast(name);
+        },
+      });
+      setResult(r);
+      setMode('states');
+    } finally {
+      setRunning(false);
+    }
+  }, []);
+
+  const total = mode === 'sample' ? SAMPLE_TOTAL : mode === 'states' ? STATES_TOTAL : PRAYER_BAKE_TOTAL;
+  const pct = Math.round((done / total) * 100);
 
   const sharePath = React.useCallback(async () => {
     if (!result) return;
@@ -61,6 +114,44 @@ export default function BakePrayerWidgetsScreen() {
         </Text>
 
         <TouchableOpacity
+          onPress={startSample}
+          disabled={running}
+          style={{
+            backgroundColor: running ? '#374151' : '#3B82F6',
+            paddingVertical: 14,
+            paddingHorizontal: 18,
+            borderRadius: 12,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: '700' }}>
+            Sample Bake — 5 PNGs (green / ar / isha)
+          </Text>
+          <Text style={{ color: '#BFDBFE', fontSize: 11, marginTop: 2 }}>
+            One PNG per widget kind. Verify NO dynamic time digits.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={startStates}
+          disabled={running}
+          style={{
+            backgroundColor: running ? '#374151' : '#8B5CF6',
+            paddingVertical: 14,
+            paddingHorizontal: 18,
+            borderRadius: 12,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: '700' }}>
+            States Bake — 6 PNGs (prayerTable_medium, all states)
+          </Text>
+          <Text style={{ color: '#DDD6FE', fontSize: 11, marginTop: 2 }}>
+            One PNG per prayer state. Verify highlight + name + no digits.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           onPress={start}
           disabled={running}
           style={{
@@ -75,11 +166,13 @@ export default function BakePrayerWidgetsScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <ActivityIndicator color="white" />
               <Text style={{ color: 'white', fontWeight: '700' }}>
-                Baking… {done} / {PRAYER_BAKE_TOTAL} ({pct}%)
+                Baking… {done} / {total} ({pct}%)
               </Text>
             </View>
           ) : (
-            <Text style={{ color: 'white', fontWeight: '700' }}>Start Bake</Text>
+            <Text style={{ color: 'white', fontWeight: '700' }}>
+              Full Bake — {PRAYER_BAKE_TOTAL} PNGs
+            </Text>
           )}
         </TouchableOpacity>
 

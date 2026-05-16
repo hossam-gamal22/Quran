@@ -980,14 +980,26 @@ const BAKE_BASE_EPOCH = Date.now();
 function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateKey): SharedWidgetData {
   const order = PRAYER_STATE_KEYS;
   const nowMs = BAKE_BASE_EPOCH;
-  const allPrayers = order.map((k, i) => ({
-    name: PRAYER_NAME_EN[k],
-    nameAr: PRAYER_NAME_AR[k],
-    time: BAKE_TIMES[k],
-    epochMs: nowMs + (i - order.indexOf(nextState)) * 90 * 60 * 1000,
-    isPassed: i < order.indexOf(nextState),
-    isNext: k === nextState,
-  }));
+  const targetIdx = order.indexOf(nextState);
+  // Build a synthetic timeline where:
+  //   • every prayer with index < targetIdx has epoch in the PAST
+  //   • nextState (targetIdx) has epoch in the FUTURE
+  //   • every prayer with index > targetIdx has epoch farther in the future
+  // This makes `resolvePreviewEpoch(false)` correctly pick the prayer at
+  // `targetIdx - 1` as the previous, and `resolvePreviewEpoch(true)` pick
+  // `targetIdx` as the next — so the prayerNextPrev preview shows the
+  // correct prev/next names for the requested state.
+  const allPrayers = order.map((k, i) => {
+    const offsetMin = (i - targetIdx) * 90 + 30;  // nextState → +30 min, prior → negative
+    return {
+      name: PRAYER_NAME_EN[k],
+      nameAr: PRAYER_NAME_AR[k],
+      time: BAKE_TIMES[k],
+      epochMs: nowMs + offsetMin * 60 * 1000,
+      isPassed: i < targetIdx,
+      isNext: k === nextState,
+    };
+  });
   return {
     prayer: {
       nextPrayer: nextState,
@@ -1059,8 +1071,12 @@ export async function bakePrayerStaticPNGs(
       errors: ['SnapshotHost not mounted'],
     };
   }
-  const outputDir = `${FileSystem.documentDirectory}prayer-static-bake/`;
+  // Fresh timestamped folder each run so stale outputs from a previous bake
+  // can never be mistaken for the current bake's content.
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+  const outputDir = `${FileSystem.documentDirectory}prayer-static-bake-${stamp}/`;
   await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true }).catch(() => {});
+  if (__DEV__) console.log(`[bake] full bake output directory: ${outputDir}`);
 
   // Limit to prayer widgets only.
   const prayerKinds = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
@@ -1084,9 +1100,10 @@ export async function bakePrayerStaticPNGs(
               : nextState;
             const assetName = `${def.id}_${size}_${theme}_${lang}_${stateToken}`;
 
-            // Mount this single slot via the existing SnapshotHost
-            // machinery, keyed by the rich assetName so each combination
-            // gets its own ref.
+            // Same pattern that successfully produced 420 PNGs in the prior
+            // run: rich 5-part slot key, direct captureRef on the same key's
+            // ref. The captureOne helper hardcodes a 3-part key which would
+            // collide across language/state variants of the same widget.
             hostSetSlots({
               [assetName]: {
                 def, size,
@@ -1139,6 +1156,205 @@ export async function bakePrayerStaticPNGs(
   };
   try {
     await FileSystem.writeAsStringAsync(manifestPath, JSON.stringify(manifest, null, 2));
+  } catch (e) {
+    errors.push(`manifest_write: ${(e as Error)?.message ?? 'unknown'}`);
+  }
+
+  return { outputDir, manifestPath, entries, errors };
+}
+
+/**
+ * Targeted 5-PNG sample bake for validating the prayer preview pipeline
+ * before committing to a full 420-PNG run.  Captures one PNG per widget kind
+ * (prayerSingle/small, prayerTable/small, prayerTable/medium, prayerTable/large,
+ * prayerNextPrevious/medium) using the requested theme/lang/nextState.
+ *
+ * Writes into a SEPARATE subfolder (`prayer-static-bake-samples/`) so it does
+ * NOT pollute the main bake output and a subsequent full run can still target
+ * a clean directory.
+ */
+export async function bakePrayerStaticSamples(opts: {
+  theme?: ResolvedWidgetTheme;
+  language?: 'ar' | 'en';
+  nextState?: PrayerStateKey;
+  onProgress?: (done: number, total: number, lastAssetName: string) => void;
+} = {}): Promise<BakeResult> {
+  if (!hostSetSlots) {
+    return { outputDir: '', manifestPath: '', entries: [], errors: ['SnapshotHost not mounted'] };
+  }
+  const theme = opts.theme ?? 'green';
+  const lang = opts.language ?? 'ar';
+  const nextState = opts.nextState ?? 'isha';
+  const prevState = defaultPreviousFor(nextState);
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+  const outputDir = `${FileSystem.documentDirectory}prayer-static-bake-samples-${stamp}/`;
+  await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true }).catch(() => {});
+  if (__DEV__) console.log(`[bake] sample bake output directory: ${outputDir}`);
+
+  const targets: Array<{ defId: string; size: PreviewSize }> = [
+    { defId: 'prayerSingle',       size: 'small' },
+    { defId: 'prayerTable',        size: 'small' },
+    { defId: 'prayerTable',        size: 'medium' },
+    { defId: 'prayerTable',        size: 'large' },
+    { defId: 'prayerNextPrevious', size: 'medium' },
+  ];
+
+  const entries: BakeEntry[] = [];
+  const errors: string[] = [];
+  const total = targets.length;
+  let done = 0;
+
+  for (const t of targets) {
+    const def = WIDGET_REGISTRY.find((d) => d.id === t.defId);
+    if (!def) {
+      errors.push(`${t.defId}: registry entry missing`);
+      done++; opts.onProgress?.(done, total, '');
+      continue;
+    }
+    const fixture = buildBakeFixture(nextState, prevState);
+    const stateToken = t.defId === 'prayerNextPrevious' ? `${prevState}_${nextState}` : nextState;
+    const assetName = `${t.defId}_${t.size}_${theme}_${lang}_${stateToken}`;
+
+    // Use the SAME slot key format as the working pump
+    // (${id}_${size}_${theme}) so the ref-lookup matches what `captureOne`
+    // does internally. The 5-part assetName is used only for the output
+    // filename, not the slot key.
+    if (__DEV__) {
+      console.log('[bake/sample]', {
+        assetName,
+        widgetId: t.defId,
+        size: t.size,
+        theme,
+        language: lang,
+        state: nextState,
+        prevState: t.defId === 'prayerNextPrevious' ? prevState : undefined,
+        // forSnapshot is hardcoded `true` inside OffscreenSlot:288. Logged
+        // here so a future change that breaks that invariant is obvious.
+        forSnapshotInOffscreenSlot: true,
+      });
+    }
+
+    hostSetSlots({
+      [assetName]: { def, size: t.size, language: lang, theme, sharedData: fixture },
+    } as any);
+    await settleNextFrame(250);
+
+    try {
+      const ref = getOrCreateRef(assetName);
+      const tmpUri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile' });
+      const dst = `${outputDir}${assetName}.png`;
+      try { await FileSystem.deleteAsync(dst, { idempotent: true }); } catch {}
+      await FileSystem.copyAsync({ from: tmpUri, to: dst });
+      entries.push({
+        assetName,
+        widgetId: t.defId,
+        size: t.size,
+        theme,
+        language: lang,
+        state: nextState,
+        previousState: t.defId === 'prayerNextPrevious' ? prevState : undefined,
+        path: dst,
+      });
+    } catch (e) {
+      errors.push(`${assetName}: ${(e as Error)?.message ?? 'capture_failed'}`);
+    }
+    done++;
+    opts.onProgress?.(done, total, assetName);
+  }
+
+  hostSetSlots({} as any);
+
+  const manifestPath = `${outputDir}manifest.json`;
+  try {
+    await FileSystem.writeAsStringAsync(manifestPath, JSON.stringify({
+      kind: 'sample',
+      theme, language: lang, state: nextState,
+      total, written: entries.length, errors,
+      entries: entries.map((e) => ({ assetName: e.assetName, widgetId: e.widgetId, size: e.size })),
+    }, null, 2));
+  } catch (e) {
+    errors.push(`manifest_write: ${(e as Error)?.message ?? 'unknown'}`);
+  }
+
+  return { outputDir, manifestPath, entries, errors };
+}
+
+/**
+ * Bake `prayerTable_medium` for ALL six prayer states with the same
+ * (theme, language). Used to validate that the dynamic-time fix holds
+ * regardless of which prayer is "active" (highlighted row + hero name).
+ */
+export async function bakePrayerTableMediumStates(opts: {
+  theme?: ResolvedWidgetTheme;
+  language?: 'ar' | 'en';
+  onProgress?: (done: number, total: number, lastAssetName: string) => void;
+} = {}): Promise<BakeResult> {
+  if (!hostSetSlots) {
+    return { outputDir: '', manifestPath: '', entries: [], errors: ['SnapshotHost not mounted'] };
+  }
+  const theme = opts.theme ?? 'green';
+  const lang = opts.language ?? 'ar';
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+  const outputDir = `${FileSystem.documentDirectory}prayer-static-bake-states-${stamp}/`;
+  await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true }).catch(() => {});
+  if (__DEV__) console.log(`[bake] states bake output directory: ${outputDir}`);
+
+  const def = WIDGET_REGISTRY.find((d) => d.id === 'prayerTable');
+  const entries: BakeEntry[] = [];
+  const errors: string[] = [];
+  const total = PRAYER_STATE_KEYS.length;
+  let done = 0;
+
+  if (!def) {
+    return { outputDir, manifestPath: `${outputDir}manifest.json`, entries, errors: ['prayerTable def missing'] };
+  }
+
+  for (const nextState of PRAYER_STATE_KEYS) {
+    const prevState = defaultPreviousFor(nextState);
+    const fixture = buildBakeFixture(nextState, prevState);
+    const assetName = `prayerTable_medium_${theme}_${lang}_${nextState}`;
+
+    if (__DEV__) {
+      console.log('[bake/states]', {
+        assetName, theme, language: lang, state: nextState,
+        forSnapshotInOffscreenSlot: true,
+      });
+    }
+
+    hostSetSlots({
+      [assetName]: { def, size: 'medium', language: lang, theme, sharedData: fixture },
+    } as any);
+    await settleNextFrame(250);
+
+    try {
+      const ref = getOrCreateRef(assetName);
+      const tmpUri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile' });
+      const dst = `${outputDir}${assetName}.png`;
+      try { await FileSystem.deleteAsync(dst, { idempotent: true }); } catch {}
+      await FileSystem.copyAsync({ from: tmpUri, to: dst });
+      entries.push({
+        assetName, widgetId: 'prayerTable', size: 'medium',
+        theme, language: lang, state: nextState,
+        path: dst,
+      });
+    } catch (e) {
+      errors.push(`${assetName}: ${(e as Error)?.message ?? 'capture_failed'}`);
+    }
+    done++;
+    opts.onProgress?.(done, total, assetName);
+  }
+
+  hostSetSlots({} as any);
+
+  const manifestPath = `${outputDir}manifest.json`;
+  try {
+    await FileSystem.writeAsStringAsync(manifestPath, JSON.stringify({
+      kind: 'states',
+      theme, language: lang,
+      total, written: entries.length, errors,
+      entries: entries.map((e) => ({ assetName: e.assetName, state: e.state })),
+    }, null, 2));
   } catch (e) {
     errors.push(`manifest_write: ${(e as Error)?.message ?? 'unknown'}`);
   }

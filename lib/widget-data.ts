@@ -9,7 +9,8 @@ import type { CanonicalPrayerSnapshot } from './canonical-prayer-snapshot';
 import { getLocalizedHijriDate, HIJRI_MONTHS_EN } from './hijri-date';
 import { getAllAzkar, resolveTranslationValue } from '@/lib/azkar-api';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
-import { t, getDateLocale, getLanguage } from '@/lib/i18n';
+import { t, getDateLocale, getLanguage, isRTL } from '@/lib/i18n';
+import { formatPrayerDurationCompact } from '@/lib/widget-format-duration';
 import { getTodayAyah, QuranAyah } from '@/lib/api/quran-cloud-api';
 
 // ========================================
@@ -399,11 +400,18 @@ export const preparePrayerWidgetData = async (
     calculationMethod: canonicalSnapshot?.calculationMethod,
     madhab: canonicalSnapshot?.madhab,
     source: canonicalSnapshot?.source,
-    timeRemaining: timeRemaining 
-      ? `${timeRemaining.hours}:${String(timeRemaining.minutes).padStart(2, '0')}`
-      : '--:--',
-    timeRemainingMinutes: timeRemaining 
-      ? timeRemaining.hours * 60 + timeRemaining.minutes 
+    // Compact duration ("1H 52M" / "52M" / "50S" or Arabic equivalents).
+    // Replaces the previous HH:MM raw format. Consumers like the Android
+    // task handler and any direct `data.prayer.timeRemaining` reader pick
+    // up the new shape automatically.
+    timeRemaining: timeRemaining
+      ? formatPrayerDurationCompact(
+          (timeRemaining.hours * 60 + timeRemaining.minutes) * 60,
+          isRTL() ? 'ar' : 'en',
+        )
+      : '',
+    timeRemainingMinutes: timeRemaining
+      ? timeRemaining.hours * 60 + timeRemaining.minutes
       : 0,
     timeRemainingLabel: t('prayer.timeRemaining'),
     allPrayers,

@@ -304,27 +304,86 @@ struct RoohEntry<Configuration: WidgetConfigurationIntent>: TimelineEntry {
     let hasRealData: Bool
 }
 
+/// Maximum timeline entries returned per `timeline(in:)` call. WidgetKit
+/// supports ~300+ entries per request; we stay well below that and use
+/// dedupe-by-minute + a hard `prefix(MAX_PRAYER_TIMELINE_ENTRIES)` cap to
+/// guarantee a safe budget. Sized so worst-case density (5-min steps for
+/// >=1h + 1-min steps for the final hour + ~42 future prayer boundaries +
+/// midnight markers) all fit.
+private let MAX_PRAYER_TIMELINE_ENTRIES = 100
+
+/// Builds the prayer-widget timeline dates with minute-level refresh
+/// density near the next prayer so the compact countdown string ("1H 52M"
+/// / "52M" / "50S") stays current. The compact formatter renders a STATIC
+/// string per entry — without dense entries the countdown would drift up
+/// to ~1 hour between refreshes.
+///
+/// Density rules (per Phase-2 follow-up requirements):
+///   • now → (next prayer − 1h): one entry every 5 minutes
+///   • (next prayer − 1h) → next prayer: one entry every 1 minute
+///   • every future prayer boundary across the 7-day cache
+///   • midnight rollover for the next day
+/// When prayer data is absent the densification falls back to the same
+/// rules against a 6-hour-from-now horizon so the timer still ticks.
 private func prayerTimelineDates(data: SharedWidgetData, now: Date = Date()) -> [Date] {
     let nowMs = now.timeIntervalSince1970 * 1000
     var dates: [Date] = [now]
 
-    // Prefer allPrayerEpochs (7-day flat list) for timeline generation.
-    // Falls back to per-item epochMs inside allPrayers when not present.
+    // Prefer allPrayerEpochs (7-day flat list); fall back to per-item.
     let epochSource: [Double] = (data.prayer?.allPrayerEpochs?.isEmpty == false)
         ? (data.prayer?.allPrayerEpochs ?? [])
         : (data.prayer?.allPrayers ?? []).compactMap { $0.epochMs }
-    let prayerEpochs = epochSource.filter { $0 > nowMs + 1000 }.sorted()
-    dates.append(contentsOf: prayerEpochs.map { Date(timeIntervalSince1970: $0 / 1000) })
+    let futureEpochs = epochSource.filter { $0 > nowMs + 1000 }.sorted()
 
+    // Resolve the next-prayer target for densification. Prefer the first
+    // future entry from the 7-day list; otherwise the `nextPrayerAtEpochMs`
+    // hint; otherwise a 6-hour-from-now fallback so the countdown still
+    // updates while shared data is empty.
+    let nextPrayerEpoch: Double? = futureEpochs.first
+        ?? (data.prayer?.nextPrayerAtEpochMs.flatMap { $0 > nowMs + 1000 ? $0 : nil })
+    let densificationEnd: Date = nextPrayerEpoch.map { Date(timeIntervalSince1970: $0 / 1000) }
+        ?? now.addingTimeInterval(6 * 3600)
+
+    let timeUntilEnd = densificationEnd.timeIntervalSince(now)
+    let oneHour: TimeInterval = 3600
+
+    if timeUntilEnd > 60 {
+        if timeUntilEnd <= oneHour {
+            // Less than 1h to next prayer — emit 1-minute entries until
+            // the boundary. Caps via the global prefix limit below.
+            let minutes = max(1, min(60, Int(timeUntilEnd / 60)))
+            for m in 1...minutes {
+                dates.append(now.addingTimeInterval(TimeInterval(m * 60)))
+            }
+        } else {
+            // ≥1h: 5-min entries until 1h before the next prayer, then
+            // 1-min entries for the final hour.
+            let phaseOneEnd = densificationEnd.addingTimeInterval(-oneHour)
+            let phaseOneSecs = phaseOneEnd.timeIntervalSince(now)
+            // Cap 5-min phase at 40 steps (≈ 3h20m runway). Anything
+            // further out is covered by subsequent prayer boundaries.
+            let phaseOneSteps = max(0, min(40, Int(phaseOneSecs / (5 * 60))))
+            if phaseOneSteps > 0 {
+                for i in 1...phaseOneSteps {
+                    dates.append(now.addingTimeInterval(TimeInterval(i * 5 * 60)))
+                }
+            }
+            for m in 1...60 {
+                dates.append(phaseOneEnd.addingTimeInterval(TimeInterval(m * 60)))
+            }
+        }
+    }
+
+    // Every future prayer boundary inside the 7-day cache — gives a hard
+    // refresh tick at exactly the moment the next/active prayer changes.
+    dates.append(contentsOf: futureEpochs.map { Date(timeIntervalSince1970: $0 / 1000) })
+
+    // Explicit nextPrayer hint, in case it sits between cache entries.
     if let nextPrayerAt = data.prayer?.nextPrayerAtEpochMs, nextPrayerAt > nowMs + 1000 {
         dates.append(Date(timeIntervalSince1970: nextPrayerAt / 1000))
     }
 
-    // Hourly fallbacks (first 6h) — safety net when prayer data is absent.
-    for hour in 1...6 {
-        dates.append(now.addingTimeInterval(TimeInterval(hour * 3600)))
-    }
-
+    // Midnight rollover so the date / hijri header refreshes at day-end.
     if let midnight = Calendar.current.nextDate(
         after: now,
         matching: DateComponents(hour: 0, minute: 0, second: 5),
@@ -333,6 +392,9 @@ private func prayerTimelineDates(data: SharedWidgetData, now: Date = Date()) -> 
         dates.append(midnight)
     }
 
+    // Dedupe by minute-bucket to absorb the case where a 1-min densified
+    // entry coincides with a prayer boundary. Then hard-cap so WidgetKit
+    // never sees more than `MAX_PRAYER_TIMELINE_ENTRIES`.
     var seen = Set<Int>()
     return dates
         .sorted()
@@ -342,9 +404,7 @@ private func prayerTimelineDates(data: SharedWidgetData, now: Date = Date()) -> 
             seen.insert(minuteBucket)
             return true
         }
-        // 64 entries covers ~10.5 days at 6 prayers/day — sufficient for the
-        // 7-day allPrayers window and leaves room for hourly fallbacks.
-        .prefix(64)
+        .prefix(MAX_PRAYER_TIMELINE_ENTRIES)
         .map { $0 }
 }
 
@@ -712,11 +772,21 @@ struct LockMinuteProvider: TimelineProvider {
     func placeholder(in context: Context) -> LockDayEntry { LockDayEntry(date: Date()) }
     func getSnapshot(in context: Context, completion: @escaping (LockDayEntry) -> Void) { completion(LockDayEntry(date: Date())) }
     func getTimeline(in context: Context, completion: @escaping (Timeline<LockDayEntry>) -> Void) {
+        // Reuse the home-screen densification so the lock-screen compact
+        // countdown ("1H 52M" / "1 س 52 د") also refreshes at minute-level
+        // near the next prayer. Falls back to a flat 30-minute window when
+        // shared data is missing (same coverage as the previous hardcoded
+        // 30-entry loop).
         let now = Date()
-        let entries: [LockDayEntry] = (0..<30).map { offset in
-            LockDayEntry(date: now.addingTimeInterval(TimeInterval(offset * 60)))
+        let dates: [Date]
+        if let shared = sharedDataIfAvailable() {
+            dates = prayerTimelineDates(data: shared, now: now)
+        } else {
+            dates = (0..<30).map { now.addingTimeInterval(TimeInterval($0 * 60)) }
         }
-        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(30 * 60))))
+        let entries = dates.map { LockDayEntry(date: $0) }
+        let policyDate = dates.dropFirst().first ?? now.addingTimeInterval(30 * 60)
+        completion(Timeline(entries: entries, policy: .after(policyDate)))
     }
 }
 
@@ -1620,7 +1690,7 @@ struct PrayerSingleView: View {
                 .lineLimit(1)
             HStack(spacing: 3) {
                 Text(context.isArabic ? "بعد" : "in")
-                Text(timerDate, style: .timer)
+                Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
                     .multilineTextAlignment(.center)
                     .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
             }
@@ -1671,7 +1741,7 @@ struct PrayerTableView: View {
                 let timerDate = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
                 HStack(spacing: 1) {
                     Text(context.isArabic ? "بعد" : "in")
-                    Text(timerDate, style: .timer)
+                    Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
                         .multilineTextAlignment(.center)
                         .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
                 }
@@ -1722,7 +1792,7 @@ struct PrayerTableView: View {
                 let timerDateMed = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
                 HStack(spacing: 3) {
                     Text(context.isArabic ? "بعد" : "in")
-                    Text(timerDateMed, style: .timer)
+                    Text(PrayerDurationFormat.until(timerDateMed, from: context.date, language: context.isArabic ? "ar" : "en"))
                         .multilineTextAlignment(.center)
                         .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
                 }
@@ -1769,7 +1839,7 @@ struct PrayerTableView: View {
                         let timerDateLg = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
                         HStack(spacing: 4) {
                             Text(context.isArabic ? "الصلاة القادمة بعد" : "Next prayer in")
-                            Text(timerDateLg, style: .timer)
+                            Text(PrayerDurationFormat.until(timerDateLg, from: context.date, language: context.isArabic ? "ar" : "en"))
                                 .multilineTextAlignment(.trailing)
                                 .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
                         }
@@ -1861,7 +1931,7 @@ struct PrayerNextPreviousView: View {
             if valid {
                 HStack(spacing: 3) {
                     Text(prefix)
-                    Text(timerDate, style: .timer)
+                    Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
                         .multilineTextAlignment(.center)
                         .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
                 }
@@ -2066,7 +2136,7 @@ struct LockNextPrayerView: View {
                 HStack(spacing: 3) {
                     Text(prefix)
                         .font(lockRubik(size: 14, weight: "Rubik-Medium"))
-                    Text(nextPrayerDate, style: .timer)
+                    Text(PrayerDurationFormat.until(nextPrayerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
                         .font(lockRubik(size: 14, weight: "Rubik-Medium"))
                         .multilineTextAlignment(.leading)
                 }
@@ -2192,7 +2262,7 @@ struct LockNextPrayerCountdownView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
             } currentValueLabel: {
-                Text(nextPrayerDate, style: .timer)
+                Text(PrayerDurationFormat.until(nextPrayerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
                     .font(lockRubik(size: 12))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -2980,7 +3050,7 @@ struct BrandedFallbackView: View {
 
 /// Builds a single overlay view (live countdown / current time / static label)
 /// positioned and scaled to match the PNG snapshot's anchor coordinates.
-/// Prayer countdowns use `Text(date, style: .timer)` so they tick live without
+/// Prayer countdowns use `Text(PrayerDurationFormat.until(date, from: context.date, language: context.isArabic ? "ar" : "en"))` so they tick live without
 /// waiting on timeline reloads. Pinned LTR + Arabic locale → "بعد ٢:١٩:١٧".
 @ViewBuilder
 private func liveOverlayView(
@@ -3005,7 +3075,7 @@ private func liveOverlayView(
             let timerDate = Date(timeIntervalSince1970: epochMs / 1000)
             HStack(spacing: anchor.compact ? 1 : 3) {
                 Text(context.isArabic ? "بعد" : "in")
-                Text(timerDate, style: .timer)
+                Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
                     .environment(\.locale, arabicLocale)
             }
             .font(baseFont)
@@ -3024,9 +3094,9 @@ private func liveOverlayView(
             HStack(spacing: anchor.compact ? 1 : 3) {
                 if context.isArabic {
                     Text("منذ")
-                    Text(timerDate, style: .timer).environment(\.locale, arabicLocale)
+                    Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")).environment(\.locale, arabicLocale)
                 } else {
-                    Text(timerDate, style: .timer).environment(\.locale, arabicLocale)
+                    Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")).environment(\.locale, arabicLocale)
                     Text("ago")
                 }
             }

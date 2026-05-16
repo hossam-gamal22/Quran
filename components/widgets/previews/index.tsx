@@ -10,6 +10,28 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText }
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getLanguage } from '@/lib/i18n';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
+import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
+
+/**
+ * Re-format a prayer time from its raw epoch into the language-current
+ * "h:mm AM" / "h:mm ص" string. Prefer this over `data.prayer.allPrayers[].time`
+ * inside previews — the cached `time` string carries the AM/PM suffix from
+ * whichever language was active at the last `updateWidgetData()` call, so
+ * switching language without re-running that pipeline leaves stale suffixes
+ * visible (e.g. "12:17 م" while the UI is English). Reformatting on every
+ * render guarantees the visible suffix always matches the current language.
+ */
+function formatPrayerTimeForPreview(epochMs: number | undefined, ar: boolean): string | null {
+  if (!epochMs || !Number.isFinite(epochMs)) return null;
+  const d = new Date(epochMs);
+  const hours24 = d.getHours();
+  const minutes = d.getMinutes();
+  const hour12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+  const mm = String(minutes).padStart(2, '0');
+  const isPM = hours24 >= 12;
+  const suffix = ar ? (isPM ? 'م' : 'ص') : (isPM ? 'PM' : 'AM');
+  return `${hour12}:${mm} ${suffix}`;
+}
 import { useSettings } from '@/contexts/SettingsContext';
 import {
   PREVIEW_PALETTE,
@@ -596,7 +618,10 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
   useLiveTick();
   const digitFont = 'Rubik-Bold';
   const trueNextItem = resolvePreviewPrayerItem(sharedData, true);
-  const time = noWrapPrayerTime(applyNumerals(trueNextItem?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14', numerals, ar));
+  // Reformat from epoch on every render so the AM/PM suffix follows the
+  // current language. Falls back to cached strings only as a last resort.
+  const liveTimeStr = formatPrayerTimeForPreview(trueNextItem?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar);
+  const time = noWrapPrayerTime(applyNumerals(liveTimeStr ?? trueNextItem?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14', numerals, ar));
   const name = ar ? (trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
   const countdown = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), (s) => applyNumerals(s, numerals, ar), ar);
   const timeFs = Platform.OS === 'android' && size === 'small' ? 38 : size === 'small' ? 42 : 56;
@@ -624,14 +649,15 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
             metrics, line height, flex slot) stays IDENTICAL — only opacity
             changes — so the anchor coordinates measured against the bake are
             exact. */}
-        <Text
+        <DynamicTimeText
+          forSnapshot={forSnapshot}
           adjustsFontSizeToFit
           numberOfLines={1}
           minimumFontScale={0.7}
-          style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}
+          style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
         >
           {time}
-        </Text>
+        </DynamicTimeText>
         {/* Phase B C2: snapshot omits the live countdown; the iOS / Android shell
             draws it on top of the PNG so it stays accurate. */}
         {forSnapshot ? (
@@ -661,7 +687,7 @@ const PRAYER_ROWS: {
   { keyAr: 'العشاء', keyEn: 'Isha', time: '08:19', icon: 'weather-night' },
 ];
 
-function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>) {
+function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar: boolean) {
   const items = data?.prayer?.allPrayers;
   // allPrayers contains today's 6 prayers only. Guard against stale multi-day
   // data that could produce duplicate keys in the list.
@@ -677,41 +703,97 @@ function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>) {
     if (k.includes('isha')) return 'weather-night';
     return 'weather-sunny';
   };
-  return todayItems.map((item) => ({
-    keyAr: item.nameAr ?? item.name ?? '',
-    keyEn: item.name ?? item.nameAr ?? '',
-    time: item.time ?? '--:--',
-    icon: iconFor(item.name),
-    isNext: !!item.isNext,
-  }));
+  return todayItems.map((item) => {
+    // Reformat from epochMs so the AM/PM suffix matches the CURRENT
+    // language. Fall back to the cached `item.time` only if the epoch
+    // is missing (very old shared-data shape).
+    const liveTime = formatPrayerTimeForPreview(item.epochMs, ar) ?? item.time ?? '--:--';
+    return {
+      keyAr: item.nameAr ?? item.name ?? '',
+      keyEn: item.name ?? item.nameAr ?? '',
+      time: liveTime,
+      icon: iconFor(item.name),
+      isNext: !!item.isNext,
+    };
+  });
 }
 
 function compactRemainingFromEpoch(
   epochMs: number | undefined,
-  fmt: (s: string | number) => string,
+  _fmt: (s: string | number) => string,
   ar: boolean,
   prefix: 'next' | 'previous' = 'next',
 ) {
-  const isNext = prefix === 'next';
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-  const toTimer = (totalSecs: number) => {
-    const h = Math.floor(totalSecs / 3600);
-    const m = Math.floor((totalSecs % 3600) / 60);
-    const s = totalSecs % 60;
-    return fmt(`${h}:${pad2(m)}:${pad2(s)}`);
-  };
-  if (!epochMs || !Number.isFinite(epochMs)) {
-    const sample = toTimer(isNext ? 9900 : 14460);
-    return ar ? (isNext ? `بعد ${sample}` : `منذ ${sample}`) : (isNext ? `in ${sample}` : `${sample} ago`);
-  }
-  const diff = isNext ? epochMs - Date.now() : Date.now() - epochMs;
-  const time = toTimer(Math.max(0, Math.floor(diff / 1000)));
-  return ar ? (isNext ? `بعد ${time}` : `منذ ${time}`) : (isNext ? `in ${time}` : `${time} ago`);
+  // Routed through the shared compact formatter — NEVER HH:MM:SS. Returns
+  // strings like "in 1H 52M" / "بعد 1 س 52 د" / "52M ago" / "منذ 52 د".
+  // The legacy `_fmt` numeral remapping is intentionally unused here:
+  // the compact format ships western digits in English and arabic digits
+  // would not be readable in unit-tagged values (e.g. "١ س ٥٢ د" looks odd
+  // because the units already carry the language signal).
+  const direction = prefix === 'next' ? 'until' : 'since';
+  const lang: 'ar' | 'en' = ar ? 'ar' : 'en';
+  // Sample fallback for when no epoch is provided (gallery-default state).
+  const safeEpoch = epochMs && Number.isFinite(epochMs)
+    ? epochMs
+    : Date.now() + (prefix === 'next' ? 9900 : -14460) * 1000;
+  return formatPrayerDurationWithPrefix(safeEpoch, Date.now(), lang, direction);
 }
 
 function noWrapPrayerTime(value: string | number): string {
   const text = String(value).trim().replace(/\s+/g, ' ');
   return text.replace(/\s+/g, '\u00A0');
+}
+
+/**
+ * REQUIRED wrapper for every dynamic numeric Text in prayer preview
+ * components. Enforces the snapshot invariant: when `forSnapshot === true`,
+ * the captured PNG contains ZERO glyphs at this position \u2014 the wrapper
+ * renders a fixed-size clipped View around a hidden Text. Layout (font
+ * metrics, line height, flex slot) is preserved exactly via the inner
+ * Text's natural sizing, but the outer View's `overflow: hidden` AND the
+ * Text's `opacity: 0` AND `color: 'transparent'` make it impossible for any
+ * pixel of the time string to land in the bake.
+ *
+ * Rule for the bake: if a `<Text>` in a prayer preview can ever render a
+ * time digit, prayer-time string, or countdown value, route it through this
+ * component instead of writing `<Text style={{ ... }}>` directly. The
+ * invariant cannot be regressed by accident \u2014 code review catches a bare
+ * `<Text>` rendering a `time` value as "should be DynamicTimeText".
+ */
+function DynamicTimeText({
+  forSnapshot,
+  style,
+  numberOfLines,
+  adjustsFontSizeToFit,
+  minimumFontScale,
+  children,
+}: {
+  forSnapshot?: boolean;
+  style?: React.ComponentProps<typeof Text>['style'];
+  numberOfLines?: number;
+  adjustsFontSizeToFit?: boolean;
+  minimumFontScale?: number;
+  children: React.ReactNode;
+}) {
+  // Defense-in-depth: BOTH `opacity: 0` AND `color: 'transparent'` are
+  // applied when forSnapshot. Either alone hides the glyphs; together they
+  // guarantee no pixel of `children` lands in the captured PNG even if a
+  // future RN renderer optimization changes how one of the two is processed.
+  //
+  // The Text node itself is preserved (no View wrapper) so the natural
+  // glyph layout — width from font metrics, height from lineHeight — is
+  // unchanged. A wrapping View introduced layout-collapse races for
+  // narrow widgets like prayerSingle/small and was reverted.
+  return (
+    <Text
+      numberOfLines={numberOfLines}
+      adjustsFontSizeToFit={adjustsFontSizeToFit}
+      minimumFontScale={minimumFontScale}
+      style={[style, forSnapshot ? { opacity: 0, color: 'transparent' } : null]}
+    >
+      {children}
+    </Text>
+  );
 }
 
 export function PrayerTablePreview({ size, language, forSnapshot }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
@@ -720,7 +802,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
   useLiveTick();
   const timeFont = 'Rubik-Bold';
   const widgetFontL = useWidgetFontFamily(fontVariant);
-  const prayerRows = prayerRowsFromShared(sharedData);
+  const prayerRows = prayerRowsFromShared(sharedData, ar);
   const nextPrayer = prayerRows.find((r) => r.isNext) ?? prayerRows[0] ?? PRAYER_ROWS[0];
   const fmt = (s: string | number) => applyNumerals(s, numerals, ar);
   const remainingText = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar);
@@ -733,9 +815,17 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
     const listFs = Platform.OS === 'android' ? 9.5 : 10;
     const rowPv = Platform.OS === 'android' ? 1 : 1.5;
     const heroTimeFs = Platform.OS === 'android' ? 29 : 32;
+    // Language-specific layout direction. Arabic reads RTL (schedule on
+    // the LEFT half, hero on the RIGHT half, row order [time|name]).
+    // English reads LTR (hero on the LEFT half, schedule on the RIGHT
+    // half, row order [name|time]). The flip is achieved with
+    // `flexDirection: row-reverse` on the outer container + each schedule
+    // row so the JSX child order stays the same.
+    const outerDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
+    const rowDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
     return (
       <GlassTile size={size} padding={8} palette={p}>
-        <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
+        <View style={{ flex: 1, flexDirection: outerDir, gap: 8 }}>
             <View style={{ flex: 1, justifyContent: 'center' }}>
               {prayerRows.map((row) => {
                 const active = !!row.isNext;
@@ -745,7 +835,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   <View
                     key={row.keyEn}
                     style={{
-                      flexDirection: 'row',
+                      flexDirection: rowDir,
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       paddingHorizontal: 4,
@@ -754,9 +844,9 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                       backgroundColor: active ? activeBg : 'transparent',
                     }}
                   >
-                    <Text numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
+                    <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
                       {timeStr}
-                    </Text>
+                    </DynamicTimeText>
                     <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, includeFontPadding: false }}>
                       {label}
                     </Text>
@@ -771,9 +861,9 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
                 {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
               </Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
+              <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}>
                 {noWrapPrayerTime(fmt(nextPrayer.time))}
-              </Text>
+              </DynamicTimeText>
               {/* Phase B C2: countdown is drawn by the native shell; skip in snapshot. */}
               {forSnapshot ? (
                 <View style={{ height: 12, marginTop: 2 }} />
@@ -793,10 +883,14 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
     // iOS uses natural font metrics; Android's default line metrics are taller.
     const listFs = Platform.OS === 'android' ? 9.5 : 11;
     const rowPv = Platform.OS === 'android' ? 0.5 : 2;
+    // Header row and every schedule row use row-reverse for English so the
+    // child order [time, label] in JSX renders visually as [label, time] —
+    // i.e. label on LEFT, time on RIGHT, matching native LTR widgets.
+    const rowDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
     return (
       <GlassTile size={size} padding={8} palette={p}>
         <View style={{ flex: 1, justifyContent: 'center' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+          <View style={{ flexDirection: rowDir, justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
             {forSnapshot ? (
               <View style={{ width: 80, height: 12 }} />
             ) : (
@@ -816,7 +910,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               <View
                 key={row.keyEn}
                 style={{
-                  flexDirection: 'row',
+                  flexDirection: rowDir,
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   paddingHorizontal: 4,
@@ -825,9 +919,9 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   backgroundColor: active ? activeBg : 'transparent',
                 }}
               >
-                <Text numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
+                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
                   {timeStr}
-                </Text>
+                </DynamicTimeText>
                 <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, includeFontPadding: false }}>
                   {label}
                 </Text>
@@ -851,12 +945,21 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
   const rowFs = isAndroid ? 16 : 15;
   const rowPv = isAndroid ? 4 : 6;
   const rowIcon = isAndroid ? 15 : 16;
+  // Language-specific flow. For Arabic (RTL), the hero icon is LEFT,
+  // content-column right-aligned, schedule rows have time LEFT and
+  // [name+icon] group RIGHT, with name LEFT of icon visually. For English
+  // (LTR), everything mirrors: hero icon RIGHT, content-column left-
+  // aligned, schedule rows have [icon+name] LEFT and time RIGHT.
+  const heroOuterDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
+  const heroContentAlign: 'flex-end' | 'flex-start' = ar ? 'flex-end' : 'flex-start';
+  const rowDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
+  const innerGroupDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
   return (
     <GlassTile size={size} padding={largePad} palette={p}>
       <View style={{ flex: 1 }}>
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: heroOuterDir,
             alignItems: 'center',
             marginBottom: heroMb,
             paddingHorizontal: 14,
@@ -866,33 +969,37 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
             overflow: 'hidden',
           }}
         >
-          <Text
-            pointerEvents="none"
-            numberOfLines={1}
-            style={{
-              position: 'absolute',
-              right: 12,
-              bottom: 14,
-              width: 200,
-              textAlign: 'center',
-              fontFamily: 'WidgetFont',
-              fontSize: 48,
-              color: watermarkFill,
-              writingDirection: 'rtl',
-              paddingTop: 26,
-              includeFontPadding: false,
-            }}
-          >
-            {'الصلاة'}
-          </Text>
+          {ar ? (
+            // Decorative Arabic watermark — only rendered for Arabic
+            // bakes. English variant has no Arabic decoration baked in.
+            <Text
+              pointerEvents="none"
+              numberOfLines={1}
+              style={{
+                position: 'absolute',
+                right: 12,
+                bottom: 14,
+                width: 200,
+                textAlign: 'center',
+                fontFamily: 'WidgetFont',
+                fontSize: 48,
+                color: watermarkFill,
+                writingDirection: 'rtl',
+                paddingTop: 26,
+                includeFontPadding: false,
+              }}
+            >
+              {'الصلاة'}
+            </Text>
+          ) : null}
           <MaterialCommunityIcons name={nextPrayer.icon} size={isAndroid ? 28 : 32} color={p.muted} />
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <View style={{ flex: 1, alignItems: heroContentAlign }}>
             <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
               {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
             </Text>
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
+            <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}>
               {noWrapPrayerTime(fmt(nextPrayer.time))}
-            </Text>
+            </DynamicTimeText>
             {forSnapshot ? (
               <View style={{ height: isAndroid ? 14 : 16, marginTop: isAndroid ? 2 : 4 }} />
             ) : (
@@ -911,7 +1018,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               <View
                 key={row.keyEn}
                 style={{
-                  flexDirection: 'row',
+                  flexDirection: rowDir,
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   paddingHorizontal: 8,
@@ -921,10 +1028,10 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   marginBottom: isAndroid ? 0 : 1,
                 }}
               >
-                <Text numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: 'left', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false, opacity: forSnapshot ? 0 : 1 }}>
+                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
                   {timeStr}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                </DynamicTimeText>
+                <View style={{ flexDirection: innerGroupDir, alignItems: 'center', gap: 6 }}>
                   <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, includeFontPadding: false }}>
                     {label}
                   </Text>
@@ -956,14 +1063,23 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
     {
       label: ar ? 'الصلاة القادمة' : 'Next Prayer',
       name: nextName,
-      time: noWrapPrayerTime(fmt(trueNextPrev?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14')),
+      time: noWrapPrayerTime(fmt(
+        formatPrayerTimeForPreview(trueNextPrev?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar)
+        ?? trueNextPrev?.time
+        ?? sharedData?.prayer?.nextPrayerTime
+        ?? '04:14'
+      )),
       sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar),
       icon: 'weather-sunset-up' as const,
     },
     {
       label: ar ? 'الصلاة السابقة' : 'Previous Prayer',
       name: previousName,
-      time: noWrapPrayerTime(fmt(truePrevPrev?.time ?? '08:18')),
+      time: noWrapPrayerTime(fmt(
+        formatPrayerTimeForPreview(truePrevPrev?.epochMs ?? sharedData?.prayer?.previousPrayerAtEpochMs, ar)
+        ?? truePrevPrev?.time
+        ?? '08:18'
+      )),
       sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, false), fmt, ar, 'previous'),
       icon: 'weather-night' as const,
     },
@@ -1003,7 +1119,8 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
             >
               {item.name}
             </Text>
-            <Text
+            <DynamicTimeText
+              forSnapshot={forSnapshot}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
@@ -1015,11 +1132,10 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
                 marginTop: 2,
                 letterSpacing: -0.5,
                 includeFontPadding: false,
-                opacity: forSnapshot ? 0 : 1,
               }}
             >
               {item.time}
-            </Text>
+            </DynamicTimeText>
             {/* Dynamic countdown/since labels are drawn by the native shell so
                 both cards stay fresh and visually balanced on the home screen. */}
             {forSnapshot ? (

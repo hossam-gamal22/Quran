@@ -267,7 +267,13 @@ function GalleryTab({
 
   return (
     <WidgetPreviewDataContext.Provider value={widgetPreviewData}>
+      {/* Keying the ScrollView (and therefore the entire VariantCard tree
+         underneath) by the current language forces a full remount when the
+         user switches Arabic ↔ English. Without this key, React reuses the
+         old card instances and one frame of the previous language's text
+         can flash before the new translations propagate through context. */}
       <ScrollView
+        key={`gallery-${lang}`}
         style={styles.scrollView}
         contentContainerStyle={styles.galleryScroll}
         showsVerticalScrollIndicator={false}

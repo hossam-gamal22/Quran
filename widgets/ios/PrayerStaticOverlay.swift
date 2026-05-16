@@ -31,7 +31,10 @@ import WidgetKit
 
 enum NumericRole {
     case clockTime         // formatted as "H:mm" or "h:mm a"
-    case countdown         // SwiftUI `Text(date, style: .timer)`
+    case countdown         // compact duration ("1H 52M" / "52M" / "50S"
+                           // in English; "1 س 52 د" / "52 د" / "50 ث" in
+                           // Arabic). Renders a static string per timeline
+                           // entry — no per-second updates.
 }
 
 struct PrayerNumericAnchor: Identifiable {
@@ -70,21 +73,61 @@ struct PrayerNumericAnchor: Identifiable {
 }
 
 enum PrayerAnchorMap {
-    static func anchors(widgetId: String, family: WidgetFamily) -> [PrayerNumericAnchor] {
+    /// Per-language anchor lookup. For prayer-table widgets, the English
+    /// (LTR) layout mirrors the Arabic (RTL) layout: the hero panel moves
+    /// from the RIGHT half to the LEFT half, schedule rows put the time
+    /// digit on the RIGHT (instead of LEFT for Arabic), and the schedule
+    /// list itself sits on the RIGHT half of the widget for English.
+    ///
+    /// The mirror is achieved by `mirror(_:)` which flips `relX` around
+    /// the 0.5 axis and inverts `alignment` (.leading ↔ .trailing).
+    static func anchors(widgetId: String,
+                        family: WidgetFamily,
+                        language: String = "ar") -> [PrayerNumericAnchor] {
+        let isEnglish = (language == "en")
         switch widgetId {
         case "prayerSingle":
+            // Small "next prayer" widget — content is centered, no
+            // horizontal mirroring needed for English.
             return prayerSingleSmallAnchors
         case "prayerTable":
+            let base: [PrayerNumericAnchor]
             switch family {
-            case .systemMedium: return prayerTableMediumAnchors
-            case .systemLarge:  return prayerTableLargeAnchors
-            default:            return prayerTableSmallAnchors
+            case .systemMedium: base = prayerTableMediumAnchors
+            case .systemLarge:  base = prayerTableLargeAnchors
+            default:            base = prayerTableSmallAnchors
             }
+            return isEnglish ? base.map(mirror) : base
         case "prayerNextPrevious":
+            // Next/prev cards already use a center-aligned, symmetric
+            // 0.27 / 0.73 layout — both language directions read it the
+            // same way (left card = next, right card = previous).
             return prayerNextPreviousMediumAnchors
         default:
             return []
         }
+    }
+
+    /// Reflect an anchor across the widget's vertical centerline.
+    /// `relX' = 1 - relX`; `.leading` ↔ `.trailing`. Other fields unchanged.
+    private static func mirror(_ a: PrayerNumericAnchor) -> PrayerNumericAnchor {
+        let flippedAlignment: Alignment
+        switch a.alignment {
+        case .leading:  flippedAlignment = .trailing
+        case .trailing: flippedAlignment = .leading
+        default:        flippedAlignment = a.alignment
+        }
+        return PrayerNumericAnchor(
+            id: a.id,
+            role: a.role,
+            relX: 1.0 - a.relX,
+            relY: a.relY,
+            relativeWidth: a.relativeWidth,
+            fontScale: a.fontScale,
+            fontFamily: a.fontFamily,
+            alignment: flippedAlignment,
+            prayerKey: a.prayerKey
+        )
     }
 
     // The anchor coordinates below are starting estimates derived from the
@@ -295,7 +338,7 @@ struct PrayerStaticOverlay: View {
                 }
 
                 if UIImage(named: assetName) != nil, let state = state, let today = today {
-                    ForEach(PrayerAnchorMap.anchors(widgetId: widgetId, family: family)) { a in
+                    ForEach(PrayerAnchorMap.anchors(widgetId: widgetId, family: family, language: language)) { a in
                         anchorView(a, state: state, today: today, pal: pal, geo: geo)
                     }
                 }
@@ -317,7 +360,13 @@ struct PrayerStaticOverlay: View {
             case .clockTime:
                 Text(clockText(for: a, state: state, today: today))
             case .countdown:
-                Text(countdownDate(for: a, state: state), style: .timer)
+                // Compact duration ("1H 52M" / "52M" / "50S" or Arabic
+                // equivalents). NOT `style: .timer` because that forces
+                // HH:MM:SS. The value is static per timeline entry — the
+                // TimelineProvider in RoohWidgets.swift emits frequent
+                // entries near the next prayer so the displayed minute
+                // value stays current.
+                Text(countdownText(for: a, state: state))
             }
         }
         .font(font)
@@ -355,17 +404,20 @@ struct PrayerStaticOverlay: View {
         return formatClock(date)
     }
 
-    private func countdownDate(for anchor: PrayerNumericAnchor,
-                               state: PrayerCalculatorState) -> Date {
+    /// Produce the compact countdown string for the requested anchor at
+    /// the entry's `now`. "sinceValue" counts up from the previous prayer;
+    /// "countdown" / "untilValue" count down to the next prayer. Returns
+    /// "1H 52M" / "52M" / "50S" (English) or "1 س 52 د" / "52 د" / "50 ث"
+    /// (Arabic). Never HH:MM:SS.
+    private func countdownText(for anchor: PrayerNumericAnchor,
+                               state: PrayerCalculatorState) -> String {
         switch anchor.id {
         case "sinceValue":
-            // "since previous prayer" — count up from previousAt. SwiftUI's
-            // .timer style can render absolute time deltas naturally.
-            return state.previousAt
+            return PrayerDurationFormat.since(state.previousAt, from: now, language: language)
         case "countdown", "untilValue":
-            return state.nextAt
+            return PrayerDurationFormat.until(state.nextAt, from: now, language: language)
         default:
-            return state.nextAt
+            return PrayerDurationFormat.until(state.nextAt, from: now, language: language)
         }
     }
 

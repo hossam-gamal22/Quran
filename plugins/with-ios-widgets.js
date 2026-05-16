@@ -51,6 +51,7 @@ const WIDGET_SWIFT_FILES = [
   'PrayerInputs.swift',
   'PrayerCalculator.swift',
   'PrayerStaticOverlay.swift',
+  'PrayerDurationFormat.swift',
 ];
 
 /**
