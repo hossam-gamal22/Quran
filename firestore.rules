@@ -201,6 +201,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Remote UI translation packs (per language) — app reads, admin writes
+    match /translations/{lang} {
+      allow read, write: if true;
+    }
+
     match /sdui_screens/{screenId} {
       allow read, write: if true;
     }

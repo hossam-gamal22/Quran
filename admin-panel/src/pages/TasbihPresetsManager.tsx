@@ -2,10 +2,16 @@
 // إدارة التسبيحات المسبقة
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, Trash2, Edit2, X, Copy, Download } from 'lucide-react';
+import { Plus, Save, Trash2, Edit2, X, Copy, Download, Wand2, RefreshCw } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { getDefaultTasbihPresets } from '../data/adhkar-defaults';
+
+function isGeneratedPlaceholderTranslation(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase().replace(/[_-]/g, ' ');
+  return /^(virtue|reference|benefit|title|subtitle|label|body)?[a-z]+(?:tasbih|azkar|dua|dhikr|daily|seasonal|prayer|quran|default)\s+default\s+\d+$/.test(normalized);
+}
 
 interface TasbihPreset {
   id: string;
@@ -22,6 +28,22 @@ interface TasbihPreset {
 const EMPTY_PRESET: Omit<TasbihPreset, 'id'> = {
   text: '', transliteration: '', target: 33, virtue: '', reference: '', source: 'hadith_sahih', grade: '', order: 0,
 };
+
+function getMobilePresetId(docId: string, order = 0): number {
+  const trailingNumber = docId.match(/(\d+)$/)?.[1];
+  if (trailingNumber) {
+    const parsed = Number(trailingNumber);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return Math.max(1, order + 1);
+}
+
+function serializePresetForFirestore(preset: TasbihPreset, docId: string) {
+  return {
+    ...preset,
+    id: getMobilePresetId(docId, preset.order || 0),
+  };
+}
 
 const TasbihPresetsManager: React.FC = () => {
   const [presets, setPresets] = useState<TasbihPreset[]>([]);
@@ -44,9 +66,13 @@ const TasbihPresetsManager: React.FC = () => {
   useEffect(() => { loadPresets(); }, []);
 
   const handleSave = async (preset: TasbihPreset) => {
+    if (isGeneratedPlaceholderTranslation(preset.virtue) || isGeneratedPlaceholderTranslation(preset.reference)) {
+      alert('قيمة "الفضل" أو "المرجع" placeholder تلقائي وليست ترجمة حقيقية. راجع النص قبل الحفظ.');
+      return;
+    }
     try {
       const id = preset.id || `tasbih_${Date.now()}`;
-      await setDoc(doc(db, 'tasbihPresets', id), { ...preset, id });
+      await setDoc(doc(db, 'tasbihPresets', id), serializePresetForFirestore(preset, id));
       setSaveMsg('✅ تم الحفظ');
       setIsModalOpen(false);
       setEditingPreset(null);
@@ -55,6 +81,53 @@ const TasbihPresetsManager: React.FC = () => {
       const msg = `❌ فشل الحفظ: ${(e as Error).message}`;
       setSaveMsg(msg);
       alert(msg);
+    }
+  };
+
+  const corruptedCount = presets.reduce((sum, p) => (
+    sum + (isGeneratedPlaceholderTranslation(p.virtue) ? 1 : 0) + (isGeneratedPlaceholderTranslation(p.reference) ? 1 : 0)
+  ), 0);
+
+  const [cleaningCorrupted, setCleaningCorrupted] = useState(false);
+
+  const handleCleanCorrupted = async () => {
+    if (cleaningCorrupted) return;
+    if (corruptedCount === 0) {
+      alert('لا توجد قيم placeholder فاسدة ✅');
+      return;
+    }
+    const confirmed = window.confirm(
+      `يوجد ${corruptedCount} قيمة placeholder فاسدة في الحقول virtue/reference.\n` +
+      `سيتم استبدالها بالنصوص الافتراضية الصحيحة من قاعدة البيانات المدمجة.\n\n` +
+      `هل تريد المتابعة؟`,
+    );
+    if (!confirmed) return;
+    setCleaningCorrupted(true);
+    try {
+      const defaults = getDefaultTasbihPresets();
+      const defaultsById = new Map(defaults.map(d => [String(d.id), d]));
+      let fixed = 0;
+      for (const p of presets) {
+        const badVirtue = isGeneratedPlaceholderTranslation(p.virtue);
+        const badReference = isGeneratedPlaceholderTranslation(p.reference);
+        if (!badVirtue && !badReference) continue;
+        const defaultMatch = defaultsById.get(String(p.id));
+        const next: TasbihPreset = {
+          ...p,
+          virtue: badVirtue ? (defaultMatch?.virtue || '') : p.virtue,
+          reference: badReference ? (defaultMatch?.reference || '') : p.reference,
+        };
+        await setDoc(doc(db, 'tasbihPresets', p.id), serializePresetForFirestore(next, p.id));
+        fixed += 1;
+      }
+      await loadPresets();
+      setSaveMsg(`✅ تم إصلاح ${fixed} تسبيح`);
+    } catch (e) {
+      const msg = `❌ فشل التنظيف: ${(e as Error).message}`;
+      setSaveMsg(msg);
+      alert(msg);
+    } finally {
+      setCleaningCorrupted(false);
     }
   };
 
@@ -83,6 +156,17 @@ const TasbihPresetsManager: React.FC = () => {
         <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-xl hover:bg-emerald-700 transition-colors">
           <Plus size={18} /> إضافة تسبيح
         </button>
+        {corruptedCount > 0 && (
+          <button
+            onClick={handleCleanCorrupted}
+            disabled={cleaningCorrupted}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-50"
+            title={`يوجد ${corruptedCount} قيمة placeholder فاسدة`}
+          >
+            {cleaningCorrupted ? <RefreshCw size={18} className="animate-spin" /> : <Wand2 size={18} />}
+            تنظيف {corruptedCount} قيمة فاسدة
+          </button>
+        )}
         <button
           className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
           onClick={async () => {
@@ -93,7 +177,7 @@ const TasbihPresetsManager: React.FC = () => {
             try {
               const defaults = getDefaultTasbihPresets();
               for (const p of defaults) {
-                await setDoc(doc(db, 'tasbihPresets', p.id), p);
+                await setDoc(doc(db, 'tasbihPresets', p.id), serializePresetForFirestore(p as TasbihPreset, p.id));
               }
               await loadPresets();
               setSaveMsg(`✅ تم استيراد ${defaults.length} تسبيح`);
@@ -119,7 +203,7 @@ const TasbihPresetsManager: React.FC = () => {
                 if (!Array.isArray(items)) throw new Error('JSON must be an array');
                 for (const p of items) {
                   const id = p.id || `tasbih_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
-                  await setDoc(doc(db, 'tasbihPresets', id), { ...p, id });
+                  await setDoc(doc(db, 'tasbihPresets', id), serializePresetForFirestore(p, id));
                 }
                 await loadPresets();
                 setSaveMsg(`✅ تم استيراد ${items.length} عنصر`);

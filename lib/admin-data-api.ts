@@ -3,11 +3,11 @@
 // جلب البيانات المدارة من الأدمن مع fallback محلي
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, onSnapshot, query, orderBy, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { fetchWithTimeout } from './fetch-with-timeout';
 
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes, so admin edits reach users quickly
 
 interface CacheEntry<T> {
   data: T;
@@ -57,16 +57,80 @@ export interface TasbihPreset {
   grade?: string;
 }
 
+function normalizeTasbihPresetId(docId: string, data: Record<string, unknown>, fallbackIndex: number): number {
+  const candidates = [data.id, docId];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+
+    if (typeof candidate === 'string') {
+      const exactNumber = Number(candidate);
+      if (Number.isFinite(exactNumber) && exactNumber > 0) {
+        return exactNumber;
+      }
+
+      const trailingNumber = candidate.match(/(\d+)$/)?.[1];
+      if (trailingNumber) {
+        const parsed = Number(trailingNumber);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  return fallbackIndex + 1;
+}
+
+function isPlaceholderText(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase().replace(/[_-]/g, ' ');
+  return /^(virtue|reference|benefit|title|subtitle|label|body)?[a-z]+(?:tasbih|azkar|dua|dhikr|daily|seasonal|prayer|quran|default)\s+default\s+\d+$/.test(normalized);
+}
+
+function stripPresetPlaceholders(preset: TasbihPreset): TasbihPreset {
+  const cleaned = { ...preset };
+  if (isPlaceholderText(cleaned.virtue)) delete cleaned.virtue;
+  if (isPlaceholderText(cleaned.reference)) delete cleaned.reference;
+  return cleaned;
+}
+
+function normalizeTasbihPresets(presets: TasbihPreset[]): TasbihPreset[] {
+  return presets
+    .map((preset, index) => {
+      const data = preset as unknown as Record<string, unknown>;
+      const order = typeof data.order === 'number' && Number.isFinite(data.order) ? data.order : index;
+      const stripped = stripPresetPlaceholders(preset);
+      return {
+        ...stripped,
+        id: normalizeTasbihPresetId(String(data.id ?? ''), data, index),
+        target: typeof data.target === 'number' && Number.isFinite(data.target) ? data.target : 33,
+        order,
+      } as TasbihPreset & { order: number };
+    })
+    .sort((a, b) => (a.order - b.order) || (a.id - b.id));
+}
+
 export async function fetchTasbihPresets(localDefaults: TasbihPreset[]): Promise<TasbihPreset[]> {
-  return fetchWithCache(
+  const presets = await fetchWithCache(
     '@admin_tasbih_presets',
     async () => {
       const snap = await getDocs(collection(db, 'tasbihPresets'));
       if (snap.empty) return null;
-      return snap.docs.map(d => ({ id: Number(d.id) || 0, ...d.data() } as TasbihPreset));
+      return snap.docs.map(d => {
+        const data = d.data() as Record<string, unknown>;
+        return {
+          ...data,
+          id: data.id ?? d.id,
+        } as unknown as TasbihPreset;
+      });
     },
     localDefaults,
   );
+
+  return normalizeTasbihPresets(presets);
 }
 
 // ==================== Islamic Events ====================
@@ -74,12 +138,20 @@ export async function fetchTasbihPresets(localDefaults: TasbihPreset[]): Promise
 export interface IslamicEvent {
   id?: string;
   name: string;
+  nameAr?: string;
   hijriMonth: number;
   hijriDay: number;
+  hijriDayEnd?: number;
   color: string;
   icon?: string;
   description?: string;
+  descriptionAr?: string;
+  type?: 'holiday' | 'fasting' | 'special' | 'observance' | 'blessed_period' | 'sunnah_fasting';
+  importance?: 'major' | 'minor';
 }
+
+const sortIslamicEvents = (events: IslamicEvent[]): IslamicEvent[] =>
+  [...events].sort((a, b) => (a.hijriMonth - b.hijriMonth) || (a.hijriDay - b.hijriDay));
 
 export async function fetchIslamicEvents(localDefaults: IslamicEvent[]): Promise<IslamicEvent[]> {
   return fetchWithCache(
@@ -87,9 +159,39 @@ export async function fetchIslamicEvents(localDefaults: IslamicEvent[]): Promise
     async () => {
       const snap = await getDocs(collection(db, 'islamicEvents'));
       if (snap.empty) return null;
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as IslamicEvent));
+      return sortIslamicEvents(snap.docs.map(d => ({ id: d.id, ...d.data() } as IslamicEvent)));
     },
     localDefaults as IslamicEvent[],
+  );
+}
+
+export function subscribeToIslamicEvents(
+  localDefaults: IslamicEvent[],
+  onUpdate: (events: IslamicEvent[]) => void,
+  onError?: (error: unknown) => void,
+): Unsubscribe {
+  const eventsQuery = query(
+    collection(db, 'islamicEvents'),
+    orderBy('hijriMonth', 'asc'),
+    orderBy('hijriDay', 'asc'),
+  );
+
+  return onSnapshot(
+    eventsQuery,
+    async snap => {
+      const events = snap.empty
+        ? localDefaults
+        : snap.docs.map(d => ({ id: d.id, ...d.data() } as IslamicEvent));
+      const sortedEvents = sortIslamicEvents(events);
+      try {
+        await AsyncStorage.setItem('@admin_islamic_events', JSON.stringify({ data: sortedEvents, timestamp: Date.now() }));
+      } catch {}
+      onUpdate(sortedEvents);
+    },
+    error => {
+      console.log('⚠️ Islamic events subscription failed:', error);
+      onError?.(error);
+    },
   );
 }
 
@@ -123,6 +225,29 @@ export async function fetchQuranThemes(localDefaults: QuranThemeOverride[]): Pro
   );
 }
 
+export function subscribeToQuranThemes(
+  onUpdate: (themes: QuranThemeOverride[]) => void,
+  onError?: (error: unknown) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'appConfig', 'quranThemes'),
+    async snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (!Array.isArray(data.themes) || data.themes.length === 0) return;
+      const themes = data.themes as QuranThemeOverride[];
+      try {
+        await AsyncStorage.setItem('@admin_quran_themes', JSON.stringify({ data: themes, timestamp: Date.now() }));
+      } catch {}
+      onUpdate(themes);
+    },
+    error => {
+      console.log('⚠️ Quran themes subscription failed:', error);
+      onError?.(error);
+    }
+  );
+}
+
 // ==================== Google Calendar Events ====================
 
 export interface GoogleCalendarEvent {
@@ -153,11 +278,16 @@ export interface AdminFontSettings {
 }
 
 export const DEFAULT_FONT_SETTINGS: AdminFontSettings = {
-  arabicFont: 'Cairo',
-  latinFont: 'Cairo',
+  arabicFont: 'Rubik',
+  latinFont: 'Rubik',
   quranFont: 'UthmanicHafs',
   baseFontSize: 16,
   headingScale: 1.25,
+};
+
+const normalizeAdminFontName = (font?: string): string => {
+  if (!font || font === 'Cairo') return 'Rubik';
+  return font;
 };
 
 /**
@@ -172,8 +302,8 @@ export async function fetchFontSettings(): Promise<AdminFontSettings> {
       if (!snap.exists()) return null;
       const data = snap.data();
       return {
-        arabicFont: typeof data.arabicFont === 'string' ? data.arabicFont : DEFAULT_FONT_SETTINGS.arabicFont,
-        latinFont: typeof data.latinFont === 'string' ? data.latinFont : DEFAULT_FONT_SETTINGS.latinFont,
+        arabicFont: normalizeAdminFontName(typeof data.arabicFont === 'string' ? data.arabicFont : DEFAULT_FONT_SETTINGS.arabicFont),
+        latinFont: normalizeAdminFontName(typeof data.latinFont === 'string' ? data.latinFont : DEFAULT_FONT_SETTINGS.latinFont),
         quranFont: typeof data.quranFont === 'string' ? data.quranFont : DEFAULT_FONT_SETTINGS.quranFont,
         baseFontSize: typeof data.baseFontSize === 'number' ? data.baseFontSize : DEFAULT_FONT_SETTINGS.baseFontSize,
         headingScale: typeof data.headingScale === 'number' ? data.headingScale : DEFAULT_FONT_SETTINGS.headingScale,
