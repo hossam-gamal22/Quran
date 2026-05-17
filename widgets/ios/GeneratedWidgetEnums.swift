@@ -29,6 +29,10 @@ enum GeneratedWidgetID: String, CaseIterable {
 /// Picker variants for the small widget. Filtered to widgets whose registry
 /// `sizes` array contains this size — variants that don't ship at this size are
 /// hidden from the iOS configuration picker entirely (no "Missing: …" placeholder).
+///
+/// Display labels are sourced from `widgets/ios/Localizable.xcstrings` and
+/// resolve at picker-render time against the widget extension bundle's
+/// preferred localization (which follows iOS Settings → preferred language).
 enum RoohSmallKind: String, AppEnum {
     case placeholder
     case daySimple
@@ -43,26 +47,56 @@ enum RoohSmallKind: String, AppEnum {
     case dailyDhikr
     case hijriDate
 
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "الويدجت")
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(
+        name: LocalizedStringResource("widget.picker.title", defaultValue: "Widget")
+    )
     static var caseDisplayRepresentations: [RoohSmallKind: DisplayRepresentation] = [
-        .placeholder: "— اختر —",
-        .daySimple: "اليوم",
-        .dayThuluth: "اليوم ثلث",
-        .dayDigital: "اليوم رقمي",
-        .monthSimple: "الشهر",
-        .prayerSingle: "الصلاة القادمة",
-        .prayerTable: "جدول الصلاة",
-        .verseOfDay: "🔒 آية اليوم",
-        .azkarMorning: "🔒 أذكار الصباح",
-        .azkarEvening: "🔒 أذكار المساء",
-        .dailyDhikr: "🔒 الذكر اليومي",
-        .hijriDate: "🔒 الهجري",
+        .placeholder: DisplayRepresentation(
+            title: LocalizedStringResource("widget.picker.placeholder", defaultValue: "Choose")
+        ),
+        .daySimple: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.daySimple", defaultValue: "Today")
+        ),
+        .dayThuluth: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.dayThuluth.free", defaultValue: "Today Thuluth")
+        ),
+        .dayDigital: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.dayDigital", defaultValue: "Digital Day")
+        ),
+        .monthSimple: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.monthSimple", defaultValue: "Month")
+        ),
+        .prayerSingle: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.prayerSingle", defaultValue: "Next Prayer")
+        ),
+        .prayerTable: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.prayerTable", defaultValue: "Prayer Table")
+        ),
+        .verseOfDay: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "🔒 Verse of the Day")
+        ),
+        .azkarMorning: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.azkarMorning.premium", defaultValue: "🔒 Morning Azkar")
+        ),
+        .azkarEvening: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.azkarEvening.premium", defaultValue: "🔒 Evening Azkar")
+        ),
+        .dailyDhikr: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.dailyDhikr.premium", defaultValue: "🔒 Daily Dhikr")
+        ),
+        .hijriDate: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.hijriDate.premium", defaultValue: "Hijri")
+        ),
     ]
 }
 
 /// Picker variants for the medium widget. Filtered to widgets whose registry
 /// `sizes` array contains this size — variants that don't ship at this size are
 /// hidden from the iOS configuration picker entirely (no "Missing: …" placeholder).
+///
+/// Display labels are sourced from `widgets/ios/Localizable.xcstrings` and
+/// resolve at picker-render time against the widget extension bundle's
+/// preferred localization (which follows iOS Settings → preferred language).
 enum RoohMediumKind: String, AppEnum {
     case placeholder
     case daySimple
@@ -76,34 +110,70 @@ enum RoohMediumKind: String, AppEnum {
     case dailyDhikr
     case hijriDate
 
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "الويدجت")
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(
+        name: LocalizedStringResource("widget.picker.title", defaultValue: "Widget")
+    )
     static var caseDisplayRepresentations: [RoohMediumKind: DisplayRepresentation] = [
-        .placeholder: "— اختر —",
-        .daySimple: "اليوم",
-        .dayThuluth: "🔒 اليوم ثلث",
-        .monthThuluth: "🔒 الشهر ثلث",
-        .prayerTable: "جدول الصلاة",
-        .prayerNextPrevious: "الصلاة السابقة والقادمة",
-        .verseOfDay: "🔒 آية اليوم",
-        .azkarMorning: "🔒 أذكار الصباح",
-        .azkarEvening: "🔒 أذكار المساء",
-        .dailyDhikr: "🔒 الذكر اليومي",
-        .hijriDate: "🔒 الهجري",
+        .placeholder: DisplayRepresentation(
+            title: LocalizedStringResource("widget.picker.placeholder", defaultValue: "Choose")
+        ),
+        .daySimple: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.daySimple", defaultValue: "Today")
+        ),
+        .dayThuluth: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.dayThuluth.premium", defaultValue: "🔒 Today Thuluth")
+        ),
+        .monthThuluth: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.monthThuluth.premium", defaultValue: "🔒 Month Thuluth")
+        ),
+        .prayerTable: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.prayerTable", defaultValue: "Prayer Table")
+        ),
+        .prayerNextPrevious: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.prayerNextPrevious", defaultValue: "Previous & Next Prayer")
+        ),
+        .verseOfDay: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "🔒 Verse of the Day")
+        ),
+        .azkarMorning: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.azkarMorning.premium", defaultValue: "🔒 Morning Azkar")
+        ),
+        .azkarEvening: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.azkarEvening.premium", defaultValue: "🔒 Evening Azkar")
+        ),
+        .dailyDhikr: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.dailyDhikr.premium", defaultValue: "🔒 Daily Dhikr")
+        ),
+        .hijriDate: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.hijriDate.premium", defaultValue: "🔒 Hijri")
+        ),
     ]
 }
 
 /// Picker variants for the large widget. Filtered to widgets whose registry
 /// `sizes` array contains this size — variants that don't ship at this size are
 /// hidden from the iOS configuration picker entirely (no "Missing: …" placeholder).
+///
+/// Display labels are sourced from `widgets/ios/Localizable.xcstrings` and
+/// resolve at picker-render time against the widget extension bundle's
+/// preferred localization (which follows iOS Settings → preferred language).
 enum RoohLargeKind: String, AppEnum {
     case placeholder
     case prayerTable
     case verseOfDay
 
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "الويدجت")
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(
+        name: LocalizedStringResource("widget.picker.title", defaultValue: "Widget")
+    )
     static var caseDisplayRepresentations: [RoohLargeKind: DisplayRepresentation] = [
-        .placeholder: "— اختر —",
-        .prayerTable: "جدول الصلاة",
-        .verseOfDay: "🔒 آية اليوم",
+        .placeholder: DisplayRepresentation(
+            title: LocalizedStringResource("widget.picker.placeholder", defaultValue: "Choose")
+        ),
+        .prayerTable: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.prayerTable", defaultValue: "Prayer Table")
+        ),
+        .verseOfDay: DisplayRepresentation(
+            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "🔒 Verse of the Day")
+        ),
     ]
 }

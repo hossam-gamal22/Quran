@@ -220,6 +220,67 @@ const HijriOverrides: React.FC = () => {
     setForm(prev => ({ ...prev, hijriMonth: preset.month }));
   };
 
+  // ============================================
+  // "Set today's Hijri date" quick-override
+  // ============================================
+  //
+  // The standard form asks the admin for the *Gregorian start date* of a
+  // Hijri month. That's the canonical anchor the app uses to compute any
+  // day within the month — but it's awkward when the admin just wants to
+  // say "in country X, TODAY is Hijri day Y". This modal takes that
+  // direct input and reverse-derives the month-start Gregorian date so
+  // the same `hijri_overrides` Firestore schema works unchanged.
+  //   anchor = today − (todaysHijriDay − 1) days
+  // The app + widget then add days to that anchor to compute any other
+  // date in the same Hijri month.
+  const [showTodayForm, setShowTodayForm] = useState(false);
+  const [todayForm, setTodayForm] = useState({
+    countryCode: 'SA',
+    todaysHijriDay: 1,
+    hijriMonth: 9,
+    hijriYear: 1447,
+    monthLength: 30 as 29 | 30,
+    source: '',
+    sourceUrl: '',
+    isVerified: true,
+  });
+
+  const handleSaveToday = async () => {
+    if (!todayForm.source) return;
+    setSaving(true);
+    try {
+      // Compute the implied month-start Gregorian date.
+      const now = new Date();
+      const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+      todayUTC.setUTCDate(todayUTC.getUTCDate() - (todayForm.todaysHijriDay - 1));
+      const yyyy = todayUTC.getUTCFullYear();
+      const mm = String(todayUTC.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(todayUTC.getUTCDate()).padStart(2, '0');
+      const hijriStartGregorian = `${yyyy}-${mm}-${dd}`;
+
+      const country = COUNTRIES.find(c => c.code === todayForm.countryCode);
+      const docId = `${todayForm.countryCode}_${todayForm.hijriYear}_${todayForm.hijriMonth}`;
+      await setDoc(doc(db, 'hijri_overrides', docId), {
+        countryCode: todayForm.countryCode,
+        countryName: country?.en || todayForm.countryCode,
+        hijriYear: todayForm.hijriYear,
+        hijriMonth: todayForm.hijriMonth,
+        monthLength: todayForm.monthLength,
+        hijriStartGregorian,
+        source: todayForm.source,
+        sourceUrl: todayForm.sourceUrl || '',
+        announcedAt: Timestamp.now(),
+        updatedBy: 'admin',
+        isVerified: todayForm.isVerified,
+      });
+      setShowTodayForm(false);
+      await fetchOverrides();
+    } catch (err) {
+      console.error('Error saving today override:', err);
+    }
+    setSaving(false);
+  };
+
   const getMonthName = (num: number) => {
     const m = HIJRI_MONTHS.find(h => h.num === num);
     return m ? `${m.ar} (${m.en})` : String(num);
@@ -254,8 +315,15 @@ const HijriOverrides: React.FC = () => {
         </button>
       </div>
 
-      {/* Preset buttons */}
+      {/* Preset buttons + "set today" quick action */}
       <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => setShowTodayForm(true)}
+          className="px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors text-sm font-medium"
+        >
+          <Calendar className="w-4 h-4 inline ml-2" />
+          تعديل تاريخ اليوم
+        </button>
         {PRESETS.map(preset => (
           <button
             key={preset.month}
@@ -271,6 +339,150 @@ const HijriOverrides: React.FC = () => {
           </button>
         ))}
       </div>
+
+      {/* Quick "today's Hijri date" modal */}
+      {showTodayForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-admin-surface rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">تعديل تاريخ اليوم الهجري</h2>
+              <button onClick={() => setShowTodayForm(false)} className="text-slate-400 hover:text-white" aria-label="إغلاق">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-400 mb-4">
+              اختر الدولة وتاريخ اليوم الهجري كما تريد أن يظهر للمستخدمين. النظام
+              سيحسب بداية الشهر الميلادية تلقائياً ويوزّعها على باقي أيام الشهر.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">الدولة</label>
+                <select
+                  value={todayForm.countryCode}
+                  onChange={e => setTodayForm(prev => ({ ...prev, countryCode: e.target.value }))}
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="اختر الدولة"
+                >
+                  {COUNTRIES.map(c => (
+                    <option key={c.code} value={c.code}>{c.name} ({c.en})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">اليوم</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={todayForm.todaysHijriDay}
+                    onChange={e => setTodayForm(prev => ({ ...prev, todaysHijriDay: Math.max(1, Math.min(30, parseInt(e.target.value) || 1)) }))}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                    aria-label="اليوم الهجري"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">الشهر</label>
+                  <select
+                    value={todayForm.hijriMonth}
+                    onChange={e => setTodayForm(prev => ({ ...prev, hijriMonth: parseInt(e.target.value) }))}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                    aria-label="الشهر الهجري"
+                  >
+                    {HIJRI_MONTHS.map(m => (
+                      <option key={m.num} value={m.num}>{m.ar}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">السنة</label>
+                  <input
+                    type="number"
+                    value={todayForm.hijriYear}
+                    onChange={e => setTodayForm(prev => ({ ...prev, hijriYear: parseInt(e.target.value) || 1447 }))}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                    aria-label="السنة الهجرية"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">طول الشهر</label>
+                <div className="flex gap-2">
+                  {[29, 30].map(len => (
+                    <button
+                      key={len}
+                      onClick={() => setTodayForm(prev => ({ ...prev, monthLength: len as 29 | 30 }))}
+                      className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+                        todayForm.monthLength === len
+                          ? 'bg-accent text-white border-accent'
+                          : 'bg-admin-surface-light text-slate-300 border-admin-border'
+                      }`}
+                    >
+                      {len} يوم
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">المصدر الرسمي</label>
+                <input
+                  type="text"
+                  value={todayForm.source}
+                  onChange={e => setTodayForm(prev => ({ ...prev, source: e.target.value }))}
+                  placeholder="مثال: المجلس الأعلى للقضاء"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="المصدر الرسمي"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">رابط المصدر (اختياري)</label>
+                <input
+                  type="url"
+                  value={todayForm.sourceUrl}
+                  onChange={e => setTodayForm(prev => ({ ...prev, sourceUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="رابط المصدر"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-slate-300">موثق رسمياً</span>
+                <button
+                  onClick={() => setTodayForm(prev => ({ ...prev, isVerified: !prev.isVerified }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    todayForm.isVerified ? 'bg-accent' : 'bg-admin-surface-light'
+                  }`}
+                  aria-label="حالة التوثيق"
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayForm.isVerified ? 'translate-x-1' : 'translate-x-6'}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                disabled={saving || !todayForm.source}
+                onClick={handleSaveToday}
+                className="flex-1 px-4 py-2 bg-accent hover:bg-accent-dark disabled:opacity-50 text-white rounded-xl transition-colors"
+              >
+                {saving ? 'جاري الحفظ...' : 'نشر'}
+              </button>
+              <button
+                onClick={() => setShowTodayForm(false)}
+                className="px-4 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (

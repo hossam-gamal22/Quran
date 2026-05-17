@@ -117,6 +117,12 @@ export default function LocationScreen() {
         country: info.country,
       });
 
+      // Persist to the shared `user_location` key so subsequent screens
+      // (home / prayer tab) don't re-request the permission.
+      import('@/lib/prayer-times').then(({ saveLocation }) => {
+        saveLocation({ latitude, longitude, city: info.city, country: info.country }).catch(() => {});
+      }).catch(() => {});
+
       // Update user's real country in Firestore + persist locally so the
       // SettingsContext reconcile effect uses it on subsequent launches.
       const countryCode = (reverseGeocode?.isoCountryCode || '').toUpperCase();

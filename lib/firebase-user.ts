@@ -238,16 +238,12 @@ export const getFCMToken = async (): Promise<string> => {
     return '';
   }
   try {
+    // Don't trigger a system permission prompt here. The prompt is handled by
+    // the onboarding flow and PermissionBanner. If permission is not granted,
+    // skip token registration silently — it will be retried after grant.
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      console.log('⚠️ Push notification permission not granted');
+      console.log('⚠️ Push notification permission not granted — skipping FCM token');
       return '';
     }
     

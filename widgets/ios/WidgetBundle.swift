@@ -7,32 +7,12 @@ import SwiftUI
 @main
 struct RoohMuslimWidgetBundle: WidgetBundle {
     var body: some Widget {
+        // Home Screen: 3 size-grouped entries. After adding one, the user picks
+        // the specific kind via Edit Widget → Widget (per Phase 4 Glassify UX).
         RoohSmallWidget()
         RoohMediumWidget()
         RoohLargeWidget()
-        RoohDaySimpleSmallWidget()
-        RoohDaySimpleMediumWidget()
-        RoohDayThuluthSmallWidget()
-        RoohDayThuluthMediumWidget()
-        RoohDayDigitalSmallWidget()
-        RoohMonthSimpleSmallWidget()
-        RoohMonthThuluthMediumWidget()
-        RoohPrayerSingleSmallWidget()
-        RoohPrayerTableSmallWidget()
-        RoohPrayerTableMediumWidget()
-        RoohPrayerTableLargeWidget()
-        RoohPrayerNextPreviousMediumWidget()
-        RoohVerseOfDaySmallWidget()
-        RoohVerseOfDayMediumWidget()
-        RoohVerseOfDayLargeWidget()
-        RoohAzkarMorningSmallWidget()
-        RoohAzkarMorningMediumWidget()
-        RoohAzkarEveningSmallWidget()
-        RoohAzkarEveningMediumWidget()
-        RoohDailyDhikrSmallWidget()
-        RoohDailyDhikrMediumWidget()
-        RoohHijriDateSmallWidget()
-        RoohHijriDateMediumWidget()
+        // Lock Screen widgets — independent of the size-grouped flow.
         RoohLockDayThuluthWidget()
         RoohLockMonthThuluthWidget()
         RoohLockNextPrayerWidget()

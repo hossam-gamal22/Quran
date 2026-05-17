@@ -109,10 +109,51 @@ function premiumForSize(def, size) {
   return !!def.isPremium;
 }
 
-/** Strip the " - " separator we use in registry titles so iOS pickers stay tight ("اليوم - ثلث" → "اليوم ثلث"). */
-function pickerTitle(def, size) {
-  const base = (def.titleAr || def.titleEn || def.id).replace(/\s*-\s*/g, ' ');
-  return premiumForSize(def, size) ? `🔒 ${base}` : base;
+/**
+ * Localization-catalog key for a (kind, size) picker label. The catalog
+ * file is `widgets/ios/Localizable.xcstrings`; per-kind keys carry a
+ * `.free` or `.premium` suffix when the same kind ships in both modes at
+ * different sizes (e.g. dayThuluth is free in small, premium in medium).
+ * Keys WITHOUT a suffix are used when premium-ness is fixed regardless of
+ * size — the catalog still has the matching entry.
+ */
+function localizableKeyForKind(def, size) {
+  const safe = def.iosKind;
+  const premium = premiumForSize(def, size);
+  // Kinds that flip premium-ness by size — emit `.free` / `.premium` variants
+  // so the catalog has separate entries for each.
+  if (safe === 'dayThuluth') return premium ? `widget.kind.dayThuluth.premium` : `widget.kind.dayThuluth.free`;
+  // Kinds that are uniformly premium across all their sizes — single
+  // `.premium` key (lock emoji included in catalog value).
+  const alwaysPremium = ['monthThuluth', 'verseOfDay', 'azkarMorning', 'azkarEvening', 'dailyDhikr', 'hijriDate'];
+  if (alwaysPremium.includes(safe)) return `widget.kind.${safe}.premium`;
+  // Kinds that are always free across their sizes.
+  return `widget.kind.${safe}`;
+}
+
+/** Fallback default-value (English) for the LocalizedStringResource when the
+ *  catalog lookup fails. Mirrors the catalog's English entry so the picker
+ *  still shows a sensible label even if the .xcstrings file is missing. */
+function fallbackEnglishLabel(def, size) {
+  const base = (def.titleEn || def.id).replace(/\s*-\s*/g, ' ');
+  // Mirror the human-friendly EN labels in the catalog.
+  const map = {
+    daySimple: 'Today',
+    dayThuluth: 'Today Thuluth',
+    dayDigital: 'Digital Day',
+    monthSimple: 'Month',
+    monthThuluth: 'Month Thuluth',
+    prayerSingle: 'Next Prayer',
+    prayerTable: 'Prayer Table',
+    prayerNextPrevious: 'Previous & Next Prayer',
+    verseOfDay: 'Verse of the Day',
+    azkarMorning: 'Morning Azkar',
+    azkarEvening: 'Evening Azkar',
+    dailyDhikr: 'Daily Dhikr',
+    hijriDate: 'Hijri',
+  };
+  const en = map[def.iosKind] || base;
+  return premiumForSize(def, size) ? `🔒 ${en}` : en;
 }
 
 function buildKindEnum(name, size, ios) {
@@ -122,18 +163,33 @@ function buildKindEnum(name, size, ios) {
   lines.push(`/// Picker variants for the ${size} widget. Filtered to widgets whose registry`);
   lines.push('/// `sizes` array contains this size — variants that don\'t ship at this size are');
   lines.push('/// hidden from the iOS configuration picker entirely (no "Missing: …" placeholder).');
+  lines.push('///');
+  lines.push('/// Display labels are sourced from `widgets/ios/Localizable.xcstrings` and');
+  lines.push('/// resolve at picker-render time against the widget extension bundle\'s');
+  lines.push('/// preferred localization (which follows iOS Settings → preferred language).');
   lines.push(`enum ${name}: String, AppEnum {`);
   for (const c of cases) {
     lines.push(`    case ${c}`);
   }
   lines.push('');
-  lines.push('    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "الويدجت")');
+  // NOTE: omit `bundle:` — `appintentsmetadataprocessor` requires
+  // `LocalizedStringResource` to resolve against the main bundle. Inside a
+  // widget extension, `Bundle.main` IS the extension's own bundle (the one
+  // shipping `Localizable.xcstrings`), so the default lookup is correct.
+  lines.push('    static var typeDisplayRepresentation = TypeDisplayRepresentation(');
+  lines.push('        name: LocalizedStringResource("widget.picker.title", defaultValue: "Widget")');
+  lines.push('    )');
   lines.push(`    static var caseDisplayRepresentations: [${name}: DisplayRepresentation] = [`);
-  lines.push('        .placeholder: "— اختر —",');
+  lines.push('        .placeholder: DisplayRepresentation(');
+  lines.push('            title: LocalizedStringResource("widget.picker.placeholder", defaultValue: "Choose")');
+  lines.push('        ),');
   for (const def of variants) {
     const safe = def.iosKind.replace(/[^A-Za-z0-9_]/g, '_');
-    const title = pickerTitle(def, size).replace(/"/g, '\\"');
-    lines.push(`        .${safe}: "${title}",`);
+    const key = localizableKeyForKind(def, size);
+    const fallback = fallbackEnglishLabel(def, size).replace(/"/g, '\\"');
+    lines.push(`        .${safe}: DisplayRepresentation(`);
+    lines.push(`            title: LocalizedStringResource("${key}", defaultValue: "${fallback}")`);
+    lines.push('        ),');
   }
   lines.push('    ]');
   lines.push('}');

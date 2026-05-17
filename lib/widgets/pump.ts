@@ -26,7 +26,12 @@ import {
 } from './snapshot';
 import type { SharedWidgetData } from '@/lib/widget-data';
 
-const SCHEMA_VERSION = 3;
+// 4 — adds anchor manifest emission (preview wraps dynamic regions with
+//      `<AnchorReporter>`, snapshot pump attaches captured anchor rects to
+//      `SharedWidgetData.snapshotManifest[routeKey].anchors`). Bumping forces
+//      every cached PNG + manifest entry to regenerate so the new fields are
+//      populated even when the user's content signature hasn't changed.
+const SCHEMA_VERSION = 4;
 
 export type DisplaySettingsLike = {
   widgetTheme?: string;

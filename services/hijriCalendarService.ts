@@ -126,6 +126,18 @@ export async function setUserCountry(countryCode: string): Promise<void> {
   try {
     await AsyncStorage.setItem(USER_COUNTRY_KEY, countryCode);
   } catch {}
+  // Country switched → admin override now lives under a different doc id.
+  // Re-subscribe so onSnapshot watches the new country's overrides, and
+  // immediately republish widget data so the home screen reflects the
+  // resolved Hijri for the new region (which may differ from the previous
+  // country's admin decision).
+  try {
+    const { updateSharedData } = await import('@/lib/widget-data');
+    await subscribeToHijriOverridesForUser(() => {
+      updateSharedData().catch(() => {});
+    });
+    updateSharedData().catch(() => {});
+  } catch {}
 }
 
 // ============================================
@@ -144,6 +156,17 @@ export async function getUserAdjustment(): Promise<number> {
 export async function setUserAdjustment(adj: number): Promise<void> {
   try {
     await AsyncStorage.setItem(USER_ADJUSTMENT_KEY, String(adj));
+  } catch {}
+  // Keep `@hijri_date_offset` (legacy key consumed by `app/hijri.tsx` + the
+  // older widget fallback path) in lock-step so the user only has to set
+  // the value once and it propagates everywhere.
+  try {
+    await AsyncStorage.setItem('@hijri_date_offset', String(adj));
+  } catch {}
+  // Push to widget immediately.
+  try {
+    const { updateSharedData } = await import('@/lib/widget-data');
+    updateSharedData().catch(() => {});
   } catch {}
 }
 
@@ -418,4 +441,62 @@ export async function refreshHijriInBackground(): Promise<void> {
       }
     } catch {}
   } catch {}
+}
+
+// ============================================
+// Firestore admin-override subscription
+// ============================================
+//
+// Live-listens for changes to `hijri_overrides/{userCountry}_{year}_{month}`
+// so the moment an admin publishes a new moon-sighting decision, the app
+// invalidates its cache, recomputes the resolved Hijri date, and pushes
+// the new effective offset out to the home-screen widget — no app reopen,
+// no manual refresh, no waiting for cache to expire.
+//
+// Returns an unsubscribe function. Designed to be called once at app init.
+let _hijriOverrideUnsub: (() => void) | null = null;
+
+export async function subscribeToHijriOverridesForUser(
+  onChange?: () => void,
+): Promise<() => void> {
+  // Tear down any previous subscription (in case of country switch).
+  if (_hijriOverrideUnsub) {
+    try { _hijriOverrideUnsub(); } catch {}
+    _hijriOverrideUnsub = null;
+  }
+  try {
+    const country = await getUserCountry();
+    if (!country) return () => {};
+    const today = new Date();
+    const approx = gregorianToHijri(today);
+    const docId = `${country}_${approx.year}_${approx.month}`;
+
+    const { doc, onSnapshot } = await import('firebase/firestore');
+    const { db } = await import('@/lib/firebase-config');
+    const ref = doc(db, 'hijri_overrides', docId);
+
+    const unsub = onSnapshot(
+      ref,
+      async () => {
+        // Bust the day's cache so the next getHijriDate() call refetches
+        // with the new override, instead of serving the now-stale cached
+        // result for up to an hour.
+        try {
+          await AsyncStorage.removeItem(getCacheKey(country, today));
+        } catch {}
+        // Notify caller (typically: trigger widget data refresh).
+        if (onChange) {
+          try { onChange(); } catch {}
+        }
+      },
+      (err) => {
+        if (__DEV__) console.warn('[hijri] override snapshot error:', err);
+      },
+    );
+    _hijriOverrideUnsub = unsub;
+    return unsub;
+  } catch (e) {
+    if (__DEV__) console.warn('[hijri] subscribe failed:', e);
+    return () => {};
+  }
 }

@@ -45,12 +45,12 @@ const WIDGET_SWIFT_FILES = [
   'PrayerLiveActivity.swift',
   'AppIntents.swift',
   'ControlWidgets.swift',
-  // Offline prayer-time calculation + static-PNG overlay rendering.
-  // Compiled together with the vendored adhan-swift sources from
-  // widgets/ios/Adhan/ (auto-discovered below).
+  // Offline prayer-time calculation. The widget extension uses pure SwiftUI
+  // for all prayer widgets and computes times locally via the vendored
+  // adhan-swift sources in widgets/ios/Adhan/ (auto-discovered below) — no
+  // PNG bake required.
   'PrayerInputs.swift',
   'PrayerCalculator.swift',
-  'PrayerStaticOverlay.swift',
   'PrayerDurationFormat.swift',
 ];
 
@@ -93,6 +93,13 @@ const WIDGET_FONT_FILES = [
   'Rubik-Bold.ttf',
   'KFGQPC-Uthmanic-Script.ttf',
 ];
+
+// Xcode 15+ Localization Catalog containing every picker / placeholder /
+// configurationDisplayName string the iOS Add Widget + Edit Widget sheets
+// surface. Resolved at picker-render time against the widget extension's
+// preferred localization (gated by `CFBundleLocalizations`, see Info.plist
+// below). Phase 4 (Glassify Add Widget UX).
+const WIDGET_XCSTRINGS_FILES = ['Localizable.xcstrings'];
 
 /**
  * Main plugin: wires up the WidgetKit extension target
@@ -172,6 +179,19 @@ const withIOSWidgets = (config) => {
       }
     }
 
+    // Copy Localizable.xcstrings catalog into the widget extension dir so it
+    // ships as a member of the extension's Resources build phase (registered
+    // below). XCStringsTool compiles it into per-locale `.lproj/Localizable.strings`
+    // in the built bundle, and `LocalizedStringResource(..., bundle: .forClass(BundleLocator.self))`
+    // resolves picker labels against it at render time.
+    for (const fileName of WIDGET_XCSTRINGS_FILES) {
+      const src = path.join(sourceDir, fileName);
+      const dst = path.join(widgetDir, fileName);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+      }
+    }
+
     // Create widget entitlements file
     const widgetEntitlements = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -189,12 +209,21 @@ const withIOSWidgets = (config) => {
     );
 
     // Create widget Info.plist
+    // CFBundleLocalizations lists every language the extension's xcstrings
+    // catalog ships with. iOS picks one at picker-render time based on the
+    // user's iOS Settings → Preferred Languages list (first match wins),
+    // which is how the Edit Widget picker labels follow the device locale.
     const widgetInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>ar</string>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ar</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>روح المسلم</string>
 	<key>CFBundleExecutable</key>
@@ -246,6 +275,7 @@ const withIOSWidgets = (config) => {
         ...adhanFilesForGroup,
         ...SHARED_SWIFT_FILES,
         ...WIDGET_FONT_FILES,
+        ...WIDGET_XCSTRINGS_FILES,
         'Assets.xcassets',
         `${WIDGET_EXTENSION_NAME}.entitlements`,
         'Info.plist',
@@ -388,6 +418,27 @@ const withIOSWidgets = (config) => {
 
         objects['PBXResourcesBuildPhase'][resourcesBuildPhaseUuid].files.push({
           value: fontBuildFileUuid,
+          comment: `${child.comment} in Resources`,
+        });
+      }
+    }
+
+    // Add Localizable.xcstrings to the widget target's Resources build phase.
+    // XCStringsTool processes the catalog into per-locale `.lproj/*.strings`
+    // resources during build; the file ref's known extension is enough — we
+    // don't need a special PBXFileReference type.
+    for (const child of groupChildren) {
+      if (WIDGET_XCSTRINGS_FILES.includes(child.comment)) {
+        const xcstringsBuildFileUuid = xcodeProject.generateUuid();
+        objects['PBXBuildFile'][xcstringsBuildFileUuid] = {
+          isa: 'PBXBuildFile',
+          fileRef: child.value,
+          fileRef_comment: child.comment,
+        };
+        objects['PBXBuildFile'][`${xcstringsBuildFileUuid}_comment`] = `${child.comment} in Resources`;
+
+        objects['PBXResourcesBuildPhase'][resourcesBuildPhaseUuid].files.push({
+          value: xcstringsBuildFileUuid,
           comment: `${child.comment} in Resources`,
         });
       }

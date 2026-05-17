@@ -36,8 +36,40 @@ import {
   WidgetSnapshotCaptureContext,
   WidgetForcedThemeContext,
   WidgetPreviewDataContext,
+  type CaptureAnchor,
 } from '@/components/widgets/previews/snapshot-capture-context';
 import type { SharedWidgetData } from '@/lib/widget-data';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Anchor manifest — per-slot collector
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Each OffscreenSlot installs a context whose `registerAnchor` callback pushes
+// into this map under its own slot key. After `captureRef` resolves, the
+// orchestrator reads the slot's array and persists it (see emitAnchors below).
+// Cleared before each slot mounts so a re-render does not double-count.
+
+const slotAnchorBuffers = new Map<string, CaptureAnchor[]>();
+
+function getAnchorRegistrar(slotKey: string): (a: CaptureAnchor) => void {
+  return (a) => {
+    let arr = slotAnchorBuffers.get(slotKey);
+    if (!arr) { arr = []; slotAnchorBuffers.set(slotKey, arr); }
+    // Replace if same id reports twice (e.g. a re-layout in a flex container).
+    const existing = arr.findIndex((x) => x.id === a.id);
+    if (existing >= 0) arr[existing] = a; else arr.push(a);
+  };
+}
+
+function takeAnchors(slotKey: string): CaptureAnchor[] {
+  const out = slotAnchorBuffers.get(slotKey) ?? [];
+  slotAnchorBuffers.delete(slotKey);
+  return out;
+}
+
+function resetAnchors(slotKey: string) {
+  slotAnchorBuffers.delete(slotKey);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Theme resolution
@@ -128,6 +160,11 @@ export interface SnapshotEntry {
   path: string;
   /** True when the file was newly written this run. */
   fresh: boolean;
+  /** Captured frame dimensions in dp (anchor rects are relative to this). */
+  capturedWidth: number;
+  capturedHeight: number;
+  /** Dynamic-region anchors emitted by `<AnchorReporter>` during this capture. */
+  anchors: CaptureAnchor[];
 }
 
 export interface WidgetSnapshotResult {
@@ -252,6 +289,9 @@ interface OffscreenSlotProps {
   sharedData?: SharedWidgetData;
   /** Mutable ref the orchestrator reads to call captureRef. */
   innerRef: React.RefObject<View | null>;
+  /** Slot key used by the anchor collector so reports are routed to the
+   *  correct buffer (slot keys are unique per (id, size, theme) mount). */
+  slotKey: string;
 }
 
 /**
@@ -263,7 +303,7 @@ interface OffscreenSlotProps {
  * `forSnapshot={true}` is passed through so previews with a live overlay omit
  * the countdown region (C2).
  */
-function OffscreenSlot({ def, size, language, theme, sharedData, innerRef }: OffscreenSlotProps) {
+function OffscreenSlot({ def, size, language, theme, sharedData, innerRef, slotKey }: OffscreenSlotProps) {
   const dims = getSizeDims(size);
   const Preview = def.Preview as React.FC<{
     size: PreviewSize;
@@ -271,8 +311,12 @@ function OffscreenSlot({ def, size, language, theme, sharedData, innerRef }: Off
     forSnapshot?: boolean;
   }>;
   const lang: 'ar' | 'en' = (def.forcedLanguage ?? language) as 'ar' | 'en';
+  const captureValue = React.useMemo(
+    () => ({ capturing: true, registerAnchor: getAnchorRegistrar(slotKey) }),
+    [slotKey],
+  );
   return (
-    <WidgetSnapshotCaptureContext.Provider value>
+    <WidgetSnapshotCaptureContext.Provider value={captureValue}>
       <WidgetForcedThemeContext.Provider value={theme}>
         <WidgetPreviewDataContext.Provider value={sharedData ?? null}>
           <View
@@ -362,6 +406,7 @@ export function SnapshotHost() {
       {Object.entries(slots).map(([key, slot]) => (
         <OffscreenSlot
           key={key}
+          slotKey={key}
           def={slot.def}
           size={slot.size}
           language={slot.language}
@@ -557,13 +602,12 @@ async function runSnapshotPass(
   // to fall outside the host's bounds — Android then skipped the rendering pass
   // for the clipped views, producing transparent capture buffers. One-at-a-time
   // is slower but the only way to guarantee every variant gets a real PNG.
-  // Prayer widgets on iOS now read pre-baked PNGs from the widget extension's
-  // Asset Catalog (widgets/ios/Assets.xcassets/PrayerStatic/*) and overlay
-  // dynamic numeric values via PrayerStaticOverlay.swift. They no longer
-  // consume runtime-captured snapshots — skip them here on iOS so the cached
-  // manifest never references stale per-state PNGs that the new pipeline
-  // ignores. Android continues to capture as before (until Android also
-  // adopts the static-PNG architecture in a follow-up).
+  // Glassify-style: prayer widgets on iOS render via pure SwiftUI (PrayerTableView /
+  // PrayerSingleView / PrayerNextPreviousView in RoohWidgets.swift) using the
+  // offline PrayerCalculator (vendored adhan-swift). No PNG is needed — the
+  // widget extension recomputes everything locally on every TimelineProvider
+  // call. Skip them in the capture pipeline so we don't burn time baking
+  // unused images. Android still uses runtime-captured snapshots.
   const IOS_STATIC_PRAYER_KINDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
 
   for (const theme of themes) {
@@ -580,11 +624,13 @@ async function runSnapshotPass(
         // Mount this single slot — wait for setState + layout + font application.
         // 250 ms gives Android time to apply custom widget fonts before capture;
         // 120 ms was sometimes too short on slower devices causing system-font fallback.
+        resetAnchors(key);
         hostSetSlots({ [key]: slot });
         await settleNextFrame(250);
 
         try {
           const cap = await captureOne(slot.def, slot.size, slot.theme);
+          const slotAnchors = takeAnchors(key);
           const entryHash = computeSnapshotHash(input, slot.theme);
           const versionKey = input.snapshotVersion ?? entryHash.slice(0, 10);
           const name = snapshotName(slot.def.id, slot.size, slot.theme, versionKey);
@@ -625,7 +671,13 @@ async function runSnapshotPass(
                 hash: entryHash,
                 path,
                 fresh: true,
+                capturedWidth: getSizeDims(slot.size).width,
+                capturedHeight: getSizeDims(slot.size).height,
+                anchors: slotAnchors,
               });
+              if (__DEV__ && slotAnchors.length > 0) {
+                console.log(`[snapshot] captured ${slotAnchors.length} anchor(s) for ${name}: ${slotAnchors.map((a) => a.id).join(', ')}`);
+              }
             } else {
               errors.push(`write_failed:${key}`);
             }

@@ -79,11 +79,11 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
   const [activeKhatma, setActiveKhatmaState] = useState<Khatma | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load khatmas on mount
+  // Load khatmas on mount. Don't request notification permission here —
+  // that happens during onboarding or when the user actually creates a khatma
+  // (the scheduling helpers check + request as needed).
   useEffect(() => {
     loadKhatmas();
-    // Request notification permissions on app start
-    requestNotificationPermissions();
   }, []);
 
   const loadKhatmas = async () => {

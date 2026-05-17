@@ -12,8 +12,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
-import { Platform, Alert, Linking, PermissionsAndroid } from 'react-native';
-import { t } from '@/lib/i18n';
+import { Platform, Linking, PermissionsAndroid } from 'react-native';
 
 /**
  * Check if exact alarms can be scheduled.
@@ -56,11 +55,15 @@ export async function openExactAlarmSettings(): Promise<void> {
 /**
  * Request notification permissions from the OS.
  * On iOS, also requests critical alerts for prayer-time adhan.
- * Returns true if granted.
+ * Returns true if granted. Never shows an Alert on every launch —
+ * if the user already denied, PermissionBanner handles re-engagement.
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  const { status: existingStatus, canAskAgain } = await Notifications.getPermissionsAsync();
   if (existingStatus === 'granted') return true;
+  // Already denied permanently — don't re-prompt or show an Alert here.
+  // The PermissionBanner inside the app guides the user to Settings.
+  if (existingStatus === 'denied' && !canAskAgain) return false;
 
   const { status } = await Notifications.requestPermissionsAsync({
     ios: {
@@ -71,17 +74,5 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     },
   });
 
-  if (status !== 'granted') {
-    Alert.alert(
-      t('notifications.permissionRequired') || '\u26A0\uFE0F الإشعارات مطلوبة',
-      t('notifications.permissionBody') || 'يرجى السماح بالإشعارات لاستقبال مواعيد الصلاة والأذكار',
-      [
-        { text: t('common.later') || 'لاحقًا', style: 'cancel' },
-        { text: t('common.settings') || 'الإعدادات', onPress: () => Linking.openSettings() },
-      ],
-    );
-    return false;
-  }
-
-  return true;
+  return status === 'granted';
 }

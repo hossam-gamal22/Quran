@@ -376,8 +376,8 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
     id: 'hijriDate',
     category: 'hijri',
-    titleAr: 'الهجري',
-    titleEn: 'Hijri',
+    titleAr: 'التاريخ الهجري',
+    titleEn: 'Hijri Date',
     sizes: ['small', 'medium'],
     platforms: ['ios', 'android'],
     isPremium: false,

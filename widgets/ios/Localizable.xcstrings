@@ -1,0 +1,365 @@
+{
+  "sourceLanguage" : "ar",
+  "version" : "1.0",
+  "strings" : {
+    "widget.picker.title" : {
+      "comment" : "Title shown above the widget-kind dropdown in the Edit Widget sheet. App is Arabic-first — every locale sees the Arabic value so the picker UI is never mixed AR/EN.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الودجت" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الودجت" } }
+      }
+    },
+    "widget.picker.placeholder" : {
+      "comment" : "Display label for the default '— choose —' option that ships with every per-size kind enum.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اختر" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اختر" } }
+      }
+    },
+    "widget.size.small.name" : {
+      "comment" : "configurationDisplayName for the size-grouped small widget shown in the Add Widget gallery.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الويدجت الصغيرة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الويدجت الصغيرة" } }
+      }
+    },
+    "widget.size.medium.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الويدجت المتوسطة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الويدجت المتوسطة" } }
+      }
+    },
+    "widget.size.large.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الويدجت الكبيرة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الويدجت الكبيرة" } }
+      }
+    },
+    "widget.size.small.description" : {
+      "comment" : "Description shown under the size widget in the Add Widget gallery — tells users to choose a style after adding.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أضفها ثم اضغط مطولًا واختر النمط." } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أضفها ثم اضغط مطولًا واختر النمط." } }
+      }
+    },
+    "widget.size.medium.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أضفها ثم اضغط مطولًا واختر النمط." } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أضفها ثم اضغط مطولًا واختر النمط." } }
+      }
+    },
+    "widget.size.large.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أضفها ثم اضغط مطولًا واختر النمط." } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أضفها ثم اضغط مطولًا واختر النمط." } }
+      }
+    },
+    "widget.kind.daySimple" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اليوم" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اليوم" } }
+      }
+    },
+    "widget.kind.dayThuluth.free" : {
+      "comment" : "Day Thuluth label when the size variant is free (small).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اليوم ثلث" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اليوم ثلث" } }
+      }
+    },
+    "widget.kind.dayThuluth.premium" : {
+      "comment" : "Day Thuluth label when the size variant is premium (medium).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اليوم ثلث" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اليوم ثلث" } }
+      }
+    },
+    "widget.kind.dayDigital" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اليوم رقمي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اليوم رقمي" } }
+      }
+    },
+    "widget.kind.monthSimple" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الشهر" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الشهر" } }
+      }
+    },
+    "widget.kind.monthThuluth.premium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الشهر ثلث" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الشهر ثلث" } }
+      }
+    },
+    "widget.kind.prayerSingle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الصلاة القادمة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الصلاة القادمة" } }
+      }
+    },
+    "widget.kind.prayerTable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "جدول الصلاة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "جدول الصلاة" } }
+      }
+    },
+    "widget.kind.prayerNextPrevious" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الصلاة السابقة والقادمة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الصلاة السابقة والقادمة" } }
+      }
+    },
+    "widget.kind.verseOfDay.premium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "آية اليوم" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "آية اليوم" } }
+      }
+    },
+    "widget.kind.azkarMorning.premium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أذكار الصباح" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أذكار الصباح" } }
+      }
+    },
+    "widget.kind.azkarEvening.premium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أذكار المساء" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أذكار المساء" } }
+      }
+    },
+    "widget.kind.dailyDhikr.premium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الذكر اليومي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الذكر اليومي" } }
+      }
+    },
+    "widget.kind.hijriDate.premium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "التاريخ الهجري" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "التاريخ الهجري" } }
+      }
+    },
+    "widget.appearance.title" : {
+      "comment" : "Title row in the Edit Widget sheet for theme/calendar/numerals/language pickers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "تخصيص الويدجت" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تخصيص الويدجت" } }
+      }
+    },
+    "widget.appearance.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اختر المظهر والتقويم والأرقام واللغة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اختر المظهر والتقويم والأرقام واللغة" } }
+      }
+    },
+    "widget.param.theme" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "المظهر" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "المظهر" } }
+      }
+    },
+    "widget.param.calendar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "التقويم" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "التقويم" } }
+      }
+    },
+    "widget.param.numerals" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "الأرقام" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الأرقام" } }
+      }
+    },
+    "widget.param.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اللغة" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اللغة" } }
+      }
+    },
+    "widget.param.auto" : {
+      "comment" : "Display label for the .auto case in every appearance enum (language/calendar/numerals/theme).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "تلقائي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تلقائي" } }
+      }
+    },
+    "widget.param.language.ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "العربية" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "العربية" } }
+      }
+    },
+    "widget.param.language.en" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "English" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "English" } }
+      }
+    },
+    "widget.param.calendar.gregorian" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ميلادي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "ميلادي" } }
+      }
+    },
+    "widget.param.calendar.hijri" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "هجري" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "هجري" } }
+      }
+    },
+    "widget.param.numerals.latin" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "123" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "123" } }
+      }
+    },
+    "widget.param.numerals.arabic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "١٢٣" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "١٢٣" } }
+      }
+    },
+    "widget.param.theme.light" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "فاتح" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "فاتح" } }
+      }
+    },
+    "widget.param.theme.dark" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "داكن" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "داكن" } }
+      }
+    },
+    "widget.param.theme.olive" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "زيتي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "زيتي" } }
+      }
+    },
+    "widget.param.theme.green" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أخضر" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أخضر" } }
+      }
+    },
+    "widget.param.theme.blue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "أزرق" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أزرق" } }
+      }
+    },
+    "widget.param.theme.desert" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "صحراوي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "صحراوي" } }
+      }
+    },
+    "widget.param.theme.slate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "رمادي" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "رمادي" } }
+      }
+    },
+    "widget.placeholder.appName.en" : {
+      "comment" : "Kept for backwards compat with code that still reads the .en key; both branches now resolve to the Arabic value.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "روح المسلم" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "روح المسلم" } }
+      }
+    },
+    "widget.placeholder.appName.ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "روح المسلم" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "روح المسلم" } }
+      }
+    },
+    "widget.placeholder.step1.en" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اضغط مطولًا" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اضغط مطولًا" } }
+      }
+    },
+    "widget.placeholder.step1.ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اضغط مطولًا" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اضغط مطولًا" } }
+      }
+    },
+    "widget.placeholder.step2.en" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "تعديل الودجت" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تعديل الودجت" } }
+      }
+    },
+    "widget.placeholder.step2.ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "تعديل الودجت" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تعديل الودجت" } }
+      }
+    },
+    "widget.placeholder.step3.en" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اختر النمط" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اختر النمط" } }
+      }
+    },
+    "widget.placeholder.step3.ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "اختر النمط" } },
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "اختر النمط" } }
+      }
+    }
+  }
+}

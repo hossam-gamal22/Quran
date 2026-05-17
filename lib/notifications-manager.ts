@@ -244,14 +244,18 @@ export async function saveAllNotifSettings(
 }
 
 // ─── Permission ───────────────────────────────────────────────────────────────
+// Requests notification permission only if not previously determined.
+// If the user already denied (canAskAgain === false), returns false without
+// surfacing a system prompt — avoids re-prompting on every launch.
 export async function requestNotifPermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
+  const { status: existing, canAskAgain } = await Notifications.getPermissionsAsync();
+  if (existing === 'granted') return true;
+  if (existing === 'denied' && !canAskAgain) return false;
   if (Platform.OS === 'android' && Platform.Version >= 33) {
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
   }
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync({
     ios: {
       allowAlert: true,

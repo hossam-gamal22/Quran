@@ -54,6 +54,7 @@ import {
   type ThemePalette,
 } from './shared';
 import { useWidgetSnapshotCapture, useWidgetForcedTheme, useWidgetPreviewData } from './snapshot-capture-context';
+import { AnchorReporter } from './anchor-reporter';
 
 // ────────────────────────────────────────────────────────
 // Glass card shell — dark blur tile that mirrors .ultraThinMaterial
@@ -289,13 +290,11 @@ export function DayThuluthPreview({ size, language }: { size: PreviewSize; langu
   );
 }
 
-export function DayDigitalPreview({ size, language, forSnapshot }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
+export function DayDigitalPreview({ size, language }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
   const { isArabic: ar, numerals, dayCalendar, dateFormat, palette: p } = usePreviewSettings(language);
   const time = formatTimeHHMM(new Date());
   const digitFont = 'Rubik-Bold';
-  // Phase B C2: snapshot omits the live time digits; native shell draws them
-  // on top via the `currentTime` overlay anchor.
-  const timeStr = forSnapshot ? '' : applyNumerals(time, numerals, ar);
+  const timeStr = applyNumerals(time, numerals, ar);
   const now = new Date();
   let dateStr = '';
   if (dayCalendar === 'hijri' && ar) {
@@ -311,12 +310,21 @@ export function DayDigitalPreview({ size, language, forSnapshot }: { size: Previ
     dateStr = sample || applyNumerals(formatDateSlash(now), numerals, ar);
   }
   const fontPx = size === 'small' ? 44 : 58;
-  // Native Text instead of SvgText — react-native-svg doesn't apply custom
-  // fonts reliably on Android, causing Rubik-Bold to fall back to system font.
+  // The live time is rendered both in gallery AND in capture (so the PNG
+  // has the same chrome dimensions), but during capture `<AnchorReporter>`
+  // hides the glyphs and reports the rect to the native overlay layer.
   return (
     <GlassTile size={size} palette={p}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        {timeStr ? (
+        <AnchorReporter
+          id="currentTime"
+          fontFamily={digitFont}
+          fontSize={fontPx}
+          fontWeight="bold"
+          color={p.text}
+          alignment="center"
+          direction={ar ? 'rtl' : 'ltr'}
+        >
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
@@ -334,11 +342,7 @@ export function DayDigitalPreview({ size, language, forSnapshot }: { size: Previ
           >
             {timeStr}
           </Text>
-        ) : (
-          // forSnapshot=true: reserve exact height so the PNG layout matches
-          // the live overlay position that the native shell draws on top.
-          <View style={{ height: fontPx + 8 }} />
-        )}
+        </AnchorReporter>
         <Text style={{ fontFamily: 'Rubik-Regular', fontSize: size === 'small' ? 12 : 14, color: p.muted, marginTop: 10 }}>
           {dateStr}
         </Text>
@@ -767,6 +771,14 @@ function DynamicTimeText({
   adjustsFontSizeToFit,
   minimumFontScale,
   children,
+  anchorId,
+  anchorFontFamily,
+  anchorFontSize,
+  anchorFontWeight,
+  anchorColor,
+  anchorAlignment,
+  anchorDirection,
+  anchorIsCountdown,
 }: {
   forSnapshot?: boolean;
   style?: React.ComponentProps<typeof Text>['style'];
@@ -774,17 +786,19 @@ function DynamicTimeText({
   adjustsFontSizeToFit?: boolean;
   minimumFontScale?: number;
   children: React.ReactNode;
+  /** Optional anchor id — when set during capture, the dp rect of this
+   *  Text is reported to the snapshot orchestrator and surfaces in the
+   *  manifest so the native widget extension draws the live value here. */
+  anchorId?: string;
+  anchorFontFamily?: string;
+  anchorFontSize?: number;
+  anchorFontWeight?: 'regular' | 'medium' | 'semibold' | 'bold';
+  anchorColor?: string;
+  anchorAlignment?: 'leading' | 'center' | 'trailing';
+  anchorDirection?: 'ltr' | 'rtl';
+  anchorIsCountdown?: boolean;
 }) {
-  // Defense-in-depth: BOTH `opacity: 0` AND `color: 'transparent'` are
-  // applied when forSnapshot. Either alone hides the glyphs; together they
-  // guarantee no pixel of `children` lands in the captured PNG even if a
-  // future RN renderer optimization changes how one of the two is processed.
-  //
-  // The Text node itself is preserved (no View wrapper) so the natural
-  // glyph layout — width from font metrics, height from lineHeight — is
-  // unchanged. A wrapping View introduced layout-collapse races for
-  // narrow widgets like prayerSingle/small and was reverted.
-  return (
+  const textNode = (
     <Text
       numberOfLines={numberOfLines}
       adjustsFontSizeToFit={adjustsFontSizeToFit}
@@ -793,6 +807,23 @@ function DynamicTimeText({
     >
       {children}
     </Text>
+  );
+
+  if (!anchorId) return textNode;
+
+  return (
+    <AnchorReporter
+      id={anchorId}
+      fontFamily={anchorFontFamily ?? 'Rubik-Medium'}
+      fontSize={anchorFontSize ?? 14}
+      fontWeight={anchorFontWeight ?? 'medium'}
+      color={anchorColor ?? '#000000'}
+      alignment={anchorAlignment ?? 'center'}
+      direction={anchorDirection ?? 'ltr'}
+      isCountdown={anchorIsCountdown}
+    >
+      {textNode}
+    </AnchorReporter>
   );
 }
 
@@ -815,14 +846,13 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
     const listFs = Platform.OS === 'android' ? 9.5 : 10;
     const rowPv = Platform.OS === 'android' ? 1 : 1.5;
     const heroTimeFs = Platform.OS === 'android' ? 29 : 32;
-    // Language-specific layout direction. Arabic reads RTL (schedule on
-    // the LEFT half, hero on the RIGHT half, row order [time|name]).
-    // English reads LTR (hero on the LEFT half, schedule on the RIGHT
-    // half, row order [name|time]). The flip is achieved with
-    // `flexDirection: row-reverse` on the outer container + each schedule
-    // row so the JSX child order stays the same.
     const outerDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
     const rowDir: 'row' | 'row-reverse' = ar ? 'row' : 'row-reverse';
+    // Decouple state-dependent visuals from the PNG when capturing.
+    // The PNG bakes only labels + chrome; the active-row highlight,
+    // hero prayer NAME, and prayer ROW TEXT COLOR are owned by the live
+    // overlay so they always reflect the current prayer state — never
+    // the state at the moment the PNG was captured.
     return (
       <GlassTile size={size} padding={8} palette={p}>
         <View style={{ flex: 1, flexDirection: outerDir, gap: 8 }}>
@@ -831,6 +861,13 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                 const active = !!row.isNext;
                 const label = ar ? row.keyAr : row.keyEn;
                 const timeStr = noWrapPrayerTime(fmt(row.time));
+                const anchorId = `prayerRowTime.${row.keyEn.toLowerCase()}`;
+                // When capturing: skip the active-bg fill and use the
+                // muted color for every row — iOS overlay re-tints the
+                // current active row and writes time text in the active
+                // foreground color, so the PNG never freezes state.
+                const rowBg = (forSnapshot || !active) ? 'transparent' : activeBg;
+                const fgForCapture = forSnapshot ? p.muted : (active ? p.text : p.muted);
                 return (
                   <View
                     key={row.keyEn}
@@ -841,13 +878,24 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                       paddingHorizontal: 4,
                       paddingVertical: rowPv,
                       borderRadius: 6,
-                      backgroundColor: active ? activeBg : 'transparent',
+                      backgroundColor: rowBg,
                     }}
                   >
-                    <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
+                    <DynamicTimeText
+                      forSnapshot={forSnapshot}
+                      numberOfLines={1}
+                      style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: fgForCapture, letterSpacing: -0.3, includeFontPadding: false }}
+                      anchorId={anchorId}
+                      anchorFontFamily={timeFont}
+                      anchorFontSize={listFs}
+                      anchorFontWeight="bold"
+                      anchorColor={p.text}
+                      anchorAlignment={ar ? 'leading' : 'trailing'}
+                      anchorDirection={ar ? 'rtl' : 'ltr'}
+                    >
                       {timeStr}
                     </DynamicTimeText>
-                    <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, includeFontPadding: false }}>
+                    <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: fgForCapture, includeFontPadding: false }}>
                       {label}
                     </Text>
                   </View>
@@ -858,15 +906,59 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 10, lineHeight: 13, color: p.muted, marginBottom: 2, includeFontPadding: false }}>
                 {ar ? 'الصلاة القادمة' : 'Next Prayer'}
               </Text>
-              <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
-                {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
-              </Text>
-              <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}>
+              {/* Hero prayer NAME is live-driven: native overlay writes
+                  the current next-prayer name here every timeline reload. */}
+              {forSnapshot ? (
+                <AnchorReporter
+                  id="prayerHeroName"
+                  fontFamily={PRAYER_NAME_FONT}
+                  fontSize={20}
+                  fontWeight="bold"
+                  color={p.text}
+                  alignment="center"
+                  direction={ar ? 'rtl' : 'ltr'}
+                >
+                  <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
+                    {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
+                  </Text>
+                </AnchorReporter>
+              ) : (
+                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
+                  {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
+                </Text>
+              )}
+              <DynamicTimeText
+                forSnapshot={forSnapshot}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+                style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+                anchorId="prayerHeroTime"
+                anchorFontFamily={timeFont}
+                anchorFontSize={heroTimeFs}
+                anchorFontWeight="bold"
+                anchorColor={p.text}
+                anchorAlignment="center"
+                anchorDirection={ar ? 'rtl' : 'ltr'}
+              >
                 {noWrapPrayerTime(fmt(nextPrayer.time))}
               </DynamicTimeText>
-              {/* Phase B C2: countdown is drawn by the native shell; skip in snapshot. */}
               {forSnapshot ? (
-                <View style={{ height: 12, marginTop: 2 }} />
+                <AnchorReporter
+                  id="prayerHeroCountdown"
+                  fontFamily="Rubik-Medium"
+                  fontSize={9}
+                  fontWeight="medium"
+                  color={p.muted}
+                  alignment="center"
+                  direction={ar ? 'rtl' : 'ltr'}
+                  isCountdown
+                  style={{ marginTop: 2 }}
+                >
+                  <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
+                    {remainingText || (ar ? '— س — د' : '—H —M')}
+                  </Text>
+                </AnchorReporter>
               ) : (
                 <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>
                   {remainingText}

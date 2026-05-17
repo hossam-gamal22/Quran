@@ -635,8 +635,14 @@ export default function RootLayout() {
   useEffect(() => {
     async function initNotificationChannels() {
       try {
-        console.log('[Notifications] Init starting — requesting permissions...');
-        const granted = await requestNewNotifPermissions();
+        // Don't auto-prompt for notification permission on every launch.
+        // First-time grant happens in onboarding (app/onboarding/notifications.tsx).
+        // Re-engagement after a denial happens via PermissionBanner.
+        // Here we only read the current status to decide whether to schedule.
+        const ExpoNotificationsLib = await import('expo-notifications');
+        const { status: permStatus } = await ExpoNotificationsLib.getPermissionsAsync();
+        const granted = permStatus === 'granted';
+        console.log(`[Notifications] Init starting — current permission: ${permStatus}`);
 
         // Always set up channels regardless of permission — they must exist
         // before any notification can be scheduled (e.g. after user grants
@@ -947,6 +953,22 @@ export default function RootLayout() {
       () => syncWidgetDataToNative(),
       'Widget sync',
       5000
+    );
+
+    // Live-subscribe to admin Hijri overrides for the user's country. When
+    // the admin publishes a new moon-sighting decision (e.g. "Egypt's
+    // Ramadan starts on May 17"), the widget refreshes within seconds — no
+    // need for the user to relaunch the app or wait for cache expiry.
+    initWithTimeout(
+      async () => {
+        const { subscribeToHijriOverridesForUser } = require('@/services/hijriCalendarService');
+        const { updateSharedData } = require('@/lib/widget-data');
+        await subscribeToHijriOverridesForUser(() => {
+          updateSharedData().catch(() => {});
+        });
+      },
+      'Hijri-override Firestore subscription',
+      5000,
     );
 
     // Auto-start/refresh Live Activity for prayer countdown (iOS only)

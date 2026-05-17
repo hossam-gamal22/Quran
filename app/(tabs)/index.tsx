@@ -816,6 +816,14 @@ export default function HomeScreen() {
   // Banner countdown state (always-on, independent of modal)
   const [bannerCountdown, setBannerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
   const [bannerNextPrayer, setBannerNextPrayer] = useState<{ name: PrayerName; time: string } | null>(null);
+  // Hydration grace period: don't show the premium-upgrade fallback banner during
+  // first paint, so async banners (welcome / prayer countdown / seasonal) get a
+  // chance to populate first instead of flashing the premium banner.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setHydrated(true), 800);
+    return () => clearTimeout(id);
+  }, []);
 
   // Load cached prayer times — try cache first, fallback to fetch
   useEffect(() => {
@@ -827,24 +835,29 @@ export default function HomeScreen() {
           setCachedPrayerTimes(cached);
           return;
         }
-        // No cache — try to fetch using saved location, or request location
+        // No cache — try to fetch using saved location. Never request permission
+        // here; that happens during onboarding or when the user opens prayer/qibla.
         const { getStoredLocation, fetchPrayerTimes, parsePrayerTimes, saveLocation, cachePrayerTimes } = await import('@/lib/prayer-times');
         const { MAKKAH_FALLBACK_DEFAULTS } = await import('@/lib/country-prayer-defaults');
         let loc = await getStoredLocation();
         if (!loc) {
-          // No stored location — try to get current location
+          // Check existing permission status without prompting the user
           const ExpoLocation = await import('expo-location');
-          const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+          const { status } = await ExpoLocation.getForegroundPermissionsAsync();
           if (status === 'granted') {
-            const current = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
-            loc = { latitude: current.coords.latitude, longitude: current.coords.longitude, city: '', country: '' };
-            await saveLocation(loc);
-            // Location now available — reschedule prayer notifications that depend on it
-            import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
-              rescheduleAllFromStorage().catch(() => {});
-            }).catch(() => {});
-          } else {
-            // Fallback to Makkah coordinates
+            try {
+              const current = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+              loc = { latitude: current.coords.latitude, longitude: current.coords.longitude, city: '', country: '' };
+              await saveLocation(loc);
+              import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
+                rescheduleAllFromStorage().catch(() => {});
+              }).catch(() => {});
+            } catch {
+              loc = null;
+            }
+          }
+          if (!loc) {
+            // Silent fallback to Makkah coordinates (no permission prompt on home)
             loc = {
               latitude: MAKKAH_FALLBACK_DEFAULTS.lat,
               longitude: MAKKAH_FALLBACK_DEFAULTS.lng,
@@ -1363,21 +1376,20 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let mounted = true;
-    // Fetch fresh config from Firebase first to avoid stale image flash
+    // Hydrate from AsyncStorage cache immediately so the welcome banner shows
+    // on first paint (instead of flashing the premium-upgrade fallback while
+    // Firestore loads).
+    AsyncStorage.getItem('remote_app_config').then(cached => {
+      if (!mounted || !cached) return;
+      try {
+        const cfg = JSON.parse(cached);
+        if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
+      } catch {}
+    });
+    // Then fetch fresh config from Firebase to update with latest content
     fetchAppConfig().then(cfg => {
       if (mounted && cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
-    }).catch(() => {
-      // Fallback to AsyncStorage cache only if Firebase fails
-      AsyncStorage.getItem('remote_app_config').then(cached => {
-        if (!mounted) return;
-        if (cached) {
-          try {
-            const cfg = JSON.parse(cached);
-            if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
-          } catch {}
-        }
-      });
-    });
+    }).catch(() => { /* offline — cached value (if any) already applied */ });
     return () => { mounted = false; };
   }, []);
 
@@ -1708,8 +1720,9 @@ export default function HomeScreen() {
           )}
         </Animated.View>
 
-        {/* Premium Upgrade Banner — fallback only when no other banner is active */}
-        {isSubscriptionEnabled && !isPremium && showUpgradeBanner && !(isBannerActive(welcomeBanner) || adminSeasonalBanner || autoSeasonalBanner || (showPrayerCountdown && bannerCountdown) || new Date().getDay() === 5) && (
+        {/* Premium Upgrade Banner — fallback only when no other banner is active.
+            Wait for hydration so async banners get a chance to render first. */}
+        {hydrated && isSubscriptionEnabled && !isPremium && showUpgradeBanner && !(isBannerActive(welcomeBanner) || adminSeasonalBanner || autoSeasonalBanner || (showPrayerCountdown && bannerCountdown) || new Date().getDay() === 5) && (
           <Animated.View entering={FadeInDown.delay(60).duration(400)}>
             <TouchableOpacity
               activeOpacity={0.85}

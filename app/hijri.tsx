@@ -349,6 +349,22 @@ export default function HijriScreen() {
     try {
       await AsyncStorage.setItem(HIJRI_OFFSET_KEY, String(offset));
     } catch {}
+    // Mirror into the service's `@hijri_user_adjustment` key so
+    // `getHijriDate()` (the 4-layer resolver used by the widget bridge)
+    // applies the user's adjustment on top of the admin override. Without
+    // this mirror, the legacy key gets set but the resolved value doesn't
+    // shift, and the widget's effective offset stays unchanged.
+    try {
+      const { setUserAdjustment } = require('@/services/hijriCalendarService');
+      await setUserAdjustment(offset);
+    } catch {
+      // setUserAdjustment also triggers updateSharedData internally; if it
+      // fails for any reason, fall back to a direct widget refresh below.
+      try {
+        const { updateSharedData } = require('@/lib/widget-data');
+        updateSharedData().catch(() => {});
+      } catch {}
+    }
     setShowOffsetModal(false);
   };
 

@@ -21,6 +21,66 @@ const WIDGET_DATA_KEY = 'widget_shared_data';
 const WIDGET_SETTINGS_KEY = 'widget_settings';
 
 /**
+ * Resolve "what UTC instant corresponds to this local hour:minute on this
+ * calendar day in this IANA timezone" using Intl.DateTimeFormat as a tz-aware
+ * offset lookup. JS's `Date.setHours(...)` interprets the values in the
+ * DEVICE's timezone, which silently produces wrong epochs when the device tz
+ * differs from the location tz (e.g. user in Cairo viewing San Francisco
+ * prayer times). This helper avoids that whole class of bugs.
+ *
+ * Algorithm: build a candidate UTC date for the target local clock, ask Intl
+ * what wall-clock time that UTC instant represents in `timeZone`, then shift
+ * by the residual delta. One iteration is sufficient unless the candidate
+ * crosses a DST boundary, in which case the second pass corrects for it.
+ */
+function epochForCalendarDayLocalTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): number {
+  let utc = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  for (let i = 0; i < 2; i++) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date(utc));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const observed = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
+    const target = Date.UTC(year, month - 1, day, hour, minute, 0);
+    const delta = target - observed;
+    if (delta === 0) return utc;
+    utc += delta;
+  }
+  return utc;
+}
+
+/**
+ * Convenience wrapper: same as `epochForCalendarDayLocalTime` but pulls the
+ * calendar day (year/month/day) from a reference Date interpreted in
+ * `timeZone`. Used for today's per-prayer epochs when no canonical snapshot
+ * epoch is available.
+ */
+function epochForLocalTime(reference: Date, hour: number, minute: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(reference);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return epochForCalendarDayLocalTime(get('year'), get('month'), get('day'), hour, minute, timeZone);
+}
+
+/**
  * مسارات أيقونات الويدجت
  * يتم استبدال هذه بملفات PNG فعلية عند توفرها في assets/images/widgets/
  */
@@ -129,6 +189,29 @@ export interface PrayerCompletionData {
   lastUpdated: string;
 }
 
+/**
+ * One anchor record published to native side per dynamic text region inside
+ * a captured PNG. Native overlay draws a SwiftUI `Text` at the recorded rect
+ * using the recorded font / weight / alignment / direction, so the live
+ * value sits exactly where the gallery laid it out. See
+ * `components/widgets/previews/anchor-reporter.tsx` for the producer and
+ * `widgets/ios/RoohWidgets.swift` for the consumer.
+ */
+export interface WidgetAnchor {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: 'regular' | 'medium' | 'semibold' | 'bold';
+  color: string;
+  alignment: 'leading' | 'center' | 'trailing';
+  direction: 'ltr' | 'rtl';
+  isCountdown?: boolean;
+}
+
 export interface WidgetSnapshotManifestEntry {
   /** Route key: `${widgetId}_${size}_${theme}`. */
   routeKey: string;
@@ -142,6 +225,14 @@ export interface WidgetSnapshotManifestEntry {
   size: 'small' | 'medium' | 'large' | string;
   theme: string;
   updatedAt: string;
+  /** Captured-frame dimensions in dp — the (x, y, width, height) inside each
+   *  `anchors` entry are relative to this frame. Native side scales by
+   *  `widgetFamily.width / capturedWidth`. */
+  capturedWidth?: number;
+  capturedHeight?: number;
+  /** Dynamic text regions the native widget must overlay (countdowns,
+   *  prayer times, current time, day numbers, …). */
+  anchors?: WidgetAnchor[];
 }
 
 export interface WidgetSettings {
@@ -190,6 +281,13 @@ export interface SharedWidgetData {
   widgetTheme?: string;
   widgetLanguage?: string;
   widgetDateFormat?: string;
+  /**
+   * User-applied Hijri calendar offset in days (typically -2 … +2) for
+   * moon-sighting reconciliation. Widget date views add this to the live
+   * timestamp before computing islamicUmmAlQura components — keeps the
+   * widget in lock-step with the Hijri calendar shown inside the app.
+   */
+  hijriOffset?: number;
   isPremium?: boolean;
   snapshotVersion?: number;
   snapshotUpdatedAt?: string;
@@ -275,7 +373,20 @@ export const preparePrayerWidgetData = async (
   canonicalSnapshot?: CanonicalPrayerSnapshot | null,
 ): Promise<WidgetPrayerData> => {
   const now = new Date();
-  const hijri = getLocalizedHijriDate();
+  // Apply the user's moon-sighting offset so the Hijri string the widget
+  // reads (`prayer.hijriDay` / `.hijriMonth` / `.hijriYear`) matches what the
+  // in-app Hijri tab shows. Native widget views also receive `hijriOffset`
+  // separately in SharedWidgetData for the Apple-Calendar fallback path.
+  let hijriOffsetValue = 0;
+  try {
+    const { getHijriOffset } = require('./hijri-date');
+    const v = await getHijriOffset();
+    if (typeof v === 'number' && Number.isFinite(v)) hijriOffsetValue = v;
+  } catch {}
+  const hijriRefDate = hijriOffsetValue
+    ? new Date(now.getTime() + hijriOffsetValue * 86400000)
+    : now;
+  const hijri = getLocalizedHijriDate(hijriRefDate);
   const updatedAt = now.toISOString();
   
   // الصلاة القادمة
@@ -314,11 +425,20 @@ export const preparePrayerWidgetData = async (
     if (explicitEpoch && Number.isFinite(explicitEpoch)) {
       prayerDate.setTime(explicitEpoch);
     } else {
+      // No canonical epoch — parse the HH:MM string in the LOCATION's
+      // timezone (not the device's). setHours() implicitly uses the device tz
+      // and produces a wrong UTC instant when the device tz differs from the
+      // location tz (e.g. user in Cairo viewing SF prayer times).
       const parts = time.split(':').map(Number);
       const hours = parts[0] ?? 0;
       const minutes = parts[1] ?? 0;
       if (!isNaN(hours) && !isNaN(minutes)) {
-        prayerDate.setHours(hours, minutes, 0, 0);
+        const locationTz = canonicalSnapshot?.timezone;
+        if (locationTz) {
+          prayerDate.setTime(epochForLocalTime(now, hours, minutes, locationTz));
+        } else {
+          prayerDate.setHours(hours, minutes, 0, 0);
+        }
       }
     }
     prayerEpochs.set(prayer, prayerDate.getTime());
@@ -333,27 +453,72 @@ export const preparePrayerWidgetData = async (
     };
   });
 
-  // Build a flat epoch list for 7 days (today + 6 future).
+  // Build a flat epoch list for 8 days (yesterday + today + 6 future).
   // Used ONLY for countdown calculations — never for display.
   // allPrayers stays as today's 6 prayers so table widgets don't duplicate.
+  //
+  // Yesterday's epochs matter for the home-screen NextPrevious widget when
+  // the user is currently BEFORE today's Fajr: in that window, the
+  // "previous" prayer is yesterday's Isha, and without it the widget shows
+  // "0 ث منذ" (the formatter degrades to a 0/null epoch) instead of the
+  // real "منذ X" since-Isha duration.
   const allPrayerEpochs: number[] = allPrayers
     .map((p) => p.epochMs)
     .filter((e): e is number => typeof e === 'number' && e > 0);
   try {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    const futureDays = await getOfflinePrayerTimesRange(tomorrow, 6);
-    for (const { date, times } of futureDays) {
-      const dayDate = new Date(date + 'T00:00:00');
+    const locationTz = canonicalSnapshot?.timezone;
+    // Yesterday — one day BEFORE today, so the widget can resolve "previous
+    // prayer" cross-day-boundary without inventing fake epochs.
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    const pastDays = await getOfflinePrayerTimesRange(yesterday, 1);
+    for (const { date, times } of pastDays) {
       for (const prayer of prayersList) {
         const time = times[prayer as keyof PrayerTimes] as string | undefined;
         if (!time || time === '--:--') continue;
         const parts = time.split(':').map(Number);
         if (isNaN(parts[0]) || isNaN(parts[1])) continue;
-        const prayerDate = new Date(dayDate);
-        prayerDate.setHours(parts[0], parts[1], 0, 0);
-        allPrayerEpochs.push(prayerDate.getTime());
+        let epochMs: number;
+        if (locationTz) {
+          const [yr, mo, da] = date.split('-').map(Number);
+          epochMs = epochForCalendarDayLocalTime(yr, mo, da, parts[0], parts[1], locationTz);
+        } else {
+          const dayDate = new Date(date + 'T00:00:00');
+          const prayerDate = new Date(dayDate);
+          prayerDate.setHours(parts[0], parts[1], 0, 0);
+          epochMs = prayerDate.getTime();
+        }
+        allPrayerEpochs.push(epochMs);
+      }
+    }
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const futureDays = await getOfflinePrayerTimesRange(tomorrow, 6);
+    for (const { date, times } of futureDays) {
+      for (const prayer of prayersList) {
+        const time = times[prayer as keyof PrayerTimes] as string | undefined;
+        if (!time || time === '--:--') continue;
+        const parts = time.split(':').map(Number);
+        if (isNaN(parts[0]) || isNaN(parts[1])) continue;
+        // Compute the epoch as "this HH:MM on this calendar day in the
+        // location's timezone" — NOT in the device's timezone. The future
+        // days returned by getOfflinePrayerTimesRange are keyed by location
+        // date so we must interpret them in the location's tz to avoid
+        // off-by-tz-offset bugs when device ≠ location.
+        let epochMs: number;
+        if (locationTz) {
+          const [year, month, day] = date.split('-').map(Number);
+          epochMs = epochForCalendarDayLocalTime(year, month, day, parts[0], parts[1], locationTz);
+        } else {
+          const dayDate = new Date(date + 'T00:00:00');
+          const prayerDate = new Date(dayDate);
+          prayerDate.setHours(parts[0], parts[1], 0, 0);
+          epochMs = prayerDate.getTime();
+        }
+        allPrayerEpochs.push(epochMs);
       }
     }
     allPrayerEpochs.sort((a, b) => a - b);

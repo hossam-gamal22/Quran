@@ -444,9 +444,15 @@ export default function PrayerScreen() {
 
   const fetchLocation = async (): Promise<LocationType | null> => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Prefer cached location to avoid unnecessary permission prompts on re-entry
+      const stored = await getStoredLocation();
+      const existing = await Location.getForegroundPermissionsAsync();
+      let status = existing.status;
       if (status !== 'granted') {
-        const stored = await getStoredLocation();
+        if (stored) return stored;
+        ({ status } = await Location.requestForegroundPermissionsAsync());
+      }
+      if (status !== 'granted') {
         if (stored) return stored;
         throw new Error(t('messages.locationPermission'));
       }

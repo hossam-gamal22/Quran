@@ -223,14 +223,36 @@ export async function writePrayerInputs(): Promise<PrayerWidgetInputs | null> {
       // keep defaults
     }
 
-    // Timezone — IANA identifier from Intl. Falls back to UTC on platforms
-    // that don't expose it.
+    // Timezone — MUST be the timezone of the user's selected LOCATION, not
+    // the device's timezone. Otherwise the widget computes prayer times for
+    // (e.g.) San Francisco coordinates but interprets the date in the
+    // device's Cairo timezone, producing nonsense times. Source of truth is
+    // `CanonicalPrayerSnapshot.timezone` (populated from the AlAdhan
+    // response's `meta.timezone`, which the app already uses).
     let timezone = 'UTC';
     try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) timezone = tz;
+      const snapshot = await loadCanonicalPrayerSnapshot({
+        settings: {
+          calculationMethod: calc.calculationMethod as any,
+          asrJuristic: calc.asrJuristic,
+          adjustments: calc.adjustments as any,
+        },
+        location,
+        allowAnySameDayLocation: true,
+      });
+      if (snapshot?.timezone) {
+        timezone = snapshot.timezone;
+      } else {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) timezone = tz;
+      }
     } catch {
-      // keep UTC
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) timezone = tz;
+      } catch {
+        // keep UTC
+      }
     }
 
     const inputs: PrayerWidgetInputs = {
@@ -315,6 +337,22 @@ function buildManifestFromEntries(
     id: string;
     size: string;
     theme: string;
+    capturedWidth?: number;
+    capturedHeight?: number;
+    anchors?: ReadonlyArray<{
+      id: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      fontFamily: string;
+      fontSize: number;
+      fontWeight: 'regular' | 'medium' | 'semibold' | 'bold';
+      color: string;
+      alignment: 'leading' | 'center' | 'trailing';
+      direction: 'ltr' | 'rtl';
+      isCountdown?: boolean;
+    }>;
   }>,
   updatedAt: string,
 ): Record<string, WidgetSnapshotManifestEntry> {
@@ -329,6 +367,9 @@ function buildManifestFromEntries(
       size: entry.size,
       theme: entry.theme,
       updatedAt,
+      capturedWidth: entry.capturedWidth,
+      capturedHeight: entry.capturedHeight,
+      anchors: entry.anchors ? Array.from(entry.anchors) : undefined,
     };
   }
   return manifest;
@@ -667,6 +708,46 @@ export async function updateWidgetData(
       }
     } catch {}
 
+    // Hijri offset = the integer number of days needed to shift the
+    // widget's native islamicUmmAlQura calendar so it matches what the
+    // user's app shows for TODAY. Collapsing four sources of truth into
+    // ONE integer the widget can apply:
+    //   1. Admin Firestore override (`hijri_overrides/{country}_{y}_{m}`) —
+    //      official Hilal announcement per country (highest priority)
+    //   2. AlAdhan API per-country method (Umm Al-Qura, Egyptian, etc.)
+    //   3. Google News RSS moon-sighting detection (days 28-30)
+    //   4. User's manual ±1/±2 day adjustment from the Hijri tab
+    // `getHijriDate()` already resolves the full chain. We then probe
+    // ±3 days from today against Apple's islamic-umalqura via Intl until
+    // the resolved day matches — that's the offset to publish.
+    let hijriOffset = 0;
+    try {
+      const { getHijriDate } = require('@/services/hijriCalendarService');
+      const today = new Date();
+      const resolved = await getHijriDate(today);
+      if (resolved && typeof resolved.day === 'number') {
+        const fmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric' });
+        for (let n = -3; n <= 3; n++) {
+          const shifted = new Date(today.getTime() + n * 86400000);
+          const appleDay = parseInt(fmt.format(shifted), 10);
+          if (Number.isFinite(appleDay) && appleDay === resolved.day) {
+            hijriOffset = n;
+            break;
+          }
+        }
+        if (__DEV__) {
+          console.log('[widget/hijri] resolved.day=', resolved.day, 'source=', resolved.source, 'country=', resolved.countryCode, 'offset=', hijriOffset);
+        }
+      } else {
+        // Fallback to the user-only offset if the service is unavailable.
+        const { getHijriOffset } = require('@/lib/hijri-date');
+        const v = await getHijriOffset();
+        if (typeof v === 'number' && Number.isFinite(v)) hijriOffset = v;
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[widget/hijri] effective offset compute failed:', e);
+    }
+
     const previousSharedData = await readCachedSharedData();
     const sharedDataBase: SharedWidgetData = {
       prayer: prayerData,
@@ -676,6 +757,7 @@ export async function updateWidgetData(
       prayerCompletion,
       settings,
       language: lang,
+      hijriOffset,
       widgetFontVariant,
       widgetCalendar,
       widgetDayCalendar,

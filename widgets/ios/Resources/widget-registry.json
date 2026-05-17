@@ -131,22 +131,7 @@
     "deepLink": "rooh-almuslim://prayer",
     "iosKind": "prayerSingle",
     "androidProvider": "RoohPrayerSmall",
-    "legacyAndroidProvider": "PrayerTimesSmall",
-    "overlay": {
-      "kind": "prayerCountdown",
-      "anchors": {
-        "small": {
-          "x": 78,
-          "y": 130,
-          "fontSize": 10,
-          "fontFamily": "Rubik-Medium",
-          "align": "center",
-          "color": "muted",
-          "clearWidth": 140,
-          "clearHeight": 14
-        }
-      }
-    }
+    "legacyAndroidProvider": "PrayerTimesSmall"
   },
   {
     "id": "prayerTable",
@@ -167,42 +152,7 @@
     "deepLink": "rooh-almuslim://prayer",
     "iosKind": "prayerTable",
     "androidProvider": "RoohPrayerMedium",
-    "legacyAndroidProvider": "PrayerTimesLarge",
-    "overlay": {
-      "kind": "prayerCountdown",
-      "anchors": {
-        "small": {
-          "x": 44,
-          "y": 24,
-          "fontSize": 9,
-          "fontFamily": "Rubik-Medium",
-          "align": "left",
-          "color": "muted",
-          "clearWidth": 82,
-          "clearHeight": 12
-        },
-        "medium": {
-          "x": 246,
-          "y": 130,
-          "fontSize": 9,
-          "fontFamily": "Rubik-Medium",
-          "align": "center",
-          "color": "muted",
-          "clearWidth": 112,
-          "clearHeight": 12
-        },
-        "large": {
-          "x": 246,
-          "y": 126,
-          "fontSize": 12,
-          "fontFamily": "Rubik-Medium",
-          "align": "center",
-          "color": "muted",
-          "clearWidth": 180,
-          "clearHeight": 18
-        }
-      }
-    }
+    "legacyAndroidProvider": "PrayerTimesLarge"
   },
   {
     "id": "prayerNextPrevious",
@@ -221,22 +171,7 @@
     "deepLink": "rooh-almuslim://prayer",
     "iosKind": "prayerNextPrevious",
     "androidProvider": "RoohPrayerMedium",
-    "legacyAndroidProvider": null,
-    "overlay": {
-      "kind": "prayerCountdown",
-      "anchors": {
-        "medium": {
-          "x": 91,
-          "y": 126,
-          "fontSize": 9,
-          "fontFamily": "Rubik-Medium",
-          "align": "center",
-          "color": "muted",
-          "clearWidth": 120,
-          "clearHeight": 12
-        }
-      }
-    }
+    "legacyAndroidProvider": null
   },
   {
     "id": "verseOfDay",
@@ -322,8 +257,8 @@
   {
     "id": "hijriDate",
     "category": "hijri",
-    "titleAr": "الهجري",
-    "titleEn": "Hijri",
+    "titleAr": "التاريخ الهجري",
+    "titleEn": "Hijri Date",
     "sizes": [
       "small",
       "medium"
@@ -332,11 +267,14 @@
       "ios",
       "android"
     ],
-    "isPremium": true,
+    "isPremium": false,
     "forcedLanguage": null,
     "deepLink": "rooh-almuslim://hijri",
     "iosKind": "hijriDate",
     "androidProvider": "RoohHijriSmall",
-    "legacyAndroidProvider": "HijriDateSmall"
+    "legacyAndroidProvider": "HijriDateSmall",
+    "premiumSizes": [
+      "medium"
+    ]
   }
 ]
