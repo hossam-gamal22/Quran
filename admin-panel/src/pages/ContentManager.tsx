@@ -20,6 +20,10 @@ import {
   getDefaultSeerahContent,
   getDefaultCompanionsContent,
 } from '../data/app-defaults';
+import {
+  getDefaultSeasonalPageContent,
+  getDefaultSeasonsMetadata,
+} from '../data/seasonal-defaults';
 
 // ─── Types (mirror lib/content-api.ts) ──────────────────────────────────
 
@@ -70,6 +74,9 @@ interface CMSSeerahSection {
   iconUrl?: string;
   iconStoragePath?: string;
   paragraphs: string[];
+  videoUrl?: string;
+  videoTitle?: string;
+  videoStoragePath?: string;
 }
 
 interface SeerahContent {
@@ -86,6 +93,9 @@ interface CMSCompanion {
   brief: string;
   story: string[];
   virtues: string[];
+  videoUrl?: string;
+  videoTitle?: string;
+  videoStoragePath?: string;
   icon?: string;
   iconUrl?: string;
   iconStoragePath?: string;
@@ -104,6 +114,10 @@ interface CMSSeasonalDua {
   titleKey: string;
   arabic: string;
   translation: string;
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 interface CMSSeasonalChecklist {
@@ -111,6 +125,10 @@ interface CMSSeasonalChecklist {
   icon: string;
   labelKey: string;
   color: string;
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 interface SeasonalPageContent {
@@ -137,6 +155,10 @@ interface AdminSpecialDay {
   description: string;
   virtues: string[];
   recommendedActions: string[];
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 interface AdminSeasonMeta {
@@ -183,6 +205,118 @@ const TABS: { key: ContentTab; label: string; icon: React.ElementType }[] = [
   { key: 'seasonal', label: 'المواسم', icon: Calendar },
   { key: 'seasons', label: 'بيانات المواسم', icon: Star },
 ];
+
+const withDefaultSeasonalPageContent = (
+  page: SeasonalPageKey,
+  data: SeasonalPageContent | null
+): SeasonalPageContent => {
+  const defaults = getDefaultSeasonalPageContent(page) as SeasonalPageContent;
+  if (!data) return defaults;
+
+  const hasUnsourcedDuas = data.duas?.some((dua) => dua.arabic && !dua.reference && !dua.sourceUrl && !dua.note);
+  if (hasUnsourcedDuas) return defaults;
+
+  const mergeDuas = (items: CMSSeasonalDua[] | undefined) => (
+    items?.length
+      ? items.map((item) => {
+        const fallback = defaults.duas.find((dua) => dua.id === item.id);
+        return fallback ? { ...fallback, ...item } : item;
+      })
+      : defaults.duas
+  );
+
+  const mergeChecklist = (items: CMSSeasonalChecklist[] | undefined) => (
+    items?.length
+      ? items.map((item) => {
+        const fallback = defaults.checklist.find((checklistItem) => checklistItem.id === item.id);
+        return fallback ? { ...fallback, ...item } : item;
+      })
+      : defaults.checklist
+  );
+
+  return {
+    ...defaults,
+    ...data,
+    duas: mergeDuas(data.duas),
+    checklist: mergeChecklist(data.checklist),
+  };
+};
+
+const hasUsableDate = (date?: { month: number; day: number }) => (
+  Boolean(date && date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 30)
+);
+
+const withDefaultSeasonsMetadata = (data: SeasonsMetadata | null): SeasonsMetadata => {
+  const defaults = getDefaultSeasonsMetadata() as SeasonsMetadata;
+  if (!data?.seasons) return defaults;
+
+  const mergeSpecialDays = (
+    currentDays: AdminSpecialDay[] | undefined,
+    fallbackDays: AdminSpecialDay[] | undefined
+  ) => {
+    if (!currentDays?.length) return fallbackDays;
+
+    return currentDays.map((day) => {
+      const fallback = fallbackDays?.find((fallbackDay) => fallbackDay.day === day.day);
+      return fallback ? { ...fallback, ...day } : day;
+    });
+  };
+
+  const seasons: Record<string, AdminSeasonMeta> = {};
+  const allKeys = new Set([...Object.keys(defaults.seasons), ...Object.keys(data.seasons)]);
+
+  allKeys.forEach((key) => {
+    const fallback = defaults.seasons[key];
+    const current = data.seasons[key];
+
+    if (!fallback) {
+      seasons[key] = current;
+      return;
+    }
+
+    if (!current) {
+      seasons[key] = fallback;
+      return;
+    }
+
+    const hasPlaceholderRange =
+      current.startDate?.month === 1 &&
+      current.startDate?.day === 1 &&
+      current.endDate?.month === 1 &&
+      current.endDate?.day === 30 &&
+      (
+        fallback.startDate.month !== 1 ||
+        fallback.startDate.day !== 1 ||
+        fallback.endDate.month !== 1 ||
+        fallback.endDate.day !== 30
+      );
+    const hasPlaceholderIcon = current.icon === 'calendar' && fallback.icon !== 'calendar';
+    const hasPlaceholderColor = current.color === '#2f7659' && fallback.color !== '#2f7659';
+
+    const hasUnsourcedSpecialDays = current.specialDays?.some((day) => (
+      day.description && !day.reference && !day.sourceUrl && !day.note
+    ));
+
+    seasons[key] = {
+      ...fallback,
+      ...current,
+      nameAr: current.nameAr || fallback.nameAr,
+      nameEn: current.nameEn || fallback.nameEn,
+      description: current.description || fallback.description,
+      startDate: !hasPlaceholderRange && hasUsableDate(current.startDate) ? current.startDate : fallback.startDate,
+      endDate: !hasPlaceholderRange && hasUsableDate(current.endDate) ? current.endDate : fallback.endDate,
+      color: !hasPlaceholderColor && current.color ? current.color : fallback.color,
+      icon: !hasPlaceholderIcon && current.icon ? current.icon : fallback.icon,
+      specialDays: key === 'shaban' || hasUnsourcedSpecialDays ? fallback.specialDays : mergeSpecialDays(current.specialDays, fallback.specialDays),
+      greetings: ['rajab', 'shaban'].includes(key) ? fallback.greetings : (current.greetings?.length ? current.greetings : fallback.greetings),
+    };
+  });
+
+  return {
+    ...data,
+    seasons,
+  };
+};
 
 // ─── Icon Upload Helper Component ──────────────────────────────────────
 
@@ -284,6 +418,155 @@ function IconUploadField({
         </button>
       )}
       <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" title="اختيار ملف صورة" />
+    </div>
+  );
+}
+
+// ─── Video Upload Field ────────────────────────────────────────────────
+
+const CONTENT_VIDEO_STORAGE_PATH = 'content-videos';
+const MAX_VIDEO_SIZE_MB = 200;
+const VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/webm,video/x-m4v';
+
+function VideoUploadField({
+  videoUrl,
+  videoStoragePath,
+  onUpload,
+  onClear,
+}: {
+  videoUrl?: string;
+  videoStoragePath?: string;
+  onUpload: (url: string, storagePath: string) => void;
+  onClear: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const isHostedFile = !!videoStoragePath;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+      alert(`حجم الفيديو أكبر من ${MAX_VIDEO_SIZE_MB} MB`);
+      return;
+    }
+    if (!file.type.startsWith('video/')) {
+      alert('يجب اختيار ملف فيديو (MP4 / MOV / WebM)');
+      return;
+    }
+
+    setUploading(true);
+    setProgress(0);
+
+    try {
+      // Remove old file if replacing
+      if (videoStoragePath) {
+        try {
+          await deleteObject(ref(storage, videoStoragePath));
+        } catch {
+          // Previous file may not exist
+        }
+      }
+
+      const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? '.mp4').toLowerCase();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '');
+      const fileName = `video_${Date.now()}_${safeName}${ext}`;
+      const storagePath = `${CONTENT_VIDEO_STORAGE_PATH}/${fileName}`;
+      const storageRef = ref(storage, storagePath);
+
+      // Manual progress via XHR-style isn't available in modular SDK without uploadBytesResumable,
+      // but for a clean UX a determinate spinner is enough; switch to resumable if needed later.
+      await uploadBytes(storageRef, file, { contentType: file.type || 'video/mp4' });
+      setProgress(100);
+      const url = await getDownloadURL(storageRef);
+      onUpload(url, storagePath);
+    } catch (err) {
+      alert(`خطأ في رفع الفيديو: ${(err as Error).message}`);
+    } finally {
+      setUploading(false);
+      setProgress(0);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm('هل تريد إزالة الفيديو المرفوع؟')) return;
+    if (videoStoragePath) {
+      try {
+        await deleteObject(ref(storage, videoStoragePath));
+      } catch {
+        // Storage file may not exist
+      }
+    }
+    onClear();
+  };
+
+  return (
+    <div className="border border-admin-border rounded-lg p-3 bg-admin-bg/30">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-slate-400">رفع فيديو مباشر (بديل لرابط يوتيوب)</span>
+        {isHostedFile && (
+          <button
+            onClick={handleRemove}
+            className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+            title="حذف الفيديو المرفوع"
+          >
+            <X size={12} /> حذف
+          </button>
+        )}
+      </div>
+
+      {isHostedFile && videoUrl ? (
+        <div className="space-y-2">
+          <video
+            src={videoUrl}
+            controls
+            className="w-full rounded border border-admin-border bg-black max-h-48"
+            preload="metadata"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1 px-3 py-1.5 bg-admin-surface border border-admin-border rounded text-xs text-slate-300 hover:text-white disabled:opacity-50"
+            >
+              {uploading ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
+              {uploading ? `جاري الرفع ${progress}%` : 'استبدال الفيديو'}
+            </button>
+            <span className="text-xs text-slate-500 truncate" dir="ltr">{videoUrl}</span>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 px-3 py-3 bg-admin-surface border border-dashed border-admin-border rounded text-xs text-slate-400 hover:text-white hover:border-slate-500 disabled:opacity-50"
+        >
+          {uploading ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              جاري رفع الفيديو...
+            </>
+          ) : (
+            <>
+              <Upload size={14} />
+              اختر ملف فيديو (MP4 / MOV / WebM, حد أقصى {MAX_VIDEO_SIZE_MB} MB)
+            </>
+          )}
+        </button>
+      )}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept={VIDEO_ACCEPT}
+        onChange={handleUpload}
+        className="hidden"
+        title="اختيار ملف فيديو"
+      />
     </div>
   );
 }
@@ -749,6 +1032,43 @@ function SeerahSectionEditor({
             {section.titleTranslations ? '+ تعديل الترجمات' : '+ إضافة ترجمات العنوان'}
           </button>
 
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">عنوان الفيديو (اختياري)</label>
+              <input
+                value={section.videoTitle || ''}
+                onChange={(e) => onUpdate({ ...section, videoTitle: e.target.value })}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                dir="rtl"
+                title="عنوان الفيديو"
+                aria-label="عنوان الفيديو"
+                placeholder="مثال: شرح مختصر للفصل"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 mb-1 block">رابط يوتيوب أو فيمو (اختياري)</label>
+              <textarea
+                value={section.videoStoragePath ? '' : section.videoUrl || ''}
+                onChange={(e) => onUpdate({ ...section, videoUrl: e.target.value, videoStoragePath: undefined })}
+                disabled={!!section.videoStoragePath}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left text-sm min-h-[78px] disabled:opacity-40"
+                dir="ltr"
+                title="رابط أو كود الفيديو"
+                aria-label="رابط أو كود الفيديو"
+                placeholder={section.videoStoragePath ? 'تم استخدام فيديو مرفوع — احذفه لاستخدام رابط' : 'YouTube URL أو كود iframe'}
+              />
+            </div>
+          </div>
+
+          <VideoUploadField
+            videoUrl={section.videoStoragePath ? section.videoUrl : undefined}
+            videoStoragePath={section.videoStoragePath}
+            onUpload={(url, storagePath) =>
+              onUpdate({ ...section, videoUrl: url, videoStoragePath: storagePath })
+            }
+            onClear={() => onUpdate({ ...section, videoUrl: undefined, videoStoragePath: undefined })}
+          />
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <button onClick={addParagraph} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
@@ -920,6 +1240,42 @@ function CompanionEditor({
           >
             {companion.nameTranslations ? '+ تعديل ترجمات الاسم' : '+ إضافة ترجمات الاسم'}
           </button>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">عنوان الفيديو (اختياري)</label>
+              <input
+                value={companion.videoTitle || ''}
+                onChange={(e) => onUpdate({ ...companion, videoTitle: e.target.value })}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                dir="rtl"
+                title="عنوان الفيديو"
+                aria-label="عنوان الفيديو"
+                placeholder="مثال: قصة أبي بكر"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 mb-1 block">رابط يوتيوب أو فيمو (اختياري)</label>
+              <textarea
+                value={companion.videoStoragePath ? '' : companion.videoUrl || ''}
+                onChange={(e) => onUpdate({ ...companion, videoUrl: e.target.value, videoStoragePath: undefined })}
+                disabled={!!companion.videoStoragePath}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left text-sm min-h-[78px] disabled:opacity-40"
+                dir="ltr"
+                title="رابط أو كود الفيديو"
+                aria-label="رابط أو كود الفيديو"
+                placeholder={companion.videoStoragePath ? 'تم استخدام فيديو مرفوع — احذفه لاستخدام رابط' : 'YouTube URL أو كود iframe'}
+              />
+            </div>
+          </div>
+
+          <VideoUploadField
+            videoUrl={companion.videoStoragePath ? companion.videoUrl : undefined}
+            videoStoragePath={companion.videoStoragePath}
+            onUpload={(url, storagePath) =>
+              onUpdate({ ...companion, videoUrl: url, videoStoragePath: storagePath })
+            }
+            onClear={() => onUpdate({ ...companion, videoUrl: undefined, videoStoragePath: undefined })}
+          />
           <div>
             <div className="flex items-center justify-between mb-2">
               <button onClick={() => onUpdate({ ...companion, story: [...companion.story, ''] })} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
@@ -1017,14 +1373,17 @@ export default function ContentManager() {
       else setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
       if (companionsDoc.exists()) setCompanions(companionsDoc.data() as CompanionsContent);
       else setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
-      if (seasonsMetaDoc.exists()) setSeasonsMeta(seasonsMetaDoc.data() as SeasonsMetadata);
+      if (seasonsMetaDoc.exists()) setSeasonsMeta(withDefaultSeasonsMetadata(seasonsMetaDoc.data() as SeasonsMetadata));
+      else setSeasonsMeta(getDefaultSeasonsMetadata() as SeasonsMetadata);
 
       const seasonalData: Record<SeasonalPageKey, SeasonalPageContent | null> = {
         ramadan: null, hajj: null, mawlid: null, ashura: null,
       };
       SEASONAL_PAGES.forEach((p, i) => {
         if (seasonalDocs[i].exists()) {
-          seasonalData[p.key] = seasonalDocs[i].data() as SeasonalPageContent;
+          seasonalData[p.key] = withDefaultSeasonalPageContent(p.key, seasonalDocs[i].data() as SeasonalPageContent);
+        } else {
+          seasonalData[p.key] = getDefaultSeasonalPageContent(p.key) as SeasonalPageContent;
         }
       });
       setSeasonal(seasonalData);
@@ -1036,7 +1395,13 @@ export default function ContentManager() {
       setHajjUmrah(getDefaultHajjUmrahContent() as unknown as HajjUmrahContent);
       setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
       setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
-      setSeasonal({ ramadan: null, hajj: null, mawlid: null, ashura: null });
+      setSeasonsMeta(getDefaultSeasonsMetadata() as SeasonsMetadata);
+      setSeasonal({
+        ramadan: getDefaultSeasonalPageContent('ramadan') as SeasonalPageContent,
+        hajj: getDefaultSeasonalPageContent('hajj') as SeasonalPageContent,
+        mawlid: getDefaultSeasonalPageContent('mawlid') as SeasonalPageContent,
+        ashura: getDefaultSeasonalPageContent('ashura') as SeasonalPageContent,
+      });
     } finally {
       setLoading(false);
     }
@@ -1095,22 +1460,25 @@ export default function ContentManager() {
   }, [companions]);
 
   const saveSeasonal = useCallback(async () => {
-    const data = seasonal[activeSeasonalPage];
-    if (!data) return;
+    const entries = Object.entries(seasonal).filter((entry): entry is [SeasonalPageKey, SeasonalPageContent] => Boolean(entry[1]));
+    if (entries.length === 0) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'appContent', `seasonalContent_${activeSeasonalPage}`), {
-        ...data,
-        updatedAt: new Date().toISOString(),
-      });
-      setStatus({ type: 'success', message: `تم حفظ محتوى ${SEASONAL_PAGES.find(p => p.key === activeSeasonalPage)?.label}` });
+      const updatedAt = new Date().toISOString();
+      await Promise.all(entries.map(([page, data]) => (
+        setDoc(doc(db, 'appContent', `seasonalContent_${page}`), {
+          ...data,
+          updatedAt,
+        })
+      )));
+      setStatus({ type: 'success', message: 'تم حفظ محتوى كل المواسم' });
     } catch (err) {
       console.error('Save error:', err);
       setStatus({ type: 'error', message: 'فشل حفظ المحتوى' });
     } finally {
       setSaving(false);
     }
-  }, [seasonal, activeSeasonalPage]);
+  }, [seasonal]);
 
   const saveSeasonsMeta = useCallback(async () => {
     if (!seasonsMeta) return;
@@ -1196,7 +1564,7 @@ export default function ContentManager() {
   const initSeasonal = (page: SeasonalPageKey) => {
     setSeasonal(prev => ({
       ...prev,
-      [page]: { duas: [], checklist: [] },
+      [page]: getDefaultSeasonalPageContent(page) as SeasonalPageContent,
     }));
   };
 
@@ -1217,15 +1585,7 @@ export default function ContentManager() {
   };
 
   const initSeasonsMeta = () => {
-    const seasons: Record<string, AdminSeasonMeta> = {};
-    SEASON_KEYS.forEach(s => {
-      seasons[s.key] = {
-        type: s.key, nameAr: s.label, nameEn: '',
-        description: '', startDate: { month: 1, day: 1 }, endDate: { month: 1, day: 30 },
-        color: '#2f7659', icon: 'calendar', greetings: [],
-      };
-    });
-    setSeasonsMeta({ seasons });
+    setSeasonsMeta(getDefaultSeasonsMetadata() as SeasonsMetadata);
   };
 
   const updateSeasonMeta = (key: string, field: string, value: unknown) => {
@@ -1459,7 +1819,7 @@ export default function ContentManager() {
                   <button
                     onClick={() => setSeerah({
                       ...seerah,
-                      sections: [...seerah.sections, { title: '', titleEn: '', icon: 'book-open-variant', paragraphs: [] }],
+                      sections: [...seerah.sections, { title: '', titleEn: '', icon: 'book-open-variant', paragraphs: [], videoUrl: '', videoTitle: '' }],
                     })}
                     className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
                   >
@@ -1509,7 +1869,7 @@ export default function ContentManager() {
                       ...companions,
                       companions: [...companions.companions, {
                         id: `companion-${Date.now()}`, nameAr: '', nameEn: '', category: companions.categories[0]?.key || 'ashara',
-                        brief: '', story: [], virtues: [],
+                        brief: '', story: [], virtues: [], videoUrl: '', videoTitle: '',
                       }],
                     })}
                     className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
@@ -1589,12 +1949,18 @@ export default function ContentManager() {
                       <input value={dua.titleKey} onChange={(e) => updateSeasonalDua(i, { ...dua, titleKey: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="مفتاح العنوان" title="مفتاح العنوان" aria-label="مفتاح العنوان" />
                     </div>
                     <textarea value={dua.arabic} onChange={(e) => updateSeasonalDua(i, { ...dua, arabic: e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[60px]" dir="rtl" placeholder="النص العربي" title="النص العربي" aria-label="النص العربي" />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-2">
                       <input value={dua.translation} onChange={(e) => updateSeasonalDua(i, { ...dua, translation: e.target.value })} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="الترجمة" title="الترجمة" aria-label="الترجمة" />
                       <button onClick={() => { const data = seasonal[activeSeasonalPage]!; setSeasonal(prev => ({ ...prev, [activeSeasonalPage]: { ...data, duas: data.duas.filter((_, idx) => idx !== i) } })); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف الدعاء">
                         <Trash2 size={14} className="text-red-400" />
                       </button>
                     </div>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <input value={dua.reference || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, reference: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="المصدر / المرجع" title="المصدر أو المرجع" aria-label="المصدر أو المرجع" />
+                      <input value={dua.sourceUrl || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, sourceUrl: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="رابط المصدر" title="رابط المصدر" aria-label="رابط المصدر" />
+                      <input value={dua.grade || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, grade: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الدرجة" title="درجة الحديث" aria-label="درجة الحديث" />
+                    </div>
+                    <input value={dua.note || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, note: e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="ملاحظة تحريرية اختيارية" title="ملاحظة تحريرية" aria-label="ملاحظة تحريرية" />
                   </div>
                 ))}
               </div>
@@ -1619,14 +1985,21 @@ export default function ContentManager() {
                   </button>
                 </div>
                 {seasonal[activeSeasonalPage]!.checklist.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 mb-2">
-                    <input value={item.id} onChange={(e) => updateSeasonalChecklist(i, { ...item, id: e.target.value })} className="w-24 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="id" title="معرف العنصر" aria-label="معرف العنصر" />
-                    <input value={item.icon} onChange={(e) => updateSeasonalChecklist(i, { ...item, icon: e.target.value })} className="w-28 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="أيقونة" title="أيقونة العنصر" aria-label="أيقونة العنصر" />
-                    <input value={item.labelKey} onChange={(e) => updateSeasonalChecklist(i, { ...item, labelKey: e.target.value })} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="مفتاح النص" title="مفتاح النص" aria-label="مفتاح النص" />
-                    <input type="color" value={item.color} onChange={(e) => updateSeasonalChecklist(i, { ...item, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" title="لون العنصر" aria-label="لون العنصر" />
-                    <button onClick={() => { const data = seasonal[activeSeasonalPage]!; setSeasonal(prev => ({ ...prev, [activeSeasonalPage]: { ...data, checklist: data.checklist.filter((_, idx) => idx !== i) } })); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف العنصر">
-                      <Trash2 size={14} className="text-red-400" />
-                    </button>
+                  <div key={i} className="border border-admin-border rounded-lg mb-2 p-3 bg-admin-bg/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input value={item.id} onChange={(e) => updateSeasonalChecklist(i, { ...item, id: e.target.value })} className="w-24 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="id" title="معرف العنصر" aria-label="معرف العنصر" />
+                      <input value={item.icon} onChange={(e) => updateSeasonalChecklist(i, { ...item, icon: e.target.value })} className="w-28 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="أيقونة" title="أيقونة العنصر" aria-label="أيقونة العنصر" />
+                      <input value={item.labelKey} onChange={(e) => updateSeasonalChecklist(i, { ...item, labelKey: e.target.value })} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="النص" title="نص العنصر" aria-label="نص العنصر" />
+                      <input type="color" value={item.color} onChange={(e) => updateSeasonalChecklist(i, { ...item, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" title="لون العنصر" aria-label="لون العنصر" />
+                      <button onClick={() => { const data = seasonal[activeSeasonalPage]!; setSeasonal(prev => ({ ...prev, [activeSeasonalPage]: { ...data, checklist: data.checklist.filter((_, idx) => idx !== i) } })); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف العنصر">
+                        <Trash2 size={14} className="text-red-400" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={item.reference || ''} onChange={(e) => updateSeasonalChecklist(i, { ...item, reference: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="المصدر / المرجع" title="المصدر أو المرجع" aria-label="المصدر أو المرجع" />
+                      <input value={item.sourceUrl || ''} onChange={(e) => updateSeasonalChecklist(i, { ...item, sourceUrl: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="رابط المصدر" title="رابط المصدر" aria-label="رابط المصدر" />
+                      <input value={item.grade || ''} onChange={(e) => updateSeasonalChecklist(i, { ...item, grade: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الدرجة" title="درجة الحديث" aria-label="درجة الحديث" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1737,6 +2110,12 @@ export default function ContentManager() {
                             </button>
                           </div>
                           <textarea value={sd.description} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, description: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[40px]" dir="rtl" placeholder="الوصف" title="الوصف" aria-label="وصف اليوم" />
+                          <div className="grid grid-cols-3 gap-2 mb-2">
+                            <input value={sd.reference || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, reference: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="المصدر / المرجع" title="المصدر أو المرجع" aria-label="المصدر أو المرجع" />
+                            <input value={sd.sourceUrl || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, sourceUrl: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="رابط المصدر" title="رابط المصدر" aria-label="رابط المصدر" />
+                            <input value={sd.grade || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, grade: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الدرجة" title="درجة الحديث" aria-label="درجة الحديث" />
+                          </div>
+                          <input value={sd.note || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, note: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-xs text-right mb-2" dir="rtl" placeholder="ملاحظة تحريرية اختيارية" title="ملاحظة تحريرية" aria-label="ملاحظة تحريرية" />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <span className="text-xs text-slate-500 block mb-1">الفضائل</span>

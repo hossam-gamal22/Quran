@@ -32,6 +32,7 @@ import { exportAsPDF, showAdThenExport, PdfTemplate } from '@/lib/pdf-export';
 import { PdfTemplatePicker } from '@/components/ui/PdfTemplatePicker';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useCompanionsContent } from '@/lib/content-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -62,6 +63,8 @@ interface Companion {
   storyEn: string[];
   virtues: string[];
   virtuesEn: string[];
+  videoUrl?: string;
+  videoTitle?: string;
 }
 
 interface Category {
@@ -755,9 +758,11 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             <Text style={[s.detailName, { color: colors.text }]}>
               {getCompanionName(companion)}
             </Text>
-            <Text style={[s.detailNameEn, { color: colors.textLight }]}>
-              {getLanguage() === 'ar' ? companion.nameEn : companion.nameAr}
-            </Text>
+            {getLanguage() !== 'ar' && (
+              <Text style={[s.detailNameEn, { color: colors.textLight }]}>
+                {companion.nameAr}
+              </Text>
+            )}
             {getLanguage() === 'ar' ? (
               <Text style={[s.detailBrief, { color: colors.textLight }]}>
                 {companion.brief}
@@ -773,6 +778,13 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             )}
           </View>
         </View>
+
+        <EmbeddedVideo
+          source={companion.videoUrl}
+          title={companion.videoTitle}
+          colors={colors}
+          style={s.detailVideo}
+        />
 
         {/* Story */}
         <View style={s.detailSectionOuter}>
@@ -1387,6 +1399,9 @@ const _s = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginTop: 4,
+  },
+  detailVideo: {
+    marginBottom: 20,
   },
 
   // Detail sections

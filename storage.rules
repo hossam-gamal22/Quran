@@ -76,6 +76,13 @@ service firebase.storage {
       allow delete: if true;
     }
 
+    match /content-videos/{fileName} {
+      allow write: if request.resource != null
+                   && request.resource.size < 200 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*');
+      allow delete: if true;
+    }
+
     match /app-content/icons/{fileName} {
       allow write: if request.resource != null
                    && request.resource.size < 5 * 1024 * 1024

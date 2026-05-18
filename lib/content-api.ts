@@ -63,6 +63,9 @@ export interface CMSSeerahSection {
   titleEn: string;
   icon: string;
   paragraphs: string[];
+  videoUrl?: string;
+  videoTitle?: string;
+  videoStoragePath?: string;
   titleTranslations?: Record<string, string>;
   iconUrl?: string;
 }
@@ -84,6 +87,9 @@ export interface CMSCompanion {
   brief: string;
   story: string[];
   virtues: string[];
+  videoUrl?: string;
+  videoTitle?: string;
+  videoStoragePath?: string;
   icon?: string;
   nameTranslations?: Record<string, string>;
   iconUrl?: string;
@@ -108,6 +114,10 @@ export interface CMSSeasonalDua {
   titleKey: string;
   arabic: string;
   translation: string;
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 export interface CMSSeasonalChecklist {
@@ -115,6 +125,10 @@ export interface CMSSeasonalChecklist {
   icon: string;
   labelKey: string;
   color: string;
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 export interface CMSSeasonalContent {
@@ -387,6 +401,10 @@ export interface CMSSpecialDay {
   description: string;
   virtues: string[];
   recommendedActions: string[];
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 export interface CMSSeasonMeta {
