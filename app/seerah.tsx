@@ -27,8 +27,10 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { exportAsPDF, showAdThenExport, PdfTemplate } from '@/lib/pdf-export';
 import { PdfTemplatePicker } from '@/components/ui/PdfTemplatePicker';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { t, getLanguage } from '@/lib/i18n';
 import { TranslatedText } from '@/components/ui/TranslatedText';
+import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useSeerahContent } from '@/lib/content-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -52,6 +54,8 @@ interface SeerahSection {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   paragraphs: string[];
   paragraphsEn: string[];
+  videoUrl?: string;
+  videoTitle?: string;
 }
 
 // ========================================
@@ -272,6 +276,15 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
             ]}
           />
           <View style={s.glassContent}>
+            <EmbeddedVideo
+              source={section.videoUrl}
+              title={section.videoTitle}
+              colors={colors}
+              style={section.paragraphs.length ? s.videoSpacing : undefined}
+              onBeforePlay={async () => {
+                await showInterstitial({ allowInSacredContext: false });
+              }}
+            />
             {section.paragraphs.map((paragraph, pIdx) => {
               const lang = getLanguage();
               const enText = section.paragraphsEn?.[pIdx];
@@ -617,6 +630,9 @@ const _s = StyleSheet.create({
   },
   glassContent: {
     padding: 18,
+  },
+  videoSpacing: {
+    marginBottom: 18,
   },
 
   // Paragraph text

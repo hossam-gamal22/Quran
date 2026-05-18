@@ -32,6 +32,7 @@ import { exportAsPDF, showAdThenExport, PdfTemplate } from '@/lib/pdf-export';
 import { PdfTemplatePicker } from '@/components/ui/PdfTemplatePicker';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useCompanionsContent } from '@/lib/content-api';
 
@@ -784,6 +785,9 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
           title={companion.videoTitle}
           colors={colors}
           style={s.detailVideo}
+          onBeforePlay={async () => {
+            await showInterstitial({ allowInSacredContext: false });
+          }}
         />
 
         {/* Story */}
