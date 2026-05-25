@@ -116,6 +116,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'الاسم الأول',
     lastNamePlaceholder: 'اسم العائلة',
     nameRequired: 'الرجاء إدخال الاسم الأول واسم العائلة',
+    nameTaken: 'هذا الاسم مستخدم بالفعل — اختر اسماً آخر',
+    nameCheckFailed: 'تعذر التحقق من الاسم. حاول مرة أخرى.',
     namePrivacy: 'خصوصيتك مهمة لنا — اسمك يُستخدم فقط في لوحة الشرف',
 
     // Footer
@@ -232,6 +234,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'First Name',
     lastNamePlaceholder: 'Last Name',
     nameRequired: 'Please enter both first and last name',
+    nameTaken: 'This name is already taken — please choose another',
+    nameCheckFailed: 'Could not verify name. Please try again.',
     namePrivacy: 'Your privacy matters — your name is only used on the Honor Board',
 
     // Footer
@@ -337,6 +341,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'Prénom',
     lastNamePlaceholder: 'Nom de famille',
     nameRequired: 'Veuillez entrer le prénom et le nom',
+    nameTaken: 'Ce nom est déjà utilisé — veuillez en choisir un autre',
+    nameCheckFailed: 'Impossible de vérifier le nom. Veuillez réessayer.',
     namePrivacy: 'Votre vie privée compte — votre nom n\'est utilisé que sur le tableau d\'honneur',
 
     // Footer
@@ -442,6 +448,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'Vorname',
     lastNamePlaceholder: 'Nachname',
     nameRequired: 'Bitte geben Sie Vor- und Nachnamen ein',
+    nameTaken: 'Dieser Name ist bereits vergeben — bitte wählen Sie einen anderen',
+    nameCheckFailed: 'Name konnte nicht überprüft werden. Bitte erneut versuchen.',
     namePrivacy: 'Ihre Privatsphäre ist uns wichtig — Ihr Name wird nur auf der Ehrentafel verwendet',
 
     // Footer
@@ -547,6 +555,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'Ad',
     lastNamePlaceholder: 'Soyad',
     nameRequired: 'Lütfen hem adınızı hem soyadınızı girin',
+    nameTaken: 'Bu isim zaten kullanılıyor — lütfen başka bir isim seçin',
+    nameCheckFailed: 'İsim doğrulanamadı. Lütfen tekrar deneyin.',
     namePrivacy: 'Gizliliğiniz önemli — adınız yalnızca Onur Kurulu\'nda kullanılır',
 
     // Footer
@@ -652,6 +662,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'Nombre',
     lastNamePlaceholder: 'Apellido',
     nameRequired: 'Por favor ingresa nombre y apellido',
+    nameTaken: 'Este nombre ya está en uso — elige otro',
+    nameCheckFailed: 'No se pudo verificar el nombre. Inténtalo de nuevo.',
     namePrivacy: 'Tu privacidad importa — tu nombre solo se usa en el Cuadro de Honor',
 
     // Footer
@@ -757,6 +769,8 @@ const translations: Record<string, Record<string, string>> = {
     firstNamePlaceholder: 'پہلا نام',
     lastNamePlaceholder: 'خاندانی نام',
     nameRequired: 'براہ کرم پہلا اور خاندانی نام دونوں درج کریں',
+    nameTaken: 'یہ نام پہلے سے استعمال ہو رہا ہے — براہ کرم دوسرا نام منتخب کریں',
+    nameCheckFailed: 'نام کی تصدیق نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
     namePrivacy: 'آپ کی رازداری اہم ہے — آپ کا نام صرف آنر بورڈ پر استعمال ہوتا ہے',
 
     // Footer

@@ -25,6 +25,7 @@ import { isRTL as checkIsRTL } from '@/lib/i18n';
 import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { getUserId, isDisplayNameTaken } from '@/lib/firebase-user';
 
 export default function NameScreen() {
   const { goToNextStep, goToPreviousStep, updatePreferences, preferences, skippedToNameStep } = useOnboarding();
@@ -34,6 +35,7 @@ export default function NameScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
 
   // Pre-fill from preferences (back-nav) or restored AsyncStorage name (server fallback)
   useEffect(() => {
@@ -62,17 +64,38 @@ export default function NameScreen() {
     })();
   }, []);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (checking) return;
     const trimFirst = firstName.trim();
     const trimLast = lastName.trim();
 
     // Name is optional (Apple 5.1.1(v) compliance) — proceed even when blank.
     const parts = [trimFirst, trimLast].filter(Boolean);
-    if (parts.length > 0) {
-      updatePreferences({ displayName: parts.join(' ') });
+    if (parts.length === 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      goToNextStep();
+      return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    goToNextStep();
+
+    const fullName = parts.join(' ');
+    setError('');
+    setChecking(true);
+    try {
+      const userId = await getUserId();
+      const taken = await isDisplayNameTaken(fullName, userId);
+      if (taken) {
+        setError(tOnboarding('nameTaken'));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+      updatePreferences({ displayName: fullName });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      goToNextStep();
+    } catch (err) {
+      setError(tOnboarding('nameCheckFailed'));
+    } finally {
+      setChecking(false);
+    }
   };
 
   const handleSkip = () => {
@@ -196,9 +219,10 @@ export default function NameScreen() {
           <SafeAreaView edges={['bottom']} style={styles.bottomContainer}>
             <Animated.View entering={FadeInUp.delay(600).duration(500)}>
               <TouchableOpacity
-                style={styles.continueButton}
+                style={[styles.continueButton, checking && styles.continueButtonDisabled]}
                 onPress={handleContinue}
                 activeOpacity={0.8}
+                disabled={checking}
               >
                 <View style={[styles.continueButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <Text style={styles.continueButtonText}>{tOnboarding('continue')}</Text>

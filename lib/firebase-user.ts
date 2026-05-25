@@ -3,15 +3,20 @@
 // آخر تحديث: 2026-03-04
 
 import { db } from './firebase-config';
-import { 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  getDoc, 
+import {
+  doc,
+  setDoc,
+  updateDoc,
+  getDoc,
   serverTimestamp,
   Timestamp,
   increment,
   deleteField,
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
 } from 'firebase/firestore';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
@@ -508,19 +513,65 @@ export const getDisplayName = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Normalize a display name for case-insensitive uniqueness checks.
+ * Strips diacritics, collapses internal whitespace, lowercases. Both
+ * `displayName` and `displayNameLower` live on the user doc; queries that
+ * enforce uniqueness must run against `displayNameLower`.
+ */
+export const normalizeDisplayName = (raw: string): string => {
+  return raw
+    .normalize('NFD')
+    .replace(/[̀-ًͯ-ٰٟۖ-ۭ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+};
+
+/**
+ * Returns true if any other user already owns this display name.
+ * Pass the current userId so they can keep their own name on re-edit.
+ */
+export const isDisplayNameTaken = async (
+  name: string,
+  excludeUserId?: string,
+): Promise<boolean> => {
+  const key = normalizeDisplayName(name);
+  if (!key) return false;
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('displayNameLower', '==', key), limit(5));
+    const snap = await getDocs(q);
+    for (const docSnap of snap.docs) {
+      if (excludeUserId && docSnap.id === excludeUserId) continue;
+      const data = docSnap.data();
+      if (data.placeholder === true) continue; // merged-away ghost
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.warn('Could not check display name uniqueness:', error);
+    // Fail-open: better to let the user proceed than block them on a network blip.
+    return false;
+  }
+};
+
 export const setDisplayName = async (name: string): Promise<void> => {
   const trimmed = name.trim();
+  const lower = normalizeDisplayName(trimmed);
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, trimmed);
   } catch (error) {
     console.error('❌ Failed to save display name locally:', error);
   }
   // Mirror to Firestore so server-side targeting (engagement notifications,
-  // admin panel filters) sees the name immediately.
+  // admin panel filters) sees the name immediately. `displayNameLower` powers
+  // the uniqueness query in isDisplayNameTaken().
   try {
     const userId = await getUserId();
     await setDoc(doc(db, 'users', userId), {
       displayName: trimmed,
+      displayNameLower: lower,
       updatedAt: serverTimestamp(),
     }, { merge: true });
   } catch (error) {

@@ -21,7 +21,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -41,9 +41,10 @@ import * as SecureStore from 'expo-secure-store';
 import * as Updates from 'expo-updates';
 import { getStoreUrls, fetchAppConfig } from '@/lib/app-config-api';
 import ShareAppModal from '@/components/ui/ShareAppModal';
-import { getDisplayName, setDisplayName, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore } from '@/lib/firebase-user';
+import { getDisplayName, setDisplayName, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore, isDisplayNameTaken } from '@/lib/firebase-user';
 import { saveDisplayName } from '@/lib/rewards-manager';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { uiText } from '@/lib/ui-text';
 
 // ========================================
 // مكونات فرعية
@@ -177,6 +178,7 @@ const SettingSection: React.FC<SettingSectionProps> = ({
 export default function SettingsScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
+  const params = useLocalSearchParams<{ editName?: string }>();
   const {
     settings,
     isDarkMode,
@@ -204,9 +206,9 @@ export default function SettingsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const storeUrls = await getStoreUrls();
     const url = Platform.select({
-      ios: storeUrls.ios || 'https://apps.apple.com/app/rooh-muslim/id123456789',
+      ios: storeUrls.ios || 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
       android: storeUrls.android || 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-      default: 'https://apps.apple.com/app/rooh-muslim/id123456789',
+      default: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
     });
     if (url) Linking.openURL(url);
   };
@@ -232,7 +234,14 @@ export default function SettingsScreen() {
   const [displayName, setDisplayNameState] = useState('');
   const [nameModalVisible, setNameModalVisible] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const nameDeepLinkHandled = useRef(false);
+  const displayNameRef = useRef('');
+
+  useEffect(() => {
+    displayNameRef.current = displayName;
+  }, [displayName]);
 
   useEffect(() => {
     // Load local name first for instant UI, then sync from Firestore for updates
@@ -254,19 +263,41 @@ export default function SettingsScreen() {
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (params.editName !== '1' || nameDeepLinkHandled.current) return;
+    nameDeepLinkHandled.current = true;
+    const timer = setTimeout(() => {
+      setNameInput(displayNameRef.current);
+      setNameModalVisible(true);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [params.editName]);
+
   const handleSaveName = async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
+    setNameError('');
     setSavingName(true);
     try {
-      await setDisplayName(trimmed);
       const userId = await getUserId();
+      // Block duplicates so two devices can't share the same display name.
+      // Skip the check when the user is just re-saving their existing name.
+      if (trimmed !== displayName) {
+        const taken = await isDisplayNameTaken(trimmed, userId);
+        if (taken) {
+          setNameError(t('settings.nameTaken'));
+          setSavingName(false);
+          return;
+        }
+      }
+      await setDisplayName(trimmed);
       await saveDisplayName(userId, trimmed);
       setDisplayNameState(trimmed);
       setNameModalVisible(false);
       Alert.alert(t('settings.nameSaved'));
     } catch (error) {
       console.error('Error saving name:', error);
+      setNameError(t('settings.nameCheckFailed'));
     } finally {
       setSavingName(false);
     }
@@ -370,7 +401,10 @@ export default function SettingsScreen() {
                   console.warn('deleteAccount: router.replace failed', e);
                   Alert.alert(
                     t('settings.deleteAccountTitle'),
-                    'تم حذف الحساب. يرجى إعادة تشغيل التطبيق يدوياً.'
+                    uiText({
+                      ar: 'تم حذف الحساب. يرجى إعادة تشغيل التطبيق يدوياً.',
+                      en: 'Account deleted. Please restart the app manually.',
+                    })
                   );
                 }
               }
@@ -764,11 +798,22 @@ export default function SettingsScreen() {
               placeholder={t('settings.enterName')}
               placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
               value={nameInput}
-              onChangeText={(text) => setNameInput(text.slice(0, 30))}
+              onChangeText={(text) => { setNameInput(text.slice(0, 30)); setNameError(''); }}
               maxLength={30}
               textAlign={isRTL ? 'right' : 'left'}
               autoFocus
             />
+            {nameError ? (
+              <Text style={{
+                color: '#f87171',
+                fontSize: 13,
+                fontFamily: fontSemiBold(),
+                marginTop: 8,
+                textAlign: isRTL ? 'right' : 'left',
+              }}>
+                {nameError}
+              </Text>
+            ) : null}
             <View style={[styles.suggestButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 style={[

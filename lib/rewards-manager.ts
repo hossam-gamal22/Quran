@@ -4,7 +4,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { db } from './firebase-config';
-import { scheduleLocalNotification } from './push-notifications';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
 import { getMonthlyActivityStats, getTodayDate } from '@/lib/worship-storage';
 
@@ -17,7 +16,7 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
   quran: 3,
   prayer: 5,
   tasbih: 1,
-  khatma: 5,
+  khatma: 100,
   fasting: 4,
 };
 
@@ -37,7 +36,7 @@ const DEFAULT_CONFIG: RewardsConfig = {
 
 let cachedConfig: RewardsConfig | null = null;
 
-const WORSHIP_ACTIVITY_KEYS = new Set<ActivityType>(['azkar', 'quran', 'prayer', 'tasbih', 'fasting']);
+const WORSHIP_ACTIVITY_KEYS = new Set<ActivityType>(['azkar', 'quran', 'prayer', 'tasbih', 'fasting', 'khatma']);
 
 type PendingScores = {
   month: string;
@@ -54,16 +53,28 @@ export type MonthlyEngagementSyncResult = {
   visibleOnLeaderboard?: boolean;
 };
 
-const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsConfig => ({
-  ...DEFAULT_CONFIG,
-  ...(raw || {}),
-  scoreWeights: {
-    ...DEFAULT_WEIGHTS,
-    ...((raw as any)?.scoreWeights || {}),
-  },
-  currentWinners: raw?.currentWinners || [],
-  history: raw?.history || [],
-});
+export type LeaderboardEntry = {
+  userId: string;
+  displayName: string;
+  score: number;
+};
+
+const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsConfig => {
+  const rawWeights = (raw as any)?.scoreWeights || {};
+  return {
+    ...DEFAULT_CONFIG,
+    ...(raw || {}),
+    scoreWeights: {
+      ...DEFAULT_WEIGHTS,
+      ...rawWeights,
+      khatma: rawWeights.khatma === undefined || rawWeights.khatma === 5
+        ? DEFAULT_WEIGHTS.khatma
+        : rawWeights.khatma,
+    },
+    currentWinners: raw?.currentWinners || [],
+    history: raw?.history || [],
+  };
+};
 
 export const calculateMonthlyScore = (
   activities: Record<string, number>,
@@ -76,12 +87,105 @@ export const calculateMonthlyScore = (
   return score;
 };
 
+export const orderLeaderboard = (
+  entries: LeaderboardEntry[],
+  topN: number = entries.length,
+): LeaderboardEntry[] => {
+  return entries
+    .map((entry, index) => ({
+      ...entry,
+      score: Number(entry.score) || 0,
+      __index: index,
+    }))
+    .sort((a, b) => {
+      const scoreDiff = b.score - a.score;
+      return scoreDiff !== 0 ? scoreDiff : a.__index - b.__index;
+    })
+    .slice(0, topN)
+    .map(({ __index, ...entry }) => entry);
+};
+
+export const mergeCurrentUserIntoLeaderboard = (
+  board: LeaderboardEntry[],
+  currentUser: LeaderboardEntry,
+  topN: number = board.length,
+): LeaderboardEntry[] => {
+  return orderLeaderboard([
+    ...board.filter(user => user.userId !== currentUser.userId),
+    currentUser,
+  ], topN);
+};
+
 const getVisibleDisplayName = (data: Record<string, any>): string => {
   return String(data.displayName || '').trim();
 };
 
 const isEligibleForLeaderboard = (data: Record<string, any>): boolean => {
   return !data.hiddenFromLeaderboard && !data.placeholder && getVisibleDisplayName(data).length > 0;
+};
+
+const toActivityCount = (value: unknown): number => Math.max(0, Number(value) || 0);
+
+const getMergeBonusActivities = (mergeBonus?: { activities?: Record<string, number> }): Record<string, number> => (
+  mergeBonus?.activities || {}
+);
+
+const getExistingBaseActivities = (
+  existingActivities: Record<string, any>,
+  mergeBonusActivities: Record<string, number>,
+): Record<string, number> => {
+  const base: Record<string, number> = {};
+  for (const [key, count] of Object.entries(existingActivities || {})) {
+    base[key] = Math.max(0, toActivityCount(count) - toActivityCount(mergeBonusActivities[key]));
+  }
+  return base;
+};
+
+const getLocalWorshipActivities = (worshipStats: Awaited<ReturnType<typeof getMonthlyActivityStats>>): Record<ActivityType, number> => ({
+  prayer: toActivityCount(worshipStats.prayers),
+  quran: toActivityCount(worshipStats.quranPages),
+  khatma: toActivityCount(worshipStats.khatmas),
+  azkar: toActivityCount(worshipStats.azkar),
+  tasbih: toActivityCount(worshipStats.tasbih),
+  fasting: toActivityCount(worshipStats.fasting),
+  app_open: 0,
+});
+
+const mergeMonthlyActivities = (
+  existingActivities: Record<string, any>,
+  pendingActivities: Record<string, any>,
+  worshipStats: Awaited<ReturnType<typeof getMonthlyActivityStats>>,
+  mergeBonus?: { activities?: Record<string, number> },
+): Record<string, number> => {
+  const mergeBonusActivities = getMergeBonusActivities(mergeBonus);
+  const existingBaseActivities = getExistingBaseActivities(existingActivities, mergeBonusActivities);
+  const localWorship = getLocalWorshipActivities(worshipStats);
+  const activities: Record<string, number> = {};
+
+  for (const [key, count] of Object.entries(existingBaseActivities)) {
+    if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
+      activities[key] = toActivityCount(count);
+    }
+  }
+
+  for (const [key, count] of Object.entries(pendingActivities || {})) {
+    if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
+      activities[key] = (activities[key] || 0) + toActivityCount(count);
+    }
+  }
+
+  for (const key of WORSHIP_ACTIVITY_KEYS) {
+    activities[key] = Math.max(
+      toActivityCount(existingBaseActivities[key]),
+      toActivityCount(localWorship[key]),
+    );
+  }
+
+  for (const [key, count] of Object.entries(mergeBonusActivities)) {
+    activities[key] = (activities[key] || 0) + toActivityCount(count);
+  }
+
+  return activities;
 };
 
 /**
@@ -376,32 +480,13 @@ export const syncMonthlyEngagementFromLocalWorship = async (
     const pending = await getPendingScores(currentMonth);
     const worshipStats = await getMonthlyActivityStats();
 
-    const activities: Record<string, number> = {};
-
-    for (const [key, count] of Object.entries(existingActivities)) {
-      if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
-        activities[key] = Number(count) || 0;
-      }
-    }
-
-    for (const [key, count] of Object.entries(pending.activities || {})) {
-      if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
-        activities[key] = (activities[key] || 0) + (Number(count) || 0);
-      }
-    }
-
-    activities.prayer = worshipStats.prayers;
-    activities.quran = worshipStats.quranPages;
-    activities.azkar = worshipStats.azkar;
-    activities.tasbih = worshipStats.tasbih;
-    activities.fasting = worshipStats.fasting;
-
     const mergeBonus = data?.mergeBonus || undefined;
-    if (mergeBonus?.activities) {
-      for (const [key, count] of Object.entries(mergeBonus.activities)) {
-        activities[key] = (activities[key] || 0) + (Number(count) || 0);
-      }
-    }
+    const activities = mergeMonthlyActivities(
+      existingActivities,
+      pending.activities || {},
+      worshipStats,
+      mergeBonus,
+    );
 
     const score = calculateMonthlyScore(activities, config.scoreWeights || DEFAULT_WEIGHTS);
 
@@ -496,37 +581,15 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
     const data = userSnap.data();
     const engagement = data?.monthlyEngagement;
     const currentMonth = getCurrentMonth();
-
-    const activities: Record<string, number> = {};
-
-    if (engagement && engagement.month === currentMonth) {
-      for (const [key, count] of Object.entries(engagement.activities || {})) {
-        if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
-          activities[key] = Number(count) || 0;
-        }
-      }
-    }
-
     const pending = await getPendingScores(currentMonth);
-    for (const [key, count] of Object.entries(pending.activities || {})) {
-      if (!WORSHIP_ACTIVITY_KEYS.has(key as ActivityType)) {
-        activities[key] = (activities[key] || 0) + (Number(count) || 0);
-      }
-    }
-
     const worshipStats = await getMonthlyActivityStats();
-    activities.prayer = worshipStats.prayers;
-    activities.quran = worshipStats.quranPages;
-    activities.azkar = worshipStats.azkar;
-    activities.tasbih = worshipStats.tasbih;
-    activities.fasting = worshipStats.fasting;
-
     const mergeBonus = data?.mergeBonus || undefined;
-    if (mergeBonus?.activities) {
-      for (const [key, count] of Object.entries(mergeBonus.activities)) {
-        activities[key] = (activities[key] || 0) + (Number(count) || 0);
-      }
-    }
+    const activities = mergeMonthlyActivities(
+      engagement && engagement.month === currentMonth ? (engagement.activities || {}) : {},
+      pending.activities || {},
+      worshipStats,
+      mergeBonus,
+    );
 
     // Recalculate score from merged activities × weights for consistency
     const weights = config.scoreWeights || DEFAULT_WEIGHTS;
@@ -550,6 +613,7 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
       const worshipStats = await getMonthlyActivityStats();
       activities.prayer = worshipStats.prayers;
       activities.quran = worshipStats.quranPages;
+      activities.khatma = worshipStats.khatmas;
       activities.azkar = worshipStats.azkar;
       activities.tasbih = worshipStats.tasbih;
       activities.fasting = worshipStats.fasting;
@@ -567,11 +631,7 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
 /**
  * Get the monthly leaderboard — top users by score for the current month
  */
-export const getMonthlyLeaderboard = async (topN: number = 20): Promise<Array<{
-  userId: string;
-  displayName: string;
-  score: number;
-}>> => {
+export const getMonthlyLeaderboard = async (topN: number = 20): Promise<LeaderboardEntry[]> => {
   try {
     const currentMonth = getCurrentMonth();
     const usersRef = collection(db, 'users');
@@ -583,7 +643,7 @@ export const getMonthlyLeaderboard = async (topN: number = 20): Promise<Array<{
     );
     const snapshot = await getDocs(q);
 
-    const leaderboard: Array<{ userId: string; displayName: string; score: number }> = [];
+    const leaderboard: LeaderboardEntry[] = [];
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const engagement = data.monthlyEngagement;
@@ -597,7 +657,7 @@ export const getMonthlyLeaderboard = async (topN: number = 20): Promise<Array<{
       }
     });
 
-    return leaderboard.slice(0, topN);
+    return orderLeaderboard(leaderboard, topN);
   } catch {
     return [];
   }
@@ -609,24 +669,20 @@ export const getMonthlyLeaderboard = async (topN: number = 20): Promise<Array<{
 export const saveDisplayName = async (userId: string, displayName: string): Promise<void> => {
   try {
     const trimmed = displayName.trim();
+    // Lazy import to avoid a circular dep with firebase-user → rewards-manager.
+    const { normalizeDisplayName } = await import('./firebase-user');
     const userRef = doc(db, 'users', userId);
     await Promise.allSettled([
-      updateDoc(userRef, { displayName: trimmed }),
+      updateDoc(userRef, {
+        displayName: trimmed,
+        displayNameLower: normalizeDisplayName(trimmed),
+      }),
       AsyncStorage.setItem('@rooh_display_name', trimmed),
     ]);
     console.log('✅ Display name saved:', trimmed);
   } catch (error) {
     console.error('❌ Failed to save display name:', error);
   }
-};
-
-/**
- * Get previous month string YYYY-MM-v2
- */
-const getPreviousMonth = (): string => {
-  const now = new Date();
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-v2`;
 };
 
 const LAST_RANK_KEY = '@honor_board_last_rank';
@@ -690,125 +746,10 @@ export const checkAndCelebrateWinner = async (userId: string): Promise<boolean> 
 };
 
 /**
- * Auto-select winners on the 1st of each month.
- * Called on app startup — checks if winners for the previous month
- * have already been selected. If not, queries the leaderboard and
- * picks the top N users automatically.
+ * Compatibility no-op.
+ * Monthly winner selection and premium grants are server-only via the
+ * scheduled Cloud Function `selectMonthlyWinners`.
  */
 export const autoSelectMonthlyWinners = async (): Promise<void> => {
-  try {
-    const config = await refreshRewardsFromFirestore();
-    if (!config.enabled) return;
-
-    const previousMonth = getPreviousMonth();
-
-    // Already selected for this month (client or server)?
-    if (config.currentMonth === previousMonth) return;
-
-    // Check server-side processedMonth flag (set by GitHub Action or another client)
-    if ((config as any).processedMonth === previousMonth) return;
-
-    // Check if we already processed this month locally
-    const alreadyProcessed = await AsyncStorage.getItem(`@winners_processed_${previousMonth}`);
-    if (alreadyProcessed) return;
-
-    // Query top users from last month (filter by month in Firestore, not client-side)
-    const usersRef = collection(db, 'users');
-    const q = query(
-      usersRef,
-      where('monthlyEngagement.month', '==', previousMonth),
-      orderBy('monthlyEngagement.score', 'desc'),
-      limit(Math.max(config.winnersCount * 5, 20))
-    );
-    const snapshot = await getDocs(q);
-
-    const winners: Winner[] = [];
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + config.rewardDurationDays);
-
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      const engagement = data.monthlyEngagement;
-      const displayName = getVisibleDisplayName(data);
-      if (winners.length < config.winnersCount && isEligibleForLeaderboard(data) && engagement?.score > 0) {
-        winners.push({
-          userId: docSnap.id,
-          displayName,
-          score: engagement.score,
-          rewardedAt: new Date().toISOString(),
-          notified: false,
-          premiumExpiresAt: expiresAt.toISOString(),
-        });
-      }
-    });
-
-    if (winners.length === 0) {
-      await AsyncStorage.setItem(`@winners_processed_${previousMonth}`, 'true');
-      return;
-    }
-
-    // Grant premium to each winner
-    for (const winner of winners) {
-      try {
-        await updateDoc(doc(db, 'users', winner.userId), {
-          adminPremium: {
-            granted: true,
-            grantedBy: 'auto_reward_system',
-            grantedAt: new Date().toISOString(),
-            plan: 'monthly',
-            expiresAt: expiresAt.toISOString(),
-            reason: `فائز في مسابقة الشهر ${previousMonth}`,
-          },
-        });
-      } catch (err) {
-        console.error('❌ Error granting premium to', winner.userId, err);
-      }
-    }
-
-    // Notify current user if they are among the winners
-    try {
-      const currentUserId = await AsyncStorage.getItem('@rooh_user_id');
-      if (currentUserId && winners.some(w => w.userId === currentUserId)) {
-        await scheduleLocalNotification(
-          {
-            title: '🏆 مبروك! أنت في لوحة الشرف',
-            body: 'حصلت على اشتراك مجاني هذا الشهر مكافأة لك',
-            data: {
-              type: 'honor_board_winner',
-              actionType: 'screen',
-              actionUrl: '/honor-board',
-            },
-          },
-          null // immediate trigger
-        );
-      }
-    } catch (notifErr) {
-      console.log('⚠️ Winner notification failed:', notifErr);
-    }
-
-    // Update rewards config
-    const historyEntry = {
-      month: previousMonth,
-      winners,
-      selectedAt: new Date().toISOString(),
-      selectedBy: 'auto' as const,
-    };
-
-    const updatedConfig: RewardsConfig = {
-      ...config,
-      currentMonth: previousMonth,
-      currentWinners: winners,
-      history: [historyEntry, ...config.history.slice(0, 11)],
-      processedMonth: previousMonth,
-    };
-
-    await setDoc(doc(db, 'config', 'rewards-settings'), updatedConfig, { merge: true });
-    cachedConfig = updatedConfig;
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updatedConfig));
-    await AsyncStorage.setItem(`@winners_processed_${previousMonth}`, 'true');
-
-    console.log(`🏆 Auto-selected ${winners.length} winners for ${previousMonth}`);
-  } catch (error) {
-    console.error('❌ Auto-winner selection failed:', error);
-  }
+  await refreshRewardsFromFirestore();
 };
