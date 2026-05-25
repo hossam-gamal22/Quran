@@ -79,3 +79,6 @@ scripts/fonts/.DS_Store
 *.jks
 *.keystore
 credentials.json
+credentials/
+*-firebase-adminsdk-*.json
+*-service-account-*.json
