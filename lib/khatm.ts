@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDateLocale, t } from '@/lib/i18n';
+import { formatDate, recordKhatmaCompletion, removeKhatmaCompletion } from '@/lib/worship-storage';
 
 const KEY = '@quran_khatm';
 
@@ -77,9 +78,13 @@ export async function markSurahComplete(
   }
 
   // تحقق من الاكتمال
+  const wasCompleted = records[idx].isCompleted;
   if (khatm.completedSurahs.length >= TOTAL_SURAHS) {
     khatm.isCompleted = true;
     khatm.endDate = Date.now();
+    if (!wasCompleted) {
+      await recordKhatmaCompletion(formatDate(new Date(khatm.endDate)), `${khatm.id}:${khatm.startDate}`);
+    }
   }
 
   records[idx] = khatm;
@@ -97,10 +102,15 @@ export async function unmarkSurahComplete(
   if (idx === -1) return;
 
   const khatm = { ...records[idx] };
+  const wasCompleted = khatm.isCompleted;
+  const previousEndDate = khatm.endDate;
   khatm.completedSurahs = khatm.completedSurahs.filter(s => s !== surahNumber);
   khatm.totalAyahsRead = Math.max(0, khatm.totalAyahsRead - ayahCount);
   khatm.isCompleted = false;
   khatm.endDate = undefined;
+  if (wasCompleted && previousEndDate) {
+    await removeKhatmaCompletion(formatDate(new Date(previousEndDate)), `${khatm.id}:${khatm.startDate}`);
+  }
 
   records[idx] = khatm;
   await saveKhatm(records);

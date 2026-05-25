@@ -166,6 +166,20 @@ const MemorizationContext = createContext<MemorizationContextType | undefined>(
   undefined,
 );
 
+const achievementTitleEn: Record<string, string> = {
+  first_ayah: 'Blessed beginning',
+  ten_ayahs: 'Ten ayahs',
+  fifty_ayahs: 'Fifty ayahs',
+  hundred_ayahs: 'One hundred ayahs',
+  first_surah: 'First surah',
+  five_surahs: 'Five surahs',
+  juz_amma: 'Juz Amma',
+  streak_3: 'Three days',
+  streak_7: 'Full week',
+  streak_30: 'Full month',
+  streak_100: 'One hundred days',
+};
+
 interface ProviderProps {
   children: ReactNode;
 }
@@ -318,12 +332,15 @@ export function MemorizationProvider({ children }: ProviderProps) {
     // Fire-and-forget achievement check
     try {
       const { checkAndUnlockAchievements } = await import('@/lib/memorization-achievements');
+      const { uiText } = await import('@/lib/ui-text');
       const newly = await checkAndUnlockAchievements(stats, next);
       if (newly.length > 0) {
         const { Platform, ToastAndroid, Alert } = await import('react-native');
-        const msg = `🏆 إنجاز جديد: ${newly[0].titleAr}`;
+        const titleFor = (id: string, ar: string) => uiText({ ar, en: achievementTitleEn[id] || id.replace(/_/g, ' ') });
+        const achievementTitle = uiText({ ar: 'إنجاز جديد', en: 'New achievement' });
+        const msg = `🏆 ${achievementTitle}: ${titleFor(newly[0].id, newly[0].titleAr)}`;
         if (Platform.OS === 'android') ToastAndroid.show(msg, ToastAndroid.LONG);
-        else Alert.alert('إنجاز جديد', newly.map((a) => `🏆 ${a.titleAr}`).join('\n'));
+        else Alert.alert(achievementTitle, newly.map((a) => `🏆 ${titleFor(a.id, a.titleAr)}`).join('\n'));
       }
     } catch {}
     return next;

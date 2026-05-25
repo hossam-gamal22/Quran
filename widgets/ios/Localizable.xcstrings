@@ -123,7 +123,7 @@
     "widget.kind.prayerNextPrevious" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "الصلاة السابقة والقادمة" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous & Next Prayer" } },
         "ar" : { "stringUnit" : { "state" : "translated", "value" : "الصلاة السابقة والقادمة" } }
       }
     },

@@ -56,6 +56,7 @@ import {
   deleteDownload,
 } from '@/lib/audio-download-manager';
 import { hasPerSurahAudio } from '@/lib/reciters-registry';
+import { mt } from '@/lib/memorization-i18n';
 
 import {
   Spacing,
@@ -108,6 +109,9 @@ const JUZ_NAMES = [
   'السادس والعشرون', 'السابع والعشرون', 'الثامن والعشرون', 'التاسع والعشرون', 'الثلاثون',
 ];
 
+const qcfWarmupDoneKey = (darkMode: boolean) =>
+  `@qcf_font_warmup_done_${darkMode ? 'dark' : 'light'}`;
+
 interface JuzInfo {
   number: number;
   name: string;
@@ -147,6 +151,10 @@ interface Reciter {
   name: string;
   englishName: string;
 }
+
+type QuranTabKey = 'surahs' | 'juz' | 'listen';
+
+const QURAN_SEGMENT_KEYS: QuranTabKey[] = ['surahs', 'juz', 'listen'];
 
 // ========================================
 // مكون زر الزجاج المتحرك
@@ -246,6 +254,7 @@ export default function QuranScreen() {
   const isRTL = useIsRTL();
   const isArabic = settings.language === 'ar';
   const isLightBg = !isDarkMode && !colors.hasBgOverride;
+  const androidSheetSurface = Platform.OS === 'android' ? colors.modalSurface : undefined;
 
   const {
     surahs,
@@ -281,32 +290,37 @@ export default function QuranScreen() {
       listen: { label: t('quran.listen'), icon: 'headphones' },
     };
 
-    const byKey = new Map((config.uiCustomization?.quranSegments || []).map((item) => [item.key, item]));
+    const configuredSegments = Array.isArray(config?.uiCustomization?.quranSegments)
+      ? config.uiCustomization.quranSegments.filter(
+          (item: any) => item && QURAN_SEGMENT_KEYS.includes(item.key as QuranTabKey),
+        )
+      : [];
+    const byKey = new Map(configuredSegments.map((item) => [item.key, item]));
 
-    return (['surahs', 'juz', 'listen'] as const)
+    return QURAN_SEGMENT_KEYS
       .filter((key) => key !== 'listen' || settings.language === 'ar')
       .map((key) => {
-      const item = byKey.get(key);
-      const label = settings.language === 'ar'
-        ? (item?.labelAr || defaults[key].label)
-        : (item?.labelEn || item?.labelAr || defaults[key].label);
+        const item = byKey.get(key);
+        const label = settings.language === 'ar'
+          ? (item?.labelAr || defaults[key].label)
+          : (item?.labelEn || item?.labelAr || defaults[key].label);
 
-      const iconMode = item?.icon?.mode;
-      const iconName = item?.icon?.name;
-      const iconPng = item?.icon?.pngUrl;
+        const iconMode = item?.icon?.mode;
+        const iconName = item?.icon?.name;
+        const iconPng = item?.icon?.pngUrl;
 
-      let icon: string = defaults[key].icon;
-      if (iconMode === 'png' && iconPng) {
-        icon = `img:${iconPng}`;
-      } else if (iconMode === 'ionicons' && iconName) {
-        icon = `ion:${iconName}`;
-      } else if ((iconMode === 'material' || iconMode === 'sf') && iconName) {
-        icon = iconName;
-      }
+        let icon: string = defaults[key].icon;
+        if (iconMode === 'png' && iconPng) {
+          icon = `img:${iconPng}`;
+        } else if (iconMode === 'ionicons' && iconName) {
+          icon = `ion:${iconName}`;
+        } else if ((iconMode === 'material' || iconMode === 'sf') && iconName) {
+          icon = iconName;
+        }
 
-      return { key, label, icon };
-    });
-  }, [config.uiCustomization?.quranSegments, settings.language]);
+        return { key, label, icon };
+      });
+  }, [config?.uiCustomization?.quranSegments, settings.language]);
 
   const quranSegmentKeys = useMemo(() => quranSegments.map((segment) => segment.key as 'surahs' | 'juz' | 'listen'), [quranSegments]);
   const quranSegmentLabels = useMemo(() => quranSegments.map((segment) => segment.label), [quranSegments]);
@@ -325,6 +339,7 @@ export default function QuranScreen() {
 
   useFocusEffect(useCallback(() => {
     let mounted = true;
+    let cancelQcfWarmup: (() => void) | null = null;
 
     const loadLastRead = async () => {
       const lastRead = await getLastRead();
@@ -356,7 +371,7 @@ export default function QuranScreen() {
     // by the time they navigate into /surah/[id]. Idempotent + non-blocking.
     (async () => {
       try {
-        const { preloadCriticalPages } = require('@/lib/qcf-font-loader');
+        const { preloadCriticalPages, startQcfSessionWarmup } = require('@/lib/qcf-font-loader');
         // Cover both modes (light + dark theme) and last-read continuation.
         const lastRead = await getLastRead();
         let lastPage: number | undefined;
@@ -377,6 +392,20 @@ export default function QuranScreen() {
           preloadCriticalPages(Array.from(pages), false, 1500),
           preloadCriticalPages(Array.from(pages), true, 1500),
         ]);
+        if (mounted) {
+          const warmupDone =
+            (await AsyncStorage.getItem(qcfWarmupDoneKey(isDarkMode === true)).catch(() => null)) === 'true';
+          cancelQcfWarmup = startQcfSessionWarmup({
+            darkMode: isDarkMode === true,
+            durationMs: warmupDone ? 2 * 60 * 1000 : 5 * 60 * 1000,
+            chunkSize: warmupDone ? 6 : 4,
+            startDelayMs: warmupDone ? 1000 : 3000,
+            priorityPages: Array.from(pages),
+            onComplete: () => {
+              AsyncStorage.setItem(qcfWarmupDoneKey(isDarkMode === true), 'true').catch(() => {});
+            },
+          });
+        }
       } catch (err) {
         if (__DEV__) console.warn('[Quran tab] preload skipped:', err);
       }
@@ -384,8 +413,9 @@ export default function QuranScreen() {
 
     return () => {
       mounted = false;
+      cancelQcfWarmup?.();
     };
-  }, []));
+  }, [isDarkMode]));
 
   // Load downloaded surahs for current reciter
   useFocusEffect(useCallback(() => {
@@ -534,6 +564,7 @@ export default function QuranScreen() {
       }
 
       const isCurrentSurah =
+        playbackState.playingFullSurah &&
         playbackState.currentSurah === surahNumber &&
         playbackState.currentAyah > 0;
 
@@ -542,9 +573,9 @@ export default function QuranScreen() {
         return;
       }
 
-      await playAyah(surahNumber, 1, true);
+      await playAyah(surahNumber, 1, true, true);
     },
-    [activeTab, openSurah, playbackState.currentAyah, playbackState.currentSurah, playAyah, togglePlayPause]
+    [activeTab, openSurah, playbackState.currentAyah, playbackState.currentSurah, playbackState.playingFullSurah, playAyah, togglePlayPause]
   );
 
   // عرض عنصر السورة
@@ -1050,7 +1081,7 @@ export default function QuranScreen() {
             <View style={[styles.quickActionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <GlassActionButton
                 icon="brain"
-                label="حفظ القرآن"
+                label={mt('title')}
                 onPress={() => router.push('/memorization' as any)}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
@@ -1132,9 +1163,9 @@ export default function QuranScreen() {
                   style={[
                     styles.modalContent,
                     {
-                      backgroundColor: isLightBg
+                      backgroundColor: androidSheetSurface ?? (isLightBg
                         ? 'rgba(255,255,255,0.97)'
-                        : '#0f1a14',
+                        : '#0f1a14'),
                     },
                   ]}
                 >
@@ -1219,7 +1250,7 @@ export default function QuranScreen() {
                 tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
                 style={StyleSheet.absoluteFill}
               />
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.97)' : '#0f1a14', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)' }]} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: androidSheetSurface ?? (isLightBg ? 'rgba(255,255,255,0.97)' : '#0f1a14'), borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)' }]} />
               <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: Spacing.xl + 20 }}>
               <View style={[styles.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Text style={[styles.settingsTitle, { color: colors.text }]}>{t('quran.quranSettings')}</Text>

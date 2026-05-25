@@ -32,6 +32,7 @@ import {
   scheduleWirdNotifications,
   scheduleDailyAyahNotification,
 } from '@/lib/notifications-manager';
+import { getPrayerTranslationKey } from '@/lib/prayer-times';
 
 // ─── Time Picker Modal ────────────────────────────────────────────────────────
 interface TimePickerProps {
@@ -143,7 +144,7 @@ export default function NotificationsCenterScreen() {
   const previewSoundRef = useRef<Audio.Sound | null>(null);
 
   // Get user's notification sound preference from app settings
-  const soundType = appSettings?.notifications?.soundType || 'general_reminder';
+  const soundType = appSettings?.notifications?.soundType || 'default';
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
@@ -280,7 +281,7 @@ export default function NotificationsCenterScreen() {
 
   const PRAYERS = [
     { key: 'Fajr',    icon: 'weather-night' as const, name: t('prayer.fajr') },
-    { key: 'Dhuhr',   icon: 'white-balance-sunny' as const, name: t('prayer.dhuhr') },
+    { key: 'Dhuhr',   icon: 'white-balance-sunny' as const, name: t(getPrayerTranslationKey('dhuhr')) },
     { key: 'Asr',     icon: 'weather-partly-cloudy' as const, name: t('prayer.asr') },
     { key: 'Maghrib', icon: 'weather-sunset-down' as const, name: t('prayer.maghrib') },
     { key: 'Isha',    icon: 'star-four-points' as const, name: t('prayer.isha') },

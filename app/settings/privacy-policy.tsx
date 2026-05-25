@@ -67,7 +67,7 @@ export default function PrivacyPolicyScreen() {
           titleAr="مقدمة"
           titleEn="Introduction"
           bodyAr={'نحن في تطبيق "روح المسلم" نقدّر خصوصيتك ونلتزم بحمايتها. توضّح هذه السياسة كيف نتعامل مع بياناتك عند استخدامك للتطبيق.'}
-          bodyEn={'At "Ruh Al-Muslim", we value your privacy and are committed to protecting it. This policy explains how we handle your data when you use the app.'}
+          bodyEn={'At "Rooh Al-Muslim", we value your privacy and are committed to protecting it. This policy explains how we handle your data when you use the app.'}
         />
 
         <Section

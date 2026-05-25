@@ -55,6 +55,7 @@ export interface TasbihPreset {
   reference?: string;
   source?: string;
   grade?: string;
+  order?: number;
 }
 
 function normalizeTasbihPresetId(docId: string, data: Record<string, unknown>, fallbackIndex: number): number {
@@ -131,6 +132,37 @@ export async function fetchTasbihPresets(localDefaults: TasbihPreset[]): Promise
   );
 
   return normalizeTasbihPresets(presets);
+}
+
+export function subscribeToTasbihPresets(
+  localDefaults: TasbihPreset[],
+  onUpdate: (presets: TasbihPreset[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    collection(db, 'tasbihPresets'),
+    (snap) => {
+      const presets = snap.empty
+        ? localDefaults
+        : snap.docs.map(d => {
+          const data = d.data() as Record<string, unknown>;
+          return {
+            ...data,
+            id: data.id ?? d.id,
+          } as unknown as TasbihPreset;
+        });
+
+      const normalized = normalizeTasbihPresets(presets);
+      onUpdate(normalized);
+      AsyncStorage.setItem('@admin_tasbih_presets', JSON.stringify({
+        data: normalized,
+        timestamp: Date.now(),
+      })).catch(() => {});
+    },
+    (err) => {
+      console.log('⚠️ Firestore tasbih subscription failed, using fallback:', err);
+      onUpdate(normalizeTasbihPresets(localDefaults));
+    },
+  );
 }
 
 // ==================== Islamic Events ====================

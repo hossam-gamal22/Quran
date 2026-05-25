@@ -36,6 +36,7 @@ import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
 import { t, getDateLocale } from '@/lib/i18n';
+import { uiText } from '@/lib/ui-text';
 import {
   BACKUP_VERSION,
   BACKUP_FILENAME,
@@ -658,7 +659,24 @@ export default function BackupScreen() {
             <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#f5a623" />
             <View style={styles.infoContent}>
               <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {t('backup.freeUserWarning')}
+                {uiText({
+                  ar: 'النقاط الشهرية محفوظة لكل المستخدمين حتى بعد حذف التطبيق. تفاصيل السجلات اليومية تُستعاد تلقائيًا للمميزين فقط، وللمستخدم المجاني احفظ نسخة ملف قبل حذف التطبيق أو تغيير الجهاز.',
+                  en: 'Monthly points are protected for all users after reinstall. Full daily records restore automatically for Premium users only; free users should save a backup file before deleting the app or switching devices.',
+                })}
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
+        {isPremium && (
+          <Animated.View entering={FadeInDown.delay(140).duration(500)} style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(13,142,98,0.15)' : '#e8f7ef' }]}>
+            <MaterialCommunityIcons name="cloud-check-outline" size={20} color="#0d8e62" />
+            <View style={styles.infoContent}>
+              <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {uiText({
+                  ar: 'النسخ السحابي التلقائي مفعل للمميزين: سجلات الصلاة والقرآن والأذكار والتسبيح والختمات تُدمج مع السحابة وتعود عند تثبيت التطبيق من جديد على نفس الحساب/الجهاز.',
+                  en: 'Automatic cloud backup is active for Premium users: prayer, Quran, adhkar, tasbih, and khatma records sync to the cloud and restore after reinstall on the same account/device.',
+                })}
               </Text>
             </View>
           </Animated.View>

@@ -54,6 +54,7 @@ import {
   TEMPORARY_PRAYER_MIN_RAKATS,
   TEMPORARY_PRAYER_PRESETS,
   calculateRakat,
+  getPrayerName,
   isPrayerCompleted,
   type SalatiPrayerType,
   type TemporaryPrayerPreset,
@@ -331,12 +332,12 @@ export default function SalatiScreen() {
         // Send immediate "أتممت صلاتك" notification + cancel today's scheduled "هل صليت؟"
         (async () => {
           try {
-            const channelId = getReminderChannelId('general_reminder');
+            const channelId = getReminderChannelId('default');
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: t('notifications.prayerAccepted'),
                 body: t('notifications.prayerAcceptedBody'),
-                sound: resolveNotificationSound('general_reminder', true),
+                sound: resolveNotificationSound('default', true),
                 data: { type: 'prayer_completed', prayer: prayerKey },
                 ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.HIGH }),
                 ...(Platform.OS === 'android' && { channelId }),
@@ -703,7 +704,7 @@ export default function SalatiScreen() {
                   { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight },
                   !isAvailable && !isCompleted && { opacity: 0.5 },
                 ]}>
-                  {info.nameAr}
+                  {getPrayerName(prayer, 'ar')}
                 </Text>
                 {isCompleted ? (
                   <Text style={styles.completedIndicator}>{t('smartTracker.done')}</Text>
@@ -763,7 +764,7 @@ export default function SalatiScreen() {
                   { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight },
                   !isAvailable && !isCompleted && { opacity: 0.5 },
                 ]}>
-                  {info.nameAr}
+                  {getPrayerName(prayer, 'ar')}
                 </Text>
                 {isCompleted ? (
                   <Text style={styles.completedIndicator}>{t('smartTracker.done')}</Text>
@@ -823,7 +824,7 @@ export default function SalatiScreen() {
                   { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight },
                   !isAvailable && !isCompleted && { opacity: 0.5 },
                 ]}>
-                  {info.nameAr}
+                  {getPrayerName(prayer, 'ar')}
                 </Text>
                 {isCompleted ? (
                   <Text style={styles.completedIndicator}>{t('smartTracker.done')}</Text>

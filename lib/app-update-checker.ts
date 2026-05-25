@@ -105,7 +105,7 @@ export async function checkAndNotifyUpdate(
       content: {
         title: dirText(t('notifications.updateAvailableTitle') || '🎉 تحديث جديد متاح'),
         body: dirText(t('notifications.updateAvailableBody') || 'يتوفر إصدار جديد من روح المسلم. حدّث الآن للحصول على أفضل تجربة.'),
-        sound: resolveNotificationSound('general_reminder', true),
+        sound: resolveNotificationSound('default', true),
         data: {
           type: 'app_update',
           storeUrl: storeUrl || '',

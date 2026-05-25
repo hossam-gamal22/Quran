@@ -929,7 +929,7 @@ export default function LearnScreen() {
         ) : (
           <TouchableOpacity style={[styles.magicBtn, { backgroundColor: '#b00020' }]} onPress={onStop}>
             <MaterialCommunityIcons name="stop-circle" size={22} color="#fff" />
-            <Text style={styles.magicText}>إيقاف</Text>
+            <Text style={styles.magicText}>{mt('recordStop')}</Text>
           </TouchableOpacity>
         ))}
 
@@ -1031,7 +1031,7 @@ function StepBadge({ active, label }: { active: boolean; label: string }) {
       <Text
         style={{
           color: active ? '#fff' : '#aaa',
-          fontFamily: 'Cairo-SemiBold',
+          fontFamily: 'Rubik-SemiBold',
           fontSize: 12,
         }}
       >
@@ -1073,7 +1073,7 @@ function ModeChoiceCard({
             <Text
               style={{
                 color: colors.text,
-                fontFamily: 'Cairo-Bold',
+                fontFamily: 'Rubik-Bold',
                 fontSize: 17,
                 textAlign: isRTL ? 'right' : 'left',
                 writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1084,7 +1084,7 @@ function ModeChoiceCard({
             <Text
               style={{
                 color: colors.textLight,
-                fontFamily: 'Cairo-Regular',
+                fontFamily: 'Rubik-Regular',
                 fontSize: 13,
                 textAlign: isRTL ? 'right' : 'left',
                 writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1120,7 +1120,7 @@ function ControlRow({
       <Text
         style={{
           color: colors.textLight,
-          fontFamily: 'Cairo-Regular',
+          fontFamily: 'Rubik-Regular',
           fontSize: 12,
           textAlign: isRTL ? 'right' : 'left',
           writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1157,7 +1157,7 @@ function Chip({
       <Text
         style={{
           color: active ? '#fff' : colors.text,
-          fontFamily: 'Cairo-SemiBold',
+          fontFamily: 'Rubik-SemiBold',
           fontSize: 12,
         }}
       >
@@ -1227,7 +1227,7 @@ function CustomRepeatInput({
         <Text
           style={{
             color: isCustom ? '#fff' : colors.text,
-            fontFamily: 'Cairo-SemiBold',
+            fontFamily: 'Rubik-SemiBold',
             fontSize: 12,
           }}
         >
@@ -1327,8 +1327,8 @@ const modalStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
-  title: { fontFamily: 'Cairo-Bold', fontSize: 17, textAlign: 'center' },
-  hint: { fontFamily: 'Cairo-Regular', fontSize: 12, textAlign: 'center' },
+  title: { fontFamily: 'Rubik-Bold', fontSize: 17, textAlign: 'center' },
+  hint: { fontFamily: 'Rubik-Regular', fontSize: 12, textAlign: 'center' },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1348,14 +1348,14 @@ const modalStyles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 14,
     paddingVertical: 12,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     fontSize: 28,
     textAlign: 'center',
     letterSpacing: 2,
   },
   actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   btn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  btnText: { fontFamily: 'Cairo-Bold', fontSize: 14 },
+  btnText: { fontFamily: 'Rubik-Bold', fontSize: 14 },
 });
 
 function ToggleBtn({
@@ -1386,7 +1386,7 @@ function ToggleBtn({
       <Text
         style={{
           color: active ? colors.primary : colors.textLight,
-          fontFamily: 'Cairo-SemiBold',
+          fontFamily: 'Rubik-SemiBold',
           fontSize: 11,
           textAlign: 'center',
         }}
@@ -1407,13 +1407,13 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     emptyText: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 14,
       textAlign: 'center',
     },
     position: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1451,7 +1451,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     playingText: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1487,7 +1487,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     recorderSecondaryText: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 12,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1516,7 +1516,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 24,
       textAlign: 'center',
       borderWidth: 1,
@@ -1537,7 +1537,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     quickAyahText: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 12,
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
@@ -1549,21 +1549,21 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     rangeTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 14,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     rangeHint: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     rangeSurah: {
       color: colors.primary,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1571,7 +1571,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     rangeInputs: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 },
     rangeLabel: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1583,7 +1583,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: 'center',
       borderWidth: 1,
@@ -1601,7 +1601,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     rangeReadOnlyText: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1621,7 +1621,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     surahPickerName: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 18,
       lineHeight: 32,
       textAlign: isRTL ? 'right' : 'left',
@@ -1629,7 +1629,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     surahPickerMeta: {
       color: colors.textLight,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       lineHeight: 22,
       textAlign: isRTL ? 'right' : 'left',
@@ -1647,7 +1647,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     surahNumberPillText: {
       color: colors.primary,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 13,
     },
     surahPickerModal: {
@@ -1662,7 +1662,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.text,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 14,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -1691,12 +1691,12 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     surahOptionNumberText: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 12,
     },
     surahOptionName: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 18,
       lineHeight: 32,
       textAlign: isRTL ? 'right' : 'left',
@@ -1704,7 +1704,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
     },
     surahOptionMeta: {
       color: colors.textLight,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       lineHeight: 22,
       textAlign: isRTL ? 'right' : 'left',
@@ -1719,7 +1719,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       paddingVertical: 12,
       borderRadius: 12,
     },
-    rangePlayText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 14 },
+    rangePlayText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 14 },
     toggleRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 },
     magicBtn: {
       flexDirection: isRTL ? 'row-reverse' : 'row',
@@ -1730,7 +1730,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       paddingVertical: 14,
       borderRadius: 14,
     },
-    magicText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 16 },
+    magicText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 16 },
     markRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 },
     markBtn: {
       flex: 1,
@@ -1742,7 +1742,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       borderRadius: 12,
       borderWidth: 1.5,
     },
-    markText: { fontFamily: 'Cairo-Bold', fontSize: 13 },
+    markText: { fontFamily: 'Rubik-Bold', fontSize: 13 },
     navRow: { flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 },
     navBtn: {
       flexDirection: isRTL ? 'row-reverse' : 'row',
@@ -1751,5 +1751,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>, nightMode: boolean, is
       paddingVertical: 8,
       paddingHorizontal: 12,
     },
-    navText: { color: colors.text, fontFamily: 'Cairo-SemiBold', fontSize: 13 },
+    navText: { color: colors.text, fontFamily: 'Rubik-SemiBold', fontSize: 13 },
   });

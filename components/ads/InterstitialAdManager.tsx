@@ -24,8 +24,10 @@ interface UseInterstitialAdReturn {
 interface ShowInterstitialOptions {
   ignoreSmartFrequencyCaps?: boolean;
   ignoreSmartSessionDelay?: boolean;
+  ignoreGlobalCooldown?: boolean;
   allowInSacredContext?: boolean;
   onShown?: () => void | Promise<void>;
+  timeoutMs?: number;
 }
 
 export const useInterstitialAd = (): UseInterstitialAdReturn => {
@@ -95,14 +97,19 @@ export const showInterstitial = async (options: ShowInterstitialOptions = {}): P
   if (!InterstitialAdClass || Platform.OS === 'web') return false;
 
   try {
+    const timeoutMs = Math.max(0, options.timeoutMs ?? 10000);
+    const startedAt = Date.now();
+    const remainingTimeout = () => Math.max(0, timeoutMs - (Date.now() - startedAt));
+    const hasTimedOut = () => remainingTimeout() <= 0;
     const { fetchAdsConfig, getAdUnitId, canShowGlobalAd, recordGlobalAdShown } = require('@/lib/ads-config');
     const { getSubscriptionState } = require('@/lib/subscription-manager');
 
     const [config, sub] = await Promise.all([fetchAdsConfig(), getSubscriptionState()]);
+    if (hasTimedOut()) return false;
     if (!config.enabled || config.showInterstitials === false || sub.isPremium) return false;
 
     // Global cooldown: enforce ≥2 minutes between any two ads (shared with App Open / hook interstitials).
-    if (!canShowGlobalAd()) return false;
+    if (!options.ignoreGlobalCooldown && !canShowGlobalAd()) return false;
 
     // Smart ad manager checks
     try {
@@ -113,10 +120,12 @@ export const showInterstitial = async (options: ShowInterstitialOptions = {}): P
         ignoreSessionDelay: options.ignoreSmartSessionDelay,
         allowInSacredContext: options.allowInSacredContext,
       }))) return false;
+      if (hasTimedOut()) return false;
     } catch {}
 
     const adUnitId = getAdUnitId('INTERSTITIAL', config);
     if (!adUnitId) return false;
+    if (hasTimedOut()) return false;
 
     return new Promise<boolean>((resolve) => {
       const ad = InterstitialAdClass.createForAdRequest(adUnitId, {
@@ -140,9 +149,10 @@ export const showInterstitial = async (options: ShowInterstitialOptions = {}): P
         try { await options.onShown?.(); } catch {}
       };
 
-      const timeout = setTimeout(() => resolveOnce(false), 10000);
+      const timeout = setTimeout(() => resolveOnce(false), remainingTimeout());
 
       ad.addAdEventListener(AdEventType.LOADED, () => {
+        if (didResolve) return;
         ad.show().then(async () => {
           await recordShownOnce();
           resolveOnce(true);

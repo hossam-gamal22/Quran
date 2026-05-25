@@ -78,7 +78,6 @@ export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
     'subscription.featureCustomBackgrounds',
     'subscription.featurePremiumWidgets',
     'subscription.featureAdvancedKhatma',
-    'subscription.supportDev',
   ],
   trialDays: 3,
   showPaywallOnLaunch: false,

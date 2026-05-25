@@ -11,14 +11,14 @@ import {
   Modal,
   TouchableOpacity,
 } from 'react-native';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { GlassCard } from '@/components/ui';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncMonthlyEngagementFromLocalWorship, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS } from '@/lib/rewards-manager';
+import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncMonthlyEngagementFromLocalWorship, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS, mergeCurrentUserIntoLeaderboard } from '@/lib/rewards-manager';
 import { getUserId, getDisplayName } from '@/lib/firebase-user';
 import type { RewardsConfig } from '@/types/rewards';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -38,6 +38,13 @@ const MEDAL_STYLES = (isDark: boolean) => [
 
 const LEADERBOARD_PREVIEW_COUNT = 5;
 const LEADERBOARD_MAX_VISIBLE_COUNT = 50;
+type MaterialIconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+type SelectedPointInfo = {
+  title: string;
+  description: string;
+  points: number;
+  icon: MaterialIconName;
+};
 
 export default function HonorBoard() {
   const colors = useColors();
@@ -45,7 +52,6 @@ export default function HonorBoard() {
   const { isDarkMode } = colors;
   const { t, settings } = useSettings();
   const isRTL = useIsRTL();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { showCelebration } = useCelebration();
   const { isPremium } = useSubscription();
@@ -59,6 +65,7 @@ export default function HonorBoard() {
   const [loadError, setLoadError] = useState(false);
   const [hasDisplayName, setHasDisplayName] = useState(true);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [selectedPointInfo, setSelectedPointInfo] = useState<SelectedPointInfo | null>(null);
   const isArabic = (settings.language || 'ar') === 'ar';
 
   useEffect(() => {
@@ -108,13 +115,11 @@ export default function HonorBoard() {
         const displayName = (syncedInfo?.displayName || userName || '').trim();
         const canShowCurrentUser = !!displayName && totalScore > 0 && syncedInfo?.visibleOnLeaderboard === true;
         if (canShowCurrentUser) {
-          const withoutCurrentUser = board.filter(u => u.userId !== userId);
-          board = [
-            ...withoutCurrentUser,
+          board = mergeCurrentUserIntoLeaderboard(
+            board,
             { userId, displayName, score: totalScore },
-          ]
-            .sort((a, b) => b.score - a.score)
-            .slice(0, LEADERBOARD_MAX_VISIBLE_COUNT);
+            LEADERBOARD_MAX_VISIBLE_COUNT,
+          );
         }
         setLeaderboard(board);
 
@@ -175,9 +180,43 @@ export default function HonorBoard() {
   if (loading) {
     return (
       <BackgroundWrapper style={{ flex: 1 }}>
-        <View style={[styles.container, { backgroundColor: bgColor }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={[styles.loadingScreen, { backgroundColor: bgColor }]}>
+            <View style={[styles.loadingBackRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <BackButton
+                color={colors.text}
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                  borderRadius: 20,
+                  width: 40,
+                  height: 40,
+                }}
+              />
+            </View>
+            <View style={styles.loadingBody}>
+              <View
+                style={[
+                  styles.loadingCard,
+                  {
+                    backgroundColor: isDarkMode ? 'rgba(15,26,20,0.78)' : 'rgba(255,255,255,0.86)',
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+                  },
+                ]}
+              >
+                <View style={[styles.loadingIconCircle, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.10)' }]}>
+                  <MaterialCommunityIcons name="trophy-outline" size={42} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+                </View>
+                <ActivityIndicator size="large" color={isDarkMode ? '#f59e0b' : '#B57200'} style={styles.loadingSpinner} />
+                <Text style={[styles.loadingTitle, { color: colors.text }]}>
+                  {isArabic ? 'جاري تحميل لوحة الشرف' : 'Loading honor board'}
+                </Text>
+                <Text style={[styles.loadingSubtitle, { color: colors.muted }]}>
+                  {isArabic ? 'نجهّز ترتيب المتسابقين ونقاطك الشهرية' : 'Preparing rankings and your monthly points'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </SafeAreaView>
       </BackgroundWrapper>
     );
   }
@@ -294,6 +333,7 @@ export default function HonorBoard() {
             {(() => {
               const ACTIVITY_ROWS = [
                 { key: 'quran', icon: 'book-open-variant' as const, labelAr: 'صفحات القرآن', labelEn: 'Quran Pages', weightKey: 'quran' as const },
+                { key: 'khatma', icon: 'bookmark-check' as const, labelAr: 'الختمات', labelEn: 'Khatmas', weightKey: 'khatma' as const },
                 { key: 'prayer', icon: 'mosque' as const, labelAr: 'الصلوات', labelEn: 'Prayers', weightKey: 'prayer' as const },
                 { key: 'azkar', icon: 'hand-heart' as const, labelAr: 'الأذكار', labelEn: 'Adhkar', weightKey: 'azkar' as const },
                 { key: 'tasbih', icon: 'counter' as const, labelAr: 'التسبيح', labelEn: 'Tasbih', weightKey: 'tasbih' as const },
@@ -343,27 +383,95 @@ export default function HonorBoard() {
           <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {isArabic ? 'نظام النقاط' : 'Points System'}
           </Text>
-          <GlassCard style={styles.activitiesCard}>
-            {[
-              { icon: 'book-open-variant' as const, labelAr: 'قراءة صفحة قرآن', labelEn: 'Read a Quran page', weightKey: 'quran' as const },
-              { icon: 'mosque' as const, labelAr: 'تسجيل صلاة', labelEn: 'Log a prayer', weightKey: 'prayer' as const },
-              { icon: 'hand-heart' as const, labelAr: 'قراءة ذكر', labelEn: 'Read a dhikr', weightKey: 'azkar' as const },
-              { icon: 'counter' as const, labelAr: 'تسبيحة واحدة', labelEn: 'Tasbih count', weightKey: 'tasbih' as const },
-              { icon: 'food-off' as const, labelAr: 'تسجيل يوم صيام', labelEn: 'Log a fasting day', weightKey: 'fasting' as const },
-              { icon: 'cellphone' as const, labelAr: 'فتح التطبيق يومياً', labelEn: 'Open app daily', weightKey: 'app_open' as const },
-            ].map((item, i, arr) => {
-              const weight = (config?.scoreWeights || DEFAULT_WEIGHTS)[item.weightKey] || DEFAULT_WEIGHTS[item.weightKey] || 1;
-              return (
-                <View key={item.weightKey}>
-                  <View style={[styles.activityRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={[styles.activityIconBg, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)' }]}>
-                      <MaterialCommunityIcons name={item.icon} size={18} color={isDarkMode ? '#f59e0b' : '#B57200'} />
-                    </View>
-                    <Text style={[styles.faqText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                      {isArabic ? item.labelAr : item.labelEn}
-                    </Text>
-                    <View style={[styles.pointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
-                      <Text style={[styles.pointsBadgeText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>+{weight}</Text>
+	          <GlassCard style={styles.activitiesCard}>
+	            {[
+	              {
+	                icon: 'book-open-variant' as const,
+	                labelAr: 'قراءة صفحة قرآن',
+	                labelEn: 'Read a Quran page',
+	                weightKey: 'quran' as const,
+	                infoAr: 'تتحسب الصفحة عندما تُسجل في قراءة القرآن اليومية. الصفحة لا تتكرر داخل نفس دورة الختمة الحالية عند فتحها أكثر من مرة.',
+	                infoEn: 'A page is counted when it is saved to the daily Quran reading record. Reopening the same page in the current khatma cycle does not add another point entry.',
+	              },
+	              {
+	                icon: 'bookmark-check' as const,
+	                labelAr: 'إكمال ختمة',
+	                labelEn: 'Complete a khatma',
+	                weightKey: 'khatma' as const,
+	                infoAr: 'تتحسب مرة واحدة عند اكتمال دورة ختمة كاملة. لو بدأت دورة جديدة بعد إعادة التعيين أو ختمة جديدة، يمكن أن تتحسب ختمة أخرى عند اكتمالها.',
+	                infoEn: 'Counted once when a full khatma cycle is completed. A new cycle or new khatma can count again after it is completed.',
+	              },
+	              {
+	                icon: 'mosque' as const,
+	                labelAr: 'تسجيل صلاة',
+	                labelEn: 'Log a prayer',
+	                weightKey: 'prayer' as const,
+	                infoAr: 'كل صلاة من الخمس تتحسب مرة في يومها إذا كانت حالتها صليت أو متأخرة. الصلاة الملغاة أو غير المسجلة لا تضيف نقاط.',
+	                infoEn: 'Each of the five prayers counts once per day when marked prayed or late. Unlogged or cleared prayers do not add points.',
+	              },
+	              {
+	                icon: 'hand-heart' as const,
+	                labelAr: 'قراءة ذكر',
+	                labelEn: 'Read a dhikr',
+	                weightKey: 'azkar' as const,
+	                infoAr: 'الذكر يتحسب عند إكمال عدده المطلوب مرة واحدة في اليوم لنفس الذكر. العلامة اليدوية تعني تحديد نوع أذكار كمكتمل من متتبع الأذكار، مثل أذكار الصباح أو المساء. تتحسب مرة واحدة إذا اختارها المستخدم يدويًا، ولا تتحسب كزيادة إذا تمت تلقائيًا بعد قراءة الأذكار نفسها.',
+	                infoEn: 'A dhikr counts after its required repetitions are completed once per day for that dhikr. Resetting and completing the same dhikr again does not duplicate points. Manual checklist marks also count without duplicating category completion.',
+	              },
+	              {
+	                icon: 'counter' as const,
+	                labelAr: 'تسبيحة واحدة',
+	                labelEn: 'Tasbih count',
+	                weightKey: 'tasbih' as const,
+	                infoAr: 'كل ضغطة تسبيح تتحسب كتسبيحة واحدة في سجل اليوم. التراجع أو إعادة التعيين ينقص أو يمسح من نقاط اليوم لنفس التسبيح.',
+	                infoEn: 'Every tasbih tap counts as one entry in today’s record. Decrement and reset update today’s score record too.',
+	              },
+	              {
+	                icon: 'food-off' as const,
+	                labelAr: 'تسجيل يوم صيام',
+	                labelEn: 'Log a fasting day',
+	                weightKey: 'fasting' as const,
+	                infoAr: 'يوم الصيام يتحسب مرة واحدة عندما يكون محفوظًا كصائم في سجل الصيام الرسمي. إلغاء تسجيل اليوم يزيله من الحساب.',
+	                infoEn: 'A fasting day counts once when it is saved as fasted in the official fasting record. Clearing the day removes it from the score.',
+	              },
+	              {
+	                icon: 'cellphone' as const,
+	                labelAr: 'فتح التطبيق يومياً',
+	                labelEn: 'Open app daily',
+	                weightKey: 'app_open' as const,
+	                infoAr: 'فتح التطبيق يتحسب مرة واحدة فقط في اليوم، حتى لو فتحت التطبيق أكثر من مرة.',
+	                infoEn: 'App open counts once per day only, even if the app is opened multiple times.',
+	              },
+	            ].map((item, i, arr) => {
+	              const weight = (config?.scoreWeights || DEFAULT_WEIGHTS)[item.weightKey] || DEFAULT_WEIGHTS[item.weightKey] || 1;
+	              return (
+	                <View key={item.weightKey}>
+	                  <View style={[styles.activityRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+	                    <View style={[styles.activityIconBg, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)' }]}>
+	                      <MaterialCommunityIcons name={item.icon} size={18} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+	                    </View>
+	                    <Text style={[styles.faqText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+	                      {isArabic ? item.labelAr : item.labelEn}
+	                    </Text>
+	                    <TouchableOpacity
+	                      onPress={() => setSelectedPointInfo({
+	                        title: isArabic ? item.labelAr : item.labelEn,
+	                        description: isArabic ? item.infoAr : item.infoEn,
+	                        points: weight,
+	                        icon: item.icon,
+	                      })}
+	                      style={[
+	                        styles.pointsInfoButton,
+	                        {
+	                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+	                          borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+	                        },
+	                      ]}
+	                      activeOpacity={0.75}
+	                    >
+	                      <MaterialCommunityIcons name="information-outline" size={17} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+	                    </TouchableOpacity>
+	                    <View style={[styles.pointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
+	                      <Text style={[styles.pointsBadgeText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>+{weight}</Text>
                     </View>
                   </View>
                   {i < arr.length - 1 && <View style={[styles.faqSeparator, { backgroundColor: colors.border }]} />}
@@ -534,9 +642,9 @@ export default function HonorBoard() {
       </View>
     </ScrollView>
     </SafeAreaView>
-    <Modal
-      visible={showLeaderboardModal}
-      transparent
+	    <Modal
+	      visible={showLeaderboardModal}
+	      transparent
       animationType="fade"
       statusBarTranslucent
       onRequestClose={() => setShowLeaderboardModal(false)}
@@ -616,16 +724,133 @@ export default function HonorBoard() {
               );
             })}
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
-    </BackgroundWrapper>
-  );
-}
+	        </View>
+	      </View>
+	    </Modal>
+	    <Modal
+	      visible={!!selectedPointInfo}
+	      transparent
+	      animationType="fade"
+	      statusBarTranslucent
+	      onRequestClose={() => setSelectedPointInfo(null)}
+	    >
+	      <View style={styles.modalBackdrop}>
+	        <View style={[
+	          styles.pointsInfoModal,
+	          {
+	            backgroundColor: isDarkMode ? '#0f1a14' : '#ffffff',
+	            borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+	          },
+	        ]}>
+	          {selectedPointInfo && (
+	            <>
+	              <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+	                <View style={[
+	                  styles.pointsInfoIcon,
+	                  { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.14)' : 'rgba(181,114,0,0.10)' },
+	                ]}>
+	                  <MaterialCommunityIcons name={selectedPointInfo.icon} size={22} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+	                </View>
+	                <Text style={[styles.modalTitle, { color: isDarkMode ? '#ffffff' : colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+	                  {selectedPointInfo.title}
+	                </Text>
+	                <TouchableOpacity
+	                  onPress={() => setSelectedPointInfo(null)}
+	                  style={[
+	                    styles.modalCloseButton,
+	                    {
+	                      backgroundColor: isDarkMode ? 'rgba(13,142,98,0.18)' : 'rgba(13,142,98,0.10)',
+	                      borderColor: isDarkMode ? 'rgba(13,142,98,0.38)' : 'rgba(13,142,98,0.22)',
+	                    },
+	                  ]}
+	                  activeOpacity={0.75}
+	                >
+	                  <MaterialCommunityIcons name="close" size={20} color={isDarkMode ? '#4ADE80' : '#0d8e62'} />
+	                </TouchableOpacity>
+	              </View>
+	              <View style={[styles.modalHeaderDivider, { backgroundColor: isDarkMode ? 'rgba(13,142,98,0.28)' : 'rgba(13,142,98,0.16)' }]} />
+	              <View style={[styles.pointsInfoMeta, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+	                <View style={[styles.pointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
+	                  <Text style={[styles.pointsBadgeText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>+{selectedPointInfo.points}</Text>
+	                </View>
+	                <Text style={[styles.faqDetailPoints, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+	                  {isArabic ? 'لكل مرة محسوبة' : 'per counted entry'}
+	                </Text>
+	              </View>
+	              <Text style={[
+	                styles.pointsInfoDescription,
+	                {
+	                  color: colors.text,
+	                  textAlign: isRTL ? 'right' : 'left',
+	                  writingDirection: isRTL ? 'rtl' : 'ltr',
+	                },
+	              ]}>
+	                {selectedPointInfo.description}
+	              </Text>
+	            </>
+	          )}
+	        </View>
+	      </View>
+	    </Modal>
+	    </BackgroundWrapper>
+	  );
+	}
 
 const _styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingScreen: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  loadingBackRow: {
+    minHeight: 44,
+    alignItems: 'center',
+  },
+  loadingBody: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 96,
+  },
+  loadingCard: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 22,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  loadingIconCircle: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingSpinner: {
+    marginTop: 18,
+    marginBottom: 16,
+  },
+  loadingTitle: {
+    fontSize: 18,
+    fontFamily: fontBold(),
+    textAlign: 'center',
+    lineHeight: 30,
+    includeFontPadding: false,
+  },
+  loadingSubtitle: {
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   content: {
     padding: 16,
@@ -790,13 +1015,21 @@ const _styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 4,
   },
-  pointsBadgeText: {
-    fontSize: 13,
-    fontFamily: fontBold(),
-    lineHeight: 20,
-    includeFontPadding: false,
-  },
-  showAllButton: {
+	  pointsBadgeText: {
+	    fontSize: 13,
+	    fontFamily: fontBold(),
+	    lineHeight: 20,
+	    includeFontPadding: false,
+	  },
+	  pointsInfoButton: {
+	    width: 30,
+	    height: 30,
+	    borderRadius: 15,
+	    borderWidth: 1,
+	    alignItems: 'center',
+	    justifyContent: 'center',
+	  },
+	  showAllButton: {
     fontSize: 14,
     fontFamily: fontSemiBold(),
     lineHeight: 24,
@@ -810,9 +1043,9 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 28,
   },
-  modalSheet: {
-    width: '100%',
-    maxHeight: '82%',
+	  modalSheet: {
+	    width: '100%',
+	    maxHeight: '82%',
     borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -822,9 +1055,22 @@ const _styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
-    elevation: 12,
-  },
-  modalHeader: {
+	    elevation: 12,
+	  },
+	  pointsInfoModal: {
+	    width: '100%',
+	    borderRadius: 22,
+	    borderWidth: 1,
+	    paddingHorizontal: 16,
+	    paddingTop: 14,
+	    paddingBottom: 16,
+	    shadowColor: '#000',
+	    shadowOffset: { width: 0, height: 8 },
+	    shadowOpacity: 0.35,
+	    shadowRadius: 20,
+	    elevation: 12,
+	  },
+	  modalHeader: {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
@@ -845,11 +1091,30 @@ const _styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalHeaderDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginTop: 10,
-    marginBottom: 2,
-  },
+	  modalHeaderDivider: {
+	    height: StyleSheet.hairlineWidth,
+	    marginTop: 10,
+	    marginBottom: 2,
+	  },
+	  pointsInfoIcon: {
+	    width: 38,
+	    height: 38,
+	    borderRadius: 19,
+	    alignItems: 'center',
+	    justifyContent: 'center',
+	  },
+	  pointsInfoMeta: {
+	    alignItems: 'center',
+	    gap: 8,
+	    marginTop: 14,
+	    marginBottom: 10,
+	  },
+	  pointsInfoDescription: {
+	    fontSize: 14,
+	    fontFamily: fontRegular(),
+	    lineHeight: 24,
+	    includeFontPadding: false,
+	  },
   modalListContent: {
     paddingTop: 2,
     paddingBottom: 6,

@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
   },
   infoCard: {
     marginHorizontal: 16,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     marginVertical: 2,
   },
   scrollView: {
@@ -470,11 +470,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
   },
   sectionSubtitle: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     marginTop: 4,
     textAlign: 'center',
   },
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 4,
     textAlign: 'center',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
   },
   errorIcon: {
     height: 36,

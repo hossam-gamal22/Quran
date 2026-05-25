@@ -36,7 +36,13 @@ import { Spacing, Colors, DarkColors } from '@/constants/theme';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
 import { FREE_PEXELS_BACKGROUNDS, PREMIUM_PEXELS_BACKGROUNDS, BACKGROUND_CATEGORIES, type PexelsBackground } from '@/constants/pexels-backgrounds';
-import { fetchPhotoBackgrounds, fetchPhotoBackgroundCategories, type PhotoBackgroundCategory } from '@/lib/photo-backgrounds-api';
+import {
+  fetchPhotoBackgrounds,
+  fetchPhotoBackgroundCategories,
+  subscribeToPhotoBackgrounds,
+  subscribeToPhotoBackgroundCategories,
+  type PhotoBackgroundCategory,
+} from '@/lib/photo-backgrounds-api';
 import { cacheBackground, getCachedBackgroundUri } from '@/lib/background-cache';
 
 const FONT_SIZES: { value: FontSize; labelKey: string; sample: number }[] = [
@@ -69,15 +75,27 @@ export default function DisplaySettingsScreen() {
   useEffect(() => {
     // Show all built-in backgrounds by default (7 color backgrounds)
     setMergedBuiltIn(APP_BACKGROUNDS.map(bg => ({ ...bg, is_premium: false })));
-    // Fetch admin-managed backgrounds (falls back to hardcoded)
+    // Fetch cache/fallback immediately, then keep the admin-managed list live while this screen is open.
     fetchPhotoBackgrounds().then(({ free, premium }) => {
       setFreePexels(free);
       setPremiumPexels(premium);
     }).catch(() => { /* keep hardcoded defaults */ });
-    // Fetch admin-managed categories (falls back to hardcoded BACKGROUND_CATEGORIES)
     fetchPhotoBackgroundCategories().then((cats) => {
       if (cats.length > 0) setAdminCategories(cats);
     }).catch(() => { /* keep hardcoded defaults */ });
+
+    const unsubscribeBackgrounds = subscribeToPhotoBackgrounds(({ free, premium }) => {
+      setFreePexels(free);
+      setPremiumPexels(premium);
+    });
+    const unsubscribeCategories = subscribeToPhotoBackgroundCategories((cats) => {
+      setAdminCategories(cats);
+    });
+
+    return () => {
+      unsubscribeBackgrounds();
+      unsubscribeCategories();
+    };
   }, []);
 
   // Theme mode options

@@ -123,7 +123,7 @@ const DEFAULT_QUICK_ACCESS = [
 
 const SECTION_FALLBACKS: Record<string, { title: string; icon: IconComponent; color: string; items: string[] }> = {
   cat_azkar: { title: 'الأذكار', icon: Moon, color: '#8B5CF6', items: ['أذكار الصباح', 'أذكار المساء', 'أذكار النوم', 'بعد الصلاة'] },
-  cat_stories: { title: 'القصص', icon: BookOpen, color: '#3a7ca5', items: ['السيرة', 'الصحابة', 'قصة اليوم', 'آيات الكون'] },
+  cat_stories: { title: 'القصص', icon: BookOpen, color: '#3a7ca5', items: ['السيرة', 'الصحابة', 'قصص دينية', 'قصة اليوم'] },
   cat_hajj: { title: 'مناسك الحج والعمرة', icon: Landmark, color: '#0D9488', items: ['الحج', 'العمرة', 'أدعية الطواف', 'أدعية السعي'] },
   cat_quran: { title: 'سور وآيات قرآنية', icon: BookOpen, color: '#4CAF50', items: ['سورة الكهف', 'سورة يس', 'سورة الملك', 'آية الكرسي'] },
   cat_duas: { title: 'أدعية وأحاديث', icon: Heart, color: '#c17f59', items: ['دعاء اليوم', 'حديث اليوم', 'أدعية مشهورة', 'دعاء قرآني'] },

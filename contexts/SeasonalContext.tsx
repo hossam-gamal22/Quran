@@ -1,7 +1,7 @@
 // contexts/SeasonalContext.tsx
 // سياق المحتوى الموسمي - روح المسلم
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   SeasonType,
@@ -195,6 +195,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
   const [seasonalContent, setSeasonalContent] = useState<SeasonalContent[]>([]);
   const [featuredContent, setFeaturedContent] = useState<SeasonalContent | null>(null);
   const [adminBanner, setAdminBanner] = useState<WelcomeBannerConfig | null>(null);
+  const seasonalContentSnapshotReady = useRef(false);
 
   // ========================================
   // تحميل البيانات
@@ -579,6 +580,30 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
 
     return unsubscribe;
   }, [currentSeason?.type, isLoading]);
+
+  useEffect(() => {
+    const seasonalContentQuery = query(
+      collection(db, 'seasonalContent'),
+      where('isActive', '==', true),
+      orderBy('priority', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(
+      seasonalContentQuery,
+      () => {
+        if (!seasonalContentSnapshotReady.current) {
+          seasonalContentSnapshotReady.current = true;
+          return;
+        }
+        refreshSeasonalData();
+      },
+      (error) => {
+        if (__DEV__) console.log('Realtime seasonal content listener unavailable:', error);
+      }
+    );
+
+    return unsubscribe;
+  }, [refreshSeasonalData]);
 
   // ========================================
   // إدارة الإعدادات

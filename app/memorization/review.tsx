@@ -172,13 +172,13 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
     emptyText: {
       color: colors.textLight,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: 'center',
     },
     position: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -186,7 +186,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     card: { padding: 24, gap: 18, alignItems: 'center', minHeight: 320 },
     surahLabel: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 16,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -202,7 +202,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     hiddenBox: { alignItems: 'center', gap: 12, paddingVertical: 32 },
     rememberPrompt: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: 'center',
     },
@@ -211,7 +211,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       paddingVertical: 12,
       borderRadius: 14,
     },
-    revealBtnText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 14 },
+    revealBtnText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 14 },
     choicesRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, alignSelf: 'stretch' },
     choice: {
       flex: 1,
@@ -225,5 +225,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     choiceNo: { backgroundColor: '#b00020' },
     choicePartial: { backgroundColor: '#c98900' },
     choiceYes: { backgroundColor: '#0d8e62' },
-    choiceText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 13 },
+    choiceText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 13 },
   });

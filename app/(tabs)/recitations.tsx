@@ -34,6 +34,7 @@ import {
   isDownloading,
   getDownloadedForReciter,
 } from '@/lib/audio-download-manager';
+import { uiText } from '@/lib/ui-text';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const AYAH_COUNTS_114 = [
@@ -392,7 +393,7 @@ export default function RecitationsScreen() {
     sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
     modalBackdrop: { ...StyleSheet.absoluteFillObject },
-    modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, height: '90%', flexDirection: 'column' },
+    modalSheet: { backgroundColor: colors.modalSurface, borderTopLeftRadius: 28, borderTopRightRadius: 28, height: '90%', flexDirection: 'column' },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10 },
     modalTitle: { fontSize: 17, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
     reciterItem: {
@@ -593,14 +594,14 @@ export default function RecitationsScreen() {
             >
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                 <MaterialCommunityIcons name="circle" size={10} color="#22C55E" />
-                <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Cairo-SemiBold' }}>
-                  {isArabic ? 'تحديد الآية أثناء التلاوة' : 'Per-ayah highlighting'}
+                <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Rubik-SemiBold' }}>
+                  {uiText({ ar: 'تحديد الآية أثناء التلاوة', en: 'Per-ayah highlighting' })}
                 </Text>
               </View>
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                 <MaterialCommunityIcons name="circle" size={10} color="#F59E0B" />
-                <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Cairo-SemiBold' }}>
-                  {isArabic ? 'تشغيل متواصل بدون تحديد' : 'Continuous play only'}
+                <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Rubik-SemiBold' }}>
+                  {uiText({ ar: 'تشغيل متواصل بدون تحديد', en: 'Continuous play only' })}
                 </Text>
               </View>
             </View>
@@ -631,8 +632,8 @@ export default function RecitationsScreen() {
                   <View style={s.reciterItemInfo}>
                     <Text style={[s.reciterItemAr, isSelected && { color: colors.primaryText }]}>{isArabic ? (r.nameAr || r.name) : (r.name || r.nameAr)}</Text>
                     {isLoadingThis && (
-                      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: 'Cairo-Regular', textAlign: isRTL ? 'right' : 'left' }}>
-                        {isArabic ? 'جارٍ التحميل من الإنترنت…' : 'Streaming over network…'}
+                      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: 'Rubik-Regular', textAlign: isRTL ? 'right' : 'left' }}>
+                        {uiText({ ar: 'جارٍ التحميل من الإنترنت...', en: 'Streaming over network...' })}
                       </Text>
                     )}
                   </View>
@@ -646,7 +647,11 @@ export default function RecitationsScreen() {
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
-                    accessibilityLabel={sync ? 'تحديد الآية تلقائياً' : 'تشغيل متواصل فقط'}
+                    accessibilityLabel={
+                      sync
+                        ? uiText({ ar: 'تحديد الآية تلقائياً', en: 'Automatic ayah highlighting' })
+                        : uiText({ ar: 'تشغيل متواصل فقط', en: 'Continuous play only' })
+                    }
                   >
                     <MaterialCommunityIcons name="circle" size={10} color={sync ? '#22C55E' : '#F59E0B'} />
                   </View>

@@ -8,9 +8,107 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+  background: #0f172a;
+}
+
+html {
+  color-scheme: dark;
+}
+
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   direction: rtl;
+  min-width: 320px;
+  color: #e2e8f0;
+  overflow-x: hidden;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 220ms ease-out both;
+}
+
+.animate-panel-enter {
+  animation: panel-enter 260ms ease-out both;
+}
+
+.animate-toast-in,
+.animate-fade-in {
+  animation: toast-in 180ms ease-out both;
+}
+
+.collapsible-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 260ms ease, opacity 180ms ease;
+}
+
+.collapsible-grid-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.shimmer-surface {
+  background-image: linear-gradient(90deg, rgba(51, 65, 85, 0.55), rgba(71, 85, 105, 0.8), rgba(51, 65, 85, 0.55));
+  background-size: 220% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ==================== Admin Panel Component Classes ==================== */

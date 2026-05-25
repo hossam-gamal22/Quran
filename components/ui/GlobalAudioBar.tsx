@@ -78,9 +78,13 @@ export function GlobalAudioBar() {
   const isLoading = isQuran ? playbackState.isLoading : state.isLoading;
   const currentPosition = isQuran ? playbackState.position : state.position;
   const currentDuration = isQuran ? playbackState.duration : state.duration;
-  const showQueue = isAzkar && state.queueLength > 1;
+  const queueDisplayIndex = state.queueDisplayIndex || state.queueIndex + 1;
+  const queueDisplayLength = state.queueDisplayLength || state.queueLength;
+  const showQueue = isAzkar && queueDisplayLength > 1;
   const showSpeed = isAzkar;
   const isLive = isRadio;
+  const previousIcon = (isRTL || isQuran) ? 'skip-next' : 'skip-previous';
+  const nextIcon = (isRTL || isQuran) ? 'skip-previous' : 'skip-next';
 
   const handleTogglePlay = () => {
     if (isQuran) quranToggle();
@@ -185,7 +189,7 @@ export function GlobalAudioBar() {
 
             {showQueue && (
               <Text style={[styles.queueBadge, { color: textSecondary }]}>
-                {state.queueIndex + 1}/{state.queueLength}
+                {queueDisplayIndex}/{queueDisplayLength}
               </Text>
             )}
 
@@ -246,7 +250,7 @@ export function GlobalAudioBar() {
           {/* Queue info */}
           {showQueue && (
             <Text style={[styles.queueInfo, { color: textSecondary }]}>
-              {state.queueIndex + 1} / {state.queueLength}
+              {queueDisplayIndex} / {queueDisplayLength}
             </Text>
           )}
 
@@ -282,7 +286,7 @@ export function GlobalAudioBar() {
             )}
 
             <Pressable onPress={() => handlePress(handlePrevious)} hitSlop={8} style={styles.controlBtn}>
-              <MaterialCommunityIcons name={isQuran ? 'skip-next' : 'skip-previous'} size={28} color={textColor} />
+              <MaterialCommunityIcons name={previousIcon} size={28} color={textColor} />
             </Pressable>
 
             <Pressable
@@ -301,7 +305,7 @@ export function GlobalAudioBar() {
             </Pressable>
 
             <Pressable onPress={() => handlePress(handleNext)} hitSlop={8} style={styles.controlBtn}>
-              <MaterialCommunityIcons name={isQuran ? 'skip-previous' : 'skip-next'} size={28} color={textColor} />
+              <MaterialCommunityIcons name={nextIcon} size={28} color={textColor} />
             </Pressable>
 
             {/* Spacer to balance speed button */}

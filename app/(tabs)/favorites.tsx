@@ -286,10 +286,20 @@ function getFallbackRoute(item: FavoriteItem): string | null {
       return `/quote-of-day?favId=${encodeURIComponent(item.id)}`;
     case 'ayah':
       return '/daily-ayah';
-    case 'hadith_sifat':
-      return '/hadith-sifat';
+    case 'hadith_sifat': {
+      const hadithId = item.id.replace(/^hadith_sifat_/, '');
+      return hadithId ? `/hadith-sifat?id=${hadithId}` : '/hadith-sifat';
+    }
     case 'companion':
       return '/companions';
+    case 'story': {
+      const storyId = item.id.replace(/^story_/, '');
+      return storyId ? `/religious-stories?id=${encodeURIComponent(storyId)}` : '/religious-stories';
+    }
+    case 'seerah': {
+      const slug = item.id.replace(/^seerah_/, '');
+      return slug ? `/seerah?section=${slug}` : '/seerah';
+    }
     default:
       return null;
   }
@@ -1221,7 +1231,13 @@ export default function FavoritesScreen() {
                               ]);
                             }}
                             onPress={() => {
-                              const route = item.route || getFallbackRoute(item);
+                              // For types that gained deep-linking after launch, always
+                              // derive the route from the saved id so old entries still
+                              // open at the exact saved item.
+                              const derivedTypes: FavoriteType[] = ['seerah', 'hadith_sifat', 'story'];
+                              const route = derivedTypes.includes(item.type)
+                                ? getFallbackRoute(item)
+                                : (item.route || getFallbackRoute(item));
                               if (route) router.push(route as any);
                             }}
                             style={{

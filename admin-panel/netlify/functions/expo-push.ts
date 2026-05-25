@@ -11,6 +11,7 @@ import type { Handler } from '@netlify/functions';
 import { verifyAdminSessionToken, extractBearerToken } from './_lib/admin-session';
 
 const EXPO_PUSH_API = 'https://api.expo.dev/v2/push/send';
+const EXPO_RECEIPTS_API = 'https://api.expo.dev/v2/push/getReceipts';
 
 function resolveAllowedOrigin(requestOrigin: string | undefined): string {
   const raw = (process.env.ADMIN_PANEL_ORIGINS || '').trim();
@@ -76,14 +77,25 @@ const handler: Handler = async (event) => {
   }
 
   try {
-    const response = await fetch(EXPO_PUSH_API, {
+    const parsedBody = event.body ? JSON.parse(event.body) : [];
+    const isReceiptRequest =
+      parsedBody &&
+      typeof parsedBody === 'object' &&
+      !Array.isArray(parsedBody) &&
+      parsedBody.action === 'receipts';
+    const expoUrl = isReceiptRequest ? EXPO_RECEIPTS_API : EXPO_PUSH_API;
+    const expoBody = isReceiptRequest
+      ? JSON.stringify({ ids: Array.isArray(parsedBody.ids) ? parsedBody.ids : [] })
+      : event.body || '[]';
+
+    const response = await fetch(expoUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${expoToken}`,
       },
-      body: event.body || '[]',
+      body: expoBody,
     });
 
     const result = await response.json();

@@ -1,1 +1,3 @@
-/*    /index.html   200
+/api/expo-push      /.netlify/functions/expo-push      200
+/api/verify-admin   /.netlify/functions/verify-admin   200
+/*                  /index.html                        200

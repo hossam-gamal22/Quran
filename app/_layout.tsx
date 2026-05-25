@@ -6,7 +6,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, AppState, AppStateStatus, Platform, StyleSheet as RNStyleSheet, View, Text, TextInput, LogBox, I18nManager, UIManager } from 'react-native';
+import { Alert, Animated, AppState, AppStateStatus, Platform, StyleSheet as RNStyleSheet, View, Text, TextInput, LogBox, I18nManager, UIManager } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { initializeAppOpenAds } from '@/lib/app-open-ad';
 import { languageInitPromise, getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
 import { syncAppIconOnStartup, checkForIconUpdate } from '@/lib/app-icon-manager';
 import { getCurrentSeason as getLocalCurrentSeason } from '@/lib/seasonal-content';
+import { hydrateHijriOffset } from '@/lib/hijri-date';
 
 // Contexts
 import { SettingsProvider, themeCachePromise } from '@/contexts/SettingsContext';
@@ -49,7 +50,8 @@ import {
   trackAppOpen, 
   syncLocalStats 
 } from '@/lib/firebase-analytics';
-import { autoSelectMonthlyWinners, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import { syncPremiumWorshipCloudData } from '@/lib/premium-worship-cloud-sync';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
 import { SnapshotHost } from '@/lib/widgets/snapshot';
@@ -77,7 +79,7 @@ import { hydrateStoriesFromFirestore } from '@/data/stories';
 import { initRemoteTranslations } from '@/lib/remote-translations';
 import { fontRegular } from '@/lib/fonts';
 import { toWesternDigits } from '@/lib/format-number';
-import { fetchQuranThemes } from '@/lib/admin-data-api';
+import { fetchQuranThemes, subscribeToQuranThemes } from '@/lib/admin-data-api';
 import { QURAN_THEMES, setQuranThemes } from '@/constants/quran-themes';
 import * as ExpoNotifications from 'expo-notifications';
 import { handleNotificationNavigation } from '@/lib/notification-router';
@@ -96,10 +98,13 @@ import { maybeUploadTelemetry } from '@/lib/notification-telemetry';
 // Import at module scope to register the background task definition (required by expo-task-manager)
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
+import '@/lib/hijri-push-sync';
+import { applyHijriOverridePushPayload, registerHijriOverridePushTask } from '@/lib/hijri-push-sync';
 import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
 import { prefetchNatureImages } from '@/lib/nature-image-prefetch';
 import { NATURE_BG_URLS } from '@/constants/nature-backgrounds';
-import { uploadToCloud } from '@/lib/cloud-sync';
+import { downloadFromCloud, getCloudBackupMeta, uploadToCloud } from '@/lib/cloud-sync';
+import { isLocalDataEmpty } from '@/lib/backup-utils';
 import * as Auth from '@/lib/_core/auth';
 import {
   recordSessionStart,
@@ -107,6 +112,7 @@ import {
   shouldShowRating,
   showRatingPrompt,
 } from '@/lib/app-rating';
+import { recordHonorBoardNameReminderOpen } from '@/lib/honor-board-name-reminder';
 
 // Signal that notification channels have been initialized.
 // SettingsContext awaits this before scheduling to avoid race condition
@@ -372,6 +378,43 @@ const StatusBarManager = () => {
   return <StatusBar style={colors.statusBarStyle} translucent={true} />;
 };
 
+const PremiumWorshipCloudSyncGate = () => {
+  const { isPremium, isLoading } = useSubscription();
+  const syncInFlightRef = useRef(false);
+
+  const runSync = useCallback(async (force = false) => {
+    if (isLoading || !isPremium || syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+    try {
+      await restoreFullCloudBackupIfFreshInstall();
+      const userId = await getUserId();
+      const result = await syncPremiumWorshipCloudData(userId, true, { force });
+      if (__DEV__ && result.restoredKeys.length > 0) {
+        console.log('[premium-backup] restored keys:', result.restoredKeys);
+      }
+    } catch (error) {
+      if (__DEV__) console.warn('[premium-backup] sync failed:', error);
+    } finally {
+      syncInFlightRef.current = false;
+    }
+  }, [isLoading, isPremium]);
+
+  useEffect(() => {
+    runSync(true);
+  }, [runSync]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        runSync(false);
+      }
+    });
+    return () => subscription.remove();
+  }, [runSync]);
+
+  return null;
+};
+
 // Smooth theme transition overlay — covers screen with correct theme color
 // while the real content finishes rendering (including background images).
 // Fades out AFTER settings are loaded, preventing any flash between splash and content.
@@ -481,6 +524,82 @@ const PaywallAutoTrigger = () => {
   return null;
 };
 
+const HonorBoardNameReminderGate = () => {
+  const { isLoading, isOnboardingComplete } = useOnboarding();
+  const router = useRouter();
+  const pathname = usePathname();
+  const promptedThisSession = useRef(false);
+  const checkInFlight = useRef(false);
+  const activeCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runCheck = useCallback(async () => {
+    if (
+      isLoading ||
+      !isOnboardingComplete ||
+      promptedThisSession.current ||
+      checkInFlight.current ||
+      pathname?.startsWith('/onboarding')
+    ) {
+      return;
+    }
+
+    checkInFlight.current = true;
+    try {
+      const result = await recordHonorBoardNameReminderOpen();
+      if (!result.shouldPrompt || promptedThisSession.current) return;
+
+      promptedThisSession.current = true;
+      const isArabic = (getLanguage() || 'ar') === 'ar';
+      Alert.alert(
+        isArabic ? 'اسمك على لوحة الشرف' : 'Your honor board name',
+        isArabic
+          ? 'أنت تفتح التطبيق بانتظام منذ أسبوع. اكتب اسمك حتى يظهر في لوحة الشرف عند تقدمك في الترتيب.'
+          : 'You have opened the app consistently for a week. Add your name so it can appear on the honor board as you climb the rankings.',
+        [
+          {
+            text: isArabic ? 'لاحقًا' : 'Later',
+            style: 'cancel',
+          },
+          {
+            text: isArabic ? 'اكتب الاسم' : 'Add name',
+            onPress: () => {
+              router.push({ pathname: '/(tabs)/settings', params: { editName: '1' } } as any);
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      if (__DEV__) console.warn('[honor-board-name-reminder] check failed:', error);
+    } finally {
+      checkInFlight.current = false;
+    }
+  }, [isLoading, isOnboardingComplete, pathname, router]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runCheck();
+    }, 12_000);
+    return () => clearTimeout(timer);
+  }, [runCheck]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        if (activeCheckTimer.current) clearTimeout(activeCheckTimer.current);
+        activeCheckTimer.current = setTimeout(() => {
+          runCheck();
+        }, 1500);
+      }
+    });
+    return () => {
+      subscription.remove();
+      if (activeCheckTimer.current) clearTimeout(activeCheckTimer.current);
+    };
+  }, [runCheck]);
+
+  return null;
+};
+
 const AUTO_BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 async function autoBackupIfNeeded() {
@@ -510,6 +629,24 @@ async function autoBackupIfNeeded() {
   }
 }
 
+async function restoreFullCloudBackupIfFreshInstall() {
+  try {
+    const user = await Auth.getUserInfo();
+    if (!user?.openId) return;
+    const isEmpty = await isLocalDataEmpty();
+    if (!isEmpty) return;
+    const meta = await getCloudBackupMeta(user.openId);
+    if (!meta) return;
+    const result = await downloadFromCloud(user.openId);
+    if (result) {
+      await AsyncStorage.setItem('last_backup_date', new Date().toISOString());
+      console.log('☁️ [AutoRestore] Full cloud backup restored:', result.restored);
+    }
+  } catch (e) {
+    console.warn('☁️ [AutoRestore] Failed:', e);
+  }
+}
+
 export default function RootLayout() {
   const pathname = usePathname();
   const router = useRouter();
@@ -517,13 +654,14 @@ export default function RootLayout() {
   const [languageReady, setLanguageReady] = useState(false);
   const splashHidden = useRef(false);
 
-  // Wait for the eagerly-started language + theme cache loads.
-  // Both are module-scope promises that read from AsyncStorage.
-  // We gate rendering on these so the first paint has correct language AND theme.
+  // Wait for the eagerly-started language + theme cache loads, plus the Hijri
+  // offset that older date helpers read synchronously on first paint.
+  // These are module-scope or tiny AsyncStorage reads, so the first render has
+  // correct language, theme, and moon-sighting adjustment.
   // Safety: 4s timeout prevents permanent hang if AsyncStorage is slow/stuck.
   useEffect(() => {
     let done = false;
-    Promise.all([languageInitPromise, themeCachePromise]).then(() => {
+    Promise.all([languageInitPromise, themeCachePromise, hydrateHijriOffset()]).then(() => {
       if (!done) { done = true; setLanguageReady(true); }
     }).catch(() => {
       if (!done) { done = true; setLanguageReady(true); }
@@ -679,6 +817,7 @@ export default function RootLayout() {
         // Register background task to reschedule DATE-based notifications
         // (prayer times, after-prayer azkar) even when app is closed/killed
         await registerBackgroundNotificationTask();
+        await registerHijriOverridePushTask();
         console.log('[Notifications] Background task registered');
 
         // NOTE: rescheduleAllFromStorage() is NOT called here intentionally.
@@ -866,11 +1005,6 @@ export default function RootLayout() {
           },
           'Track app open + sync scores',
           10000
-        ),
-        initWithTimeout(
-          () => autoSelectMonthlyWinners(),
-          'Auto-select monthly winners',
-          5000
         ),
         initWithTimeout(
           async () => {
@@ -1107,6 +1241,12 @@ export default function RootLayout() {
     // Subscribe to live admin edits of custom adhkar categories.
     const unsubscribeCustomCategories = subscribeToCustomCategoriesFromFirestore();
 
+    // Subscribe to live admin edits of Quran themes so the reader sees color
+    // changes without waiting for cache expiry or app reinstall.
+    const unsubscribeQuranThemes = subscribeToQuranThemes((themes) => {
+      setQuranThemes(themes);
+    });
+
     const activityInterval = setInterval(() => {
       updateLastActive().catch(() => {});
     }, 5 * 60 * 1000);
@@ -1137,6 +1277,7 @@ export default function RootLayout() {
       unsubscribeSoundSettings();
       unsubscribeAzkar();
       unsubscribeCustomCategories();
+      unsubscribeQuranThemes();
       saveSessionTime().catch(() => {});
     };
   }, []);
@@ -1169,6 +1310,20 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [router]);
 
+  useEffect(() => {
+    const receivedSub = ExpoNotifications.addNotificationReceivedListener((notification) => {
+      applyHijriOverridePushPayload(notification.request.content.data).catch(() => {});
+    });
+    const responseSub = ExpoNotifications.addNotificationResponseReceivedListener((response) => {
+      applyHijriOverridePushPayload(response.notification.request.content.data).catch(() => {});
+    });
+
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, []);
+
   // Mark app ready when fonts finish (splash hide is handled by SplashGate inside SettingsProvider)
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -1179,16 +1334,9 @@ export default function RootLayout() {
         splashHidden.current = true;
         setAppReady(true);
       }
-      // Preload ALL 604 QCF Mushaf page fonts in the background so any place in
-      // the app that renders Quran (deep-link from favorites, daily-ayah, ayat-kursi,
-      // tafsir, share card, etc.) finds the correct per-page font already in memory.
-      try {
-        const { preloadAllPagesInBackground } = require('@/lib/qcf-font-loader');
-        preloadAllPagesInBackground(false);
-        preloadAllPagesInBackground(true);
-      } catch (err) {
-        console.warn('⚠️ QCF background preload failed to start:', err);
-      }
+      // QCF page fonts are loaded on demand by Quran screens/components.
+      // Loading all 604 pages in both light and dark variants during startup
+      // creates avoidable memory pressure on low-end Android devices.
       // Scan the on-disk Tajweed color font cache so hasColorFontForPage() / getColorFontSource()
       // return correct results without an extra round-trip when the user enters a Mushaf page.
       try {
@@ -1220,6 +1368,7 @@ export default function RootLayout() {
         const notifId = response.notification.request.identifier;
 
         if (__DEV__) console.log('🔔 Cold-start notification tap:', notifId, JSON.stringify(data));
+        await applyHijriOverridePushPayload(data).catch(() => false);
 
         // Handle "هل صليت؟" action buttons (prayed / will_pray) on cold start.
         // If consumed, skip navigation — the user tapped an action, not the notification body.
@@ -1328,7 +1477,9 @@ export default function RootLayout() {
                           <OnboardingProvider>
                           <CelebrationProvider>
                         <OnboardingGate />
+                        <PremiumWorshipCloudSyncGate />
                         <PaywallAutoTrigger />
+                        <HonorBoardNameReminderGate />
                         <StatusBarManager />
                         <NavigationTracker />
                         <OfflineModal />
@@ -1364,7 +1515,9 @@ export default function RootLayout() {
                           <Stack.Screen name="daily-dua" />
                           <Stack.Screen name="daily-ayah" />
                           <Stack.Screen name="companions" />
+                          <Stack.Screen name="religious-stories" />
                           <Stack.Screen name="question-answer" />
+                          <Stack.Screen name="qa-thread/[id]" />
                           <Stack.Screen name="memorization" />
                           <Stack.Screen name="temp-page/[id]" />
                           <Stack.Screen name="sdui/[screenId]" />

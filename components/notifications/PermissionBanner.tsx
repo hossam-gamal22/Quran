@@ -67,6 +67,12 @@ export function PermissionBanner({ excludedKeys = [], onlyKeys }: PermissionBann
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
     await issue.action();
+    // OEM auto-start state is not readable on many Android skins (including
+    // Tecno/Transsion Phone Master), so once the user opens the vendor settings
+    // we avoid nagging them again immediately.
+    if (issue.key === 'oemAutoStart') {
+      await dismissBanner(issue.key);
+    }
     // إعادة فحص بعد 500ms (لو المستخدم منح الإذن في الإعدادات)
     setTimeout(() => refresh(), 500);
   };
@@ -138,13 +144,13 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     textAlign: 'right',
     writingDirection: 'rtl',
   },
   body: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     lineHeight: 20,
     textAlign: 'right',
     writingDirection: 'rtl',
@@ -162,6 +168,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
   },
 });

@@ -12,7 +12,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
-import { Platform, Linking, PermissionsAndroid } from 'react-native';
+import { Platform, Linking, NativeModules, PermissionsAndroid } from 'react-native';
 
 /**
  * Check if exact alarms can be scheduled.
@@ -24,6 +24,13 @@ export async function checkExactAlarmPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
   const apiLevel = Platform.Version as number;
   if (apiLevel < 31) return true;
+
+  try {
+    const FullAdhan = (NativeModules as any)?.FullAdhanModule;
+    if (FullAdhan?.canScheduleExactAlarms) {
+      return (await FullAdhan.canScheduleExactAlarms()) === true;
+    }
+  } catch {}
 
   try {
     const granted = await (PermissionsAndroid as any).check(
@@ -54,7 +61,8 @@ export async function openExactAlarmSettings(): Promise<void> {
 
 /**
  * Request notification permissions from the OS.
- * On iOS, also requests critical alerts for prayer-time adhan.
+ * On iOS, request regular alert/sound permissions only. Critical Alerts require
+ * an Apple-approved entitlement and are intentionally not part of the default path.
  * Returns true if granted. Never shows an Alert on every launch —
  * if the user already denied, PermissionBanner handles re-engagement.
  */
@@ -70,7 +78,6 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       allowAlert: true,
       allowBadge: true,
       allowSound: true,
-      allowCriticalAlerts: true,
     },
   });
 

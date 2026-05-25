@@ -7,7 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Localization from 'expo-localization';
-import { gregorianToHijri, getHijriMonthDays, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN } from '@/lib/hijri-date';
+import { gregorianToHijri, getHijriMonthDays, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN, setCachedHijriOffset } from '@/lib/hijri-date';
 import { getFirestoreOverride } from '@/lib/hijri-overrides';
 import { fetchMoonSightingNews } from '@/services/moonSightingNews';
 
@@ -154,6 +154,7 @@ export async function getUserAdjustment(): Promise<number> {
 }
 
 export async function setUserAdjustment(adj: number): Promise<void> {
+  setCachedHijriOffset(adj);
   try {
     await AsyncStorage.setItem(USER_ADJUSTMENT_KEY, String(adj));
   } catch {}
@@ -163,6 +164,7 @@ export async function setUserAdjustment(adj: number): Promise<void> {
   try {
     await AsyncStorage.setItem('@hijri_date_offset', String(adj));
   } catch {}
+  await invalidateHijriCache();
   // Push to widget immediately.
   try {
     const { updateSharedData } = await import('@/lib/widget-data');
@@ -174,16 +176,28 @@ export async function setUserAdjustment(adj: number): Promise<void> {
 // Cache Layer
 // ============================================
 
-function getCacheKey(countryCode: string, date: Date): string {
+function getCacheKey(countryCode: string, date: Date, userAdj: number = 0): string {
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const yyyy = date.getFullYear();
-  return `${CACHE_PREFIX}${countryCode}_${yyyy}-${mm}-${dd}`;
+  return `${CACHE_PREFIX}${countryCode}_${yyyy}-${mm}-${dd}_adj_${userAdj}`;
 }
 
-async function getCachedResult(countryCode: string, date: Date): Promise<HijriResult | null> {
+export async function invalidateHijriCache(countryCode?: string, date?: Date): Promise<void> {
   try {
-    const key = getCacheKey(countryCode, date);
+    const keys = await AsyncStorage.getAllKeys();
+    const datePart = date
+      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      : '';
+    const prefix = countryCode ? `${CACHE_PREFIX}${countryCode}_` : CACHE_PREFIX;
+    const stale = keys.filter((key) => key.startsWith(prefix) && (!datePart || key.includes(datePart)));
+    if (stale.length > 0) await AsyncStorage.multiRemove(stale);
+  } catch {}
+}
+
+async function getCachedResult(countryCode: string, date: Date, userAdj: number): Promise<HijriResult | null> {
+  try {
+    const key = getCacheKey(countryCode, date, userAdj);
     const raw = await AsyncStorage.getItem(key);
     if (!raw) return null;
     const cached = JSON.parse(raw);
@@ -196,9 +210,9 @@ async function getCachedResult(countryCode: string, date: Date): Promise<HijriRe
   }
 }
 
-async function cacheResult(countryCode: string, date: Date, result: HijriResult): Promise<void> {
+async function cacheResult(countryCode: string, date: Date, result: HijriResult, userAdj: number): Promise<void> {
   try {
-    const key = getCacheKey(countryCode, date);
+    const key = getCacheKey(countryCode, date, userAdj);
     await AsyncStorage.setItem(key, JSON.stringify({ ...result, _cachedAt: Date.now() }));
   } catch {}
 }
@@ -239,6 +253,51 @@ function buildFromOverride(
     confidence: 'high',
     note: override.source,
   };
+}
+
+type HijriMonthKey = { year: number; month: number };
+
+function getAdjacentHijriMonthKeys(year: number, month: number): HijriMonthKey[] {
+  const previous = month === 1
+    ? { year: year - 1, month: 12 }
+    : { year, month: month - 1 };
+  const current = { year, month };
+  const next = month === 12
+    ? { year: year + 1, month: 1 }
+    : { year, month: month + 1 };
+  return [previous, current, next];
+}
+
+function isDateInsideOverride(
+  override: { hijriStartGregorian: string; monthLength: 29 | 30 },
+  gregorianDate: Date,
+  userAdj: number,
+): boolean {
+  const startDate = new Date(override.hijriStartGregorian);
+  if (Number.isNaN(startDate.getTime())) return false;
+
+  const adjusted = new Date(gregorianDate);
+  if (userAdj !== 0) {
+    adjusted.setDate(adjusted.getDate() + userAdj);
+  }
+  const diffDays = Math.floor((adjusted.getTime() - startDate.getTime()) / 86400000);
+  return diffDays >= 0 && diffDays < override.monthLength;
+}
+
+async function getActiveFirestoreOverride(
+  countryCode: string,
+  approxYear: number,
+  approxMonth: number,
+  gregorianDate: Date,
+  userAdj: number,
+) {
+  for (const candidate of getAdjacentHijriMonthKeys(approxYear, approxMonth)) {
+    const override = await getFirestoreOverride(countryCode, candidate.year, candidate.month);
+    if (override && override.isVerified && isDateInsideOverride(override, gregorianDate, userAdj)) {
+      return override;
+    }
+  }
+  return null;
 }
 
 // ============================================
@@ -310,18 +369,8 @@ export async function getHijriDate(
   const userAdj = await getUserAdjustment();
 
   // Serve from cache immediately (no loading flash)
-  const cached = await getCachedResult(country, gregorianDate);
+  const cached = await getCachedResult(country, gregorianDate, userAdj);
   if (cached) {
-    if (userAdj !== 0) {
-      const adjusted = new Date(gregorianDate);
-      adjusted.setDate(adjusted.getDate() + userAdj);
-      const recalc = gregorianToHijri(adjusted);
-      cached.day = recalc.day;
-      cached.month = recalc.month;
-      cached.year = recalc.year;
-      cached.monthName = HIJRI_MONTHS_EN[recalc.month - 1] || '';
-      cached.monthNameAr = HIJRI_MONTHS_AR[recalc.month - 1] || '';
-    }
     return cached;
   }
 
@@ -330,10 +379,10 @@ export async function getHijriDate(
 
   // ── LAYER 1 — Admin Firestore Override (highest priority) ──
   try {
-    const override = await getFirestoreOverride(country, approx.year, approx.month);
-    if (override && override.isVerified) {
+    const override = await getActiveFirestoreOverride(country, approx.year, approx.month, gregorianDate, userAdj);
+    if (override) {
       const result = buildFromOverride(override, gregorianDate, country, userAdj);
-      await cacheResult(country, gregorianDate, result);
+      await cacheResult(country, gregorianDate, result, userAdj);
       return result;
     }
   } catch {}
@@ -383,7 +432,7 @@ export async function getHijriDate(
         confidence,
         note,
       };
-      await cacheResult(country, gregorianDate, result);
+      await cacheResult(country, gregorianDate, result, userAdj);
       return result;
     }
   } catch {}
@@ -397,7 +446,7 @@ export async function getHijriDate(
     confidence: 'low',
     note: 'Based on calculation — may differ from official announcement',
   };
-  await cacheResult(country, gregorianDate, result);
+  await cacheResult(country, gregorianDate, result, userAdj);
   return result;
 }
 
@@ -413,10 +462,10 @@ export async function refreshHijriInBackground(): Promise<void> {
 
     // Try Layer 1
     try {
-      const override = await getFirestoreOverride(country, approx.year, approx.month);
-      if (override && override.isVerified) {
+      const override = await getActiveFirestoreOverride(country, approx.year, approx.month, today, 0);
+      if (override) {
         const result = buildFromOverride(override, today, country, 0);
-        await cacheResult(country, today, result);
+        await cacheResult(country, today, result, 0);
         return;
       }
     } catch {}
@@ -437,7 +486,7 @@ export async function refreshHijriInBackground(): Promise<void> {
           countryCode: country,
           confidence: 'medium',
         };
-        await cacheResult(country, today, result);
+        await cacheResult(country, today, result, 0);
       }
     } catch {}
   } catch {}
@@ -469,30 +518,38 @@ export async function subscribeToHijriOverridesForUser(
     if (!country) return () => {};
     const today = new Date();
     const approx = gregorianToHijri(today);
-    const docId = `${country}_${approx.year}_${approx.month}`;
-
     const { doc, onSnapshot } = await import('firebase/firestore');
     const { db } = await import('@/lib/firebase-config');
-    const ref = doc(db, 'hijri_overrides', docId);
 
-    const unsub = onSnapshot(
-      ref,
-      async () => {
-        // Bust the day's cache so the next getHijriDate() call refetches
-        // with the new override, instead of serving the now-stale cached
-        // result for up to an hour.
-        try {
-          await AsyncStorage.removeItem(getCacheKey(country, today));
-        } catch {}
-        // Notify caller (typically: trigger widget data refresh).
-        if (onChange) {
-          try { onChange(); } catch {}
-        }
-      },
-      (err) => {
-        if (__DEV__) console.warn('[hijri] override snapshot error:', err);
-      },
-    );
+    const notifyChange = async () => {
+      // Bust the day's cache so the next getHijriDate() call refetches
+      // with the new override, instead of serving the now-stale cached
+      // result for up to an hour.
+      try {
+        await invalidateHijriCache(country, today);
+      } catch {}
+      // Notify caller (typically: trigger widget data refresh).
+      if (onChange) {
+        try { onChange(); } catch {}
+      }
+    };
+
+    const unsubscribers = getAdjacentHijriMonthKeys(approx.year, approx.month).map(({ year, month }) => {
+      const ref = doc(db, 'hijri_overrides', `${country}_${year}_${month}`);
+      return onSnapshot(
+        ref,
+        notifyChange,
+        (err) => {
+          if (__DEV__) console.warn('[hijri] override snapshot error:', err);
+        },
+      );
+    });
+
+    const unsub = () => {
+      unsubscribers.forEach(unsubscribe => {
+        try { unsubscribe(); } catch {}
+      });
+    };
     _hijriOverrideUnsub = unsub;
     return unsub;
   } catch (e) {

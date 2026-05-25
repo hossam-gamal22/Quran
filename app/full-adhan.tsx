@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { t } from '@/lib/i18n';
+import { getPrayerTranslationKey, type PrayerName } from '@/lib/prayer-times';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useNotificationSettings } from '@/contexts/SettingsContext';
 import {
@@ -110,7 +111,10 @@ export default function FullAdhanScreen() {
     //    iOS or in Expo Go where the native module is missing.
     if (Platform.OS === 'android') {
       const FullAdhanModule = (NativeModules as any)?.FullAdhanModule;
-      if (FullAdhanModule?.stopPlayback) {
+      if (FullAdhanModule?.stopFullAdhan) {
+        try { await FullAdhanModule.stopFullAdhan(); } catch {}
+      } else if (FullAdhanModule?.stopPlayback) {
+        // Backward compatibility for older dev builds that exposed this name.
         try { await FullAdhanModule.stopPlayback(); } catch {}
       }
     }
@@ -239,9 +243,13 @@ export default function FullAdhanScreen() {
     await loadAndPlay(nextVoice);
   }, [updateNotifications, loadAndPlay]);
 
+  const prayerTitleKey = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'].includes(prayerKey)
+    ? getPrayerTranslationKey(prayerKey as PrayerName)
+    : `prayer.${prayerKey}`;
+
   const titleText = isTest
     ? t('fullAdhan.testTitle')
-    : t('fullAdhan.prayerTitle', { prayer: t(`prayer.${prayerKey}`) });
+    : t('fullAdhan.prayerTitle', { prayer: t(prayerTitleKey) });
 
   const closeIcon = isRTL ? 'chevron-right' : 'chevron-left';
   const availableVoices = useMemo(
@@ -418,7 +426,7 @@ const styles = StyleSheet.create({
   titleText: {
     color: '#ffffff',
     fontSize: 18,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     textAlign: 'center',
   },
   testBadge: {
@@ -431,7 +439,7 @@ const styles = StyleSheet.create({
   testBadgeText: {
     color: '#ffffff',
     fontSize: 11,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
   },
   middle: {
     flex: 1,
@@ -484,7 +492,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ffffff',
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: 'Rubik-Medium',
     textAlign: 'center',
     marginTop: 12,
     marginBottom: 16,
@@ -498,7 +506,7 @@ const styles = StyleSheet.create({
   retryBtnText: {
     color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
   },
   completedWrap: {
     flex: 1,
@@ -509,7 +517,7 @@ const styles = StyleSheet.create({
   completedText: {
     color: '#ffffff',
     fontSize: 22,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     textAlign: 'center',
     lineHeight: 38,
   },
@@ -529,7 +537,7 @@ const styles = StyleSheet.create({
   pickerTriggerText: {
     color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
   },
   adWrap: {
     width: '100%',

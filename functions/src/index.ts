@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
+import * as crypto from 'crypto';
 
 // Expo Access Token for authenticated push API calls
 const expoAccessToken = defineSecret('EXPO_ACCESS_TOKEN');
@@ -28,6 +29,7 @@ interface ExpoPushMessage {
   mutableContent?: boolean;
   categoryId?: string;
   channelId?: string;
+  interruptionLevel?: 'active' | 'critical' | 'passive' | 'time-sensitive';
 }
 
 /** Expo API Response */
@@ -69,6 +71,109 @@ interface AdminNotificationTargetUser {
   lastActive?: admin.firestore.Timestamp | null;
 }
 
+interface PrayerLocationDoc {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  updatedAt?: unknown;
+}
+
+const TIMEZONE_COUNTRIES: Record<string, string> = {
+  'Africa/Cairo': 'EG',
+  'Asia/Riyadh': 'SA',
+  'Asia/Dubai': 'AE',
+  'Asia/Kuwait': 'KW',
+  'Asia/Qatar': 'QA',
+  'Asia/Bahrain': 'BH',
+  'Asia/Muscat': 'OM',
+  'Asia/Baghdad': 'IQ',
+  'Asia/Amman': 'JO',
+  'Asia/Gaza': 'PS',
+  'Asia/Hebron': 'PS',
+  'Asia/Beirut': 'LB',
+  'Asia/Damascus': 'SY',
+  'Asia/Aden': 'YE',
+  'Africa/Tripoli': 'LY',
+  'Africa/Tunis': 'TN',
+  'Africa/Algiers': 'DZ',
+  'Africa/Casablanca': 'MA',
+  'Africa/Khartoum': 'SD',
+  'Europe/London': 'GB',
+  'America/New_York': 'US',
+  'America/Los_Angeles': 'US',
+  'Europe/Paris': 'FR',
+  'Europe/Berlin': 'DE',
+  'Europe/Istanbul': 'TR',
+};
+
+function getTimezoneCountryCode(timezone: unknown): string {
+  return typeof timezone === 'string' ? TIMEZONE_COUNTRIES[timezone] || '' : '';
+}
+
+function hasPrayerLocation(data: admin.firestore.DocumentData, prayerLocation?: PrayerLocationDoc): boolean {
+  return typeof data.locationLatitude === 'number' ||
+    typeof data.locationLongitude === 'number' ||
+    typeof prayerLocation?.latitude === 'number' ||
+    typeof prayerLocation?.longitude === 'number';
+}
+
+function resolveCountryForTargeting(
+  data: admin.firestore.DocumentData,
+  prayerLocation?: PrayerLocationDoc,
+): { country: string; countrySource: string; countryVerified: boolean } {
+  const storedCountry = String(data.country || '').toUpperCase();
+  const timezoneCountry = getTimezoneCountryCode(data.timezone).toUpperCase();
+  const countrySource = String(data.countrySource || 'device_locale');
+  const locationAvailable = hasPrayerLocation(data, prayerLocation);
+  const prayerCountry = String(data.prayerCountryCode || '').toUpperCase();
+
+  // Prayer-GPS is the single source of truth once the user has confirmed
+  // their location from the prayer screen. Admin edits never override this
+  // for targeting purposes.
+  if (prayerCountry) {
+    return { country: prayerCountry, countrySource: 'gps', countryVerified: true };
+  }
+  if (locationAvailable && countrySource === 'gps' && storedCountry) {
+    return { country: storedCountry, countrySource: 'gps', countryVerified: true };
+  }
+
+  const oldGpsTimezoneConflict = Boolean(
+    timezoneCountry &&
+    storedCountry &&
+    timezoneCountry !== storedCountry &&
+    countrySource === 'gps' &&
+    !locationAvailable
+  );
+
+  return {
+    country: oldGpsTimezoneConflict ? timezoneCountry : (storedCountry || timezoneCountry || 'SA'),
+    countrySource,
+    countryVerified: countrySource === 'admin' || locationAvailable || oldGpsTimezoneConflict,
+  };
+}
+
+async function fetchPrayerLocationsByUserId(): Promise<Map<string, PrayerLocationDoc>> {
+  const locations = new Map<string, PrayerLocationDoc>();
+  try {
+    const snap = await db.collection('userPrayerSettings').get();
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      const latitude = typeof data.latitude === 'number' ? data.latitude : undefined;
+      const longitude = typeof data.longitude === 'number' ? data.longitude : undefined;
+      if (latitude === undefined && longitude === undefined) return;
+      locations.set(docSnap.id, {
+        latitude,
+        longitude,
+        city: typeof data.city === 'string' ? data.city : undefined,
+        updatedAt: data.updatedAt,
+      });
+    });
+  } catch (error) {
+    logger.warn('[scheduled-admin-push] could not load prayer locations:', error);
+  }
+  return locations;
+}
+
 const EXPO_PUSH_APIS = [
   'https://api.expo.dev/v2/push/send',
   'https://exp.host/--/api/v2/push/send',
@@ -77,6 +182,8 @@ const EXPO_PUSH_APIS = [
 const EXPO_REQUEST_TIMEOUT_MS = 15000;
 const AUTO_QA_DISCLAIMER =
   'تنبيه: هذه إجابة بحثية آلية مبنية على المصادر المتاحة، وقد لا تكون دقيقة بنسبة 100%. حاولنا بذل أقصى جهد لتقديم أقرب إفادة، ويُفضّل الرجوع لأهل العلم في المسائل الشخصية أو الحساسة.';
+const AUTO_QA_DISCLAIMER_EN =
+  'Note: This is an automated research answer based on the available sources, and it may not be 100% accurate. We did our best to provide the closest useful answer. Please consult qualified scholars for personal or sensitive matters.';
 const DEFAULT_AUTO_QA_ALLOWED_SITES = [
   'islamweb.net',
   'islamqa.info',
@@ -185,6 +292,394 @@ async function reserveAutoQaSearchQuota(dailyLimit: number | null): Promise<bool
 
     return true;
   });
+}
+
+/**
+ * Strip common Islamic greetings + closings from the question text before
+ * running language detection / search-query construction.  Islamic greetings
+ * in Latin script (assalamualaikum...) bias content-language detection toward
+ * "ar" and pad the search query with non-keyword tokens that hurt recall.
+ *
+ * Conservative: only removes well-known multi-word greeting phrases at the
+ * start/end of the question.  The remaining text is what the user actually
+ * asked about.
+ */
+function stripIslamicGreetings(question: string): string {
+  let q = ` ${question} `;
+
+  const patterns: RegExp[] = [
+    // Arabic greetings + their closings (Arabic letters don't trigger \b, so
+    // we anchor against spaces / punctuation instead)
+    /(^|[\s.,;:!?])السلام\s*عليكم(\s*ورحمة\s*الله(\s*وبركاته)?)?/gi,
+    /(^|[\s.,;:!?])و?عليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?/gi,
+    /(^|[\s.,;:!?])بارك\s*الله\s*فيكم/gi,
+    /(^|[\s.,;:!?])جزاكم?\s*الله\s*خيرا/gi,
+    // Transliterated Islamic greetings (covers the Qurbani example)
+    /\bas+ala?mu?\s*['`-]?\s*ala[iy]kum(\s*wa?\s*ra[hH]ma?t?[uo]l?lahi?)?(\s*wa?\s*barakatu?h?u?)?\b/gi,
+    /\bwa?\s*['`-]?\s*ala[iy]kum\s*as+ala?m(\s*wa?\s*ra[hH]ma?t?[uo]l?lahi?)?(\s*wa?\s*barakatu?h?u?)?\b/gi,
+    /\bsala?m\s*['`-]?\s*ala[iy]kum\b/gi,
+    /\bbara?ka\s*allahu?\s*fi?kum\b/gi,
+    /\bjaza?ka\s*allahu?\s*[kK]ha[iy]ran\b/gi,
+    // Common filler phrases (tolerates short connector words / typos
+    // between "question" and "regarding|about|on")
+    /\bmy\s+question(\s+\S{1,4}){0,2}\s+(regarding|about|on)\b/gi,
+    /\bI\s+have\s+a\s+question(\s+\S{1,4}){0,2}\s+(regarding|about|on)\b/gi,
+    /\bI\s+(want|wanted|would\s+like)\s+to\s+(ask|know)\b/gi,
+    /\bplease\s+(tell|let)\s+me\b/gi,
+  ];
+
+  for (const re of patterns) {
+    q = q.replace(re, ' ');
+  }
+
+  return q.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Decide the language to use for the answer body / sources / disclaimer.
+ * Falls back to the app-provided language when the content signal is weak.
+ *
+ * The original language field on the user-question doc represents the app's
+ * UI language at submit time.  Users frequently type in a different language
+ * from their UI (e.g. Arabic-UI app, English question text), so we override
+ * here when the content language is clearly different.
+ */
+function detectQuestionLanguage(question: string, providedLanguage?: string): string {
+  const cleaned = stripIslamicGreetings(question);
+  const arabicChars = (cleaned.match(/[؀-ۿ]/g) || []).length;
+  const latinChars = (cleaned.match(/[A-Za-z]/g) || []).length;
+  const totalSignal = arabicChars + latinChars;
+
+  // Not enough signal — trust the app-provided language
+  if (totalSignal < 6) return providedLanguage || 'ar';
+
+  const arabicShare = arabicChars / totalSignal;
+
+  // ≥ 60 % Arabic letters → respond in Arabic
+  if (arabicShare >= 0.6) return 'ar';
+
+  // ≥ 70 % Latin letters → respond in the app language if it is a Latin-script
+  // language; otherwise default to English so the user still understands.
+  if (arabicShare <= 0.3) {
+    const provided = (providedLanguage || '').toLowerCase();
+    const latinLanguages = new Set(['en', 'fr', 'de', 'es', 'tr', 'id', 'ms', 'ru']);
+    if (latinLanguages.has(provided)) return provided;
+    // Urdu / Hindi / Bengali are non-Latin scripts; if the typed text is Latin
+    // we cannot safely answer in their native script, so fall back to English.
+    return 'en';
+  }
+
+  // Mixed text — trust the app-provided language but bias toward Arabic when
+  // unspecified, since the bundled fatwa corpus is Arabic-first.
+  return providedLanguage || 'ar';
+}
+
+/**
+ * Islamic terminology glossary.  Source of truth lives in
+ * `qa-glossary.json` — each entry maps a canonical Arabic term to its
+ * known variants in 11 non-Arabic languages.  Admins can extend at
+ * runtime by adding entries to the `qaGlossary` Firestore collection.
+ *
+ * Compiled once per function instance at cold-start into a regex set
+ * with Unicode-aware word boundaries (so Arabic / Urdu / Hindi / Bengali
+ * variants match correctly).
+ */
+interface GlossaryEntry {
+  ar: string;
+  en?: string[];
+  fr?: string[];
+  de?: string[];
+  es?: string[];
+  tr?: string[];
+  ur?: string[];
+  id?: string[];
+  ms?: string[];
+  hi?: string[];
+  bn?: string[];
+  ru?: string[];
+}
+
+interface CompiledGlossaryEntry {
+  re: RegExp;
+  ar: string;
+}
+
+// Load the bundled seed glossary once.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const SEED_GLOSSARY: { entries: GlossaryEntry[] } = require('./qa-glossary.json');
+
+function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function compileGlossaryEntries(entries: GlossaryEntry[]): CompiledGlossaryEntry[] {
+  const compiled: CompiledGlossaryEntry[] = [];
+  for (const entry of entries) {
+    if (!entry?.ar) continue;
+    const variants = new Set<string>();
+    const langs = ['en', 'fr', 'de', 'es', 'tr', 'ur', 'id', 'ms', 'hi', 'bn', 'ru'] as const;
+    for (const lang of langs) {
+      const list = entry[lang];
+      if (Array.isArray(list)) {
+        for (const v of list) {
+          const trimmed = (v || '').trim();
+          if (trimmed.length >= 2) variants.add(trimmed);
+        }
+      }
+    }
+    if (variants.size === 0) continue;
+    // Longer variants first so multi-word terms match before sub-strings
+    const sorted = Array.from(variants).sort((a, b) => b.length - a.length);
+    const pattern = sorted.map(escapeRegex).join('|');
+    try {
+      // Unicode-aware boundaries: not preceded/followed by another letter or
+      // number from any script.  Works for Latin, Arabic, Urdu, Hindi, Bengali, …
+      compiled.push({
+        re: new RegExp(`(?<![\\p{L}\\p{N}])(?:${pattern})(?![\\p{L}\\p{N}])`, 'giu'),
+        ar: entry.ar,
+      });
+    } catch (err) {
+      logger.warn('[glossary] failed to compile entry', { ar: entry.ar, err: String(err).slice(0, 80) });
+    }
+  }
+  return compiled;
+}
+
+const COMPILED_SEED_GLOSSARY = compileGlossaryEntries(SEED_GLOSSARY.entries || []);
+
+// Cache of compiled glossary entries from the admin-curated Firestore
+// collection.  Refreshed every 5 minutes per function instance to keep
+// the hot path warm without re-reading on every request.
+let _adminGlossaryCache: CompiledGlossaryEntry[] = [];
+let _adminGlossaryFetchedAt = 0;
+const ADMIN_GLOSSARY_TTL_MS = 5 * 60 * 1000;
+
+async function getAdminGlossary(): Promise<CompiledGlossaryEntry[]> {
+  const now = Date.now();
+  if (now - _adminGlossaryFetchedAt < ADMIN_GLOSSARY_TTL_MS) return _adminGlossaryCache;
+  try {
+    const snap = await db.collection('qaGlossary').get();
+    const entries: GlossaryEntry[] = snap.docs.map((d) => d.data() as GlossaryEntry);
+    _adminGlossaryCache = compileGlossaryEntries(entries);
+    _adminGlossaryFetchedAt = now;
+    logger.info('[glossary] admin entries loaded', { count: entries.length });
+  } catch (err) {
+    // If the collection doesn't exist yet, treat as empty
+    logger.info('[glossary] admin collection unavailable, using seed only', {
+      err: String(err).slice(0, 80),
+    });
+    _adminGlossaryCache = [];
+    _adminGlossaryFetchedAt = now;
+  }
+  return _adminGlossaryCache;
+}
+
+async function applyIslamicTransliterations(text: string): Promise<string> {
+  let out = text;
+  for (const { re, ar } of COMPILED_SEED_GLOSSARY) {
+    out = out.replace(re, ar);
+  }
+  const adminEntries = await getAdminGlossary();
+  for (const { re, ar } of adminEntries) {
+    out = out.replace(re, ar);
+  }
+  return out;
+}
+
+/**
+ * Translate text from a non-Arabic source language to Arabic.  Tries
+ * MyMemory first (best quality on Islamic terminology with hints), falls
+ * back to LibreTranslate when MyMemory fails or rate-limits.  Chunks long
+ * input to stay under each provider's per-request limit.
+ *
+ * Returns the original text if every provider fails or echoes input.
+ */
+async function translateToArabic(text: string, sourceLang: string): Promise<string> {
+  const src = (sourceLang || 'en').toLowerCase();
+  if (!text.trim() || src === 'ar') return text;
+
+  const chunks = chunkForTranslation(text, 450);
+  const translated = await Promise.all(chunks.map(async (chunk) => {
+    const myMemory = await translateOneViaMyMemory(chunk, src, 'ar');
+    if (myMemory && hasArabicText(myMemory) && myMemory !== chunk) return myMemory;
+    const libre = await translateOneViaLibre(chunk, src, 'ar');
+    if (libre && hasArabicText(libre) && libre !== chunk) return libre;
+    return chunk;
+  }));
+  return translated.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function chunkForTranslation(text: string, maxLen: number): string[] {
+  const parts = text.split(/(?<=[.!?؟])\s+|\n+/).map((p) => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let buffer = '';
+  for (const part of parts) {
+    if ((buffer + ' ' + part).length > maxLen) {
+      if (buffer) chunks.push(buffer);
+      buffer = part;
+    } else {
+      buffer = buffer ? `${buffer} ${part}` : part;
+    }
+  }
+  if (buffer) chunks.push(buffer);
+  return chunks.length ? chunks.slice(0, 6) : [text.slice(0, maxLen)];
+}
+
+/**
+ * Translation memoization layer.  Every successful provider result is
+ * persisted in Firestore (`qaTranslationCache/{hash}`) and re-served on
+ * future requests, so we never pay the same translation twice — saving
+ * latency and free-tier quota on MyMemory / LibreTranslate.
+ *
+ * Two tiers:
+ *   • In-memory LRU (per function instance) — sub-ms hits, capped at 500 entries
+ *   • Firestore (`qaTranslationCache` collection) — durable, shared across instances
+ *
+ * On a hit, `hits` increments and `lastUsedAt` updates so the admin can
+ * later inspect the most-used translations and curate them.
+ */
+const _memoryCache = new Map<string, string>();
+const MEMORY_CACHE_LIMIT = 500;
+
+function cacheKey(text: string, from: string, to: string): string {
+  return crypto.createHash('sha1').update(`${from}|${to}|${text}`).digest('hex');
+}
+
+function lruGet(key: string): string | undefined {
+  if (!_memoryCache.has(key)) return undefined;
+  const v = _memoryCache.get(key)!;
+  // Bump to most-recently-used by re-inserting
+  _memoryCache.delete(key);
+  _memoryCache.set(key, v);
+  return v;
+}
+
+function lruSet(key: string, value: string): void {
+  if (_memoryCache.has(key)) _memoryCache.delete(key);
+  _memoryCache.set(key, value);
+  if (_memoryCache.size > MEMORY_CACHE_LIMIT) {
+    const oldest = _memoryCache.keys().next().value;
+    if (oldest) _memoryCache.delete(oldest);
+  }
+}
+
+async function readTranslationCache(text: string, from: string, to: string): Promise<string | null> {
+  const key = cacheKey(text, from, to);
+  const mem = lruGet(key);
+  if (mem) return mem;
+  try {
+    const snap = await db.collection('qaTranslationCache').doc(key).get();
+    if (!snap.exists) return null;
+    const data = snap.data() as { translation?: string } | undefined;
+    const translation = data?.translation;
+    if (translation) {
+      lruSet(key, translation);
+      // Fire-and-forget hit counter; never block translation on it
+      snap.ref.update({
+        hits: admin.firestore.FieldValue.increment(1),
+        lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => undefined);
+      return translation;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeTranslationCache(text: string, from: string, to: string, translation: string, provider: string): Promise<void> {
+  const key = cacheKey(text, from, to);
+  lruSet(key, translation);
+  try {
+    await db.collection('qaTranslationCache').doc(key).set({
+      sourceText: text.slice(0, 1000),
+      sourceLang: from,
+      targetLang: to,
+      translation,
+      provider,
+      hits: 1,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch {
+    // Cache writes are best-effort
+  }
+}
+
+async function translateOneViaMyMemory(text: string, from: string, to: string): Promise<string> {
+  const cached = await readTranslationCache(text, from, to);
+  if (cached) return cached;
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return '';
+    const data = await res.json() as { responseData?: { translatedText?: string }; responseStatus?: number };
+    const out = data?.responseData?.translatedText?.trim() || '';
+    if (!out || out === text) return '';
+    if (data.responseStatus === 429) return '';
+    if (out.includes('%') && /%[0-9A-F]{2}/.test(out)) return '';
+    await writeTranslationCache(text, from, to, out, 'mymemory');
+    return out;
+  } catch {
+    return '';
+  }
+}
+
+async function translateOneViaLibre(text: string, from: string, to: string): Promise<string> {
+  // MyMemory failed before this is called, so do NOT re-check cache here.
+  const instances = [
+    'https://libretranslate.com',
+    'https://translate.argosopentech.com',
+    'https://libretranslate.de',
+  ];
+  for (const instance of instances) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`${instance}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const data = await res.json() as { translatedText?: string };
+      const out = data?.translatedText?.trim();
+      if (out && out !== text) {
+        await writeTranslationCache(text, from, to, out, `libre:${instance}`);
+        return out;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return '';
+}
+
+/**
+ * Build an Arabic search query from a non-Arabic question:
+ *   1. Apply Islamic transliteration hints (Qurbani → الأضحية).
+ *   2. Translate the remainder via MyMemory / LibreTranslate.
+ * Falls back to the hinted text if translation fails, since even partial
+ * Arabic terms are better than English keywords on Arabic-only sites.
+ */
+async function buildArabicSearchQuery(cleanedQuestion: string, language: string): Promise<string> {
+  if (isArabicLanguage(language)) return cleanedQuestion;
+  const hinted = await applyIslamicTransliterations(cleanedQuestion);
+
+  // If transliteration alone already produced mostly Arabic text, use it.
+  const arabicShare = (hinted.match(/[؀-ۿ]/g) || []).length /
+    Math.max((hinted.match(/[؀-ۿA-Za-z]/g) || []).length, 1);
+  if (arabicShare >= 0.6) return hinted;
+
+  const translated = await translateToArabic(hinted, language);
+  if (translated && hasArabicText(translated)) return translated;
+
+  return hinted;
 }
 
 function normalizeArabicText(value: string): string {
@@ -454,14 +949,90 @@ async function extractFatwaContent(url: string): Promise<string> {
   }
 }
 
-function buildAutoQaAnswer(question: string, sources: AutoQaSource[], extractedContent?: string): string {
-  // Priority 1: actual content fetched from a fatwa page
+function isArabicLanguage(language?: string): boolean {
+  return !language || language === 'ar';
+}
+
+function getAutoQaDisclaimer(language?: string): string {
+  return isArabicLanguage(language) ? AUTO_QA_DISCLAIMER : AUTO_QA_DISCLAIMER_EN;
+}
+
+function hasArabicText(text?: string): boolean {
+  return /[\u0600-\u06FF]/.test(text || '');
+}
+
+/**
+ * Translate Arabic text to the user's language using the free MyMemory
+ * endpoint.  Best-effort: returns the original text on failure or empty result.
+ * MyMemory accepts up to ~500 chars per request, so callers should chunk.
+ */
+async function translateViaMyMemory(text: string, targetLang: string): Promise<string> {
+  if (!text.trim() || isArabicLanguage(targetLang)) return text;
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=ar|${targetLang}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return text;
+    const data = await res.json() as { responseData?: { translatedText?: string }; responseStatus?: number };
+    const translated = data?.responseData?.translatedText;
+    if (!translated || translated.trim().length === 0) return text;
+    if (data.responseStatus === 429) return text;
+    if (translated.includes('%') && /%[0-9A-F]{2}/.test(translated)) return text;
+    return translated.trim();
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Translate a longer Arabic block in paragraph-sized chunks so each call
+ * stays under MyMemory's per-request limit, then re-join.  Capped at ~1.8K
+ * chars (4 chunks) to keep cloud-function latency reasonable.
+ */
+async function translateArabicContent(text: string, targetLang: string): Promise<string> {
+  if (isArabicLanguage(targetLang) || !text.trim()) return text;
+  const paragraphs = text.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let buffer = '';
+  for (const para of paragraphs) {
+    if ((buffer + ' ' + para).length > 450) {
+      if (buffer) chunks.push(buffer);
+      buffer = para;
+    } else {
+      buffer = buffer ? `${buffer}\n${para}` : para;
+    }
+  }
+  if (buffer) chunks.push(buffer);
+
+  const capped = chunks.slice(0, 4);
+  const translated = await Promise.all(capped.map((c) => translateViaMyMemory(c, targetLang)));
+  return translated.join('\n\n');
+}
+
+async function buildAutoQaAnswer(
+  question: string,
+  sources: AutoQaSource[],
+  extractedContent?: string,
+  language = 'ar'
+): Promise<string> {
+  const disclaimer = getAutoQaDisclaimer(language);
+
+  // Priority 1: actual content fetched from a fatwa page.  For non-Arabic
+  // users, translate the Arabic fatwa to their language so the answer
+  // matches the language they asked in.
   if (extractedContent && extractedContent.length >= 80) {
-    return `${extractedContent}\n\n${AUTO_QA_DISCLAIMER}`;
+    if (isArabicLanguage(language)) {
+      return `${extractedContent}\n\n${disclaimer}`;
+    }
+    const translated = await translateArabicContent(extractedContent.slice(0, 1800), language);
+    if (translated && translated !== extractedContent) {
+      return `${translated}\n\n${disclaimer}`;
+    }
   }
 
   // Priority 2: compile meaningful snippets from the sources themselves
-  // Only use snippets that are relevant to the question (contain at least 1 keyword)
   const GENERIC_SNIPPET_RX = /اضغط هنا|للاطلاع على|نتائج البحث في/;
   const meaningfulSources = sources.filter(
     (s) =>
@@ -473,13 +1044,22 @@ function buildAutoQaAnswer(question: string, sources: AutoQaSource[], extractedC
   if (meaningfulSources.length > 0) {
     const compiled = meaningfulSources
       .slice(0, 3)
-      .map((s) => s.snippet)
+      .map((s) => s.snippet as string)
       .join('\n\n');
-    return `${compiled}\n\n${AUTO_QA_DISCLAIMER}`;
+    if (isArabicLanguage(language) || !hasArabicText(compiled)) {
+      return `${compiled}\n\n${disclaimer}`;
+    }
+    const translated = await translateArabicContent(compiled, language);
+    if (translated && translated !== compiled) {
+      return `${translated}\n\n${disclaimer}`;
+    }
   }
 
   // Priority 3: generic fallback (no content, no relevant snippets)
-  return `وجدت لك أقرب مصادر مرتبطة بسؤالك مع الروابط أدناه.\n\n${AUTO_QA_DISCLAIMER}`;
+  if (!isArabicLanguage(language)) {
+    return `I found the closest sources related to your question in the links below.\n\n${disclaimer}`;
+  }
+  return `وجدت لك أقرب مصادر مرتبطة بسؤالك مع الروابط أدناه.\n\n${disclaimer}`;
 }
 
 function getCuratedFallbackSources(question: string): AutoQaSource[] {
@@ -1072,9 +1652,28 @@ async function searchDorarDirect(question: string): Promise<AutoQaSource[]> {
  * function never saves status=no_results.  The user can tap any link and browse
  * the site's own search results for their question.
  */
-function buildGenericSearchLinks(question: string): AutoQaSource[] {
+function buildGenericSearchLinks(question: string, language = 'ar'): AutoQaSource[] {
   const encoded = encodeURIComponent(question);
   const shortQ = question.slice(0, 60);
+  if (!isArabicLanguage(language)) {
+    return [
+      {
+        title: `Search results on Islamweb: ${shortQ}`,
+        url: `${ISLAMWEB_BASE}/ar/fatwa/search/?q=${encoded}`,
+        snippet: 'Open this link to browse fatwas related to your question in the Islamweb database.',
+      },
+      {
+        title: `Search results on Islam Q&A: ${shortQ}`,
+        url: `${ISLAMQA_BASE}/ar/search?q=${encoded}`,
+        snippet: 'Open this link to browse answers related to your question on Islam Question & Answer.',
+      },
+      {
+        title: `Search results on Dorar: ${shortQ}`,
+        url: `${DORAR_BASE}/feqhia?q=${encoded}`,
+        snippet: 'Open this link to browse fiqh issues related to your question in the jurisprudence encyclopedia.',
+      },
+    ];
+  }
   return [
     {
       title: `نتائج البحث في إسلام ويب: ${shortQ}`,
@@ -1092,6 +1691,23 @@ function buildGenericSearchLinks(question: string): AutoQaSource[] {
       snippet: 'اضغط هنا للاطلاع على المسائل الفقهية المتعلقة بسؤالك في الموسوعة الفقهية.',
     },
   ];
+}
+
+function localizeAutoQaSources(sources: AutoQaSource[], question: string, language = 'ar'): AutoQaSource[] {
+  if (isArabicLanguage(language)) return sources;
+  const shortQ = question.slice(0, 60);
+  return sources.map((source, index) => {
+    const host = getSourceHost(source.url);
+    return {
+      ...source,
+      title: hasArabicText(source.title)
+        ? `${index + 1}. Source from ${host}: ${shortQ}`
+        : source.title,
+      snippet: hasArabicText(source.snippet)
+        ? `Open this source on ${host} to review material related to your question.`
+        : source.snippet,
+    };
+  });
 }
 
 async function searchAutoQaSources(question: string, configuredSites?: string[] | string): Promise<AutoQaSource[]> {
@@ -1168,13 +1784,32 @@ export const answerUserQuestionAutomatically = functions.firestore
   .onCreate(async (snap) => {
     const data = snap.data() || {};
     const question = String(data.question || '').trim();
+    const submittedLanguage = String(data.language || 'ar');
     if (!question) return;
     if (data.requestMode !== 'assistant') return;
 
+    // Detect the actual content language of the question (the user may type in
+    // English even when the app UI is Arabic).  Strip Islamic greetings first
+    // so they do not bias detection toward Arabic.
+    const cleanedQuestion = stripIslamicGreetings(question) || question;
+    const language = detectQuestionLanguage(question, submittedLanguage);
+
     await snap.ref.update({
       autoAnswerStatus: 'searching',
-      autoAnswerDisclaimer: AUTO_QA_DISCLAIMER,
+      autoAnswerDisclaimer: getAutoQaDisclaimer(language),
+      autoAnswerLanguage: language,
       autoAnswerStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Translate non-Arabic questions into Arabic before searching the
+    // Arabic-only fatwa sites; we keep `cleanedQuestion` for display and
+    // use `searchQuery` for IslamWeb / IslamQA / Dorar lookups + scoring.
+    const searchQuery = await buildArabicSearchQuery(cleanedQuestion, language);
+    logger.info('[auto-qa] language resolved', {
+      submitted: submittedLanguage,
+      detected: language,
+      cleanedPreview: cleanedQuestion.slice(0, 80),
+      searchQueryPreview: searchQuery.slice(0, 80),
     });
 
     try {
@@ -1193,20 +1828,22 @@ export const answerUserQuestionAutomatically = functions.firestore
       if (!hasQuota) {
         await snap.ref.update({
           autoAnswerStatus: 'daily_limit',
-          autoAnswer:
-            'نأسف، تم الوصول للحد الرسمي للأسئلة اليوم. يمكنك إرسال سؤالك لنا وسنراجعه ونرد عليك بمصادر موثوقة خلال 48 ساعة إن شاء الله.',
+          autoAnswer: isArabicLanguage(language)
+            ? 'نأسف، تم الوصول للحد الرسمي للأسئلة اليوم. يمكنك إرسال سؤالك لنا وسنراجعه ونرد عليك بمصادر موثوقة خلال 48 ساعة إن شاء الله.'
+            : 'Sorry, the official question limit for today has been reached. You can send us your question and we will review it with trusted sources within 48 hours, inshaAllah.',
           autoAnswerSources: [],
           autoAnswerCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         return;
       }
 
-      const sources = await searchAutoQaSources(question, assistantConfig.allowedSites);
+      const sources = await searchAutoQaSources(searchQuery, assistantConfig.allowedSites);
       if (sources.length === 0) {
         await snap.ref.update({
           autoAnswerStatus: 'no_results',
-          autoAnswer:
-            'لم نعثر على مصادر كافية للإجابة على هذا السؤال الآن. تم حفظ سؤالك، ويمكنك المحاولة بصياغة أوضح أو الرجوع لأهل العلم.',
+          autoAnswer: isArabicLanguage(language)
+            ? 'لم نعثر على مصادر كافية للإجابة على هذا السؤال الآن. تم حفظ سؤالك، ويمكنك المحاولة بصياغة أوضح أو الرجوع لأهل العلم.'
+            : 'We could not find enough reliable sources to answer this question right now. Your question has been saved; you can try a clearer wording or consult qualified scholars.',
           autoAnswerSources: [],
           autoAnswerCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -1233,7 +1870,7 @@ export const answerUserQuestionAutomatically = functions.firestore
       if (specificPage) {
         try {
           extractedContent = await extractFatwaContent(specificPage.url);
-          const relevance = scoreRelevance(question, extractedContent);
+          const relevance = scoreRelevance(searchQuery, extractedContent);
           logger.info('[auto-qa] content extracted', {
             url: specificPage.url,
             length: extractedContent.length,
@@ -1252,10 +1889,11 @@ export const answerUserQuestionAutomatically = functions.firestore
         }
       }
 
-      // Filter sources to only keep those relevant to the question
+      // Filter sources to only keep those relevant to the question.  Snippets
+      // come back in Arabic, so we score them against the Arabic search query.
       const relevantSources = sources.filter((s) => {
-        const titleScore = scoreRelevance(question, s.title || '');
-        const snippetScore = scoreRelevance(question, s.snippet || '');
+        const titleScore = scoreRelevance(searchQuery, s.title || '');
+        const snippetScore = scoreRelevance(searchQuery, s.snippet || '');
         const best = Math.max(titleScore, snippetScore);
         if (best < 0.15) {
           logger.warn('[auto-qa] source filtered as irrelevant', { title: s.title, score: best });
@@ -1267,14 +1905,17 @@ export const answerUserQuestionAutomatically = functions.firestore
       // use generic search-page links so we never show wrong content to the user.
       const finalSources = relevantSources.length > 0
         ? relevantSources
-        : (extractedContent ? sources : buildGenericSearchLinks(question));
+        : (extractedContent ? sources : buildGenericSearchLinks(searchQuery, language));
+      const localizedFinalSources = localizeAutoQaSources(finalSources, cleanedQuestion, language);
+      const finalAnswer = await buildAutoQaAnswer(searchQuery, localizedFinalSources, extractedContent, language);
 
       await snap.ref.update({
         status: 'answered',
         autoAnswerStatus: 'answered',
-        autoAnswer: buildAutoQaAnswer(question, finalSources, extractedContent),
-        autoAnswerSources: finalSources,
-        autoAnswerDisclaimer: AUTO_QA_DISCLAIMER,
+        autoAnswer: finalAnswer,
+        autoAnswerSources: localizedFinalSources,
+        autoAnswerDisclaimer: getAutoQaDisclaimer(language),
+        autoAnswerLanguage: language,
         autoAnswerCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
@@ -1310,6 +1951,45 @@ export const answerUserQuestionAutomatically = functions.firestore
  */
 
 // ==================== Monthly Honor Board Winner Selection ====================
+
+/**
+ * Protect monthly leaderboard scores from old app versions that recalculate
+ * from empty local storage after reinstall and overwrite the cloud score.
+ */
+export const guardMonthlyEngagementRegression = functions.firestore
+  .document('users/{userId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    const beforeEngagement = before.monthlyEngagement || {};
+    const afterEngagement = after.monthlyEngagement || {};
+    const beforeMonth = String(beforeEngagement.month || '');
+    const afterMonth = String(afterEngagement.month || '');
+    const beforeScore = Number(beforeEngagement.score) || 0;
+    const afterScore = Number(afterEngagement.score) || 0;
+
+    if (!beforeMonth || beforeMonth !== afterMonth) return;
+    if (beforeScore <= 0 || afterScore >= beforeScore) return;
+
+    logger.warn('[honor-board] prevented monthly score regression', {
+      userId: context.params.userId,
+      month: beforeMonth,
+      from: beforeScore,
+      to: afterScore,
+      displayName: String(after.displayName || before.displayName || '').trim(),
+    });
+
+    await change.after.ref.update({
+      monthlyEngagement: beforeEngagement,
+      monthlyEngagementGuard: {
+        restoredAt: admin.firestore.FieldValue.serverTimestamp(),
+        restoredFromScore: afterScore,
+        restoredToScore: beforeScore,
+        month: beforeMonth,
+        reason: 'prevent_score_regression',
+      },
+    });
+  });
 
 /**
  * Scheduled Cloud Function: runs at 00:05 on the 1st of every month.
@@ -1424,6 +2104,7 @@ export const selectMonthlyWinners = onSchedule(
               sound: 'default',
               priority: 'high',
               channelId: 'general',
+              interruptionLevel: 'time-sensitive',
             });
             winner.notified = true;
           }
@@ -1666,16 +2347,25 @@ async function fetchAdminNotificationTargets(
     const data = snap.data() || {};
     const fcmToken = String(data.fcmToken || '');
     if (!fcmToken.startsWith('ExponentPushToken')) return [];
+    const prayerSnap = await db.doc(`userPrayerSettings/${targetUserId}`).get().catch(() => null);
+    const countryInfo = resolveCountryForTargeting(
+      data,
+      prayerSnap?.exists ? prayerSnap.data() as PrayerLocationDoc : undefined,
+    );
     return [{
       id: snap.id,
       fcmToken,
       platform: String(data.platform || 'unknown'),
       language: String(data.language || 'ar'),
-      country: String(data.country || 'SA').toUpperCase(),
-      countrySource: String(data.countrySource || 'device_locale'),
-      countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
+      country: countryInfo.country,
+      countrySource: countryInfo.countrySource,
+      countryVerified: countryInfo.countryVerified,
       lastActive: data.lastActive || null,
     }];
+  }
+
+  if (targetAudience === 'single_user') {
+    return [];
   }
 
   let usersQuery: FirebaseFirestore.Query = db.collection('users');
@@ -1683,7 +2373,10 @@ async function fetchAdminNotificationTargets(
     usersQuery = usersQuery.where('platform', '==', targetAudience);
   }
 
-  const snap = await usersQuery.get();
+  const [snap, prayerLocationsByUserId] = await Promise.all([
+    usersQuery.get(),
+    fetchPrayerLocationsByUserId(),
+  ]);
   const storeSources = new Set(['play_store', 'app_store']);
   const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const tokenMap = new Map<string, AdminNotificationTargetUser>();
@@ -1697,9 +2390,10 @@ async function fetchAdminNotificationTargets(
     if (!fcmToken.startsWith('ExponentPushToken')) return;
 
     const language = String(data.language || 'ar');
-    const country = String(data.country || 'SA').toUpperCase();
-    const countrySource = String(data.countrySource || 'device_locale');
-    const countryVerified = countrySource === 'admin' || (countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude));
+    const countryInfo = resolveCountryForTargeting(data, prayerLocationsByUserId.get(docSnap.id));
+    const country = countryInfo.country;
+    const countrySource = countryInfo.countrySource;
+    const countryVerified = countryInfo.countryVerified;
     const lastActive = data.lastActive as admin.firestore.Timestamp | undefined;
     const lastActiveMs = typeof lastActive?.toDate === 'function'
       ? lastActive.toDate().getTime()
@@ -1794,6 +2488,7 @@ export const processScheduledAdminNotifications = onSchedule(
               sound: 'default',
               priority: 'high',
               channelId: 'general',
+              interruptionLevel: 'time-sensitive',
               ttl: 86400,
               data: {
                 actionType: String(notification.actionType || ''),
@@ -1926,125 +2621,404 @@ const PRAYER_TITLES_AR: Record<string, string> = {
   jumuah:  'الجمعة.. خير يوم طلعت عليه الشمس 🕌',
 };
 
+const FCM_FALLBACK_SCHEMA_VERSION = 2;
+const FCM_FALLBACK_QUERY_LIMIT = 1000;
+const FCM_FALLBACK_MAX_MINUTES_BEFORE = 5;
+const FCM_FALLBACK_LATE_GRACE_MS = 2 * 60 * 1000;
+const FCM_REFRESH_REMINDER_REPEAT_MS = 24 * 60 * 60 * 1000;
+const FCM_REFRESH_REMINDER_LEAD_MS = 12 * 60 * 60 * 1000;
+const SERVER_FALLBACK_PRAYER_KEYS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+type ServerFallbackPrayerKey = typeof SERVER_FALLBACK_PRAYER_KEYS[number];
+const SERVER_ADHAN_SOUND_FILES: Record<string, string> = {
+  abdulbasit: 'abdulbasit.mp3',
+  ajman: 'ajman.mp3',
+  alaqsa: 'alaqsa.mp3',
+  ali_mulla: 'ali_mulla.mp3',
+  dosari: 'dosari.mp3',
+  egypt: 'egypt.mp3',
+  haramain: 'haramain.mp3',
+  madinah: 'madinah.mp3',
+  makkah: 'makkah.mp3',
+  mansoor_zahrani: 'mansoor_zahrani.mp3',
+  mishary: 'mishary.mp3',
+  naqshbandi: 'naqshbandi.mp3',
+  sharif: 'sharif.mp3',
+  silent: 'silent.mp3',
+  sudais: 'sudais.mp3',
+};
+
+function getPrayerFallbackRefreshText(language?: string): { title: string; body: string } {
+  if (language === 'en') {
+    return {
+      title: 'Refresh adhan alerts',
+      body: 'Open Rooh Al-Muslim once to keep adhan alerts exact. Otherwise, fallback alerts may arrive a few minutes early or late.',
+    };
+  }
+  return {
+    title: 'تحديث تنبيهات الأذان',
+    body: 'افتح روح المسلم مرة واحدة للحفاظ على إشعارات الأذان في وقتها الدقيق. إن لم تفتح التطبيق، سنرسل تنبيهًا احتياطيًا قريبًا من الأذان وقد يتقدم أو يتأخر بضع دقائق.',
+  };
+}
+
+function normalizeServerAdhanSound(soundKey: unknown): string {
+  const key = String(soundKey || 'makkah').replace(/\.mp3$/, '');
+  return SERVER_ADHAN_SOUND_FILES[key] ? key : 'makkah';
+}
+
+function buildPrayerFallbackPushAudio(settings: admin.firestore.DocumentData): {
+  channelId: string;
+  sound?: string;
+  soundType: string;
+  fullAdhanVoice: string;
+  useFullAdhan: boolean;
+} {
+  const adhanSoundEnabled = settings.adhanSound !== false;
+  const soundType = normalizeServerAdhanSound(settings.adhanSoundType);
+  const fullAdhanVoice = normalizeServerAdhanSound(settings.fullAdhanSoundType || soundType);
+  const useFullAdhan = settings.useFullAdhan === true;
+
+  if (!adhanSoundEnabled || soundType === 'silent') {
+    return {
+      channelId: 'silent',
+      sound: undefined,
+      soundType: 'silent',
+      fullAdhanVoice,
+      useFullAdhan,
+    };
+  }
+
+  return {
+    channelId: `adhan_${soundType}`,
+    sound: SERVER_ADHAN_SOUND_FILES[soundType],
+    soundType,
+    fullAdhanVoice,
+    useFullAdhan,
+  };
+}
+
+function firestoreDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as any).toDate === 'function') {
+    return (value as any).toDate();
+  }
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function computeNextServerPrayer(
+  settings: admin.firestore.DocumentData,
+  from: Date,
+): { key: ServerFallbackPrayerKey; at: Date } | null {
+  if (typeof settings.latitude !== 'number' || typeof settings.longitude !== 'number') return null;
+
+  const adhan = require('adhan');
+  const coords = new adhan.Coordinates(settings.latitude, settings.longitude);
+  const params = buildAdhanParams(
+    Number(settings.calculationMethod || 4),
+    Number(settings.asrJuristic || 0),
+    settings.adjustments,
+  );
+  const today = new adhan.PrayerTimes(coords, from, params);
+  const tomorrow = new adhan.PrayerTimes(
+    coords,
+    new Date(from.getTime() + 24 * 60 * 60 * 1000),
+    params,
+  );
+
+  const candidates = [
+    ...SERVER_FALLBACK_PRAYER_KEYS.map((key) => ({ key, at: today[key] as Date })),
+    ...SERVER_FALLBACK_PRAYER_KEYS.map((key) => ({ key, at: tomorrow[key] as Date })),
+  ].filter((p) => p.at instanceof Date && p.at > from);
+  candidates.sort((a, b) => a.at.getTime() - b.at.getTime());
+  return candidates[0] ?? null;
+}
+
+function nextFallbackPatch(
+  settings: admin.firestore.DocumentData,
+  from: Date,
+): Record<string, unknown> {
+  const next = computeNextServerPrayer(settings, from);
+  return {
+    fallbackSchemaVersion: FCM_FALLBACK_SCHEMA_VERSION,
+    fallbackUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...(next
+      ? { nextPrayerAt: next.at, nextPrayerKey: next.key }
+      : { fallbackEnabled: false }),
+  };
+}
+
+async function migrateLegacyFallbackDocs(now: Date, updates: Promise<unknown>[]): Promise<number> {
+  const snap = await db.collection('userPrayerSettings')
+    .where('fallbackSchemaVersion', '==', null)
+    .limit(FCM_FALLBACK_QUERY_LIMIT)
+    .get();
+
+  let migrated = 0;
+  for (const docSnap of snap.docs) {
+    const s = docSnap.data();
+    if (s.disabled) continue;
+
+    const localActiveAt = firestoreDate(s.localNotificationsActiveAt) || firestoreDate(s.updatedAt) || now;
+    const localScheduleDays = s.platform === 'android' ? 7 : 3;
+    const localScheduleExpiresAt = new Date(localActiveAt.getTime() + localScheduleDays * 24 * 60 * 60 * 1000);
+    const refreshReminderAt = new Date(Math.max(
+      now.getTime() + 60 * 60 * 1000,
+      localScheduleExpiresAt.getTime() - FCM_REFRESH_REMINDER_LEAD_MS,
+    ));
+    const fallbackActive = localScheduleExpiresAt <= now;
+    const next = computeNextServerPrayer(s, now);
+
+    updates.push(docSnap.ref.set({
+      localScheduleDays,
+      localScheduleExpiresAt,
+      refreshReminderAt,
+      fallbackEnabled: fallbackActive && Boolean(next),
+      fallbackSchemaVersion: FCM_FALLBACK_SCHEMA_VERSION,
+      fallbackUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...(next && { nextPrayerAt: next.at, nextPrayerKey: next.key }),
+    }, { merge: true }));
+    migrated++;
+  }
+  return migrated;
+}
+
+async function queueRefreshReminderMessages(
+  now: Date,
+  messages: ExpoPushMessage[],
+  updates: Promise<unknown>[],
+): Promise<number> {
+  const snap = await db.collection('userPrayerSettings')
+    .where('fallbackEnabled', '==', false)
+    .where('refreshReminderAt', '<=', now)
+    .orderBy('refreshReminderAt', 'asc')
+    .limit(FCM_FALLBACK_QUERY_LIMIT)
+    .get();
+
+  let queued = 0;
+  const nextReminderAt = new Date(now.getTime() + FCM_REFRESH_REMINDER_REPEAT_MS);
+  for (const docSnap of snap.docs) {
+    const uid = docSnap.id;
+    const s = docSnap.data();
+    if (s.disabled) continue;
+
+    const localExpiresAt = firestoreDate(s.localScheduleExpiresAt);
+    if (localExpiresAt && localExpiresAt <= now) continue;
+
+    let userData: admin.firestore.DocumentData | undefined;
+    try {
+      const userDoc = await db.doc(`users/${uid}`).get();
+      userData = userDoc.data();
+    } catch {
+      continue;
+    }
+
+    const fcmToken = userData?.fcmToken;
+    const notifEnabled = userData?.notificationsEnabled !== false;
+    updates.push(docSnap.ref.set({
+      refreshReminderAt: nextReminderAt,
+      fallbackUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }));
+    if (!notifEnabled || !fcmToken || !String(fcmToken).startsWith('ExponentPushToken')) continue;
+
+    const text = getPrayerFallbackRefreshText(String(userData?.language || s.language || 'ar'));
+    messages.push({
+      to: fcmToken,
+      title: text.title,
+      body: text.body,
+      sound: 'default',
+      priority: 'high',
+      channelId: 'general',
+      interruptionLevel: 'time-sensitive',
+      data: {
+        type: 'prayer_refresh_reminder',
+        source: 'fcm',
+        actionType: 'screen',
+        actionUrl: '/(tabs)/prayer',
+      },
+    });
+    queued++;
+  }
+  return queued;
+}
+
+async function activateExpiredFallbackUsers(now: Date, updates: Promise<unknown>[]): Promise<number> {
+  const snap = await db.collection('userPrayerSettings')
+    .where('fallbackEnabled', '==', false)
+    .where('localScheduleExpiresAt', '<=', now)
+    .orderBy('localScheduleExpiresAt', 'asc')
+    .limit(FCM_FALLBACK_QUERY_LIMIT)
+    .get();
+
+  let activated = 0;
+  for (const docSnap of snap.docs) {
+    const s = docSnap.data();
+    if (s.disabled) continue;
+    const next = computeNextServerPrayer(s, now);
+    updates.push(docSnap.ref.set({
+      fallbackEnabled: Boolean(next),
+      fallbackSchemaVersion: FCM_FALLBACK_SCHEMA_VERSION,
+      fallbackUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...(next && { nextPrayerAt: next.at, nextPrayerKey: next.key }),
+    }, { merge: true }));
+    if (next) activated++;
+  }
+  return activated;
+}
+
+async function queueDuePrayerFallbackMessages(
+  now: Date,
+  messages: ExpoPushMessage[],
+  updates: Promise<unknown>[],
+): Promise<number> {
+  const upper = new Date(now.getTime() + FCM_FALLBACK_MAX_MINUTES_BEFORE * 60 * 1000);
+  const staleBefore = new Date(now.getTime() - FCM_FALLBACK_LATE_GRACE_MS);
+  const snap = await db.collection('userPrayerSettings')
+    .where('fallbackEnabled', '==', true)
+    .where('nextPrayerAt', '<=', upper)
+    .orderBy('nextPrayerAt', 'asc')
+    .limit(FCM_FALLBACK_QUERY_LIMIT)
+    .get();
+
+  let queued = 0;
+  for (const docSnap of snap.docs) {
+    const uid = docSnap.id;
+    const s = docSnap.data();
+    if (s.disabled) continue;
+
+    const localExpiresAt = firestoreDate(s.localScheduleExpiresAt);
+    if (localExpiresAt && localExpiresAt > now) {
+      updates.push(docSnap.ref.set({
+        fallbackEnabled: false,
+        fallbackUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }));
+      continue;
+    }
+
+    const nextPrayerAt = firestoreDate(s.nextPrayerAt);
+    const nextPrayerKey = String(s.nextPrayerKey || '') as ServerFallbackPrayerKey;
+    if (!nextPrayerAt || !SERVER_FALLBACK_PRAYER_KEYS.includes(nextPrayerKey)) {
+      updates.push(docSnap.ref.set(nextFallbackPatch(s, now), { merge: true }));
+      continue;
+    }
+
+    if (nextPrayerAt < staleBefore) {
+      updates.push(docSnap.ref.set(nextFallbackPatch(s, now), { merge: true }));
+      continue;
+    }
+
+    let fcmToken: string | undefined;
+    let language = String(s.language || 'ar');
+    let userData: admin.firestore.DocumentData | undefined;
+    try {
+      const userDoc = await db.doc(`users/${uid}`).get();
+      userData = userDoc.data();
+      fcmToken = userData?.fcmToken;
+      language = String(userData?.language || language);
+      const notifEnabled = userData?.notificationsEnabled !== false;
+      if (!notifEnabled) continue;
+    } catch {
+      continue;
+    }
+    if (!fcmToken || !fcmToken.startsWith('ExponentPushToken')) continue;
+
+    // ── Dedupe vs. local notifications ─────────────────────────────────────
+    // If the user opened the app within the local schedule window, their
+    // on-device notifications for this prayer are still armed. Skip the FCM
+    // push to prevent duplicates. `users.lastActive` is updated on every app
+    // foreground independently of syncPrayerDataToFirestore, so it remains
+    // accurate even if a sync write failed or was throttled.
+    const lastActive = firestoreDate(userData?.lastActive);
+    if (lastActive) {
+      const platform = String(s.platform || '');
+      const scheduleDays = Number(s.localScheduleDays) || (platform === 'android' ? 7 : 3);
+      const localWindowMs = (scheduleDays + 1) * 24 * 60 * 60 * 1000; // +1 day safety
+      if (now.getTime() - lastActive.getTime() < localWindowMs) {
+        updates.push(docSnap.ref.set({
+          fallbackEnabled: false,
+          localScheduleExpiresAt: new Date(lastActive.getTime() + scheduleDays * 24 * 60 * 60 * 1000),
+          fallbackUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }));
+        continue;
+      }
+    }
+
+    const dedupeId = `${uid}_${nextPrayerKey}_${nextPrayerAt.toISOString().slice(0, 13)}`;
+    const dedupeRef = db.doc(`fcmPrayerSent/${dedupeId}`);
+    const dedupeSnap = await dedupeRef.get();
+    const followingPatch = nextFallbackPatch(s, new Date(nextPrayerAt.getTime() + 60 * 1000));
+    updates.push(docSnap.ref.set(followingPatch, { merge: true }));
+    if (dedupeSnap.exists) continue;
+
+    const nameAr = PRAYER_NAMES_AR[nextPrayerKey] ?? nextPrayerKey;
+    const isFriday = nextPrayerAt.getDay() === 5;
+    const effectiveKey = (nextPrayerKey === 'dhuhr' && isFriday) ? 'jumuah' : nextPrayerKey;
+    const titleAr = `🕌 ${PRAYER_TITLES_AR[effectiveKey] ?? nameAr}`;
+    const bodyAr = PRAYER_BODIES_AR[effectiveKey] ?? `حان وقت صلاة ${nameAr}`;
+    const audio = buildPrayerFallbackPushAudio(s);
+
+    messages.push({
+      to: fcmToken,
+      title: titleAr,
+      body: bodyAr,
+      ...(audio.sound && { sound: audio.sound }),
+      priority: 'high',
+      channelId: audio.channelId,
+      interruptionLevel: 'time-sensitive',
+      data: {
+        type: audio.useFullAdhan ? 'full_adhan' : 'prayer_fallback',
+        prayer: nextPrayerKey,
+        voice: audio.fullAdhanVoice,
+        soundType: audio.soundType,
+        regularSoundType: audio.soundType,
+        fullAdhanSoundType: audio.fullAdhanVoice,
+        fallback: '1',
+        language,
+        source: 'fcm',
+      },
+    });
+
+    updates.push(
+      dedupeRef.set({
+        uid,
+        prayer: nextPrayerKey,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        expireAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+      }),
+    );
+    queued++;
+  }
+  return queued;
+}
+
 /**
- * Scheduled Cloud Function: runs every 15 minutes.
- * For every user with fcmToken + prayerLocation in Firestore:
- *   - compute next prayer using adhan lib
- *   - if prayer falls within next 15 minutes, send Expo push
- *   - mark sent so we don't duplicate within 30 min
+ * Scheduled Cloud Function: runs every 5 minutes.
+ * Uses indexed queue fields instead of scanning every user:
+ *   - refreshReminderAt asks users to open the app before local adhan expires
+ *   - localScheduleExpiresAt activates fallback only after local schedule ends
+ *   - nextPrayerAt finds users whose next fallback adhan is due soon
  *
  * هذا "حزام أمان" — الجدولة المحلية لا تزال الأساسية، لكن لو فشلت
  * (force-stop, OEM kill, exact alarm denied) المستخدم يستلم push من السيرفر.
  */
 export const sendPrayerPushFallback = onSchedule(
-  { schedule: '*/15 * * * *', timeZone: 'UTC', secrets: ['EXPO_ACCESS_TOKEN'], memory: '512MiB' },
+  { schedule: '*/5 * * * *', timeZone: 'UTC', secrets: ['EXPO_ACCESS_TOKEN'], memory: '512MiB' },
   async () => {
     const startedAt = Date.now();
     try {
       const token = expoAccessToken.value();
-      const settingsSnap = await db.collection('userPrayerSettings').get();
-      logger.info(`[fcm-prayer] فحص ${settingsSnap.size} مستخدم`);
-
-      const adhan = require('adhan');
       const now = new Date();
       const messages: ExpoPushMessage[] = [];
       const updates: Promise<unknown>[] = [];
 
-      for (const docSnap of settingsSnap.docs) {
-        const uid = docSnap.id;
-        const s = docSnap.data();
-        if (s.disabled) continue;
-        if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number') continue;
-
-        // Skip users whose app was opened in the last 3 days — their local
-        // notifications are active, so FCM would create a duplicate. Tightened
-        // from 7d so a long-dormant gap doesn't quietly resume FCM for an
-        // active user who happened to skip a few days.
-        const localActiveAt = s.localNotificationsActiveAt?.toDate?.() as Date | undefined;
-        if (localActiveAt) {
-          const daysSinceActive = (now.getTime() - localActiveAt.getTime()) / (1000 * 60 * 60 * 24);
-          if (daysSinceActive < 3) continue;
-        }
-
-        // اقرأ FCM token من users/{uid}
-        let fcmToken: string | undefined;
-        try {
-          const userDoc = await db.doc(`users/${uid}`).get();
-          fcmToken = userDoc.data()?.fcmToken;
-          // احترم تعطيل الإشعارات من المستخدم
-          const notifEnabled = userDoc.data()?.notificationsEnabled !== false;
-          if (!notifEnabled) continue;
-        } catch { continue; }
-        if (!fcmToken || !fcmToken.startsWith('ExponentPushToken')) continue;
-
-        try {
-          const coords = new adhan.Coordinates(s.latitude, s.longitude);
-          const params = buildAdhanParams(
-            s.calculationMethod || 4,
-            s.asrJuristic || 0,
-            s.adjustments,
-          );
-          const todayPrayers = new adhan.PrayerTimes(coords, now, params);
-          const tomorrowPrayers = new adhan.PrayerTimes(
-            coords,
-            new Date(now.getTime() + 24 * 60 * 60 * 1000),
-            params,
-          );
-          const next = todayPrayers.nextPrayer();
-          const nextTime: Date = next === adhan.Prayer.None
-            ? tomorrowPrayers.fajr
-            : todayPrayers.timeForPrayer(next);
-          if (!nextTime) continue;
-
-          const minutesUntil = (nextTime.getTime() - now.getTime()) / 60000;
-          const prayerKeyPreview = String(next).toLowerCase();
-          logger.info(
-            `[fcm-prayer] uid=${uid} next=${prayerKeyPreview} nextTimeUTC=${nextTime.toISOString()} minutesUntil=${minutesUntil.toFixed(1)} adj=${JSON.stringify(s.adjustments ?? {})}`,
-          );
-          // Send 5-15 minutes before prayer time so FCM delivery delay (≤10 min)
-          // keeps the notification arriving around prayer time, not after it.
-          // Sending at minutesUntil=0 caused 18+ minute post-prayer delivery.
-          if (minutesUntil < 5 || minutesUntil > 15) continue;
-
-          // De-duplication: تجاهل لو أرسلنا نفس الصلاة لنفس المستخدم خلال 30 دقيقة
-          const prayerKey = String(next).toLowerCase();
-          const dedupeId = `${uid}_${prayerKey}_${nextTime.toISOString().slice(0, 13)}`;
-          const dedupeRef = db.doc(`fcmPrayerSent/${dedupeId}`);
-          const dedupeSnap = await dedupeRef.get();
-          if (dedupeSnap.exists) continue;
-
-          const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
-          // Friday Dhuhr → Jumuah
-          const isFriday = now.getDay() === 5;
-          const effectiveKey = (prayerKey === 'dhuhr' && isFriday) ? 'jumuah' : prayerKey;
-          // Title: 🕌 + full prayer title exactly matching app's getPrayerNotifTitle()
-          const titleAr = `🕌 ${PRAYER_TITLES_AR[effectiveKey] ?? nameAr}`;
-          const bodyAr = PRAYER_BODIES_AR[effectiveKey] ?? `حان وقت صلاة ${nameAr}`;
-          messages.push({
-            to: fcmToken,
-            title: titleAr,
-            body: bodyAr,
-            sound: 'default',
-            priority: 'high',
-            data: {
-              type: 'prayer_fallback',
-              prayer: prayerKey,
-              source: 'fcm',
-            },
-          });
-
-          updates.push(
-            dedupeRef.set({
-              uid,
-              prayer: prayerKey,
-              sentAt: admin.firestore.FieldValue.serverTimestamp(),
-              expireAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
-            }),
-          );
-        } catch (e) {
-          logger.warn(`[fcm-prayer] فشل حساب ${uid}:`, e);
-        }
-      }
+      const migrated = await migrateLegacyFallbackDocs(now, updates);
+      const refreshQueued = await queueRefreshReminderMessages(now, messages, updates);
+      const activated = await activateExpiredFallbackUsers(now, updates);
+      await Promise.allSettled(updates.splice(0));
+      const prayerQueued = await queueDuePrayerFallbackMessages(now, messages, updates);
 
       // أرسل في batches من 100
       let sent = 0;
@@ -2053,7 +3027,10 @@ export const sendPrayerPushFallback = onSchedule(
       }
       await Promise.allSettled(updates);
 
-      logger.info(`[fcm-prayer] أُرسل ${sent}/${messages.length} push في ${Date.now() - startedAt}ms`);
+      logger.info(
+        `[fcm-prayer] migrated=${migrated} refresh=${refreshQueued} activated=${activated} prayer=${prayerQueued}; ` +
+        `sent ${sent}/${messages.length} in ${Date.now() - startedAt}ms`,
+      );
     } catch (e) {
       logger.error('[fcm-prayer] failed:', e);
     }
@@ -2080,6 +3057,396 @@ export const cleanupFcmPrayerDedupe = onSchedule(
       logger.info(`[fcm-prayer-cleanup] حذف ${snap.size} سجل`);
     } catch (e) {
       logger.error('[fcm-prayer-cleanup] failed:', e);
+    }
+  },
+);
+
+// ============================================================================
+// Engagement Notifications — تذكيرات تحفيزية تلقائية
+//
+// 3 أنواع مكونة من لوحة الإدمن (appConfig/engagementNotifications):
+//   1) inactivity          — مرت N يوم بدون نشاط
+//   2) nameAndOpenPrompt   — مر N يوم من التنزيل وما فتح ولا كتب اسم
+//   3) namePrompt          — فاتح التطبيق لكن بدون اسم
+//
+// تتبّع آخر إرسال لكل مستخدم في users/{id}.engagementPushSent.{type}.lastSentAt
+// عشان نحترم repeatDays (0 = مرة واحدة فقط).
+// ============================================================================
+
+type EngagementType = 'inactivity' | 'nameAndOpenPrompt' | 'namePrompt';
+
+interface EngagementConfig {
+  enabled: boolean;
+  triggerDays: number;
+  repeatDays: number;
+  actionUrl: string;
+  translations: NotificationTranslations;
+}
+
+interface EngagementConfigDoc {
+  inactivity?: EngagementConfig;
+  nameAndOpenPrompt?: EngagementConfig;
+  namePrompt?: EngagementConfig;
+}
+
+const ENGAGEMENT_TYPES: EngagementType[] = ['inactivity', 'nameAndOpenPrompt', 'namePrompt'];
+const ENGAGEMENT_RECIPIENT_PREVIEW_LIMIT = 100;
+
+interface EngagementRecipientPreview {
+  userId: string;
+  displayName: string;
+  language: string;
+  platform: string;
+  lastActiveMs: number;
+}
+
+function tsToMillis(value: unknown): number {
+  if (!value) return 0;
+  if (typeof (value as admin.firestore.Timestamp)?.toMillis === 'function') {
+    try { return (value as admin.firestore.Timestamp).toMillis(); } catch { return 0; }
+  }
+  if (typeof (value as { seconds?: number })?.seconds === 'number') {
+    return (value as { seconds: number }).seconds * 1000;
+  }
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function userMatchesEngagementType(
+  type: EngagementType,
+  cfg: EngagementConfig,
+  data: admin.firestore.DocumentData,
+): boolean {
+  const now = Date.now();
+  const thresholdMs = Math.max(0, cfg.triggerDays) * 24 * 60 * 60 * 1000;
+  const lastActiveMs = tsToMillis(data.lastActive);
+  const createdAtMs = tsToMillis(data.createdAt) || tsToMillis(data.registrationDate);
+  const displayName = String(data.displayName || data.name || '').trim();
+  const hasName = displayName.length > 0;
+
+  if (type === 'inactivity') {
+    // المستخدم نشط قبل، ومرّت triggerDays بدون نشاط جديد
+    if (!lastActiveMs) return false;
+    return now - lastActiveMs >= thresholdMs;
+  }
+
+  if (type === 'nameAndOpenPrompt') {
+    // مر triggerDays من التنزيل، لا اسم، ولم يفتح التطبيق إطلاقاً
+    if (!createdAtMs) return false;
+    if (hasName) return false;
+    if (lastActiveMs && lastActiveMs > createdAtMs + 5 * 60 * 1000) return false;
+    return now - createdAtMs >= thresholdMs;
+  }
+
+  if (type === 'namePrompt') {
+    // فاتح التطبيق على الأقل مرة، لكن بدون اسم
+    if (hasName) return false;
+    if (!lastActiveMs) return false;
+    if (thresholdMs > 0 && now - lastActiveMs < thresholdMs) return false;
+    return true;
+  }
+
+  return false;
+}
+
+function shouldSendEngagementAgain(
+  cfg: EngagementConfig,
+  data: admin.firestore.DocumentData,
+  type: EngagementType,
+): boolean {
+  const sent = (data.engagementPushSent || {}) as Record<string, { lastSentAt?: unknown; count?: number }>;
+  const last = sent[type];
+  const lastSentMs = tsToMillis(last?.lastSentAt);
+  if (!lastSentMs) return true;
+  // 0 means "send only once"
+  if (!cfg.repeatDays || cfg.repeatDays <= 0) return false;
+  return Date.now() - lastSentMs >= cfg.repeatDays * 24 * 60 * 60 * 1000;
+}
+
+function pickEngagementTranslation(
+  translations: NotificationTranslations,
+  language: string,
+): { title: string; body: string } {
+  const lang = language as SupportedLanguage;
+  const exact = translations?.[lang];
+  if (exact?.title && exact?.body) return { title: exact.title, body: exact.body };
+  const ar = translations?.ar;
+  if (ar?.title && ar?.body) return { title: ar.title, body: ar.body };
+  const en = translations?.en;
+  if (en?.title && en?.body) return { title: en.title, body: en.body };
+  for (const value of Object.values(translations || {})) {
+    if (value?.title && value?.body) return { title: value.title, body: value.body };
+  }
+  return { title: 'روح المسلم', body: '' };
+}
+
+async function loadEngagementConfig(): Promise<EngagementConfigDoc | null> {
+  try {
+    const snap = await db.doc('appConfig/engagementNotifications').get();
+    if (!snap.exists) return null;
+    return snap.data() as EngagementConfigDoc;
+  } catch (error) {
+    logger.error('[engagement] failed to load config:', error);
+    return null;
+  }
+}
+
+async function processEngagementType(
+  type: EngagementType,
+  cfg: EngagementConfig,
+  expoToken: string,
+): Promise<{ matched: number; sent: number; failed: number; skipped: number }> {
+  if (!cfg.enabled) return { matched: 0, sent: 0, failed: 0, skipped: 0 };
+
+  const usersSnap = await db.collection('users').get();
+  const storeSources = new Set(['play_store', 'app_store']);
+  const messages: ExpoPushMessage[] = [];
+  const userIdByIndex: string[] = [];
+  const recipientPreview: EngagementRecipientPreview[] = [];
+  const perLanguage: Record<string, number> = {};
+
+  let matched = 0;
+  let skipped = 0;
+
+  usersSnap.forEach((docSnap) => {
+    const data = docSnap.data();
+    if (data.placeholder) return;
+    if (!storeSources.has(String(data.installSource || ''))) return;
+    const fcmToken = String(data.fcmToken || '');
+    if (!fcmToken.startsWith('ExponentPushToken')) return;
+    if (data.appStatus === 'uninstalled' || data.pushTokenInvalid === true) return;
+
+    if (!userMatchesEngagementType(type, cfg, data)) return;
+    matched++;
+    if (!shouldSendEngagementAgain(cfg, data, type)) {
+      skipped++;
+      return;
+    }
+
+    const language = String(data.language || 'ar');
+    const text = pickEngagementTranslation(cfg.translations || {}, language);
+    if (!text.title || !text.body) return;
+    perLanguage[language] = (perLanguage[language] || 0) + 1;
+
+    userIdByIndex.push(docSnap.id);
+    if (recipientPreview.length < ENGAGEMENT_RECIPIENT_PREVIEW_LIMIT) {
+      recipientPreview.push({
+        userId: docSnap.id,
+        displayName: String(data.displayName || data.name || '').trim(),
+        language,
+        platform: String(data.platform || data.devicePlatform || ''),
+        lastActiveMs: tsToMillis(data.lastActive),
+      });
+    }
+    messages.push({
+      to: fcmToken,
+      title: text.title,
+      body: text.body,
+      sound: 'default',
+      priority: 'high',
+      channelId: 'general',
+      interruptionLevel: 'time-sensitive',
+      ttl: 86400,
+      data: {
+        actionType: 'screen',
+        actionUrl: String(cfg.actionUrl || '/'),
+        type: `engagement_${type}`,
+        language,
+      },
+    });
+  });
+
+  if (messages.length === 0) {
+    return { matched, sent: 0, failed: 0, skipped };
+  }
+
+  const historyRef = await db.collection('notifications').add({
+    type: `engagement_${type}`,
+    targetAudience: 'engagement',
+    actionType: 'screen',
+    actionUrl: cfg.actionUrl || '/',
+    translations: cfg.translations,
+    status: 'sending',
+    sentCount: 0,
+    failedCount: 0,
+    deliveredCount: 0,
+    openedCount: 0,
+    clickedCount: 0,
+    perLanguage,
+    matchedCount: matched,
+    skippedCount: skipped,
+    recipientCount: userIdByIndex.length,
+    recipientPreview,
+    recipientPreviewLimit: ENGAGEMENT_RECIPIENT_PREVIEW_LIMIT,
+    triggerDays: cfg.triggerDays,
+    repeatDays: cfg.repeatDays,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  messages.forEach((message) => {
+    message.data = {
+      ...(message.data || {}),
+      notificationDocId: historyRef.id,
+    };
+  });
+
+  let sent = 0;
+  let failed = 0;
+  try {
+    for (let i = 0; i < messages.length; i += 100) {
+      const batchMessages = messages.slice(i, i + 100);
+      const batchUserIds = userIdByIndex.slice(i, i + 100);
+      const okCount = await sendExpoBatch(batchMessages, expoToken);
+      sent += okCount;
+      failed += batchMessages.length - okCount;
+
+      // Mark all batch users as recently sent (Expo doesn't return per-token
+      // success in our wrapper; conservative approach is to mark all and let
+      // repeatDays gate the next attempt). We use a single write per user.
+      const writeBatch = db.batch();
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      for (const uid of batchUserIds) {
+        writeBatch.set(
+          db.doc(`users/${uid}`),
+          {
+            engagementPushSent: {
+              [type]: {
+                lastSentAt: now,
+                count: admin.firestore.FieldValue.increment(1),
+              },
+            },
+          },
+          { merge: true },
+        );
+      }
+      try { await writeBatch.commit(); } catch (e) { logger.warn('[engagement] tracking write failed:', e); }
+    }
+
+    await historyRef.update({
+      status: sent > 0 ? 'sent' : 'failed',
+      sentCount: sent,
+      failedCount: failed,
+      deliveredCount: sent,
+      perLanguage,
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      error: sent > 0 ? admin.firestore.FieldValue.delete() : 'Expo send failed for all engagement recipients',
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await historyRef.update({
+      status: 'failed',
+      sentCount: sent,
+      failedCount: failed || messages.length,
+      deliveredCount: sent,
+      failedAt: admin.firestore.FieldValue.serverTimestamp(),
+      error: message.slice(0, 1000),
+    }).catch((updateError) => logger.warn('[engagement] failed to update history after send error:', updateError));
+    throw error;
+  }
+
+  return { matched, sent, failed, skipped };
+}
+
+async function runEngagementSweep(restrictType?: EngagementType): Promise<void> {
+  const cfgDoc = await loadEngagementConfig();
+  if (!cfgDoc) {
+    logger.info('[engagement] no config doc — skipping sweep');
+    return;
+  }
+  const token = expoAccessToken.value();
+  const types = restrictType ? [restrictType] : ENGAGEMENT_TYPES;
+
+  for (const type of types) {
+    const cfg = cfgDoc[type];
+    if (!cfg) continue;
+    try {
+      const result = await processEngagementType(type, cfg, token);
+      logger.info(`[engagement] ${type} → matched ${result.matched}, sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}`);
+    } catch (error) {
+      logger.error(`[engagement] ${type} failed:`, error);
+    }
+  }
+}
+
+/**
+ * Daily sweep at 09:00 UTC (12:00 Cairo / 12:00 Riyadh in winter).
+ * Runs all three engagement types based on their admin-configured rules.
+ */
+export const runEngagementNotifications = onSchedule(
+  { schedule: '0 9 * * *', timeZone: 'UTC', secrets: ['EXPO_ACCESS_TOKEN'], memory: '512MiB' },
+  async () => {
+    await runEngagementSweep();
+  },
+);
+
+/**
+ * Manual trigger consumer: when the admin presses "تشغيل فوري الآن" in the
+ * engagement page, a doc is written to engagementNotificationTriggers/{id}.
+ * This processor runs every minute, processes pending triggers, and updates
+ * their status. The per-user repeat gate still applies, so it can't be used
+ * to spam users.
+ */
+export const processEngagementTriggers = onSchedule(
+  { schedule: '*/1 * * * *', timeZone: 'UTC', secrets: ['EXPO_ACCESS_TOKEN'], memory: '512MiB' },
+  async () => {
+    try {
+      const snap = await db
+        .collection('engagementNotificationTriggers')
+        .where('status', '==', 'pending')
+        .limit(10)
+        .get();
+      if (snap.empty) return;
+      const cfgDoc = await loadEngagementConfig();
+      if (!cfgDoc) {
+        for (const docSnap of snap.docs) {
+          await docSnap.ref.update({
+            status: 'failed',
+            error: 'engagement config missing',
+            processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+        return;
+      }
+      const token = expoAccessToken.value();
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data();
+        const type = String(data.type || '') as EngagementType;
+        if (!ENGAGEMENT_TYPES.includes(type)) {
+          await docSnap.ref.update({
+            status: 'failed',
+            error: `unknown type ${type}`,
+            processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          continue;
+        }
+        const cfg = cfgDoc[type];
+        if (!cfg) {
+          await docSnap.ref.update({
+            status: 'failed',
+            error: `no config for ${type}`,
+            processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          continue;
+        }
+        try {
+          await docSnap.ref.update({ status: 'processing', processedAt: admin.firestore.FieldValue.serverTimestamp() });
+          const result = await processEngagementType(type, cfg, token);
+          await docSnap.ref.update({
+            status: 'done',
+            result,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          logger.info(`[engagement-trigger] ${type} done → ${JSON.stringify(result)}`);
+        } catch (error) {
+          await docSnap.ref.update({
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('[engagement-trigger] processor failed:', error);
     }
   },
 );

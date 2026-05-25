@@ -88,7 +88,9 @@ export default function AlKahfReminderSheet({ visible, onDismiss }: AlKahfRemind
           >
             <View style={[styles.content, {
               paddingBottom: Math.max(insets.bottom, 16) + 16,
-              backgroundColor: isLight ? 'rgba(255,255,255,0.85)' : 'rgba(28,28,30,0.85)',
+              backgroundColor: Platform.OS === 'android'
+                ? (isLight ? '#FFFFFF' : '#0f1a14')
+                : (isLight ? 'rgba(255,255,255,0.85)' : 'rgba(28,28,30,0.85)'),
             }]}>
               {/* Handle bar */}
               <View style={styles.handleBar}>

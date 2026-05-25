@@ -11,7 +11,10 @@ import { UniversalHeader } from '@/components/ui';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BrandedCapture } from '@/components/ui/BrandedCapture';
 import { useSettings } from '@/contexts/SettingsContext';
-import { getSurahName, getAyahCount, toArabicDigits } from '@/lib/memorization-helpers';
+import { getSurahName, getAyahCount } from '@/lib/memorization-helpers';
+import { mt } from '@/lib/memorization-i18n';
+import { uiDateLocale } from '@/lib/ui-text';
+import { localizeNumber } from '@/lib/format-number';
 
 export default function CertificateScreen() {
   const router = useRouter();
@@ -21,7 +24,7 @@ export default function CertificateScreen() {
   const surahNum = Number(params.surah || '1');
   const surahName = getSurahName(surahNum);
   const ayahCount = getAyahCount(surahNum);
-  const today = new Date().toLocaleDateString('ar-EG');
+  const today = new Date().toLocaleDateString(uiDateLocale());
 
   return (
     <BackgroundWrapper
@@ -31,29 +34,29 @@ export default function CertificateScreen() {
       style={{ flex: 1 }}
     >
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <UniversalHeader title="شهادة إتمام" onBack={() => router.back()} />
+        <UniversalHeader title={mt('certificateTitle')} onBack={() => router.back()} />
 
         <View style={styles.container}>
-          <BrandedCapture title={`شهادة حفظ ${surahName}`}>
+          <BrandedCapture title={mt('certificateCaptureTitle', { surah: surahName })}>
             {(textColor) => (
               <View style={[styles.cert, { borderColor: '#0d8e62' }]}>
                 <MaterialCommunityIcons name="certificate" size={56} color="#0d8e62" />
-                <Text style={[styles.title, { color: textColor }]}>شهادة إتمام</Text>
-                <Text style={[styles.subtitle, { color: textColor }]}>حفظ كتاب الله</Text>
+                <Text style={[styles.title, { color: textColor }]}>{mt('certificateTitle')}</Text>
+                <Text style={[styles.subtitle, { color: textColor }]}>{mt('certificateSubtitle')}</Text>
 
                 <View style={styles.divider} />
 
-                <Text style={[styles.body, { color: textColor }]}>نُبارك إتمام حفظ</Text>
+                <Text style={[styles.body, { color: textColor }]}>{mt('certificateCongrats')}</Text>
                 <Text style={[styles.surahName, { color: '#0d8e62' }]}>{surahName}</Text>
                 <Text style={[styles.body, { color: textColor }]}>
-                  {`${toArabicDigits(ayahCount)} آية`}
+                  {mt('certificateAyahCount', { count: localizeNumber(ayahCount) })}
                 </Text>
 
                 <View style={styles.divider} />
 
                 <Text style={[styles.date, { color: textColor }]}>{today}</Text>
                 <Text style={[styles.dua, { color: textColor }]}>
-                  جعلها الله حُجّة لك لا عليك
+                  {mt('certificateDua')}
                 </Text>
               </View>
             )}
@@ -74,16 +77,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  title: { fontFamily: 'Cairo-Bold', fontSize: 24 },
-  subtitle: { fontFamily: 'Cairo-SemiBold', fontSize: 16, opacity: 0.85 },
+  title: { fontFamily: 'Rubik-Bold', fontSize: 24 },
+  subtitle: { fontFamily: 'Rubik-SemiBold', fontSize: 16, opacity: 0.85 },
   divider: {
     width: '60%',
     height: 1,
     backgroundColor: 'rgba(13,142,98,0.4)',
     marginVertical: 12,
   },
-  body: { fontFamily: 'Cairo-Regular', fontSize: 14 },
+  body: { fontFamily: 'Rubik-Regular', fontSize: 14 },
   surahName: { fontFamily: 'KFGQPCUthmanic', fontSize: 32, marginVertical: 6 },
-  date: { fontFamily: 'Cairo-SemiBold', fontSize: 13, opacity: 0.85 },
-  dua: { fontFamily: 'Cairo-Regular', fontSize: 13, marginTop: 8, textAlign: 'center' },
+  date: { fontFamily: 'Rubik-SemiBold', fontSize: 13, opacity: 0.85 },
+  dua: { fontFamily: 'Rubik-Regular', fontSize: 13, marginTop: 8, textAlign: 'center' },
 });

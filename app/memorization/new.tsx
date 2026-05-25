@@ -439,7 +439,7 @@ function Section({
       <Text
         style={{
           color: colors.text,
-          fontFamily: 'Cairo-Bold',
+          fontFamily: 'Rubik-Bold',
           fontSize: 15,
           textAlign: isRTL ? 'right' : 'left',
           writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -485,7 +485,7 @@ function ChipsRow({
             <Text
               style={{
                 color: active ? '#fff' : colors.text,
-                fontFamily: 'Cairo-SemiBold',
+                fontFamily: 'Rubik-SemiBold',
                 fontSize: 13,
               }}
             >
@@ -504,7 +504,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     scroll: { padding: 16, gap: 14, paddingBottom: 60 },
     label: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -523,7 +523,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       borderRadius: 16,
       backgroundColor: 'rgba(255,255,255,0.06)',
     },
-    chipText: { color: colors.text, fontFamily: 'Cairo-Regular', fontSize: 12 },
+    chipText: { color: colors.text, fontFamily: 'Rubik-Regular', fontSize: 12 },
     exactBox: {
       gap: 8,
       padding: 12,
@@ -534,7 +534,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     hint: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -548,14 +548,14 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     presetTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 14,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     presetMeta: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -566,7 +566,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.text,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 14,
       textAlign: 'center',
       borderWidth: 1,
@@ -584,7 +584,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     readOnlyText: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -599,5 +599,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       borderRadius: 14,
       marginTop: 8,
     },
-    ctaText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 16 },
+    ctaText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 16 },
   });

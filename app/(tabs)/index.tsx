@@ -31,7 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllSurahs, type QuranV4Surah } from '@/lib/qcf-page-data';
-import { getLocalizedHijriDate } from '@/lib/hijri-date';
+import { getLocalizedHijriDate, subscribeToHijriOffsetChanges } from '@/lib/hijri-date';
 import { getCategoryById, type AzkarCategoryType, resolveCategoryId } from '@/lib/azkar-api';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -52,7 +52,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { Dimensions } from 'react-native';
-import { getCachedPrayerTimes, getNextPrayer, getTimeRemaining, getPrayerNameAr, timeStringToDate, type PrayerTimes, type PrayerName } from '@/lib/prayer-times';
+import { getCachedPrayerTimes, getNextPrayer, getTimeRemaining, getPrayerNameAr, getPrayerTranslationKey, timeStringToDate, type PrayerTimes, type PrayerName } from '@/lib/prayer-times';
 import { schedulePrayerNotification, requestNotificationPermission, cancelNotification, scheduleLocalNotification } from '@/lib/push-notifications';
 import * as Notifications from 'expo-notifications';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -89,7 +89,9 @@ const PAGE_CONFIGS = {
   hadith_sifat: { icon: 'format-quote-open', color: '#0d8e62' }, // matches names green theme
   seerah: { icon: 'book-account', color: '#6366F1' }, // seerah page
   companions: { icon: 'account-group', color: '#0d8e62' }, // companions page
+  religious_stories: { icon: 'book-heart', color: '#6d5dfc' }, // religious stories page
   daily_hadith: { icon: 'format-quote-open', color: '#6366F1' }, // hadith of day
+  daily_reflection: { icon: 'book-open-page-variant', color: '#c07b10' }, // ibrah of day
 };
 
 // ========================================
@@ -143,13 +145,27 @@ const EXTRA_APP_PAGES: CustomQuickAccessItem[] = [
   { id: 'page_names', ...PAGE_CONFIGS.names, label: '', nameKey: 'home.namesOfAllah', route: '/names' },
   { id: 'page_ruqya', ...getAzkarCategoryData('34'), label: '', nameKey: 'azkar.ruqya', route: '/ruqya' },
   { id: 'page_companions', icon: 'account-group', color: '#0d8e62', label: '', nameKey: 'companions.title', route: '/companions' },
-  { id: 'page_quote_of_day', icon: 'lightbulb-on', color: '#c07b10', label: '', nameKey: 'home.quoteOfDay', route: '/quote-of-day' },
+  { id: 'page_religious_stories', ...PAGE_CONFIGS.religious_stories, label: '', nameKey: 'home.religiousStories', route: '/religious-stories' },
+  { id: 'page_quote_of_day', ...PAGE_CONFIGS.daily_reflection, label: '', nameKey: 'home.quoteOfDay', route: '/quote-of-day' },
   { id: 'page_quran_bookmarks', icon: 'bookmark', color: '#0d8e62', label: '', nameKey: 'home.quranBookmarks', route: '/quran-bookmarks' },
   { id: 'page_worship_tracker', icon: 'chart-line', color: '#0d8e62', label: '', nameKey: 'home.followWorship', route: '/worship-tracker' },
 ];
 
 const CUSTOM_ITEMS_STORAGE_KEY = '@quick_access_custom_items';
 const COLLAPSED_SECTIONS_KEY = '@home_collapsed_sections';
+const QUICK_ACCESS_QA_ID = 'question_answer';
+const QUICK_ACCESS_QA_FORCED_INDEX = 2;
+const QUICK_ACCESS_QA_MIGRATION_V8_KEY = '@quick_access_migration_qa_v8';
+
+const withQuestionAnswerInThirdSlot = (ids: string[]) => {
+  const withoutQuestionAnswer = ids.filter(id => id !== QUICK_ACCESS_QA_ID);
+  const insertAt = Math.min(QUICK_ACCESS_QA_FORCED_INDEX, withoutQuestionAnswer.length);
+  return [
+    ...withoutQuestionAnswer.slice(0, insertAt),
+    QUICK_ACCESS_QA_ID,
+    ...withoutQuestionAnswer.slice(insertAt),
+  ];
+};
 
 const DUA_CATEGORIES = [
   { id: '26', nameKey: 'azkar.quranDuas', ...getAzkarCategoryData('26') },
@@ -199,6 +215,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     items: [
       { id: 'seerah', labelKey: 'seerah.title', icon: 'book-account', color: '#6366F1', route: '/seerah' },
       { id: 'companions', labelKey: 'companions.title', icon: 'account-group', color: '#0d8e62', route: '/companions' },
+      { id: 'religious_stories', labelKey: 'home.religiousStories', ...PAGE_CONFIGS.religious_stories, route: '/religious-stories' },
     ],
   },
   {
@@ -234,6 +251,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
       { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), icon: 'hand-heart', color: '#c07b10', route: '/sunnah-dua-daily' },
       { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, icon: 'calendar-heart', route: '/daily-dua' },
       { id: 'daily_hadith', labelKey: 'home.hadithOfDay', ...PAGE_CONFIGS.daily_hadith, route: '/hadith-of-day' },
+      { id: 'daily_reflection', labelKey: 'home.quoteOfDay', ...PAGE_CONFIGS.daily_reflection, route: '/quote-of-day' },
       { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), icon: 'shield-check', color: '#0D9488', route: '/ruqya' },
       { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), icon: 'book-open-page-variant', color: '#3a7ca5', route: '/quran-dua-daily' },
       { id: 'famous_duas', labelKey: 'home.famousDuas', icon: 'star-circle', color: '#0d8e62', route: '/famous-duas' },
@@ -299,6 +317,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
     items: [
       { id: 'seerah', labelKey: 'seerah.title', icon: 'book-account', color: '#6366F1', route: '/seerah' },
       { id: 'companions_stories', labelKey: 'companions.title', icon: 'account-group', color: '#0d8e62', route: '/companions' },
+      { id: 'religious_stories', labelKey: 'home.religiousStories', ...PAGE_CONFIGS.religious_stories, route: '/religious-stories' },
     ],
   },
   {
@@ -325,6 +344,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
       { id: 'general_duas', labelKey: 'home.selectedDuas', ...getAzkarCategoryData('34'), icon: 'hand-heart', color: '#c07b10', route: '/sunnah-dua-daily' },
       { id: 'daily_dua', labelKey: 'home.dailyDua', ...PAGE_CONFIGS.daily_dua, icon: 'calendar-heart', route: '/daily-dua' },
       { id: 'daily_hadith', labelKey: 'home.hadithOfDay', ...PAGE_CONFIGS.daily_hadith, route: '/hadith-of-day' },
+      { id: 'daily_reflection', labelKey: 'home.quoteOfDay', ...PAGE_CONFIGS.daily_reflection, route: '/quote-of-day' },
       { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), icon: 'shield-check', color: '#0D9488', route: '/ruqya' },
       { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), icon: 'book-open-page-variant', color: '#3a7ca5', route: '/quran-dua-daily' },
       { id: 'famous_duas', labelKey: 'home.famousDuas', icon: 'star-circle', color: '#0d8e62', route: '/famous-duas' },
@@ -596,7 +616,12 @@ export default function HomeScreen() {
   const { isPremium, showUpgradeBanner, isSubscriptionEnabled } = useSubscription();
 
   // Date display
-  const homeHijriDate = useMemo(() => getLocalizedHijriDate(), []);
+  const [homeHijriDate, setHomeHijriDate] = useState(() => getLocalizedHijriDate());
+  const refreshHomeHijriDate = useCallback(() => {
+    setHomeHijriDate(getLocalizedHijriDate());
+  }, [settings.prayer.calculationMethod, settings.prayer.asrJuristic, settings.prayer.adjustments]);
+
+  useEffect(() => subscribeToHijriOffsetChanges(refreshHomeHijriDate), [refreshHomeHijriDate]);
   const gregorianDateStr = useMemo(() => {
     const { getLocalizedFullDate } = require('@/lib/hijri-date');
     const full = getLocalizedFullDate();
@@ -830,14 +855,14 @@ export default function HomeScreen() {
     const loadPrayerTimes = async () => {
       try {
         const today = new Date().toISOString().split('T')[0];
-        const cached = await getCachedPrayerTimes(today);
+        const cached = await getCachedPrayerTimes(today, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
         if (cached) {
           setCachedPrayerTimes(cached);
           return;
         }
         // No cache — try to fetch using saved location. Never request permission
         // here; that happens during onboarding or when the user opens prayer/qibla.
-        const { getStoredLocation, fetchPrayerTimes, parsePrayerTimes, saveLocation, cachePrayerTimes } = await import('@/lib/prayer-times');
+        const { getStoredLocation, fetchPrayerTimes, parsePrayerTimes, saveLocation, cachePrayerTimes, applyAdjustments } = await import('@/lib/prayer-times');
         const { MAKKAH_FALLBACK_DEFAULTS } = await import('@/lib/country-prayer-defaults');
         let loc = await getStoredLocation();
         if (!loc) {
@@ -869,8 +894,9 @@ export default function HomeScreen() {
         if (loc) {
           const response = await fetchPrayerTimes(loc);
           if (response) {
-            const times = parsePrayerTimes(response);
-            await cachePrayerTimes(today, times);
+            const rawTimes = parsePrayerTimes(response);
+            const times = applyAdjustments(rawTimes, settings.prayer.adjustments);
+            await cachePrayerTimes(today, times, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
             setCachedPrayerTimes(times);
             // Sync to widget data
             try {
@@ -986,7 +1012,8 @@ export default function HomeScreen() {
       AsyncStorage.getItem('@quick_access_migration_qa_v5'),
       AsyncStorage.getItem('@quick_access_migration_qa_v6'),
       AsyncStorage.getItem('@quick_access_migration_qa_v7'),
-    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done, qaMigrationV5Done, qaMigrationV6Done, qaMigrationV7Done]) => {
+      AsyncStorage.getItem(QUICK_ACCESS_QA_MIGRATION_V8_KEY),
+    ]).then(([stored, storedCustom, customizedFlag, qaMigrationV2Done, qaMigrationV3Done, qaMigrationV4Done, qaMigrationV5Done, qaMigrationV6Done, qaMigrationV7Done, qaMigrationV8Done]) => {
       // Check if user has ever customized their Quick Access
       const userHasCustomized = customizedFlag === 'true';
       setHasUserCustomized(userHasCustomized);
@@ -1059,6 +1086,16 @@ export default function HomeScreen() {
               AsyncStorage.setItem('@quick_access_migration_qa_v7', 'true');
             }
 
+            // v8: next-release upgrade — make "Question & Answer" the 3rd quick
+            // access item once, then let the next user customisation take over.
+            if (!qaMigrationV8Done) {
+              ids = withQuestionAnswerInThirdSlot(ids);
+              AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+              AsyncStorage.setItem(QUICK_ACCESS_QA_MIGRATION_V8_KEY, 'true');
+              AsyncStorage.setItem('@quick_access_customized', 'true');
+              setHasUserCustomized(true);
+            }
+
             setSelectedQuickAccessIds(ids);
           }
         } catch {}
@@ -1086,6 +1123,9 @@ export default function HomeScreen() {
               }
               if (item.id === 'page_quran_bookmarks') {
                 return { ...item, icon: 'bookmark', color: '#0d8e62' };
+              }
+              if (item.id === 'page_religious_stories' || item.nameKey === 'قصص دينية') {
+                return { ...item, nameKey: 'home.religiousStories' };
               }
               return item;
             });
@@ -1138,6 +1178,17 @@ export default function HomeScreen() {
         setSelectedQuickAccessIds(ids);
         AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
         AsyncStorage.setItem('@quick_access_migration_qa_v7', 'true');
+        AsyncStorage.setItem('@quick_access_customized', 'true');
+      }
+
+      // v8 fallback: users without stored quick access still receive the new
+      // mandatory 3rd slot until they next save a custom quick-access list.
+      if (!stored && !qaMigrationV8Done) {
+        const ids = withQuestionAnswerInThirdSlot(QUICK_ACCESS.slice(0, 4).map(i => i.id));
+        setSelectedQuickAccessIds(ids);
+        setHasUserCustomized(true);
+        AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
+        AsyncStorage.setItem(QUICK_ACCESS_QA_MIGRATION_V8_KEY, 'true');
         AsyncStorage.setItem('@quick_access_customized', 'true');
       }
     });
@@ -1239,29 +1290,6 @@ export default function HomeScreen() {
         .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
     }
 
-    // GUARANTEED on Android: question_answer MUST be at index 2
-    if (Platform.OS === 'android') {
-      const qaIndex = result.findIndex(item => item.id === 'question_answer');
-      const qaItem = result[qaIndex]
-        ?? allQuickAccessItems.find(item => item.id === 'question_answer')
-        ?? QUICK_ACCESS.find(q => q.id === 'question_answer');
-      if (qaItem) {
-        // Remove from wherever it is (if present)
-        result = result.filter(item => item.id !== 'question_answer');
-        // Force into index 2
-        const insertAt = Math.min(2, result.length);
-        result = [...result.slice(0, insertAt), qaItem as any, ...result.slice(insertAt)];
-      }
-    } else if (!result.find(item => item.id === 'question_answer')) {
-      // Non-Android: inject if missing
-      const qaItem = allQuickAccessItems.find(item => item.id === 'question_answer')
-        ?? QUICK_ACCESS.find(q => q.id === 'question_answer');
-      if (qaItem) {
-        const insertAt = Math.min(2, result.length);
-        result = [...result.slice(0, insertAt), qaItem as any, ...result.slice(insertAt)];
-      }
-    }
-
     return result;
   }, [homeConfig, allQuickAccessItems, selectedQuickAccessIds, hasUserCustomized]);
 
@@ -1272,26 +1300,48 @@ export default function HomeScreen() {
       .trim();
   }, []);
 
-  // Resolve multi-lang banner text with fallback: titles[lang] → titles.en → t() seasonal key → title
+  const cleanBannerPlaceholder = useCallback((text: string | undefined, field: 'title' | 'subtitle') => {
+    const cleaned = stripEmojis(text || '');
+    const normalized = cleaned.trim().toLowerCase();
+    if (
+      normalized === field ||
+      normalized === `${field}...` ||
+      normalized === `${field}…`
+    ) {
+      return '';
+    }
+    return cleaned;
+  }, [stripEmojis]);
+
+  // Resolve multi-lang banner text with RTL-safe fallback.
   const resolveBannerText = useCallback((banner: WelcomeBannerConfig, field: 'title' | 'subtitle') => {
     const lang = (settings.language || 'ar') as keyof MultiLangText;
     const multiField = field === 'title' ? banner.titles : banner.subtitles;
-    if (multiField) {
-      const resolved = multiField[lang] || multiField.en;
-      if (resolved) return stripEmojis(resolved);
+    const localized = cleanBannerPlaceholder(multiField?.[lang], field);
+    if (localized) return localized;
+
+    const legacyText = cleanBannerPlaceholder(banner[field], field);
+    const arabicText = cleanBannerPlaceholder(multiField?.ar, field);
+    const englishText = cleanBannerPlaceholder(multiField?.en, field);
+
+    // Arabic should never fall through to an English placeholder while a legacy
+    // Arabic value exists. Older admin saves only populated title/subtitle.
+    if (lang === 'ar') {
+      return legacyText || arabicText || englishText;
     }
-    // If current language is Arabic, return the Arabic field directly
-    if (lang === 'ar') return stripEmojis(banner[field]);
+
+    if (englishText) return englishText;
+
     // For non-Arabic languages without multi-lang data, try translation keys
     const text = banner[field] || '';
     if (text.includes('\u0639\u064a\u062f') || text.includes('\u0645\u0628\u0627\u0631\u0643')) {
-      return stripEmojis(t(field === 'title' ? 'seasonal.eid.title' : 'seasonal.eid.subtitle'));
+      return cleanBannerPlaceholder(t(field === 'title' ? 'seasonal.eid.title' : 'seasonal.eid.subtitle'), field);
     }
     if (text.includes('\u0631\u0645\u0636\u0627\u0646')) {
-      return stripEmojis(t(field === 'title' ? 'seasonal.ramadan.title' : 'seasonal.ramadan.subtitle'));
+      return cleanBannerPlaceholder(t(field === 'title' ? 'seasonal.ramadan.title' : 'seasonal.ramadan.subtitle'), field);
     }
-    return stripEmojis(banner[field]);
-  }, [settings.language, stripEmojis]);
+    return legacyText || arabicText || englishText;
+  }, [settings.language, cleanBannerPlaceholder, t]);
 
   // Welcome banner from Firestore (start null to avoid flash of stale content)
   const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>(null);
@@ -1346,6 +1396,8 @@ export default function HomeScreen() {
       eid_fitr: '/seasonal/ramadan', // Use ramadan page for eid
       eid_adha: '/seasonal/hajj', // Use hajj page for eid adha
       muharram: '/seasonal/ashura', // Use ashura page for muharram
+      rajab: '/seasonal',
+      shaban: '/seasonal',
     };
     
     // Map season type to translation keys
@@ -1360,19 +1412,21 @@ export default function HomeScreen() {
       muharram: { title: 'seasonal.muharram.title', subtitle: 'seasonal.muharram.subtitle' },
     };
     
-    const route = seasonRoutes[currentSeason.type] || '/seasonal/ramadan';
+    const route = seasonRoutes[currentSeason.type] || '/seasonal';
     const translationKey = seasonTranslationKeys[currentSeason.type];
+    const title = currentSeason.nameAr || (translationKey ? t(translationKey.title) : '');
+    const subtitle = dailyData.greeting || currentSeason.description || (translationKey ? t(translationKey.subtitle) : '');
     
     return {
       enabled: true,
-      title: translationKey ? t(translationKey.title) : currentSeason.nameAr,
-      subtitle: translationKey ? t(translationKey.subtitle) : currentSeason.description,
+      title,
+      subtitle,
       icon: currentSeason.icon,
       color: currentSeason.color,
       route,
       displayMode: 'text',
     };
-  }, [currentSeason, t]);
+  }, [currentSeason, dailyData.greeting, t]);
 
   useEffect(() => {
     let mounted = true;
@@ -1542,7 +1596,7 @@ export default function HomeScreen() {
             `${String(c.hours).padStart(2, '0')}:${String(c.minutes).padStart(2, '0')}:${String(c.seconds).padStart(2, '0')}`;
             const countdownLine = bannerCountdown && bannerNextPrayer ? (textColor?: string) => (
               <Text style={[styles.bannerSecondaryCountdown, textColor ? { color: textColor } : {}, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {`${t(`prayer.${bannerNextPrayer.name}`)} · ${fmtCountdown(bannerCountdown)}`}
+              {`${t(getPrayerTranslationKey(bannerNextPrayer.name))} · ${fmtCountdown(bannerCountdown)}`}
             </Text>
           ) : null;
 
@@ -1656,7 +1710,7 @@ export default function HomeScreen() {
 
           // Priority 3: Prayer countdown card (no event, not Friday) — gated by admin flag
           if (showPrayerCountdown && bannerCountdown && bannerNextPrayer) {
-            const prayerName = t(`prayer.${bannerNextPrayer.name}`);
+            const prayerName = t(getPrayerTranslationKey(bannerNextPrayer.name));
             return (
             <Animated.View entering={FadeIn.duration(600)}>
               <TouchableOpacity
@@ -1748,7 +1802,7 @@ export default function HomeScreen() {
         )}
 
         {/* Permission Recovery Banner — يظهر فقط لو في إذن مفقود */}
-        <PermissionBanner excludedKeys={['batteryOptimization', 'location']} />
+        <PermissionBanner excludedKeys={['batteryOptimization', 'location', 'backgroundRefresh']} />
 
         {/* Daily Highlights */}
         <CollapsibleSection title={t('home.highlights')} icon="star-circle" iconColor="#c07b10" sectionId="highlights" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
@@ -2187,7 +2241,7 @@ export default function HomeScreen() {
                       }} 
                       onPress={resetQuickAccessToDefaults}
                     >
-                      <Text style={{ color: '#DC2626', fontFamily: 'Cairo-SemiBold', fontSize: colors.fs(14) }}>
+                      <Text style={{ color: '#DC2626', fontFamily: 'Rubik-SemiBold', fontSize: colors.fs(14) }}>
                         {t('home.resetToDefaults')}
                       </Text>
                     </TouchableOpacity>
@@ -2222,14 +2276,14 @@ export default function HomeScreen() {
           style={styles.nextPrayerOverlay}
           onPress={() => setShowNextPrayerModal(false)}
         >
-          <Pressable style={[styles.nextPrayerSheet, { backgroundColor: colors.surface }]}>
+          <Pressable style={[styles.nextPrayerSheet, { backgroundColor: colors.modalSurface }]}>
             {/* Handle bar */}
             <View style={styles.nextPrayerHandle} />
 
             {(() => {
               const nextPrayer = cachedPrayerTimes ? getNextPrayer(cachedPrayerTimes) : null;
               const prayerNameAr = nextPrayer ? getPrayerNameAr(nextPrayer.name) : '';
-              const prayerNameTranslated = nextPrayer ? t(`prayer.${nextPrayer.name}`) : '';
+              const prayerNameTranslated = nextPrayer ? t(getPrayerTranslationKey(nextPrayer.name)) : '';
               return (
                 <>
                   {/* Mosque icon */}
@@ -2258,7 +2312,7 @@ export default function HomeScreen() {
                             { value: nextPrayerCountdown.minutes, label: t('home.minuteLabel') },
                             { value: nextPrayerCountdown.seconds, label: t('home.secondLabel') },
                           ].map((item, i) => (
-                            <View key={i} style={[styles.nextPrayerCountdownBox, { backgroundColor: colors.surface }]}>
+                            <View key={i} style={[styles.nextPrayerCountdownBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                               <Text style={[styles.nextPrayerCountdownNum, { color: '#0D9488' }]}>
                                 {String(item.value).padStart(2, '0')}
                               </Text>

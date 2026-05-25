@@ -22,6 +22,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getPrayerTranslationKey, type PrayerName } from '@/lib/prayer-times';
 
 const PRAYERS = [
   { key: 'fajr', tKey: 'prayer.fajr', icon: 'weather-sunset-up', color: '#3a7ca5' },
@@ -96,7 +97,7 @@ export default function PrayerAdjustmentsScreen() {
                       <View style={styles.iconBg}>
                         <MaterialCommunityIcons name={prayer.icon as any} size={22} color={prayer.color} />
                       </View>
-                      <Text style={[styles.prayerName, { color: colors.text }]}>{t(prayer.tKey)}</Text>
+                      <Text style={[styles.prayerName, { color: colors.text }]}>{t(getPrayerTranslationKey(prayer.key as PrayerName))}</Text>
                     </View>
                     <View style={[styles.stepper, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <TouchableOpacity

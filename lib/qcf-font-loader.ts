@@ -238,11 +238,9 @@ export async function ensurePagesLoaded(
 }
 
 /**
- * Preload ALL 604 QCF page fonts in the background after app startup.
- * Loads in chunks so we never block the JS thread; failures are logged but never thrown.
- * Called once from `app/_layout.tsx` after the initial useFonts() resolves so that
- * any subsequent navigation to a Quran page (deep-link, favorite, ayat-kursi, etc.)
- * finds its per-page font already in memory.
+ * Backward-compatible starter preload for callers that still ask for a broad
+ * QCF warmup. It intentionally loads only common entry pages; loading all 604
+ * pages in both light/dark variants causes memory pressure on low-end Android.
  */
 let allPagesPreloadStarted: { light: boolean; dark: boolean } = { light: false, dark: false };
 export function preloadAllPagesInBackground(darkMode: boolean = false): void {
@@ -250,24 +248,68 @@ export function preloadAllPagesInBackground(darkMode: boolean = false): void {
   if (allPagesPreloadStarted[key]) return;
   allPagesPreloadStarted[key] = true;
 
-  const CHUNK_SIZE = 25;
-  const CHUNK_DELAY_MS = 60;
+  const starterPages = [1, 2, 3, 4, 5, 6, 7, 42, 440, 562, 604];
+  setTimeout(() => {
+    preloadCriticalPages(starterPages, darkMode, 1500).catch(() => {});
+  }, 1000);
+}
 
-  const loadChunk = async (start: number) => {
-    const end = Math.min(start + CHUNK_SIZE, TOTAL_QURAN_PAGES + 1);
-    const tasks: Promise<unknown>[] = [];
-    for (let p = start; p < end; p++) {
-      if (!isValidPage(p)) continue;
-      if (loadedPages.has(p) && loadedPages.get(p) === darkMode) continue;
-      tasks.push(loadPageFont(p, darkMode).catch(() => null));
-    }
-    await Promise.all(tasks);
-    if (end <= TOTAL_QURAN_PAGES) {
-      setTimeout(() => loadChunk(end), CHUNK_DELAY_MS);
-    }
+export function startQcfSessionWarmup(options: {
+  darkMode?: boolean;
+  durationMs?: number;
+  chunkSize?: number;
+  startDelayMs?: number;
+  priorityPages?: number[];
+  onComplete?: () => void;
+} = {}): () => void {
+  const darkMode = options.darkMode === true;
+  const durationMs = options.durationMs ?? 5 * 60 * 1000;
+  const chunkSize = Math.max(1, options.chunkSize ?? 4);
+  const startDelayMs = Math.max(0, options.startDelayMs ?? 3000);
+  const priorityPages = (options.priorityPages ?? []).filter(isValidPage);
+  const prioritySet = new Set(priorityPages);
+  const pages = [
+    ...priorityPages,
+    ...Array.from({ length: TOTAL_QURAN_PAGES }, (_, index) => index + 1)
+      .filter((page) => !prioritySet.has(page)),
+  ];
+
+  let cancelled = false;
+  let index = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const totalChunks = Math.max(1, Math.ceil(pages.length / chunkSize));
+  const chunkDelayMs = Math.max(250, Math.floor(durationMs / totalChunks));
+
+  const scheduleNext = (delayMs: number) => {
+    timer = setTimeout(runChunk, delayMs);
   };
-  // Defer first chunk so we yield to the JS thread after splash hide.
-  setTimeout(() => loadChunk(1), 1000);
+
+  const runChunk = () => {
+    if (cancelled || index >= pages.length) return;
+    const chunk = pages.slice(index, index + chunkSize);
+    index += chunk.length;
+
+    Promise.all(
+      chunk.map((page) =>
+        isPageFontLoaded(page, darkMode)
+          ? Promise.resolve()
+          : loadPageFont(page, darkMode).catch(() => undefined),
+      ),
+    ).finally(() => {
+      if (!cancelled && index < pages.length) {
+        scheduleNext(chunkDelayMs);
+      } else if (!cancelled && index >= pages.length) {
+        options.onComplete?.();
+      }
+    });
+  };
+
+  scheduleNext(startDelayMs);
+
+  return () => {
+    cancelled = true;
+    if (timer) clearTimeout(timer);
+  };
 }
 
 /** Preload fonts spiraling outward from a start page */

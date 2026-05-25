@@ -118,6 +118,7 @@ export function prayerLabelEn(arabic: string): string {
     'الفجر': 'Fajr',
     'الشروق': 'Sunrise',
     'الظهر': 'Dhuhr',
+    'صلاة الجمعة': 'Jumuah',
     'العصر': 'Asr',
     'المغرب': 'Maghrib',
     'العشاء': 'Isha',

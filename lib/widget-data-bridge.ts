@@ -17,7 +17,7 @@ import {
   type WidgetSnapshotManifestEntry,
 } from './widget-data';
 import { getLanguage } from './i18n';
-import { type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes } from './prayer-times';
+import { type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes, applyAdjustments } from './prayer-times';
 import { getOfflinePrayerTimes } from './prayer-week-cache';
 import {
   buildCanonicalPrayerSnapshot,
@@ -130,6 +130,27 @@ async function scheduleAndroidPrayerWidgetRefreshes(sharedData: SharedWidgetData
     }
   } catch (e) {
     if (__DEV__) console.warn('[widget/android] prayer refresh schedule failed:', e);
+  }
+}
+
+/**
+ * Arm the 15-minute content-widget refresh chain on Android. Mirrors the
+ * iOS WidgetKit timeline cadence at a battery-friendly interval — once
+ * scheduled, the native receiver re-arms itself on every fire so the
+ * azkar / dhikr / verse widgets keep cycling indefinitely without the
+ * user opening the app. Skips silently when no content widget is placed
+ * (the receiver short-circuits in that case).
+ */
+async function scheduleAndroidContentWidgetRefresh(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    const { PrayerWidgetRefreshModule } = NativeModules;
+    if (PrayerWidgetRefreshModule?.scheduleContentWidgetRefresh) {
+      await PrayerWidgetRefreshModule.scheduleContentWidgetRefresh();
+      if (__DEV__) console.log('[widget/android] content refresh chain armed (15-min cadence)');
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[widget/android] content refresh schedule failed:', e);
   }
 }
 
@@ -748,6 +769,39 @@ export async function updateWidgetData(
       if (__DEV__) console.warn('[widget/hijri] effective offset compute failed:', e);
     }
 
+    // Generate / roll forward the 365-ayah verse pool. Idempotent —
+    // when N days elapsed since the last seed, N consumed entries are
+    // dropped and N new random ayat are appended so the widget keeps a
+    // full year of daily content queued.
+    let versePool: SharedWidgetData['versePool'] | undefined;
+    try {
+      const { ensureVersePool } = require('./verse-pool');
+      const pool = await ensureVersePool();
+      if (pool && Array.isArray(pool.entries) && pool.entries.length > 0) {
+        versePool = {
+          entries: pool.entries,
+          seedDayOfYear: pool.seedDayOfYear,
+          seedYear: pool.seedYear,
+          generatedAt: pool.generatedAt,
+        };
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[widget/verse-pool] ensure failed:', e);
+    }
+
+    // Build morning + evening azkar pools (chunks + Quran-title pre-computed)
+    // so the Android RN preview can pick the same chunk that iOS's SwiftUI
+    // BundledAzkar.currentSlot picks at the same minute. Without this the
+    // Android azkar widgets fall back to a hardcoded sample and Android +
+    // iOS drift apart visually.
+    let azkarPools: SharedWidgetData['azkarPools'] | undefined;
+    try {
+      const { prepareAzkarPools } = require('./widget-data');
+      azkarPools = prepareAzkarPools();
+    } catch (e) {
+      if (__DEV__) console.warn('[widget/azkar-pools] build failed:', e);
+    }
+
     const previousSharedData = await readCachedSharedData();
     const sharedDataBase: SharedWidgetData = {
       prayer: prayerData,
@@ -758,6 +812,8 @@ export async function updateWidgetData(
       settings,
       language: lang,
       hijriOffset,
+      versePool,
+      azkarPools,
       widgetFontVariant,
       widgetCalendar,
       widgetDayCalendar,
@@ -889,6 +945,7 @@ export async function updateWidgetData(
     if (__DEV__) console.log(`[widget/refresh] sharedDataWriteMs=${Date.now() - writeT0}`);
 
     await scheduleAndroidPrayerWidgetRefreshes(sharedData);
+    await scheduleAndroidContentWidgetRefresh();
 
     // Trigger native widget refresh on both platforms (after active snapshot is ready).
     await triggerNativeWidgetReload(sharedData);
@@ -1008,10 +1065,16 @@ export function scheduleMidnightRefresh(onRefresh?: () => void): () => void {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-        const response = await fetchPrayerTimes(location, tomorrow);
+        const effective = await getEffectivePrayerCalcSettings();
+        const response = await fetchPrayerTimes(location, tomorrow, {
+          calculationMethod: effective.calculationMethod as any,
+          asrJuristic: effective.asrJuristic as any,
+          adjustments: effective.adjustments as any,
+        } as any);
         if (response?.timings) {
           const parsed = parsePrayerTimes(response);
-          await cachePrayerTimes(tomorrowStr, parsed);
+          const adjusted = applyAdjustments(parsed, effective.adjustments as any);
+          await cachePrayerTimes(tomorrowStr, adjusted, effective.calculationMethod, effective.asrJuristic);
         }
       }
     } catch {

@@ -13,7 +13,9 @@ export type FavoriteType =
   | 'quote'
   | 'companion'
   | 'hadith_sifat'
-  | 'dhikr';
+  | 'dhikr'
+  | 'story'
+  | 'seerah';
 
 export interface FavoriteItem {
   id: string;
@@ -41,6 +43,8 @@ export const FAVORITE_CATEGORIES: {
   { key: 'adhkar', labelKey: 'favorites.categoryAzkar', types: ['dhikr'], icon: 'counter' },
   { key: 'quotes', labelKey: 'favorites.categoryWisdom', types: ['quote'], icon: 'format-quote-close' },
   { key: 'companions', labelKey: 'favorites.categoryCompanions', types: ['companion'], icon: 'account-group' },
+  { key: 'stories', labelKey: 'favorites.categoryStories', types: ['story'], icon: 'book-heart' },
+  { key: 'seerah', labelKey: 'favorites.categorySeerah', types: ['seerah'], icon: 'book-account' },
 ];
 
 async function loadAll(): Promise<FavoriteItem[]> {

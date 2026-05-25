@@ -30,6 +30,7 @@ import { t } from '@/lib/i18n';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { localizeNumber } from '@/lib/format-number';
 import { getTodayListeningMinutes } from '@/lib/listening-tracker';
+import { getPrayerTranslationKey } from '@/lib/prayer-times';
 import type { PrayerStatus } from '@/lib/worship-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -177,7 +178,7 @@ export default function DailySummaryScreen() {
   const prayerNames = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
   const prayerLabels: Record<string, string> = {
     fajr: t('prayer.fajr'),
-    dhuhr: t('prayer.dhuhr'),
+    dhuhr: t(getPrayerTranslationKey('dhuhr')),
     asr: t('prayer.asr'),
     maghrib: t('prayer.maghrib'),
     isha: t('prayer.isha'),

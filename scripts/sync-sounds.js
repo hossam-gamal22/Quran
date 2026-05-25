@@ -24,7 +24,7 @@ const SOUNDS_DIR = path.join(__dirname, '..', 'assets', 'sounds');
 const APP_JSON_PATH = path.join(__dirname, '..', 'app.json');
 const SERVICE_ACCOUNT_PATH = path.join(__dirname, '..', 'credentials', 'firebase-admin.json');
 
-const FIRESTORE_CONFIG_DOC = 'appConfig/soundConfig';
+const FIRESTORE_CONFIG_DOC = 'appConfig/soundSettings';
 const FIRESTORE_UPLOADED_COLLECTION = 'uploadedSounds';
 
 // ==================== Initialize Firebase Admin ====================
@@ -215,7 +215,7 @@ async function syncSounds() {
 
   console.log(`✅ تمت إضافة ${addedCount} صوت جديد إلى app.json`);
 
-  // Update soundConfig in Firestore
+  // Update soundSettings in Firestore
   console.log('\n📊 تحديث إعدادات الأصوات في Firestore...');
   
   const configRef = db.doc(FIRESTORE_CONFIG_DOC);

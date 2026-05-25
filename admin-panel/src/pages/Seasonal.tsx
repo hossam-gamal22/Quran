@@ -13,12 +13,27 @@ import {
   Loader2,
   RefreshCw,
   X,
+  Moon,
+  Star,
+  CalendarDays,
+  HandHeart,
+  Bell,
+  Target,
+  Lightbulb,
+  Quote,
+  Settings,
+  Sparkles,
+  HelpCircle,
+  Landmark,
+  Gift,
+  type LucideIcon,
 } from 'lucide-react';
 import { collection, doc, getDocs, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
 import { Styled } from '../components/Styled';
+import { getDefaultSeasonalBannerContent } from '../data/seasonal-defaults';
 
 // ==================== الأنواع ====================
 
@@ -83,50 +98,40 @@ const CONTENT_TYPES: { value: ContentType; labelAr: string; icon: string }[] = [
   { value: 'quote', labelAr: 'اقتباس', icon: '💬' },
 ];
 
+const ICON_OPTIONS: { value: string; labelAr: string; icon?: LucideIcon; emoji?: string }[] = [
+  { value: 'moon-waning-crescent', labelAr: 'هلال', icon: Moon },
+  { value: 'star-crescent', labelAr: 'هلال ونجمة', icon: Star },
+  { value: 'calendar-star', labelAr: 'تقويم مميز', icon: CalendarDays },
+  { value: 'hand-heart', labelAr: 'دعاء', icon: HandHeart },
+  { value: 'bell', labelAr: 'تذكير', icon: Bell },
+  { value: 'target', labelAr: 'تحدي', icon: Target },
+  { value: 'lightbulb', labelAr: 'معلومة', icon: Lightbulb },
+  { value: 'quote', labelAr: 'اقتباس', icon: Quote },
+  { value: 'sparkles', labelAr: 'مميز', icon: Sparkles },
+  { value: 'mosque', labelAr: 'مسجد', icon: Landmark },
+  { value: 'gift', labelAr: 'هدية', icon: Gift },
+  { value: 'settings', labelAr: 'مخصص', icon: Settings },
+  { value: '🌙', labelAr: 'رمضان', emoji: '🌙' },
+  { value: '🎉', labelAr: 'عيد', emoji: '🎉' },
+  { value: '🕋', labelAr: 'حج', emoji: '🕋' },
+  { value: '✨', labelAr: 'نور', emoji: '✨' },
+  { value: '📿', labelAr: 'أذكار', emoji: '📿' },
+  { value: '🕌', labelAr: 'جمعة', emoji: '🕌' },
+];
+
+const renderSeasonalIcon = (value?: string, className = 'w-8 h-8', color?: string) => {
+  const iconValue = value || 'sparkles';
+  const option = ICON_OPTIONS.find(item => item.value === iconValue || item.emoji === iconValue);
+  if (option?.emoji) {
+    return <span className="leading-none">{option.emoji}</span>;
+  }
+  const Icon = option?.icon || HelpCircle;
+  return <Icon className={className} style={color ? { color } : undefined} strokeWidth={2.4} />;
+};
+
 // ==================== البيانات التجريبية ====================
 
-const INITIAL_CONTENT: SeasonalContent[] = [
-  {
-    id: '1',
-    seasonType: 'ramadan',
-    contentType: 'greeting',
-    titleAr: 'رمضان كريم',
-    titleEn: 'Ramadan Kareem',
-    contentAr: 'أهلاً بك في شهر الخير والبركة',
-    contentEn: 'Welcome to the month of goodness',
-    icon: '🌙',
-    backgroundColor: '#1a1a2e',
-    textColor: '#ffffff',
-    accentColor: '#ffd700',
-    startDate: '9-1',
-    endDate: '9-30',
-    isHijriDate: true,
-    priority: 1,
-    isActive: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-02-28T00:00:00Z'
-  },
-  {
-    id: '2',
-    seasonType: 'friday',
-    contentType: 'azkar',
-    titleAr: 'أذكار يوم الجمعة',
-    titleEn: 'Friday Azkar',
-    contentAr: 'أكثر من الصلاة على النبي ﷺ',
-    contentEn: 'Increase prayers upon the Prophet ﷺ',
-    icon: '🕌',
-    backgroundColor: '#006400',
-    textColor: '#ffffff',
-    accentColor: '#90EE90',
-    startDate: 'friday',
-    endDate: 'friday',
-    isHijriDate: false,
-    priority: 1,
-    isActive: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-02-28T00:00:00Z'
-  }
-];
+const INITIAL_CONTENT = getDefaultSeasonalBannerContent() as SeasonalContent[];
 
 // ==================== المكون الرئيسي ====================
 
@@ -254,11 +259,11 @@ const Seasonal: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Calendar className="w-7 h-7 text-emerald-600" />
             إدارة المحتوى الموسمي
           </h1>
-          <p className="text-gray-500 mt-1">إدارة المحتوى الخاص بالمناسبات الإسلامية</p>
+          <p className="text-slate-300 mt-1">إدارة المحتوى الخاص بالمناسبات الإسلامية</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -331,7 +336,9 @@ const Seasonal: React.FC = () => {
                       className="w-48 p-4 flex flex-col items-center justify-center text-center"
                       css={{ backgroundColor: content.backgroundColor, color: content.textColor }}
                     >
-                      <span className="text-4xl mb-2">{content.icon}</span>
+                      <div className="mb-2 flex h-12 items-center justify-center text-4xl">
+                        {renderSeasonalIcon(content.icon, 'w-11 h-11', content.textColor)}
+                      </div>
                       <Styled as="p" className="text-sm font-bold" css={{ color: content.textColor }}>{content.titleAr}</Styled>
                     </Styled>
                     
@@ -344,7 +351,10 @@ const Seasonal: React.FC = () => {
                               {season?.icon} {season?.labelAr}
                             </span>
                             <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
-                              {contentType?.icon} {contentType?.labelAr}
+                              <span className="inline-flex items-center gap-1">
+                                {renderSeasonalIcon(contentType?.icon, 'w-3 h-3')}
+                                {contentType?.labelAr}
+                              </span>
                             </span>
                             <span className={`px-2 py-1 text-xs rounded-full ${content.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                               {content.isActive ? 'نشط' : 'غير نشط'}
@@ -580,14 +590,29 @@ const Seasonal: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">الأيقونة</label>
-                    <input
-                      type="text"
-                      value={editingContent.icon}
-                      onChange={(e) => setEditingContent({ ...editingContent, icon: e.target.value })}
-                      aria-label="الأيقونة"
-                      className="w-full px-3 py-2 border rounded-lg text-2xl text-center"
-                      placeholder="🌙"
-                    />
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {ICON_OPTIONS.map(option => {
+                        const selected = editingContent.icon === option.value || editingContent.icon === option.emoji;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setEditingContent({ ...editingContent, icon: option.value })}
+                            className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                              selected
+                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                            title={option.labelAr}
+                          >
+                            <span className="flex h-6 w-6 items-center justify-center text-lg">
+                              {renderSeasonalIcon(option.value, 'w-5 h-5')}
+                            </span>
+                            <span>{option.labelAr}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-4">
@@ -630,7 +655,9 @@ const Seasonal: React.FC = () => {
                       className="p-6 rounded-xl text-center"
                       css={{ backgroundColor: editingContent.backgroundColor, color: editingContent.textColor }}
                     >
-                      <span className="text-5xl mb-3 block">{editingContent.icon}</span>
+                      <div className="mb-3 flex h-14 items-center justify-center text-5xl">
+                        {renderSeasonalIcon(editingContent.icon, 'w-12 h-12', editingContent.textColor)}
+                      </div>
                       <h3 className="text-xl font-bold mb-2">{editingContent.titleAr || 'العنوان'}</h3>
                       <p className="opacity-90">{editingContent.contentAr || 'المحتوى...'}</p>
                     </Styled>

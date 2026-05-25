@@ -28,6 +28,7 @@ import {
   getTimeRemaining,
   formatPrayerTime,
   getPrayerIcon,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { t } from '@/lib/i18n';
 
@@ -177,7 +178,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     );
   }
 
-  const prayerNameLocalized = t(`prayer.${nextPrayer.name}`);
+  const prayerNameLocalized = t(getPrayerTranslationKey(nextPrayer.name));
   const prayerIcon = getPrayerIcon(nextPrayer.name);
 
   const formatHMS = (t: typeof timeRemaining) => {

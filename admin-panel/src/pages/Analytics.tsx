@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Styled } from '../components/Styled';
-import { fetchActiveDevices, fetchActiveUsersLifetimeEngagement, type LifetimeEngagement } from '../utils/user-query';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import {
+  fetchActiveDevices,
+  fetchActiveUsersLifetimeEngagement,
+  subscribeActiveDevices,
+  type ActiveDevicesResult,
+  type LifetimeEngagement,
+} from '../utils/user-query';
+import { collection, collectionGroup, getDocs, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   BarChart3,
@@ -118,6 +124,35 @@ const getActivityStatsForRange = async (range: DateRange) => {
   };
 };
 
+const buildActivityStats = (
+  docs: Array<{ data: () => Record<string, any> }>
+) => {
+  const activeUserIds = new Set<string>();
+  let appOpens = 0;
+  let azkar = 0;
+  let tasbih = 0;
+  let prayers = 0;
+
+  docs.forEach((docSnap) => {
+    const data = docSnap.data();
+    const userId = typeof data.userId === 'string' ? data.userId : '';
+    if (userId) activeUserIds.add(userId);
+
+    if (data.type === 'app_open') appOpens += 1;
+    if (data.type === 'azkar') azkar += 1;
+    if (data.type === 'prayer') prayers += 1;
+    if (data.type === 'tasbih') tasbih += Number(data.count) || 1;
+  });
+
+  return {
+    activeUsers: activeUserIds.size,
+    appOpens,
+    azkar,
+    tasbih,
+    prayers,
+  };
+};
+
 const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('month');
@@ -127,9 +162,132 @@ const Analytics: React.FC = () => {
   const [platforms, setPlatforms] = useState<PlatformStats>({ ios: 0, android: 0 });
   const [lifetime, setLifetime] = useState<LifetimeEngagement>({ totalAzkar: 0, totalQuran: 0, totalPrayers: 0 });
 
-  // Single SSOT load — both demographics + engagement
+  // Live SSOT load — both demographics + engagement
   useEffect(() => {
-    loadDeviceStats();
+    setIsLoading(true);
+    let mounted = true;
+    let latestDevices: ActiveDevicesResult | null = null;
+    let latestActivity: Awaited<ReturnType<typeof getActivityStatsForRange>> | null = null;
+    let latestLifetimeByUser: Record<string, LifetimeEngagement> | null = null;
+    let lifetimeRequestId = 0;
+
+    const applyStats = () => {
+      if (!mounted || !latestDevices || !latestActivity) return;
+      const deviceStats = latestDevices.stats;
+      const sortedCountries = Object.entries(deviceStats.storeByCountry)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([code, count]) => ({
+          country: code,
+          flag: COUNTRY_FLAGS[code] || '🌍',
+          users: count,
+          percentage: deviceStats.storeRegistered > 0 ? Math.round((count / deviceStats.storeRegistered) * 100) : 0,
+        }));
+
+      setStats({
+        totalUsers: deviceStats.storeRegistered,
+        activeUsers: latestActivity.activeUsers,
+        appOpens: latestActivity.appOpens,
+        retentionRate: deviceStats.storeRegistered > 0
+          ? Math.round((latestActivity.activeUsers / deviceStats.storeRegistered) * 100)
+          : 0,
+        totalAzkar: latestActivity.azkar,
+        totalTasbih: latestActivity.tasbih,
+        totalPrayers: latestActivity.prayers,
+      });
+      setPlatforms({ ios: deviceStats.storeIos, android: deviceStats.storeAndroid });
+      setTopCountries(sortedCountries);
+      setIsLoading(false);
+    };
+
+    const applyLifetime = () => {
+      if (!mounted || !latestDevices || !latestLifetimeByUser) return;
+      const activeUserIds = new Set(latestDevices.users.map(u => u.id));
+      let totalAzkar = 0;
+      let totalQuran = 0;
+      let totalPrayers = 0;
+
+      Object.entries(latestLifetimeByUser).forEach(([userId, userLifetime]) => {
+        if (!activeUserIds.has(userId)) return;
+        totalAzkar += userLifetime.totalAzkar;
+        totalQuran += userLifetime.totalQuran;
+        totalPrayers += userLifetime.totalPrayers;
+      });
+
+      setLifetime({ totalAzkar, totalQuran, totalPrayers });
+    };
+
+    const refreshLifetime = async (result: ActiveDevicesResult) => {
+      const requestId = ++lifetimeRequestId;
+      try {
+        const userIds = result.users.map(u => u.id);
+        const lifetimeData = await fetchActiveUsersLifetimeEngagement(userIds);
+        if (mounted && requestId === lifetimeRequestId) {
+          setLifetime(lifetimeData);
+        }
+      } catch (error) {
+        console.error('Error loading lifetime engagement:', error);
+      }
+    };
+
+    const unsubscribeDevices = subscribeActiveDevices(
+      (result) => {
+        latestDevices = result;
+        applyStats();
+        applyLifetime();
+      },
+      (error) => {
+        console.error('Error listening to device stats:', error);
+        loadDeviceStats();
+      }
+    );
+
+    const start = getRangeStart(dateRange);
+    const unsubscribeActivity = onSnapshot(
+      query(
+        collection(db, 'activity'),
+        where('timestamp', '>=', Timestamp.fromDate(start))
+      ),
+      (snapshot) => {
+        latestActivity = buildActivityStats(snapshot.docs);
+        applyStats();
+      },
+      (error) => {
+        console.error('Error listening to activity stats:', error);
+        loadDeviceStats();
+      }
+    );
+
+    const unsubscribeLifetime = onSnapshot(
+      collectionGroup(db, 'stats'),
+      (snapshot) => {
+        const nextLifetimeByUser: Record<string, LifetimeEngagement> = {};
+        snapshot.docs.forEach((docSnap) => {
+          if (docSnap.id !== 'lifetime') return;
+          const userId = docSnap.ref.parent.parent?.id;
+          if (!userId) return;
+          const data = docSnap.data();
+          nextLifetimeByUser[userId] = {
+            totalAzkar: Number(data.azkarRead) || 0,
+            totalQuran: Number(data.quranPages) || 0,
+            totalPrayers: Number(data.prayers) || 0,
+          };
+        });
+        latestLifetimeByUser = nextLifetimeByUser;
+        applyLifetime();
+      },
+      (error) => {
+        console.error('Error listening to lifetime engagement:', error);
+        if (latestDevices) refreshLifetime(latestDevices);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      unsubscribeDevices();
+      unsubscribeActivity();
+      unsubscribeLifetime();
+    };
   }, [dateRange]);
 
   const loadDeviceStats = async () => {
@@ -204,11 +362,11 @@ const Analytics: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-emerald-600" />
             التحليلات والإحصائيات
           </h1>
-          <p className="text-gray-500 mt-1">نظرة شاملة على أداء التطبيق</p>
+          <p className="text-slate-300 mt-1">نظرة شاملة على أداء التطبيق</p>
         </div>
         <div className="flex items-center gap-3">
           <select

@@ -4,7 +4,7 @@
 // look identical to the rendered native widgets.
 
 import { Dimensions } from 'react-native';
-import { gregorianToHijri, HIJRI_MONTHS_AR } from '@/lib/hijri-date';
+import { getHijriDate, HIJRI_MONTHS_AR } from '@/lib/hijri-date';
 
 export type WidgetThemeKey =
   | 'auto'
@@ -283,7 +283,7 @@ export function formatDateSample(
   const y = String(date.getFullYear());
   if (fmt === 'gregorian-ar') return `${num(y)} / ${num(m)} / ${num(d)}`;
   if (fmt === 'gregorian-en') return `${num(d)} / ${num(m)} / ${num(y)}`;
-  const hijri = gregorianToHijri(date);
+  const hijri = getHijriDate(date);
   const hd = String(hijri.day).padStart(2, '0');
   const hm = String(hijri.month).padStart(2, '0');
   const hy = String(hijri.year);

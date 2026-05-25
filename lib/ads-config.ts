@@ -24,6 +24,7 @@ export type AdScreenKey =
   | 'worship'
   | 'seerah'
   | 'companions'
+  | 'religious_stories'
   | 'hajj_umrah'
   | 'daily_ayah'
   | 'hadith'
@@ -156,6 +157,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     worship: false,
     seerah: true,
     companions: true,
+    religious_stories: true,
     hajj_umrah: true,
     daily_ayah: true,
     hadith: true,

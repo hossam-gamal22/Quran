@@ -8,7 +8,7 @@ import { getReminderChannelId } from '../services/notifications/channels';
 
 // Sound file mapping (must match app.json expo-notifications sounds)
 const SOUND_FILES: Record<string, string> = {
-  general_reminder: 'general_reminder.mp3',
+  complete: 'notif_daily_summary.mp3',
   salawat: 'salawat.mp3',
   istighfar: 'istighfar.mp3',
   tasbih: 'tasbih.mp3',
@@ -25,13 +25,14 @@ function resolveKhatmaSound(soundType?: string, soundEnabled?: boolean): string 
   if (soundEnabled === false || soundType === 'silent') {
     return false;
   }
-  
+
   // Default system sound
   if (!soundType || soundType === 'default') return 'default';
-  
-  // Lookup custom sound file
-  const file = SOUND_FILES[soundType] || 'general_reminder.mp3';
-  
+
+  // Lookup custom sound file — fall back to system default if unknown
+  const file = SOUND_FILES[soundType];
+  if (!file) return 'default';
+
   // Android: no extension, iOS: with extension
   if (Platform.OS === 'android') return file.replace(/\.mp3$/, '');
   return file;
@@ -223,12 +224,12 @@ export const sendTestKhatmaNotification = async (): Promise<void> => {
       content: {
         title: dirText(`📖 ${t('notifications.testTitle')}`),
         body: dirText(t('notifications.testBody')),
-        sound: resolveKhatmaSound('general_reminder', true),
-        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        sound: resolveKhatmaSound('default', true),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('default') }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: Platform.OS === 'android'
-        ? { channelId: getReminderChannelId('general_reminder') }
+        ? { channelId: getReminderChannelId('default') }
         : null,
     });
   } catch (error) {
@@ -242,16 +243,18 @@ export const sendKhatmaCompletionNotification = async (khatmaName: string): Prom
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;
 
+    const completionSoundKey = 'complete';
     await Notifications.scheduleNotificationAsync({
       content: {
         title: dirText(`🎉 ${t('notifications.khatmaComplete')}`),
         body: dirText(`${t('khatma.khatmaCompletedMsg')} - "${khatmaName}"`),
-        sound: resolveKhatmaSound('general_reminder', true),
-        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        sound: resolveKhatmaSound(completionSoundKey, true),
+        data: { type: 'khatma_complete', soundType: completionSoundKey },
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId(completionSoundKey) }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: Platform.OS === 'android'
-        ? { channelId: getReminderChannelId('general_reminder') }
+        ? { channelId: getReminderChannelId(completionSoundKey) }
         : null,
     });
   } catch (error) {
@@ -265,16 +268,18 @@ export const sendWirdCompletionNotification = async (): Promise<void> => {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;
 
+    const completionSoundKey = 'complete';
     await Notifications.scheduleNotificationAsync({
       content: {
         title: dirText(`✅ ${t('notifications.wellDone')}`),
         body: dirText(t('khatma.wirdCompletedMsg')),
-        sound: resolveKhatmaSound('general_reminder', true),
-        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        sound: resolveKhatmaSound(completionSoundKey, true),
+        data: { type: 'khatma_wird_complete', soundType: completionSoundKey },
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId(completionSoundKey) }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: Platform.OS === 'android'
-        ? { channelId: getReminderChannelId('general_reminder') }
+        ? { channelId: getReminderChannelId(completionSoundKey) }
         : null,
     });
   } catch (error) {

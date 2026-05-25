@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DISMISS_KEY_PREFIX = '@perm_banner_dismissed_';
 const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 ساعة
+const OEM_AUTOSTART_DISMISS_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // شهر
 
 export type PermissionKey = 'notifications' | 'location' | 'exactAlarm' | 'batteryOptimization' | 'oemAutoStart' | 'dndAccess' | 'backgroundRefresh';
 
@@ -338,7 +339,7 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
 
   // Phase 5: Background App Refresh معطّل (iOS)
   // بدونه expo-background-task لا يجدد الإشعارات تلقائياً
-  if (s.backgroundRefresh === 'denied' && (await shouldShowBanner('backgroundRefresh'))) {
+  if ((s.backgroundRefresh === 'denied' || s.backgroundRefresh === 'restricted') && (await shouldShowBanner('backgroundRefresh'))) {
     issues.push({
       key: 'backgroundRefresh',
       severity: 'warning',
@@ -482,7 +483,10 @@ export async function shouldShowBanner(key: PermissionKey): Promise<boolean> {
     const dismissedAt = await AsyncStorage.getItem(`${DISMISS_KEY_PREFIX}${key}`);
     if (!dismissedAt) return true;
     const elapsed = Date.now() - parseInt(dismissedAt, 10);
-    return elapsed > DISMISS_DURATION_MS;
+    const duration = key === 'oemAutoStart'
+      ? OEM_AUTOSTART_DISMISS_DURATION_MS
+      : DISMISS_DURATION_MS;
+    return elapsed > duration;
   } catch {
     return true;
   }

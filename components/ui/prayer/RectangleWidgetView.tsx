@@ -10,6 +10,7 @@ import {
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
@@ -64,7 +65,7 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
     );
   }
 
-  const prayerName = t(`prayer.${nextPrayer.name}`);
+  const prayerName = t(getPrayerTranslationKey(nextPrayer.name));
   const pad = (n: number) => String(n).padStart(2, '0');
 
   const bgColor = isDarkMode ? 'rgba(30,30,32,0.09)' : 'rgba(0,0,0,0.09)';

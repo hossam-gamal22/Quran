@@ -23,7 +23,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { useAzkarTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { DailyAzkarRecord, getAllAzkarRecords, formatDate } from '@/lib/worship-storage';
+import { AzkarType, getAllAzkarRecords, formatDate } from '@/lib/worship-storage';
 import GlassCard from '@/components/ui/GlassCard';
 import { AppIcon } from '@/components/ui/AppIcon';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -40,7 +40,7 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const AZKAR_TYPES: { key: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>; icon: string; color: string; labelKey: string }[] = [
+const AZKAR_TYPES: { key: AzkarType; icon: string; color: string; labelKey: string }[] = [
   { key: 'morning', icon: 'weather-sunset-up', color: '#F59E0B', labelKey: 'azkar.morning' },
   { key: 'evening', icon: 'weather-night', color: '#6366F1', labelKey: 'azkar.evening' },
   { key: 'sleep', icon: 'weather-night', color: '#3B82F6', labelKey: 'azkar.sleep' },
@@ -156,7 +156,7 @@ export default function AzkarTrackerScreen() {
     setIsRefreshing(false);
   }, []);
 
-  const handleToggle = async (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => {
+  const handleToggle = async (type: AzkarType) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await toggleAzkarType(type);
   };

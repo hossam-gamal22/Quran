@@ -18,10 +18,11 @@ import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { ScreenContainer } from '@/components/screen-container';
 import { NativeTabs } from '@/components/ui/NativeTabs';
-import { exportAsPDF, showAdThenExport, PdfTemplate } from '@/lib/pdf-export';
-import { PdfTemplatePicker } from '@/components/ui/PdfTemplatePicker';
+import { exportAsPDF, showAdThenExport } from '@/lib/pdf-export';
+import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { MissingTranslationCard } from '@/components/ui/MissingTranslationCard';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import {
   HAJJ_SECTIONS,
   DUAS_BY_RITUAL,
@@ -44,7 +45,7 @@ export default function HajjScreen() {
   const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
   const [activeTab, setActiveTab] = useState<'rituals' | 'duas'>('rituals');
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
 
   // Use CMS data with hardcoded fallback
   const { hajjSections, duasByRitual } = useHajjUmrahContent();
@@ -52,39 +53,41 @@ export default function HajjScreen() {
   // Filter duas relevant to Hajj only
   const hajjDuas = duasByRitual;
 
-  const handleExportPDF = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowTemplatePicker(true);
-  }, []);
-
-  const doExport = useCallback((template: PdfTemplate) => {
-    if (activeTab === 'duas') {
-      const title = t('hajjUmrah.hajjDuas');
-      const html = hajjDuas.map((group, i) => {
-        const duasHtml = group.duas.map(d =>
-          `<div class="dua-box"><div class="dua-arabic">${d.arabic}</div>${d.occasion ? `<div class="dua-note">${t('hajjUmrah.whenLabel')}: ${d.occasion}</div>` : ''}${d.reference ? `<div class="dua-note">${t('hajjUmrah.referenceLabel')}: ${d.reference}</div>` : ''}</div>`
+  const handleSharePdf = useCallback(async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (activeTab === 'duas') {
+        const title = t('hajjUmrah.hajjDuas');
+        const html = hajjDuas.map((group, i) => {
+          const duasHtml = group.duas.map(d =>
+            `<div class="dua-box"><div class="dua-arabic">${d.arabic}</div>${d.occasion ? `<div class="dua-note">${t('hajjUmrah.whenLabel')}: ${d.occasion}</div>` : ''}${d.reference ? `<div class="dua-note">${t('hajjUmrah.referenceLabel')}: ${d.reference}</div>` : ''}</div>`
+          ).join('');
+          return `<div class="section"><div class="section-title">${i + 1}. ${group.title}</div>${duasHtml}</div>`;
+        }).join('');
+        await showAdThenExport(() => exportAsPDF(title, html));
+        return;
+      }
+      const title = t('hajjUmrah.hajjRituals');
+      const html = hajjSections.map((sec, i) => {
+        const stepsHtml = sec.steps.map((step, j) =>
+          `<div class="step"><span class="step-num">${j + 1}</span><span class="step-text">${step.text}</span></div>`
         ).join('');
-        return `<div class="section"><div class="section-title">${i + 1}. ${group.title}</div>${duasHtml}</div>`;
+        const duasHtml = sec.duas.map(d =>
+          `<div class="dua-box"><div class="dua-arabic">${d.arabic}</div>${d.note ? `<div class="dua-note">— ${d.note}</div>` : ''}</div>`
+        ).join('');
+        return `<div class="section">
+          <div class="section-title">${i + 1}. ${sec.title}</div>
+          <div class="section-desc">${sec.description}</div>
+          <div class="steps-label">${t('hajjUmrah.steps')}:</div>
+          ${stepsHtml}
+          ${duasHtml ? `<div class="steps-label" style="margin-top:10px;">${t('hajjUmrah.duas')}:</div>${duasHtml}` : ''}
+        </div>`;
       }).join('');
-      return showAdThenExport(() => exportAsPDF(title, html, template));
+      await showAdThenExport(() => exportAsPDF(title, html));
+    } catch (pdfError) {
+      setPdfErrorVisible(true);
+      console.log('Hajj PDF sharing failed', pdfError);
     }
-    const title = t('hajjUmrah.hajjRituals');
-    const html = hajjSections.map((sec, i) => {
-      const stepsHtml = sec.steps.map((step, j) =>
-        `<div class="step"><span class="step-num">${j + 1}</span><span class="step-text">${step.text}</span></div>`
-      ).join('');
-      const duasHtml = sec.duas.map(d =>
-        `<div class="dua-box"><div class="dua-arabic">${d.arabic}</div>${d.note ? `<div class="dua-note">— ${d.note}</div>` : ''}</div>`
-      ).join('');
-      return `<div class="section">
-        <div class="section-title">${i + 1}. ${sec.title}</div>
-        <div class="section-desc">${sec.description}</div>
-        <div class="steps-label">${t('hajjUmrah.steps')}:</div>
-        ${stepsHtml}
-        ${duasHtml ? `<div class="steps-label" style="margin-top:10px;">${t('hajjUmrah.duas')}:</div>${duasHtml}` : ''}
-      </div>`;
-    }).join('');
-    return showAdThenExport(() => exportAsPDF(title, html, template));
   }, [activeTab, hajjSections, hajjDuas]);
 
   return (
@@ -92,7 +95,6 @@ export default function HajjScreen() {
       {/* Header */}
       <UniversalHeader
         titleColor={colors.text}
-        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, color: colors.text }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text, lineHeight: 30, includeFontPadding: false }} numberOfLines={1}>{t('hajjUmrah.hajj')}</Text>
@@ -139,12 +141,16 @@ export default function HajjScreen() {
 
       {/* Content */}
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+        <ContentLanguageNotice />
         {activeTab === 'duas' ? (
           <>
-            <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
-              <Text style={[s.countText, { color: ACCENT }]}>
-                {hajjDuas.reduce((sum, g) => sum + g.duas.length, 0)} {t('hajjUmrah.duaCount')} • {hajjDuas.length} {t('hajjUmrah.sectionsCount')}
-              </Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap' }}>
+              <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, flexShrink: 1 }]}>
+                <Text style={[s.countText, { color: ACCENT }]}>
+                  {hajjDuas.reduce((sum, g) => sum + g.duas.length, 0)} {t('hajjUmrah.duaCount')} • {hajjDuas.length} {t('hajjUmrah.sectionsCount')}
+                </Text>
+              </View>
+              <PdfShareButton onPress={handleSharePdf} />
             </View>
             {hajjDuas.map((group, index) => (
               <DuaRitualCard key={`duas-${index}`} group={group} isDarkMode={isDarkMode} colors={colors} initiallyExpanded={index === 0} />
@@ -152,8 +158,11 @@ export default function HajjScreen() {
           </>
         ) : (
           <>
-            <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
-              <Text style={[s.countText, { color: ACCENT }]}>{hajjSections.length} {t('hajjUmrah.ritualsCount')}</Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap' }}>
+              <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, flexShrink: 1 }]}>
+                <Text style={[s.countText, { color: ACCENT }]}>{hajjSections.length} {t('hajjUmrah.ritualsCount')}</Text>
+              </View>
+              <PdfShareButton onPress={handleSharePdf} />
             </View>
             <View style={s.timeline}>
               {hajjSections.map((section, index) => (
@@ -179,11 +188,13 @@ export default function HajjScreen() {
         <MissingTranslationCard pageName="Hajj" />
       </ScrollView>
       <BannerAdComponent screen="hajj_umrah" />
-      <PdfTemplatePicker
-        visible={showTemplatePicker}
-        onClose={() => setShowTemplatePicker(false)}
-        onSelect={doExport}
-        pageType="hajj"
+      <PdfShareErrorModal
+        visible={pdfErrorVisible}
+        onRetry={() => {
+          setPdfErrorVisible(false);
+          handleSharePdf();
+        }}
+        onClose={() => setPdfErrorVisible(false)}
       />
     </ScreenContainer>
   );

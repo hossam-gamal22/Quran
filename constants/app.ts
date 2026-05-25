@@ -23,13 +23,13 @@ export const APP_CONFIG = {
     email: 'hossamgamal290@gmail.com',
     website: '',
     playStore: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-    appStore: 'https://apps.apple.com/app/rooh-muslim/id123456789',
+    appStore: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
   },
   
   // روابط التحميل
   downloadLinks: {
     android: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-    ios: 'https://apps.apple.com/app/rooh-muslim/id123456789',
+    ios: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
   },
   
   // التوقيع للمشاركة (language-aware)

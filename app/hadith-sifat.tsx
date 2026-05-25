@@ -1,6 +1,6 @@
 // أحاديث صفات الله — صفحة عرض الأحاديث النبوية عن صفات الله
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Share, Platform,
@@ -16,7 +16,7 @@ import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { HADITH_SIFAT, HADITH_SIFAT_THEMES, DivineTrait } from '@/data/hadith-sifat';
@@ -36,6 +36,7 @@ const THEME_LABEL_KEYS: Record<string, string> = {
 };
 export default function HadithSifatScreen() {
   const router = useRouter();
+  const { id: idParam } = useLocalSearchParams<{ id?: string }>();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const { isDarkMode } = useSettings();
@@ -45,6 +46,30 @@ export default function HadithSifatScreen() {
   const isArabic = language === 'ar';
   const [selectedTheme, setSelectedTheme] = useState<string>(HADITH_SIFAT_THEMES[0]?.id ?? '');
   const [favIds, setFavIds] = useState<Set<number>>(new Set());
+  const scrollRef = useRef<ScrollView>(null);
+  const cardPositionsRef = useRef<Record<number, number>>({});
+  const handledIdParamRef = useRef<string | null>(null);
+
+  // Auto-switch theme + scroll to hadith when opened via ?id=<hadithId>
+  useEffect(() => {
+    if (!idParam || handledIdParamRef.current === idParam) return;
+    const parsedId = Number(idParam);
+    if (Number.isNaN(parsedId)) return;
+    const target = HADITH_SIFAT.find(h => h.id === parsedId);
+    if (!target) return;
+    handledIdParamRef.current = idParam;
+    if (target.theme && target.theme !== selectedTheme) setSelectedTheme(target.theme);
+
+    const attemptScroll = (attempt: number) => {
+      const y = cardPositionsRef.current[parsedId];
+      if (y !== undefined && scrollRef.current) {
+        scrollRef.current.scrollTo({ y: Math.max(0, y - 16), animated: true });
+        return;
+      }
+      if (attempt < 10) setTimeout(() => attemptScroll(attempt + 1), 90);
+    };
+    setTimeout(() => attemptScroll(0), 150);
+  }, [idParam, selectedTheme]);
 
   useEffect(() => {
     Promise.all(HADITH_SIFAT.map(h => isFavorited(`hadith_sifat_${h.id}`, 'hadith_sifat'))).then(results => {
@@ -63,7 +88,7 @@ export default function HadithSifatScreen() {
       subtitle: hadith.narrator,
       arabic: hadith.arabic,
       reference: `${hadith.narrator} — ${hadith.source}`,
-      route: '/hadith-sifat',
+      route: `/hadith-sifat?id=${hadith.id}`,
     });
     setFavIds(prev => {
       const next = new Set(prev);
@@ -96,6 +121,7 @@ export default function HadithSifatScreen() {
       </UniversalHeader>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -138,7 +164,13 @@ export default function HadithSifatScreen() {
         {filteredHadiths.map((hadith, index) => {
           const themeInfo = HADITH_SIFAT_THEMES.find(t => t.id === hadith.theme);
           return (
-            <Animated.View key={hadith.id} entering={FadeInDown.delay(index * 50).duration(400)}>
+            <Animated.View
+              key={hadith.id}
+              entering={FadeInDown.delay(index * 50).duration(400)}
+              onLayout={(e) => {
+                cardPositionsRef.current[hadith.id] = e.nativeEvent.layout.y;
+              }}
+            >
               <GlassCard style={styles.hadithCardGlass}>
                 <View style={[styles.hadithRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View style={[styles.hadithAccent, { backgroundColor: themeInfo?.color || '#c17f59' }]} />

@@ -70,6 +70,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Premium automatic backup snapshots. These mirror the current open users
+    // trust model until Firebase Auth ownership rules are introduced.
+    match /users/{userId}/premiumBackups/{backupId} {
+      allow read, write: if true;
+    }
+
     // Phase 2: FCM Prayer Push Fallback
     // الـ app يكتب موقع وإعدادات الصلاة، Cloud Function تقرأ
     //
@@ -92,7 +98,11 @@ service cloud.firestore {
           // sounds (per-prayer)
           'soundFajr', 'soundDhuhr', 'soundAsr', 'soundMaghrib', 'soundIsha',
           // metadata
-          'fcmToken', 'language', 'country', 'updatedAt',
+          'fcmToken', 'language', 'country', 'updatedAt', 'localNotificationsActiveAt',
+          'localScheduleDays', 'localScheduleExpiresAt', 'refreshReminderAt',
+          'nextPrayerAt', 'nextPrayerKey', 'fallbackEnabled',
+          'fallbackSchemaVersion', 'fallbackUpdatedAt',
+          'adhanSound', 'adhanSoundType', 'fullAdhanSoundType', 'useFullAdhan',
           'lastSyncedAt', 'platform', 'appVersion', 'deviceId'
         ])
         && request.resource.data.size() <= 32;
@@ -263,7 +273,15 @@ service cloud.firestore {
     }
 
     // ─── Purchase History ────────────────────────────────────────
-    // User purchases subcollection — app writes, admin reads
+    // User purchases subcollection — app writes, admin reads.
+    // Collection group queries require a recursive rule for every `purchases`
+    // subcollection, not only the direct `users/{userId}/purchases` path.
+    match /{path=**}/purchases/{purchaseId} {
+      allow read, write: if true;
+    }
+
+    // Direct user purchases path kept for clarity and backwards-compatible
+    // direct reads/writes from older clients.
     match /users/{userId}/purchases/{purchaseId} {
       allow read, write: if true;
     }

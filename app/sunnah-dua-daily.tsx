@@ -1,7 +1,7 @@
 // app/sunnah-dua-daily.tsx
 // صفحة دعاء يومي من السنة — يعرض دعاء مختلف كل يوم من أدعية السنة النبوية
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { getAllAzkar, getZikrTranslation, getCategoryById, getCategoryName, type Zikr, type Language, type AzkarCategoryType } from '@/lib/azkar-api';
+import { duaToZikr, fetchSelectedDuas, subscribeToSelectedDuas, type SelectedDua } from '@/lib/duas-api';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -92,16 +93,48 @@ export default function SunnahDuaDailyScreen() {
 
   useSacredContext('dua_reading');
 
-  const sunnahDuas = useMemo(() => {
+  const localSunnahDuas = useMemo(() => {
     const all = getAllAzkar();
     const catSet = new Set(SUNNAH_DUA_CATEGORIES);
     return all.filter(z => catSet.has(String(z.category)));
   }, []);
 
+  const selectedDuasToZikr = useCallback((duas: SelectedDua[]) => (
+    duas.map(d => duaToZikr(d)) as unknown as Zikr[]
+  ), []);
+
+  const [sunnahDuas, setSunnahDuas] = useState<Zikr[]>(localSunnahDuas);
+
   const initial = useMemo(() => getSunnahDuaOfDay(sunnahDuas), [sunnahDuas]);
 
   const [currentDua, setCurrentDua] = useState<Zikr>(initial.dua);
   const [currentIndex, setCurrentIndex] = useState<number>(initial.index);
+
+  useEffect(() => {
+    const next = getSunnahDuaOfDay(sunnahDuas);
+    setCurrentDua(next.dua);
+    setCurrentIndex(next.index);
+  }, [sunnahDuas]);
+
+  useEffect(() => {
+    let mounted = true;
+    const applySelectedDuas = (duas: SelectedDua[]) => {
+      if (!mounted) return;
+      setSunnahDuas(selectedDuasToZikr(duas));
+    };
+
+    fetchSelectedDuas({ forceRefresh: true })
+      .then(duas => {
+        if (duas.length > 0) applySelectedDuas(duas);
+      })
+      .catch(() => {});
+
+    const unsubscribe = subscribeToSelectedDuas(applySelectedDuas);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [localSunnahDuas, selectedDuasToZikr]);
 
   const language = getLanguage() as Language;
   const isArabic = language === 'ar';

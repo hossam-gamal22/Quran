@@ -1,7 +1,7 @@
 // app/famous-duas.tsx
-// الأدعية المختارة — 20 famous Quran/Sunnah duas + tasbihat from data/famous-duas.ts.
+// الأدعية المختارة — admin-managed selectedDuas with bundled fallback.
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -31,14 +31,79 @@ import {
   type FamousDua,
   type FamousDuaCategory,
 } from '@/data/famous-duas';
+import {
+  fetchSelectedDuas,
+  subscribeToSelectedDuas,
+  type SelectedDua,
+} from '@/lib/duas-api';
 
 type TabKey = 'all' | FamousDuaCategory;
+
+interface DisplayDua {
+  id: string;
+  arabic: string;
+  category: FamousDuaCategory;
+  source: string;
+  translation?: string;
+  transliteration?: string;
+  fadl?: {
+    text: string;
+    source: string;
+  };
+  repetitions: number | null;
+  occasion?: string;
+}
 
 const CATEGORY_ICONS: Record<FamousDuaCategory, string> = {
   quran_duas: 'book-open-page-variant',
   sunnah_duas: 'mosque',
   tasbihat: 'counter',
 };
+
+function getLocalizedRecordValue(value: Record<string, string> | string | undefined, lang: string): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value[lang] || value.ar || value.en || '';
+}
+
+function inferSelectedDuaCategory(dua: SelectedDua): FamousDuaCategory {
+  const source = `${dua.source || ''} ${dua.reference || ''}`;
+  if (/قرآن|القرآن|سورة|آية|quran|qur'an/i.test(source)) return 'quran_duas';
+  if (/تسبيح|استغفار|ذكر|tasbih|dhikr/i.test(source)) return 'tasbihat';
+  return 'sunnah_duas';
+}
+
+function selectedDuaToDisplay(dua: SelectedDua, lang: string): DisplayDua {
+  const benefit = getLocalizedRecordValue(dua.benefit, lang);
+  const source = [dua.source, dua.reference].filter(Boolean).join(' • ');
+  const translation = lang === 'ar' ? '' : getLocalizedRecordValue(dua.translations, lang);
+
+  return {
+    id: `selected_${dua.id}`,
+    arabic: dua.arabic,
+    category: inferSelectedDuaCategory(dua),
+    source: source || dua.reference || dua.source || '',
+    translation,
+    fadl: benefit ? { text: benefit, source: '' } : undefined,
+    repetitions: null,
+  };
+}
+
+function famousDuaToDisplay(dua: FamousDua, lang: string): DisplayDua {
+  return {
+    id: dua.id,
+    arabic: dua.arabic,
+    category: dua.category,
+    source: resolveLocalized(dua.source, lang),
+    transliteration: dua.transliteration,
+    fadl: {
+      text: resolveLocalized(dua.fadl.text, lang),
+      source: resolveLocalized(dua.fadl.source, lang),
+    },
+    repetitions: dua.repetitions,
+    occasion: resolveLocalized(dua.occasion, lang),
+  };
+}
 
 export default function FamousDuasScreen() {
   const insets = useSafeAreaInsets();
@@ -50,6 +115,29 @@ export default function FamousDuasScreen() {
   useSacredContext('dua_reading');
 
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [selectedDuas, setSelectedDuas] = useState<SelectedDua[]>([]);
+  const [selectedDuasLoaded, setSelectedDuasLoaded] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const applyDuas = (duas: SelectedDua[]) => {
+      if (!mounted) return;
+      setSelectedDuas(duas);
+      setSelectedDuasLoaded(true);
+    };
+
+    fetchSelectedDuas({ forceRefresh: true })
+      .then(duas => {
+        if (mounted && duas.length > 0) setSelectedDuas(duas);
+      })
+      .catch(() => {});
+
+    const unsubscribe = subscribeToSelectedDuas(applyDuas);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   const tabs = useMemo(
     () => [
@@ -61,34 +149,41 @@ export default function FamousDuasScreen() {
     []
   );
 
-  const filteredDuas = useMemo(() => {
-    if (activeTab === 'all') return FAMOUS_DUAS;
-    return FAMOUS_DUAS.filter((d) => d.category === activeTab);
-  }, [activeTab]);
+  const displayDuas = useMemo(() => {
+    if (selectedDuasLoaded || selectedDuas.length > 0) {
+      return selectedDuas.map(dua => selectedDuaToDisplay(dua, lang));
+    }
+    return FAMOUS_DUAS.map(dua => famousDuaToDisplay(dua, lang));
+  }, [lang, selectedDuas, selectedDuasLoaded]);
 
-  const handleCopy = useCallback(async (dua: FamousDua) => {
+  const filteredDuas = useMemo(() => {
+    if (activeTab === 'all') return displayDuas;
+    return displayDuas.filter((d) => d.category === activeTab);
+  }, [activeTab, displayDuas]);
+
+  const handleCopy = useCallback(async (dua: DisplayDua) => {
     try {
       await Haptics.selectionAsync();
-      const text = `${dua.arabic}\n\n${resolveLocalized(dua.source, lang)}`;
+      const parts = [dua.arabic, dua.translation, dua.source].filter(Boolean);
+      const text = parts.join('\n\n');
       await Clipboard.setStringAsync(text);
       Alert.alert(t('common.copied') || 'تم النسخ', '');
     } catch {}
-  }, [lang]);
+  }, []);
 
-  const handleShare = useCallback(async (dua: FamousDua) => {
+  const handleShare = useCallback(async (dua: DisplayDua) => {
     try {
       await Haptics.selectionAsync();
-      const fadl = resolveLocalized(dua.fadl.text, lang);
-      const fadlSrc = resolveLocalized(dua.fadl.source, lang);
-      const src = resolveLocalized(dua.source, lang);
-      const message =
-        `${dua.arabic}\n\n` +
-        `📖 ${src}\n\n` +
-        `✨ ${fadl}\n${fadlSrc}\n\n` +
-        `— روح المسلم`;
+      const parts = [dua.arabic];
+      if (dua.translation) parts.push(dua.translation);
+      if (dua.source) parts.push(`📖 ${dua.source}`);
+      if (dua.fadl?.text) parts.push(`✨ ${dua.fadl.text}`);
+      if (dua.fadl?.source) parts.push(dua.fadl.source);
+      parts.push('— روح المسلم');
+      const message = parts.join('\n\n');
       await Share.share({ message });
     } catch {}
-  }, [lang]);
+  }, []);
 
   return (
     <BackgroundWrapper>
@@ -110,7 +205,7 @@ export default function FamousDuasScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
-        {filteredDuas.map((dua, idx) => (
+        {filteredDuas.length > 0 ? filteredDuas.map((dua, idx) => (
           <DuaCard
             key={dua.id}
             dua={dua}
@@ -122,14 +217,21 @@ export default function FamousDuasScreen() {
             onCopy={() => handleCopy(dua)}
             onShare={() => handleShare(dua)}
           />
-        ))}
+        )) : (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="heart-outline" size={36} color={colors.textLight} />
+            <Text style={[styles.emptyText, { color: colors.textLight }]}>
+              {t('common.noData') || 'لا توجد أدعية مفعلة حالياً'}
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </BackgroundWrapper>
   );
 }
 
 interface DuaCardProps {
-  dua: FamousDua;
+  dua: DisplayDua;
   index: number;
   lang: string;
   isRTL: boolean;
@@ -140,10 +242,6 @@ interface DuaCardProps {
 }
 
 function DuaCard({ dua, index, lang, isRTL, colors, styles, onCopy, onShare }: DuaCardProps) {
-  const occasion = resolveLocalized(dua.occasion, lang);
-  const fadl = resolveLocalized(dua.fadl.text, lang);
-  const fadlSrc = resolveLocalized(dua.fadl.source, lang);
-  const src = resolveLocalized(dua.source, lang);
   const icon = CATEGORY_ICONS[dua.category];
 
   return (
@@ -172,21 +270,29 @@ function DuaCard({ dua, index, lang, isRTL, colors, styles, onCopy, onShare }: D
         </Text>
       )}
 
-      <View style={styles.sourceRow}>
-        <MaterialCommunityIcons name="book-open-variant" size={14} color={colors.primary} />
-        <Text style={[styles.sourceText, { color: colors.text }]}>{src}</Text>
-      </View>
+      {lang !== 'ar' && !!dua.translation && (
+        <Text style={[styles.translation, { color: colors.textLight }]}>
+          {dua.translation}
+        </Text>
+      )}
 
-      {!!occasion && (
+      {!!dua.source && (
+        <View style={styles.sourceRow}>
+          <MaterialCommunityIcons name="book-open-variant" size={14} color={colors.primary} />
+          <Text style={[styles.sourceText, { color: colors.text }]}>{dua.source}</Text>
+        </View>
+      )}
+
+      {!!dua.occasion && (
         <View style={[styles.occasionBox, { backgroundColor: colors.primary + '14' }]}>
           <Text style={[styles.occasionText, { color: colors.text }]}>
-            <Text style={{ fontFamily: 'Cairo-Bold' }}>{t('common.occasion') || 'المناسبة'}: </Text>
-            {occasion}
+            <Text style={{ fontFamily: 'Rubik-Bold' }}>{t('common.occasion') || 'المناسبة'}: </Text>
+            {dua.occasion}
           </Text>
         </View>
       )}
 
-      {!!fadl && (
+      {!!dua.fadl?.text && (
         <View style={styles.fadlBox}>
           <View style={[styles.fadlHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="star-four-points" size={16} color="#9B7B00" />
@@ -194,9 +300,9 @@ function DuaCard({ dua, index, lang, isRTL, colors, styles, onCopy, onShare }: D
               {t('common.virtue') || 'فضل الدعاء'}
             </Text>
           </View>
-          <Text style={[styles.fadlText, { color: colors.text }]}>{fadl}</Text>
-          {!!fadlSrc && (
-            <Text style={[styles.fadlSource, { color: colors.textLight }]}>{fadlSrc}</Text>
+          <Text style={[styles.fadlText, { color: colors.text }]}>{dua.fadl.text}</Text>
+          {!!dua.fadl.source && (
+            <Text style={[styles.fadlSource, { color: colors.textLight }]}>{dua.fadl.source}</Text>
           )}
         </View>
       )}
@@ -246,7 +352,7 @@ const _styles = StyleSheet.create({
   },
   indexBadgeText: {
     color: '#fff',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     fontSize: 13,
   },
   repBadge: {
@@ -257,7 +363,7 @@ const _styles = StyleSheet.create({
     marginStart: 'auto',
   },
   repBadgeText: {
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     fontSize: 12,
   },
   arabic: {
@@ -269,9 +375,16 @@ const _styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   translit: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 13,
     fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  translation: {
+    fontFamily: 'Rubik-Regular',
+    fontSize: 14,
+    lineHeight: 24,
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
@@ -283,7 +396,7 @@ const _styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   sourceText: {
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     fontSize: 13,
   },
   occasionBox: {
@@ -292,7 +405,7 @@ const _styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   occasionText: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 13,
     lineHeight: 22,
     textAlign: 'right',
@@ -312,18 +425,18 @@ const _styles = StyleSheet.create({
     marginBottom: 6,
   },
   fadlTitle: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     fontSize: 13,
   },
   fadlText: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 13,
     lineHeight: 22,
     textAlign: 'right',
     writingDirection: 'rtl',
   },
   fadlSource: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 11,
     fontStyle: 'italic',
     marginTop: 4,
@@ -346,7 +459,18 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   actionLabel: {
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     fontSize: 13,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xxl,
+    gap: Spacing.sm,
+  },
+  emptyText: {
+    fontFamily: 'Rubik-SemiBold',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

@@ -184,6 +184,17 @@ class AdhanPlaybackService : Service() {
       asset.use {
         nextPlayer.setAudioAttributes(audioAttributes())
         nextPlayer.setDataSource(it.fileDescriptor, it.startOffset, it.length)
+        nextPlayer.setOnPreparedListener {
+          try {
+            it.start()
+            Log.i(TAG, "Started adhan playback (chain index=" + index + ") for " + soundKey)
+          } catch (e: Exception) {
+            Log.w(TAG, "Failed to start prepared adhan at chain index=" + index + " — trying next fallback", e)
+            try { it.release() } catch (_: Exception) {}
+            if (player === it) player = null
+            tryPlayFromChain(chain, index + 1, soundKey)
+          }
+        }
         nextPlayer.setOnCompletionListener { stopSelfSafely() }
         nextPlayer.setOnErrorListener { _, what, extra ->
           Log.w(TAG, "MediaPlayer error at index=" + index + " what=" + what + " extra=" + extra + " — trying next fallback")
@@ -192,10 +203,8 @@ class AdhanPlaybackService : Service() {
           tryPlayFromChain(chain, index + 1, soundKey)
           true
         }
-        nextPlayer.prepare()
-        nextPlayer.start()
+        nextPlayer.prepareAsync()
       }
-      Log.i(TAG, "Started adhan playback (chain index=" + index + ") for " + soundKey)
     } catch (e: Exception) {
       Log.w(TAG, "Failed to prepare adhan at chain index=" + index + " — trying next fallback", e)
       try { nextPlayer.release() } catch (_: Exception) {}
@@ -689,6 +698,30 @@ class FullAdhanModule(reactContext: ReactApplicationContext) :
     } catch (e: Exception) {
       Log.e(TAG, "cancelAllFullAdhan failed", e)
       promise.reject("ERR_CANCEL_ADHAN", e)
+    }
+  }
+
+  @ReactMethod
+  fun cancelFullAdhanFrom(startRequestCode: Int, promise: Promise) {
+    try {
+      val ctx = reactApplicationContext
+      val alarmManager = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+      val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      } else {
+        PendingIntent.FLAG_UPDATE_CURRENT
+      }
+      val start = startRequestCode.coerceIn(0, MAX_REQUEST_CODES)
+      for (i in start until MAX_REQUEST_CODES) {
+        val intent = Intent(ctx, FullAdhanAlarmReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(ctx, REQUEST_CODE_BASE + i, intent, flags)
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
+      }
+      promise.resolve(true)
+    } catch (e: Exception) {
+      Log.e(TAG, "cancelFullAdhanFrom failed", e)
+      promise.reject("ERR_CANCEL_ADHAN_FROM", e)
     }
   }
 

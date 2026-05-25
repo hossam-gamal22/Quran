@@ -28,10 +28,17 @@ export const NOTIFICATION_SOUNDS: Record<string, number> = {
   istighfar: require('@/assets/sounds/istighfar.mp3'),
   tasbih: require('@/assets/sounds/tasbih.mp3'),
   alhamdulillah: require('@/assets/sounds/alhamdulillah.mp3'),
+  complete: require('@/assets/sounds/notif_daily_summary.mp3'),
   subhanallah: require('@/assets/sounds/subhanallah.mp3'),
   morning_adhkar: require('@/assets/sounds/morning_adhkar.mp3'),
   evening_adhkar: require('@/assets/sounds/evening_adhkar.mp3'),
-  general_reminder: require('@/assets/sounds/general_reminder.mp3'),
+  notif_after_prayer: require('@/assets/sounds/notif_after_prayer.mp3'),
+  notif_daily_summary: require('@/assets/sounds/notif_daily_summary.mp3'),
+  notif_kahf: require('@/assets/sounds/notif_kahf.mp3'),
+  notif_khatma: require('@/assets/sounds/notif_khatma.mp3'),
+  notif_sleep: require('@/assets/sounds/notif_sleep.mp3'),
+  notif_verse: require('@/assets/sounds/notif_verse.mp3'),
+  notif_wakeup: require('@/assets/sounds/notif_wakeup.mp3'),
 };
 
 export const ADHAN_SOUNDS: Record<string, number> = {

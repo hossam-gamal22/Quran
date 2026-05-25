@@ -391,7 +391,7 @@ function Stat({
       <Text
         style={{
           color: colors.text,
-          fontFamily: 'Cairo-Bold',
+          fontFamily: 'Rubik-Bold',
           fontSize: small ? 14 : 18,
         }}
       >
@@ -401,7 +401,7 @@ function Stat({
         <Text
           style={{
             color: colors.textLight,
-            fontFamily: 'Cairo-Regular',
+            fontFamily: 'Rubik-Regular',
             fontSize: 11,
             marginTop: 2,
             textAlign: 'center',
@@ -426,27 +426,27 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     cardTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 16,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     planName: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     emptyBox: { alignItems: 'center', gap: 12, paddingVertical: 12 },
-    emptyText: { color: colors.textLight, fontFamily: 'Cairo-Regular', fontSize: 13 },
+    emptyText: { color: colors.textLight, fontFamily: 'Rubik-Regular', fontSize: 13 },
     primaryBtn: {
       backgroundColor: colors.primary,
       paddingHorizontal: 20,
       paddingVertical: 10,
       borderRadius: 12,
     },
-    primaryBtnText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 14 },
+    primaryBtnText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 14 },
     statsRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 8 },
     todayRow: {
       flexDirection: isRTL ? 'row-reverse' : 'row',
@@ -459,7 +459,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     previewBox: { gap: 4, marginTop: 4 },
     previewLine: {
       color: colors.text,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 13,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -478,7 +478,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     nextReviewText: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -508,19 +508,19 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     chipSurah: {
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 12,
       writingDirection: 'rtl',
     },
     chipAyahs: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       writingDirection: 'rtl',
     },
     muted: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: 'center',
       marginTop: 4,
@@ -554,17 +554,17 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       backgroundColor: '#b00020',
       paddingHorizontal: 6,
     },
-    mistakeBadgeText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 12 },
+    mistakeBadgeText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 12 },
     modeCardDisabled: { opacity: 0.55 },
     modeTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 14,
       marginTop: 4,
     },
     modeDesc: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 11,
       textAlign: 'center',
     },
@@ -576,7 +576,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       alignItems: 'center',
       gap: 4,
     },
-    linkText: { color: colors.primary, fontFamily: 'Cairo-SemiBold', fontSize: 13 },
+    linkText: { color: colors.primary, fontFamily: 'Rubik-SemiBold', fontSize: 13 },
     outlineBtn: {
       flexDirection: isRTL ? 'row-reverse' : 'row',
       gap: 8,
@@ -587,5 +587,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       borderWidth: 1.5,
       borderColor: colors.primary,
     },
-    outlineBtnText: { fontFamily: 'Cairo-Bold', fontSize: 14 },
+    outlineBtnText: { fontFamily: 'Rubik-Bold', fontSize: 14 },
   });

@@ -30,9 +30,21 @@ interface ThemeColors {
   tabBarBackground?: string;
 }
 
+interface SeasonalThemeConfig {
+  id: string;
+  name?: string;
+  nameAr?: string;
+  season?: string;
+  startDate: string;
+  endDate: string;
+  colors?: Partial<ThemeColors>;
+  isActive?: boolean;
+}
+
 interface ThemeConfigData {
   light?: ThemeColors;
   dark?: ThemeColors;
+  seasonalThemes?: SeasonalThemeConfig[];
   updatedAt?: string;
   version?: number;
 }

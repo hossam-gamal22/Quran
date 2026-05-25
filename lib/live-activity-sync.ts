@@ -10,7 +10,7 @@ import {
   endLiveActivity,
   LiveActivityData,
 } from '@/lib/live-activities';
-import { getCachedPrayerTimes, getTodayDateString, formatPrayerTime } from '@/lib/prayer-times';
+import { getCachedPrayerTimes, getTodayDateString, formatPrayerTime, getPrayerTranslationKey, type PrayerName } from '@/lib/prayer-times';
 import { getOfflinePrayerTimes } from '@/lib/prayer-week-cache';
 import { getWidgetSettings } from '@/lib/widget-data';
 import { getLanguage, t } from '@/lib/i18n';
@@ -80,7 +80,7 @@ export async function refreshLiveActivityIfEnabled(): Promise<boolean> {
       pTime.setHours(h, m, 0, 0);
       return {
         name: p.engKey,
-        nameAr: t(`prayer.${p.engKey}`),
+        nameAr: t(getPrayerTranslationKey(p.engKey as PrayerName)),
         time: formatPrayerTime(raw, false),
         passed: pTime < now,
       };

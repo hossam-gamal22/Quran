@@ -28,7 +28,7 @@ const DATE_WIDGET_IDS = new Set(['daySimple', 'dayThuluth', 'dayDigital', 'month
 const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const WEEKDAYS_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-const HIJRI_MONTHS_AR = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني', 'جمادى الأولى', 'جمادى الثانية', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'];
+const HIJRI_MONTHS_AR = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني', 'جمادى الأولى', 'جمادى الثانية', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذي الحجة'];
 
 function LiveDateWidget({
   widgetId,
@@ -214,7 +214,7 @@ interface OverlayAnchor {
   compact?: boolean;
 }
 
-function overlaysFor(widgetId: string, size: AndroidSize): OverlayAnchor[] {
+function overlaysFor(widgetId: string, size: AndroidSize, isAr: boolean = true): OverlayAnchor[] {
   const key = `${widgetId}_${size}`;
   switch (key) {
     case 'dayDigital_small':
@@ -228,10 +228,21 @@ function overlaysFor(widgetId: string, size: AndroidSize): OverlayAnchor[] {
     case 'prayerTable_large':
       return [{ kind: 'prayerNextCountdown', x: 213, y: 114, width: 176, fontSize: 12, fontFamily: FONT.rubikMedium, textAlign: 'right' }];
     case 'prayerNextPrevious_medium':
-      return [
-        { kind: 'prayerNextCountdown', x: 91, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
-        { kind: 'prayerPreviousCountdown', x: 238, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
-      ];
+      // Mirror PrayerNextPrevPreview's language-conditional layout:
+      //   Arabic: next-LEFT (x=91), previous-RIGHT (x=238)
+      //   English: previous-LEFT (x=91), next-RIGHT (x=238)
+      // Swapping the overlay KINDS instead of the coordinates keeps the
+      // baked PNG card boundaries (which are at fixed positions) aligned
+      // with the live countdown text drawn on top of them.
+      return isAr
+        ? [
+            { kind: 'prayerNextCountdown', x: 91, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
+            { kind: 'prayerPreviousCountdown', x: 238, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
+          ]
+        : [
+            { kind: 'prayerPreviousCountdown', x: 91, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
+            { kind: 'prayerNextCountdown', x: 238, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
+          ];
     default:
       return [];
   }
@@ -398,7 +409,7 @@ export function SnapshotWidget({
   const imagePath = snapshotPath ?? manifestEntry?.path ?? snapshotFilePathForKey(imageKey);
   const p = paletteFor(resolvedTheme);
   const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
-  const overlays = overlaysFor(widgetId, size);
+  const overlays = overlaysFor(widgetId, size, isAr);
 
   // Branded loading state — rendered ONLY when no PNG is on disk.
   if (!hasSnapshot) {

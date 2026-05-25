@@ -98,12 +98,11 @@ const DEFAULT_ASSIGNMENTS: SoundAssignments = {
 interface BundledSound {
   id: string;
   name: string;
-  category: 'notification' | 'adhan';
+  category: 'notification' | 'adhan' | 'effect';
 }
 
 const BUNDLED_SOUNDS: BundledSound[] = [
   // إشعارات
-  { id: 'general_reminder', name: 'تذكير عام', category: 'notification' },
   { id: 'salawat', name: 'صلاة على النبي', category: 'notification' },
   { id: 'istighfar', name: 'استغفار', category: 'notification' },
   { id: 'tasbih', name: 'تسبيح', category: 'notification' },
@@ -111,6 +110,20 @@ const BUNDLED_SOUNDS: BundledSound[] = [
   { id: 'alhamdulillah', name: 'الحمد لله', category: 'notification' },
   { id: 'morning_adhkar', name: 'أذكار الصباح', category: 'notification' },
   { id: 'evening_adhkar', name: 'أذكار المساء', category: 'notification' },
+  { id: 'notif_after_prayer', name: 'بعد الصلاة', category: 'notification' },
+  { id: 'complete', name: 'complete', category: 'notification' },
+  { id: 'notif_kahf', name: 'تذكير سورة الكهف', category: 'notification' },
+  { id: 'notif_khatma', name: 'تذكير الختمة', category: 'notification' },
+  { id: 'notif_sleep', name: 'أذكار النوم', category: 'notification' },
+  { id: 'notif_verse', name: 'آية يومية', category: 'notification' },
+  { id: 'notif_wakeup', name: 'أذكار الاستيقاظ', category: 'notification' },
+  // مؤثرات داخل التطبيق
+  { id: 'button_click', name: 'ضغط زر', category: 'effect' },
+  { id: 'success', name: 'نجاح', category: 'effect' },
+  { id: 'page_turn', name: 'تقليب صفحة', category: 'effect' },
+  { id: 'tasbih_click', name: 'نقرة تسبيح', category: 'effect' },
+  { id: 'prayer_complete', name: 'إتمام صلاة', category: 'effect' },
+  { id: 'quran_open', name: 'فتح القرآن', category: 'effect' },
   // أذان
   { id: 'makkah', name: 'أذان مكة المكرمة', category: 'adhan' },
   { id: 'madinah', name: 'أذان المدينة المنورة', category: 'adhan' },
@@ -764,6 +777,7 @@ export default function SoundManager() {
             {PAGE_EVENT_TYPES.map(type => {
               const selectedSoundId = assignments.pageEvents[type.key];
               const selectedSound = sounds.find(s => s.id === selectedSoundId);
+              const selectedBundledSound = BUNDLED_SOUNDS.find(s => s.id === selectedSoundId);
 
               return (
                 <div
@@ -776,8 +790,10 @@ export default function SoundManager() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-medium">{type.label}</p>
-                      {selectedSound && (
-                        <p className="text-xs text-slate-500 mt-0.5">{selectedSound.name}</p>
+                      {(selectedSound || selectedBundledSound) && (
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {selectedSound?.name || selectedBundledSound?.name}
+                        </p>
                       )}
                     </div>
 
@@ -799,6 +815,11 @@ export default function SoundManager() {
                         ))}
                       </optgroup>
                       <optgroup label="🎵 مؤثرات مدمجة">
+                        {BUNDLED_SOUNDS.filter(s => s.category === 'effect').map(s => (
+                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="🕌 أذان مدمج">
                         {BUNDLED_SOUNDS.filter(s => s.category === 'adhan').map(s => (
                           <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
                         ))}

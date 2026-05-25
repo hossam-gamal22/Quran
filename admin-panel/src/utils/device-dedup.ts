@@ -2,7 +2,8 @@
  * Device deduplication utility
  * Multi-layer fingerprinting to ensure one physical device = one unique user.
  *
- * Layer 1: deviceName + deviceBrand + platform (strongest signal)
+ * Layer 0: explicit app-written device IDs/fingerprint (strongest signal)
+ * Layer 1: deviceName + deviceBrand + platform
  * Layer 2: fcmToken (same push token = same device)
  * Layer 3: displayName + platform + country (same person on same platform/country)
  */
@@ -10,6 +11,9 @@
 export interface DeviceUser {
   id: string;
   platform?: string;
+  nativeDeviceId?: string;
+  originalDeviceUserId?: string;
+  deviceFingerprint?: string;
   deviceName?: string;
   deviceBrand?: string;
   displayName?: string;
@@ -52,15 +56,33 @@ const GENERIC_NAMES = new Set([
   'ipod touch',
 ]);
 
+function normalizeId(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
 /**
- * Pick the most recently active user from a group.
+ * Pick the best visible record from a duplicate group.
+ *
+ * Prefer the profile that is actually useful in the admin UI: named records
+ * beat anonymous placeholders, reachable push tokens beat empty tokens, then
+ * the newest activity wins.
  */
-function pickMostRecent<T extends DeviceUser>(group: T[]): T {
+function pickBestRecord<T extends DeviceUser>(group: T[]): T {
   if (group.length === 1) return group[0];
+
+  const score = (user: T): number => {
+    const displayName = ((user.displayName || (user as any).name || '') as string).trim();
+    const token = (user.fcmToken || '').trim();
+    let value = 0;
+    if (displayName && displayName !== '-') value += 1_000_000_000_000;
+    if (token.startsWith('ExponentPushToken')) value += 100_000_000_000;
+    else if (token) value += 10_000_000_000;
+    value += toEpoch(user.lastActive) || toEpoch(user.createdAt);
+    return value;
+  };
+
   group.sort((a, b) => {
-    const aTime = toEpoch(a.lastActive) || toEpoch(a.createdAt);
-    const bTime = toEpoch(b.lastActive) || toEpoch(b.createdAt);
-    return bTime - aTime;
+    return score(b) - score(a);
   });
   return group[0];
 }
@@ -96,6 +118,27 @@ export function deduplicateByDevice<T extends DeviceUser>(users: T[]): {
   // Initialize: each user is its own group
   for (let i = 0; i < users.length; i++) {
     parent.set(i, i);
+  }
+
+  // Layer 0: explicit app-written identity fields.
+  const explicitIdMap = new Map<string, number>();
+  for (let i = 0; i < users.length; i++) {
+    const u = users[i];
+    const ids = [
+      normalizeId(u.nativeDeviceId),
+      normalizeId(u.originalDeviceUserId),
+      normalizeId(u.deviceFingerprint),
+    ].filter(Boolean);
+
+    for (const id of ids) {
+      const key = `explicit::${id}`;
+      const existing = explicitIdMap.get(key);
+      if (existing !== undefined) {
+        union(i, existing);
+      } else {
+        explicitIdMap.set(key, i);
+      }
+    }
   }
 
   // Layer 1: deviceName + deviceBrand + platform
@@ -165,7 +208,7 @@ export function deduplicateByDevice<T extends DeviceUser>(users: T[]): {
   const uniqueUsers: T[] = [];
   const groupMap = new Map<string, string[]>();
   for (const group of groups.values()) {
-    const winner = pickMostRecent(group);
+    const winner = pickBestRecord(group);
     uniqueUsers.push(winner);
     groupMap.set(winner.id, group.map(u => u.id));
   }

@@ -215,9 +215,9 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
   },
   downloadLinks: {
     android: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-    ios: '',
+    ios: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
   },
-  storeUrlIos: '',
+  storeUrlIos: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
   storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
   features: {
     quran: true,
@@ -246,6 +246,57 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
   },
 };
 
+function isRecord(value: unknown): value is Record<string, any> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeUiCustomization(value: unknown): UICustomizationConfig {
+  const ui = isRecord(value) ? value : {};
+  return {
+    tabBarItems: Array.isArray(ui.tabBarItems) ? ui.tabBarItems : DEFAULT_UI_CUSTOMIZATION.tabBarItems,
+    quranSegments: Array.isArray(ui.quranSegments) ? ui.quranSegments : DEFAULT_UI_CUSTOMIZATION.quranSegments,
+    prayerTopSegments: Array.isArray(ui.prayerTopSegments) ? ui.prayerTopSegments : DEFAULT_UI_CUSTOMIZATION.prayerTopSegments,
+    prayerViewSegments: Array.isArray(ui.prayerViewSegments) ? ui.prayerViewSegments : DEFAULT_UI_CUSTOMIZATION.prayerViewSegments,
+    tabBarLayout: {
+      ...DEFAULT_UI_CUSTOMIZATION.tabBarLayout,
+      ...(isRecord(ui.tabBarLayout) ? ui.tabBarLayout : {}),
+    },
+  };
+}
+
+function mergeRemoteConfig(data: unknown): RemoteAppConfig {
+  const remote = isRecord(data) ? data : {};
+  if (remote.minSupportedVersion && !remote.minVersion) {
+    remote.minVersion = remote.minSupportedVersion;
+  }
+
+  return {
+    ...DEFAULT_REMOTE_CONFIG,
+    ...remote,
+    contact: {
+      ...DEFAULT_REMOTE_CONFIG.contact,
+      ...(isRecord(remote.contact) ? remote.contact : {}),
+    },
+    downloadLinks: {
+      ...DEFAULT_REMOTE_CONFIG.downloadLinks,
+      ...(isRecord(remote.downloadLinks) ? remote.downloadLinks : {}),
+    },
+    features: {
+      ...DEFAULT_REMOTE_CONFIG.features,
+      ...(isRecord(remote.features) ? remote.features : {}),
+    },
+    uiCustomization: mergeUiCustomization(remote.uiCustomization),
+    shareModal: {
+      ...DEFAULT_REMOTE_CONFIG.shareModal,
+      ...(isRecord(remote.shareModal) ? remote.shareModal : {}),
+    },
+    quranAutoScroll: {
+      ...DEFAULT_REMOTE_CONFIG.quranAutoScroll,
+      ...(isRecord(remote.quranAutoScroll) ? remote.quranAutoScroll : {}),
+    },
+  } as RemoteAppConfig;
+}
+
 // جلب الإعدادات من Firebase
 export const fetchAppConfig = async (): Promise<RemoteAppConfig> => {
   try {
@@ -265,16 +316,13 @@ export const fetchAppConfig = async (): Promise<RemoteAppConfig> => {
     if (docSnap.exists()) {
       const data = docSnap.data() as Record<string, any>;
       
-      // التوافق مع اسم الحقل القديم minSupportedVersion → minVersion
-      if (data.minSupportedVersion && !data.minVersion) {
-        data.minVersion = data.minSupportedVersion;
-      }
+      const mergedConfig = mergeRemoteConfig(data);
       
       // حفظ في AsyncStorage للاستخدام offline
-      await AsyncStorage.setItem('remote_app_config', JSON.stringify(data));
+      await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));
       
       console.log('✅ تم جلب الإعدادات من Firebase بنجاح');
-      return { ...DEFAULT_REMOTE_CONFIG, ...data } as RemoteAppConfig;
+      return mergedConfig;
     } else {
       console.log('⚠️ لا توجد إعدادات في Firebase، استخدام الافتراضية');
     }
@@ -288,11 +336,7 @@ export const fetchAppConfig = async (): Promise<RemoteAppConfig> => {
     if (cached) {
       console.log('✅ تم استخدام الإعدادات المحفوظة (Cache)');
       const parsed = JSON.parse(cached);
-      // التوافق مع اسم الحقل القديم
-      if (parsed.minSupportedVersion && !parsed.minVersion) {
-        parsed.minVersion = parsed.minSupportedVersion;
-      }
-      return { ...DEFAULT_REMOTE_CONFIG, ...parsed } as RemoteAppConfig;
+      return mergeRemoteConfig(parsed);
     }
   } catch (error) {
     console.log('⚠️ فشل قراءة Cache');
@@ -327,11 +371,7 @@ export const subscribeToAppConfig = (
     async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as Record<string, any>;
-        // التوافق مع اسم الحقل القديم
-        if (data.minSupportedVersion && !data.minVersion) {
-          data.minVersion = data.minSupportedVersion;
-        }
-        const mergedConfig = { ...DEFAULT_REMOTE_CONFIG, ...data } as RemoteAppConfig;
+        const mergedConfig = mergeRemoteConfig(data);
         
         // حفظ في AsyncStorage للاستخدام offline
         await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));

@@ -110,6 +110,13 @@ enum PrayerKey: String, Codable, CaseIterable {
     case fajr, sunrise, dhuhr, asr, maghrib, isha
 
     var arabicName: String {
+        arabicName(on: Date())
+    }
+
+    func arabicName(on date: Date) -> String {
+        if self == .dhuhr && Calendar(identifier: .gregorian).component(.weekday, from: date) == 6 {
+            return "صلاة الجمعة"
+        }
         switch self {
         case .fajr:    return "الفجر"
         case .sunrise: return "الشروق"
@@ -121,6 +128,13 @@ enum PrayerKey: String, Codable, CaseIterable {
     }
 
     var englishName: String {
+        englishName(on: Date())
+    }
+
+    func englishName(on date: Date) -> String {
+        if self == .dhuhr && Calendar(identifier: .gregorian).component(.weekday, from: date) == 6 {
+            return "Jumuah"
+        }
         switch self {
         case .fajr:    return "Fajr"
         case .sunrise: return "Sunrise"

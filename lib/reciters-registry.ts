@@ -67,8 +67,8 @@ export const RECITERS_REGISTRY: ReciterEntry[] = [
   },
   {
     id: 'abdulbasit_murattal',
-    nameAr: 'عبد الباسط عبد الصمد - مرتل',
-    nameEn: 'Abdul Basit Abdus Samad (Murattal)',
+    nameAr: 'عبد الباسط عبد الصمد',
+    nameEn: 'Abdul Basit Abdus Samad',
     style: 'murattal',
     bitrate: 64,
     alquranCloudId: 'ar.abdulsamad',
@@ -89,8 +89,8 @@ export const RECITERS_REGISTRY: ReciterEntry[] = [
   },
   {
     id: 'minshawi_murattal',
-    nameAr: 'محمد صديق المنشاوي - مرتل',
-    nameEn: 'Mohamed Siddiq Al-Minshawi (Murattal)',
+    nameAr: 'محمد صديق المنشاوي',
+    nameEn: 'Mohamed Siddiq Al-Minshawi',
     style: 'murattal',
     bitrate: 128,
     alquranCloudId: 'ar.minshawi',
@@ -207,8 +207,8 @@ export const RECITERS_REGISTRY: ReciterEntry[] = [
   // ── 🟡 Continuous-only (no per-ayah sync) ──
   {
     id: 'abdulbasit_mujawwad',
-    nameAr: 'عبد الباسط عبد الصمد - مجود',
-    nameEn: 'Abdul Basit Abdus Samad (Mujawwad)',
+    nameAr: 'عبد الباسط عبد الصمد',
+    nameEn: 'Abdul Basit Abdus Samad',
     style: 'mujawwad',
     bitrate: 128,
     everyAyahFolder: 'Abdul_Basit_Mujawwad_128kbps',
@@ -216,8 +216,8 @@ export const RECITERS_REGISTRY: ReciterEntry[] = [
   },
   {
     id: 'husary_mujawwad',
-    nameAr: 'محمود خليل الحصري - مجود',
-    nameEn: 'Al-Husary (Mujawwad)',
+    nameAr: 'محمود خليل الحصري',
+    nameEn: 'Al-Husary',
     style: 'mujawwad',
     bitrate: 128,
     alquranCloudId: 'ar.husarymujawwad',
@@ -226,8 +226,8 @@ export const RECITERS_REGISTRY: ReciterEntry[] = [
   },
   {
     id: 'minshawi_mujawwad',
-    nameAr: 'محمد صديق المنشاوي - مجود',
-    nameEn: 'Al-Minshawi (Mujawwad)',
+    nameAr: 'محمد صديق المنشاوي',
+    nameEn: 'Al-Minshawi',
     style: 'mujawwad',
     bitrate: 64,
     everyAyahFolder: 'Minshawy_Mujawwad_64kbps',

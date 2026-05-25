@@ -168,14 +168,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
   },
   title: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     fontSize: 18,
     color: '#fff',
     marginTop: 16,
     textAlign: 'center',
   },
   subtitle: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 13,
     color: '#aaa',
     marginTop: 8,
@@ -196,19 +196,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressText: {
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     fontSize: 14,
     color: '#D4A017',
     marginTop: 10,
   },
   failedText: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 12,
     color: '#EF4444',
     marginTop: 4,
   },
   errorText: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 13,
     color: '#EF4444',
     marginTop: 12,
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   cancelText: {
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     fontSize: 14,
     color: '#fff',
   },

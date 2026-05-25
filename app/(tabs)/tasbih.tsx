@@ -39,7 +39,7 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSacredContext } from '@/hooks/use-sacred-context';
-import { getLanguage, t } from '@/lib/i18n';
+import { getLanguage, getTranslations, t } from '@/lib/i18n';
 import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
 import { copyToClipboard } from '../../lib/clipboard';
 import { APP_CONFIG } from '../../constants/app';
@@ -49,9 +49,13 @@ import { useAdBottomInset } from '@/lib/ads-context';
 import { Share } from 'react-native';
 import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
 import { trackTasbih } from '@/lib/firebase-analytics';
-import { fetchTasbihPresets } from '@/lib/admin-data-api';
+import { subscribeToTasbihPresets } from '@/lib/admin-data-api';
 import { getUserId } from '@/lib/firebase-user';
 import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import {
+  didReachTasbihTarget,
+  removeLowerTargetDuplicateTasbihat,
+} from '@/lib/tasbih-progress';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -83,6 +87,13 @@ interface CustomTasbih {
   target: number;
   createdAt: string;
 }
+
+const YUNUS_DUA_TASBIH_TEXT = 'لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ';
+const YUNUS_DUA_TASBIH_TRANSLITERATION = 'La ilaha illa anta subhanaka inni kuntu minaz-zalimin';
+const YUNUS_DUA_TASBIH_VIRTUE = 'دعوة ذي النون عليه السلام؛ قال النبي ﷺ: «فإنه لم يدعُ بها رجل مسلم في شيء قط إلا استجاب الله له». ولم يثبت لها عدد مخصوص';
+const YUNUS_DUA_TASBIH_REFERENCE = 'الأنبياء: 87، وسنن الترمذي 3505';
+const YUNUS_DUA_POINT_TARGET = 1;
+const DEPRECATED_SUBHAN_WABIHAMDIH_TEXT = 'سبحان الله وبحمده';
 
 // ============================================
 // بيانات التسبيحات المعتمدة
@@ -126,10 +137,12 @@ const DEFAULT_PRESET_TASBIHAT: TasbihItem[] = [
   },
   {
     id: 6,
-    text: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ',
-    transliteration: 'Subhan Allahi wa bihamdih',
-    target: 100,
-    source: 'hadith_sahih',
+    text: YUNUS_DUA_TASBIH_TEXT,
+    transliteration: YUNUS_DUA_TASBIH_TRANSLITERATION,
+    target: 1,
+    source: 'quran',
+    virtue: YUNUS_DUA_TASBIH_VIRTUE,
+    reference: YUNUS_DUA_TASBIH_REFERENCE,
   },
   {
     id: 7,
@@ -196,30 +209,121 @@ const DEFAULT_PRESET_TASBIHAT: TasbihItem[] = [
   },
 ];
 
+function normalizePresetTranslationId(id: unknown): number | undefined {
+  if (typeof id === 'number' && Number.isInteger(id) && id >= 1 && id <= DEFAULT_PRESET_TASBIHAT.length) {
+    return id;
+  }
+
+  if (typeof id === 'string') {
+    const trailingNumber = id.match(/(\d+)$/)?.[1];
+    if (trailingNumber) {
+      const parsed = Number(trailingNumber);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= DEFAULT_PRESET_TASBIHAT.length) {
+        return parsed;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function cleanOptionalText(text?: string): string | undefined {
+  const trimmed = text?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function isGeneratedTasbihPlaceholder(text?: string): boolean {
+  const normalized = text?.trim().toLowerCase().replace(/[_-]/g, ' ');
+  return !!normalized && /^(virtue|reference)?\s*tasbih default \d+$/.test(normalized);
+}
+
+function getBundledTasbihValue(field: 'virtue' | 'reference', id: number): string | undefined {
+  const key = `${field}${id}`;
+  const current = getTranslations().tasbih as unknown as Record<string, string>;
+  const arabic = getTranslations('ar').tasbih as unknown as Record<string, string>;
+  return cleanOptionalText(current[key]) || cleanOptionalText(arabic[key]);
+}
+
 // Helper to get translated virtue/reference/grade for a preset
-function getPresetVirtue(id: number): string | undefined {
-  const key = `tasbih.virtue${id}` as any;
-  const val = t(key);
-  return val !== key ? val : undefined;
+function getPresetVirtue(id: unknown, fallback?: string): string | undefined {
+  const presetId = normalizePresetTranslationId(id);
+  const cleanFallback = cleanOptionalText(fallback);
+  if (!presetId) {
+    return isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback;
+  }
+
+  return getBundledTasbihValue('virtue', presetId) || (
+    isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback
+  );
 }
-function getPresetReference(id: number): string | undefined {
-  const key = `tasbih.reference${id}` as any;
-  const val = t(key);
-  return val !== key ? val : undefined;
+function getPresetReference(id: unknown, fallback?: string): string | undefined {
+  const presetId = normalizePresetTranslationId(id);
+  const cleanFallback = cleanOptionalText(fallback);
+  if (!presetId) {
+    return isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback;
+  }
+
+  return getBundledTasbihValue('reference', presetId) || (
+    isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback
+  );
 }
-function getPresetGrade(id: number): string | undefined {
+function getPresetGrade(id: unknown): string | undefined {
+  const presetId = normalizePresetTranslationId(id);
+  if (!presetId) return undefined;
+
   const gradeMap: Record<number, string> = {
     1: 'gradeSahih', 2: 'gradeSahih', 3: 'gradeSahih',
-    4: 'gradeMutafaq', 5: 'gradeMutafaq', 6: 'gradeMutafaq',
+    4: 'gradeMutafaq', 5: 'gradeMutafaq',
     7: 'gradeSahih', 8: 'gradeMutafaq', 9: 'gradeSahih',
     10: 'gradeHasan', 11: 'gradeSahih', 12: 'gradeSahih',
     13: 'gradeSahih', 14: 'gradeSahih', 15: 'gradeHasan',
   };
-  const gradeKey = gradeMap[id];
+  const gradeKey = gradeMap[presetId];
   if (!gradeKey) return undefined;
   const fullKey = `tasbih.${gradeKey}` as any;
   const val = t(fullKey);
   return val !== fullKey ? val : undefined;
+}
+
+function normalizeTasbihTextForReplacement(text: string): string {
+  return stripTashkeel(text).replace(/\s+/g, ' ').trim();
+}
+
+function isYunusDuaTasbih(item: Pick<TasbihItem, 'id' | 'text'>): boolean {
+  return item.id === 6
+    || normalizeTasbihTextForReplacement(item.text) === normalizeTasbihTextForReplacement(YUNUS_DUA_TASBIH_TEXT);
+}
+
+function getTasbihPointTarget(item: Pick<TasbihItem, 'id' | 'text' | 'target'>): number {
+  return isYunusDuaTasbih(item) ? YUNUS_DUA_POINT_TARGET : Math.max(1, item.target || 1);
+}
+
+function getTargetOverrideForTasbih(item: TasbihItem, overrides: Record<string, number>): number | undefined {
+  if (!isYunusDuaTasbih(item)) return undefined;
+  const override = Number(overrides[String(item.id)]);
+  return Number.isFinite(override) && override > 0 ? Math.floor(override) : undefined;
+}
+
+function applyTasbihTargetOverride(item: TasbihItem, overrides: Record<string, number>): TasbihItem {
+  const override = getTargetOverrideForTasbih(item, overrides);
+  return override ? { ...item, target: override } : item;
+}
+
+function replaceDeprecatedTasbihPreset(item: TasbihItem): TasbihItem {
+  if (normalizeTasbihTextForReplacement(item.text) !== DEPRECATED_SUBHAN_WABIHAMDIH_TEXT) {
+    return item;
+  }
+
+  return {
+    ...item,
+    text: YUNUS_DUA_TASBIH_TEXT,
+    transliteration: YUNUS_DUA_TASBIH_TRANSLITERATION,
+    target: 1,
+    source: 'quran',
+    virtue: YUNUS_DUA_TASBIH_VIRTUE,
+    reference: YUNUS_DUA_TASBIH_REFERENCE,
+    grade: undefined,
+  };
 }
 
 // ============================================
@@ -240,6 +344,7 @@ const STORAGE_KEYS = {
   customTasbihat: 'custom_tasbihat',
   completedToday: 'tasbih_completed_today',
   typeStats: 'tasbih_type_stats',
+  targetOverrides: 'tasbih_target_overrides',
   lastDate: '@tasbih_last_date',
   dailyHistory: '@tasbih_daily_history',
 };
@@ -304,9 +409,11 @@ export default function TasbihScreen() {
   const dailyStatsRef = useRef<Record<string, number>>({});
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const typeStatsRef = useRef<Record<string, Record<string, number>>>({});
+  const targetOverridesRef = useRef<Record<string, number>>({});
   const rewardsSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tasbihAdShownThisSessionRef = useRef(false);
   const tasbihAdInFlightRef = useRef(false);
+  const completedTasbihatRef = useRef<Record<number, boolean>>({});
   // Per-tasbih count memory: remembers count for each tasbih when switching
   const perTasbihCountsRef = useRef<Record<number | string, number>>({});
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -314,6 +421,7 @@ export default function TasbihScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showTargetModal, setShowTargetModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const { showStats } = useLocalSearchParams<{ showStats?: string }>();
 
@@ -324,25 +432,43 @@ export default function TasbihScreen() {
     }
   }, [showStats]);
 
-  // Fetch admin-managed presets from Firestore
+  // Subscribe to admin-managed presets from Firestore so order/content updates live.
   useEffect(() => {
-    fetchTasbihPresets(DEFAULT_PRESET_TASBIHAT as any).then((presets) => {
-      if (presets.length > 0) {
-        setPresetTasbihat(presets as TasbihItem[]);
+    const unsubscribe = subscribeToTasbihPresets(DEFAULT_PRESET_TASBIHAT as any, (presets) => {
+      const nextPresets = removeLowerTargetDuplicateTasbihat(
+        (presets as TasbihItem[]).map(replaceDeprecatedTasbihPreset),
+      ).map(item => applyTasbihTargetOverride(item, targetOverridesRef.current));
+      if (nextPresets.length === 0) return;
+
+      setPresetTasbihat(nextPresets);
+      const updatedSelected = nextPresets.find(item => item.id === selectedIdRef.current);
+      if (updatedSelected) {
+        selectedIdRef.current = updatedSelected.id;
+        setSelectedTasbih(updatedSelected);
+        return;
       }
+
+      selectedIdRef.current = nextPresets[0].id;
+      countRef.current = 0;
+      setCount(0);
+      setSelectedTasbih(nextPresets[0]);
     });
+
+    return () => unsubscribe();
   }, []);
 
   const [customTasbihat, setCustomTasbihat] = useState<CustomTasbih[]>([]);
   const [customText, setCustomText] = useState('');
   const [customTarget, setCustomTarget] = useState('33');
   const [manualCountInput, setManualCountInput] = useState('');
+  const [targetInput, setTargetInput] = useState('');
   const [dailyStats, setDailyStats] = useState<Record<string, number>>({});
   const [showVirtue, setShowVirtue] = useState(true);
   const isArabic = getLanguage() === 'ar';
   const [showTranslation, setShowTranslation] = useState(false);
   const [completedTasbihat, setCompletedTasbihat] = useState<Record<number, boolean>>({});
   const [typeStats, setTypeStats] = useState<Record<string, Record<string, number>>>({});
+  const [targetOverrides, setTargetOverrides] = useState<Record<string, number>>({});
   const [resetToastVisible, setResetToastVisible] = useState(false);
 
   // ===== ANIMATION =====
@@ -364,6 +490,8 @@ export default function TasbihScreen() {
   useEffect(() => { roundsRef.current = rounds; }, [rounds]);
   useEffect(() => { selectedIdRef.current = selectedTasbih.id; }, [selectedTasbih.id]);
   useEffect(() => { typeStatsRef.current = typeStats; }, [typeStats]);
+  useEffect(() => { targetOverridesRef.current = targetOverrides; }, [targetOverrides]);
+  useEffect(() => { completedTasbihatRef.current = completedTasbihat; }, [completedTasbihat]);
 
   const scheduleRewardsSync = useCallback(() => {
     if (rewardsSyncDebounceRef.current) {
@@ -481,13 +609,14 @@ export default function TasbihScreen() {
 
   const loadData = async () => {
     try {
-      const [settingsRaw, customRaw, progressRaw, statsRaw, completedRaw, typeStatsRaw, lastDateRaw, dailyHistoryRaw] = await Promise.all([
+      const [settingsRaw, customRaw, progressRaw, statsRaw, completedRaw, typeStatsRaw, targetOverridesRaw, lastDateRaw, dailyHistoryRaw] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.settings),
         AsyncStorage.getItem(STORAGE_KEYS.customTasbihat),
         AsyncStorage.getItem(STORAGE_KEYS.progress),
         AsyncStorage.getItem(STORAGE_KEYS.dailyStats),
         AsyncStorage.getItem(STORAGE_KEYS.completedToday),
         AsyncStorage.getItem(STORAGE_KEYS.typeStats),
+        AsyncStorage.getItem(STORAGE_KEYS.targetOverrides),
         AsyncStorage.getItem(STORAGE_KEYS.lastDate),
         AsyncStorage.getItem(STORAGE_KEYS.dailyHistory),
       ]);
@@ -505,6 +634,14 @@ export default function TasbihScreen() {
       }
       if (customRaw) {
         try { setCustomTasbihat(JSON.parse(customRaw)); } catch {}
+      }
+      if (targetOverridesRaw) {
+        try {
+          const parsedOverrides = JSON.parse(targetOverridesRaw);
+          targetOverridesRef.current = parsedOverrides;
+          setTargetOverrides(parsedOverrides);
+          setPresetTasbihat(items => items.map(item => applyTasbihTargetOverride(item, parsedOverrides)));
+        } catch {}
       }
 
       // --- Daily auto-reset logic ---
@@ -544,6 +681,7 @@ export default function TasbihScreen() {
         setCount(0);
         setTotalCount(0);
         setRounds(0);
+        completedTasbihatRef.current = {};
         setCompletedTasbihat({});
         perTasbihCountsRef.current = {};
         await AsyncStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({
@@ -568,7 +706,7 @@ export default function TasbihScreen() {
             if (p.selectedId) {
               const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
               if (found) {
-                setSelectedTasbih(found);
+                setSelectedTasbih(applyTasbihTargetOverride(found, targetOverridesRef.current));
                 selectedIdRef.current = found.id;
               }
             }
@@ -595,7 +733,9 @@ export default function TasbihScreen() {
           const parsed = JSON.parse(completedRaw);
           const compDate = parsed.date || '';
           if (compDate === todayISO || compDate === new Date().toDateString()) {
-            setCompletedTasbihat(parsed.completed || {});
+            const parsedCompleted = parsed.completed || {};
+            completedTasbihatRef.current = parsedCompleted;
+            setCompletedTasbihat(parsedCompleted);
           }
         } catch {}
       }
@@ -661,6 +801,91 @@ export default function TasbihScreen() {
     } catch (e) { console.error(e); }
   }, []);
 
+  const adjustTodayTypeCount = useCallback(async (tasbihText: string, delta: number) => {
+    if (delta === 0) return;
+    try {
+      const today = getTodayISO();
+      const updated = { ...typeStatsRef.current };
+      const dayStats = { ...(updated[today] || {}) };
+      const nextValue = Math.max(0, (Number(dayStats[tasbihText]) || 0) + delta);
+      if (nextValue > 0) {
+        dayStats[tasbihText] = nextValue;
+      } else {
+        delete dayStats[tasbihText];
+      }
+
+      if (Object.keys(dayStats).length > 0) {
+        updated[today] = dayStats;
+      } else {
+        delete updated[today];
+      }
+
+      typeStatsRef.current = updated;
+      setTypeStats(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.typeStats, JSON.stringify(updated));
+      scheduleRewardsSync();
+    } catch (e) { console.error(e); }
+  }, [scheduleRewardsSync]);
+
+  const keepOnlyCompletedTodayTypeStats = useCallback(async (items: TasbihItem[]) => {
+    try {
+      const today = getTodayISO();
+      const updated = { ...typeStatsRef.current };
+      const dayStats = { ...(updated[today] || {}) };
+      const completedLimits = new Map<string, number>();
+
+      items.forEach(item => {
+        if (!completedTasbihatRef.current[item.id]) return;
+        completedLimits.set(item.text, Math.max(completedLimits.get(item.text) || 0, item.target));
+      });
+
+      const keptStats: Record<string, number> = {};
+      Object.entries(dayStats).forEach(([text, value]) => {
+        const completedLimit = completedLimits.get(text);
+        if (!completedLimit) return;
+        keptStats[text] = Math.min(Number(value) || 0, completedLimit);
+      });
+
+      if (Object.keys(keptStats).length > 0) {
+        updated[today] = keptStats;
+      } else {
+        delete updated[today];
+      }
+      typeStatsRef.current = updated;
+      setTypeStats(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.typeStats, JSON.stringify(updated));
+      scheduleRewardsSync();
+    } catch (e) { console.error(e); }
+  }, [scheduleRewardsSync]);
+
+  const markTasbihCompletedToday = useCallback(async (tasbihId: number) => {
+    if (completedTasbihatRef.current[tasbihId]) return;
+
+    const nextCompleted = { ...completedTasbihatRef.current, [tasbihId]: true };
+    completedTasbihatRef.current = nextCompleted;
+    setCompletedTasbihat(nextCompleted);
+    await AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
+      date: getTodayISO(), completed: nextCompleted,
+    }));
+  }, []);
+
+  const getTodayPointBearingAmount = useCallback((tasbih: TasbihItem, amount: number): number => {
+    if (amount <= 0 || completedTasbihatRef.current[tasbih.id]) return 0;
+
+    const today = getTodayISO();
+    const creditedToday = Number(typeStatsRef.current[today]?.[tasbih.text]) || 0;
+    const remainingPointCredit = Math.max(0, getTasbihPointTarget(tasbih) - creditedToday);
+
+    return Math.min(amount, remainingPointCredit);
+  }, []);
+
+  const getReversiblePointAmount = useCallback((tasbih: TasbihItem, currentCount: number): number => {
+    if (completedTasbihatRef.current[tasbih.id] || currentCount <= 0) return 0;
+    const today = getTodayISO();
+    const creditedToday = Number(typeStatsRef.current[today]?.[tasbih.text]) || 0;
+    return Math.min(Math.max(0, currentCount), Math.max(0, creditedToday), getTasbihPointTarget(tasbih));
+  }, []);
+
   const showTasbihCompletionAd = useCallback(async () => {
     if (tasbihAdShownThisSessionRef.current || tasbihAdInFlightRef.current) return;
     tasbihAdInFlightRef.current = true;
@@ -693,6 +918,13 @@ export default function TasbihScreen() {
 
   // ===== HANDLERS =====
   const handlePress = useCallback(async () => {
+    const currentTasbih = selectedTasbih;
+    const previousCount = countRef.current;
+    const previousTotal = totalCountRef.current;
+    const previousRounds = roundsRef.current;
+    const target = Math.max(1, currentTasbih.target || 1);
+    const wasCompletedToday = !!completedTasbihatRef.current[currentTasbih.id];
+
     tapScale.value = withSpring(0.9, { damping: 12, stiffness: 400 }, () => {
       tapScale.value = withSpring(1, { damping: 8, stiffness: 200 });
     });
@@ -703,12 +935,33 @@ export default function TasbihScreen() {
         : Vibration.vibrate(30);
     }
 
-    const newCount = count + 1;
-    const newTotal = totalCount + 1;
-    await trackTypeIncrement(selectedTasbih.text);
-    scheduleRewardsSync();
+    const newCount = previousCount + 1;
+    const newTotal = previousTotal + 1;
+    const completedRound = newCount >= target;
+    const pointBearingAmount = isYunusDuaTasbih(currentTasbih)
+      ? (completedRound ? getTodayPointBearingAmount(currentTasbih, YUNUS_DUA_POINT_TARGET) : 0)
+      : getTodayPointBearingAmount(currentTasbih, 1);
+    const completionWrite = completedRound && !wasCompletedToday
+      ? markTasbihCompletedToday(currentTasbih.id).catch(e => console.error(e))
+      : Promise.resolve();
 
-    if (newCount >= selectedTasbih.target) {
+    if (completedRound) {
+      countRef.current = 0;
+      totalCountRef.current = newTotal;
+      roundsRef.current = previousRounds + 1;
+      perTasbihCountsRef.current[currentTasbih.id] = 0;
+    } else {
+      countRef.current = newCount;
+      totalCountRef.current = newTotal;
+      perTasbihCountsRef.current[currentTasbih.id] = newCount;
+    }
+
+    if (pointBearingAmount > 0) {
+      await trackTypeIncrement(currentTasbih.text, pointBearingAmount);
+      scheduleRewardsSync();
+    }
+
+    if (completedRound) {
       if (vibrationEnabled) {
         Platform.OS === 'ios'
           ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
@@ -722,27 +975,27 @@ export default function TasbihScreen() {
       setRounds(r => r + 1);
       setTotalCount(newTotal);
       // Clear per-tasbih count for completed tasbih
-      perTasbihCountsRef.current[selectedTasbih.id] = 0;
-      saveProgress(0, newTotal, rounds + 1);
+      perTasbihCountsRef.current[currentTasbih.id] = 0;
+      saveProgress(0, newTotal, previousRounds + 1);
 
-      // تسجيل إحصائيات التسبيح في Firebase
-      trackTasbih(selectedTasbih.target, selectedTasbih.text, rounds + 1).catch(() => {});
+      if (!wasCompletedToday) {
+        // تسجيل إحصائيات التسبيح في Firebase
+        trackTasbih(getTasbihPointTarget(currentTasbih), currentTasbih.text, previousRounds + 1).catch(() => {});
+        await completionWrite;
+      }
 
-      const newCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
-      setCompletedTasbihat(newCompleted);
-      AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
-        date: getTodayISO(), completed: newCompleted,
-      }));
-      maybeShowCompletionAd(rounds, rounds + 1);
+      maybeShowCompletionAd(previousRounds, previousRounds + 1);
 
       // Log completion to worship tracker
-      try {
-        const today = getTodayDate();
-        const azkarRecord = await getAzkarRecord(today);
-        const record = azkarRecord || { date: today, morning: false, evening: false, sleep: false, wakeup: false, afterPrayer: false };
-        record.afterPrayer = true;
-        await saveAzkarRecord(record);
-      } catch (e) { console.error('Error logging to worship tracker:', e); }
+      if (!wasCompletedToday) {
+        try {
+          const today = getTodayDate();
+          const azkarRecord = await getAzkarRecord(today);
+          const record = azkarRecord || { date: today, morning: false, evening: false, sleep: false, wakeup: false, afterPrayer: false };
+          record.afterPrayer = true;
+          await saveAzkarRecord(record);
+        } catch (e) { console.error('Error logging to worship tracker:', e); }
+      }
       
       // Auto-advance to next tasbih if enabled
       if (autoAdvance) {
@@ -755,11 +1008,11 @@ export default function TasbihScreen() {
             source: 'athar' as const,
           })),
         ];
-        const curIdx = advanceItems.findIndex(t => t.id === selectedTasbih.id);
+        const curIdx = advanceItems.findIndex(t => t.id === currentTasbih.id);
         const nextIdx = (curIdx + 1) % advanceItems.length;
         const nextItem = advanceItems[nextIdx];
         // Save current tasbih's count (0 since just completed) before switching
-        perTasbihCountsRef.current[selectedTasbih.id] = 0;
+        perTasbihCountsRef.current[currentTasbih.id] = 0;
         // Restore the next tasbih's previous count (or 0 if fresh)
         const restoredCount = perTasbihCountsRef.current[nextItem.id] || 0;
         setSelectedTasbih(nextItem);
@@ -774,21 +1027,47 @@ export default function TasbihScreen() {
     } else {
       setCount(newCount);
       setTotalCount(newTotal);
-      saveProgress(newCount, newTotal, rounds);
+      perTasbihCountsRef.current[currentTasbih.id] = newCount;
+      saveProgress(newCount, newTotal, previousRounds);
     }
-  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, PRESET_TASBIHAT, customTasbihat, completedTasbihat, saveProgress, trackTypeIncrement, scheduleRewardsSync, maybeShowCompletionAd]);
+  }, [selectedTasbih, vibrationEnabled, autoAdvance, PRESET_TASBIHAT, customTasbihat, saveProgress, trackTypeIncrement, scheduleRewardsSync, maybeShowCompletionAd, markTasbihCompletedToday, getTodayPointBearingAmount]);
 
   const handleReset = () => {
     Alert.alert(t('tasbih.reset'), t('tasbih.resetConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.yes'), style: 'destructive', onPress: () => { setCount(0); saveProgress(0, totalCount, rounds); } },
+      { text: t('common.yes'), style: 'destructive', onPress: () => {
+        if (!completedTasbihatRef.current[selectedTasbih.id]) {
+          adjustTodayTypeCount(selectedTasbih.text, -countRef.current).catch(() => {});
+        }
+        const nextTotal = Math.max(0, totalCountRef.current - countRef.current);
+        perTasbihCountsRef.current[selectedTasbih.id] = 0;
+        setCount(0);
+        setTotalCount(nextTotal);
+        saveProgress(0, nextTotal, roundsRef.current);
+      } },
     ]);
   };
 
   const handleResetAll = () => {
     Alert.alert(t('tasbih.resetAll'), t('tasbih.resetAllConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.yes'), style: 'destructive', onPress: () => { setCount(0); setTotalCount(0); setRounds(0); perTasbihCountsRef.current = {}; saveProgress(0, 0, 0); } },
+      { text: t('common.yes'), style: 'destructive', onPress: () => {
+        const resetItems: TasbihItem[] = [
+          ...PRESET_TASBIHAT,
+          ...customTasbihat.map(ct => ({
+            id: ct.id,
+            text: ct.text,
+            target: ct.target,
+            source: 'athar' as const,
+          })),
+        ];
+        keepOnlyCompletedTodayTypeStats(resetItems).catch(() => {});
+        setCount(0);
+        setTotalCount(0);
+        setRounds(0);
+        perTasbihCountsRef.current = {};
+        saveProgress(0, 0, 0);
+      } },
     ]);
   };
 
@@ -796,14 +1075,34 @@ export default function TasbihScreen() {
     const item: TasbihItem = 'source' in tasbih
       ? tasbih as TasbihItem
       : { id: tasbih.id, text: tasbih.text, target: tasbih.target, source: 'athar' as const };
-    // Save current tasbih's count before switching
-    perTasbihCountsRef.current[selectedTasbih.id] = countRef.current;
-    // Restore the target tasbih's previous count (or 0 if fresh)
-    const restored = perTasbihCountsRef.current[item.id] || 0;
-    setSelectedTasbih(item);
-    setCount(restored);
-    countRef.current = restored;
-    setShowTasbihList(false);
+    const targetItem = applyTasbihTargetOverride(item, targetOverridesRef.current);
+    const applySelection = () => {
+      // Save current tasbih's count before switching
+      perTasbihCountsRef.current[selectedTasbih.id] = countRef.current;
+      // Restore the target tasbih's previous count (or 0 if fresh)
+      const restored = perTasbihCountsRef.current[targetItem.id] || 0;
+      setSelectedTasbih(targetItem);
+      setCount(restored);
+      countRef.current = restored;
+      selectedIdRef.current = targetItem.id;
+      setShowTasbihList(false);
+    };
+
+    if (targetItem.id !== selectedTasbih.id && completedTasbihatRef.current[targetItem.id]) {
+      Alert.alert(
+        isArabic ? 'تم تسبيح اليوم' : 'Completed today',
+        isArabic
+          ? 'أكملت هذا الذكر اليوم. يمكنك التسبيح مرة أخرى، لكنه لن يزيد النقاط أو الترتيب.'
+          : 'You completed this dhikr today. You can repeat it, but it will not add points or ranking progress.',
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: isArabic ? 'تسبيح مرة أخرى' : 'Repeat', onPress: applySelection },
+        ],
+      );
+      return;
+    }
+
+    applySelection();
   };
 
   const addCustomTasbih = async () => {
@@ -820,6 +1119,45 @@ export default function TasbihScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  const openTargetModal = useCallback(() => {
+    setTargetInput(String(selectedTasbih.target));
+    setShowTargetModal(true);
+  }, [selectedTasbih.target]);
+
+  const saveSelectedTargetOverride = useCallback(async () => {
+    const nextTarget = parseTasbihAmount(targetInput);
+    if (!Number.isFinite(nextTarget) || nextTarget <= 0 || nextTarget > 99999) {
+      Alert.alert(t('common.error'), t('tasbih.externalCountError'));
+      return;
+    }
+
+    const normalizedTarget = Math.floor(nextTarget);
+    const nextOverrides = {
+      ...targetOverridesRef.current,
+      [String(selectedTasbih.id)]: normalizedTarget,
+    };
+    targetOverridesRef.current = nextOverrides;
+    setTargetOverrides(nextOverrides);
+    await AsyncStorage.setItem(STORAGE_KEYS.targetOverrides, JSON.stringify(nextOverrides));
+
+    const updatedSelected = { ...selectedTasbih, target: normalizedTarget };
+    setSelectedTasbih(updatedSelected);
+    setPresetTasbihat(items => items.map(item => (
+      item.id === selectedTasbih.id ? { ...item, target: normalizedTarget } : item
+    )));
+
+    const clampedCount = Math.min(countRef.current, Math.max(0, normalizedTarget - 1));
+    if (clampedCount !== countRef.current) {
+      countRef.current = clampedCount;
+      perTasbihCountsRef.current[selectedTasbih.id] = clampedCount;
+      setCount(clampedCount);
+      saveProgress(clampedCount, totalCountRef.current, roundsRef.current);
+    }
+
+    setShowTargetModal(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [targetInput, selectedTasbih, saveProgress]);
+
   const deleteCustomTasbih = async (id: number) => {
     Alert.alert(t('common.delete'), t('tasbih.deleteConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -832,25 +1170,43 @@ export default function TasbihScreen() {
   };
 
   const handleDecrement = useCallback(() => {
-    if (count <= 0) return;
+    const currentCount = countRef.current;
+    if (currentCount <= 0) return;
     if (vibrationEnabled) {
       Platform.OS === 'ios'
         ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
         : Vibration.vibrate(20);
     }
-    const newCount = count - 1;
-    const newTotal = Math.max(0, totalCount - 1);
+    const newCount = currentCount - 1;
+    const newTotal = Math.max(0, totalCountRef.current - 1);
+    if (!completedTasbihatRef.current[selectedTasbih.id]) {
+      const reversibleAmount = getReversiblePointAmount(selectedTasbih, currentCount);
+      if (reversibleAmount > 0 && currentCount <= getTasbihPointTarget(selectedTasbih)) {
+        adjustTodayTypeCount(selectedTasbih.text, -1).catch(() => {});
+      }
+    }
+    perTasbihCountsRef.current[selectedTasbih.id] = newCount;
     setCount(newCount);
     setTotalCount(newTotal);
-    saveProgress(newCount, newTotal, rounds);
-  }, [count, totalCount, rounds, vibrationEnabled, saveProgress]);
+    saveProgress(newCount, newTotal, roundsRef.current);
+  }, [adjustTodayTypeCount, selectedTasbih, vibrationEnabled, saveProgress, getReversiblePointAmount]);
 
   const handleQuickReset = useCallback(() => {
-    if (count === 0) return;
+    const currentCount = countRef.current;
+    if (currentCount === 0) return;
+    if (!completedTasbihatRef.current[selectedTasbih.id]) {
+      const reversibleAmount = getReversiblePointAmount(selectedTasbih, currentCount);
+      if (reversibleAmount > 0) {
+        adjustTodayTypeCount(selectedTasbih.text, -reversibleAmount).catch(() => {});
+      }
+    }
+    const nextTotal = Math.max(0, totalCountRef.current - currentCount);
+    perTasbihCountsRef.current[selectedTasbih.id] = 0;
     setCount(0);
-    saveProgress(0, totalCount, rounds);
+    setTotalCount(nextTotal);
+    saveProgress(0, nextTotal, roundsRef.current);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  }, [count, totalCount, rounds, saveProgress]);
+  }, [adjustTodayTypeCount, saveProgress, selectedTasbih, getReversiblePointAmount]);
 
   const addManualTasbihCount = useCallback(async () => {
     const amount = parseTasbihAmount(manualCountInput);
@@ -868,9 +1224,20 @@ export default function TasbihScreen() {
     const nextCount = combinedCount % target;
     const nextTotal = previousTotal + amount;
     const nextRounds = previousRounds + completedRoundsDelta;
+    const wasCompletedToday = !!completedTasbihatRef.current[selectedTasbih.id];
+    const reachedFirstDailyCompletion = !wasCompletedToday && didReachTasbihTarget({
+      amount,
+      currentCount: previousCount,
+      target,
+    });
+    const pointBearingAmount = isYunusDuaTasbih(selectedTasbih)
+      ? (reachedFirstDailyCompletion ? getTodayPointBearingAmount(selectedTasbih, YUNUS_DUA_POINT_TARGET) : 0)
+      : getTodayPointBearingAmount(selectedTasbih, amount);
 
-    await trackTypeIncrement(selectedTasbih.text, amount);
-    scheduleRewardsSync();
+    if (pointBearingAmount > 0) {
+      await trackTypeIncrement(selectedTasbih.text, pointBearingAmount);
+      scheduleRewardsSync();
+    }
 
     setCount(nextCount);
     setTotalCount(nextTotal);
@@ -885,21 +1252,20 @@ export default function TasbihScreen() {
           : Vibration.vibrate([0, 100, 100, 100]);
       }
       playPageSound('tasbihComplete', EFFECT_SOUNDS.success).catch(() => {});
-      trackTasbih(amount, selectedTasbih.text, nextRounds).catch(() => {});
+      if (reachedFirstDailyCompletion) {
+        trackTasbih(getTasbihPointTarget(selectedTasbih), selectedTasbih.text, nextRounds).catch(() => {});
+        await markTasbihCompletedToday(selectedTasbih.id);
+      }
 
-      const nextCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
-      setCompletedTasbihat(nextCompleted);
-      AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
-        date: getTodayISO(), completed: nextCompleted,
-      }));
-
-      try {
-        const today = getTodayDate();
-        const azkarRecord = await getAzkarRecord(today);
-        const record = azkarRecord || { date: today, morning: false, evening: false, sleep: false, wakeup: false, afterPrayer: false };
-        record.afterPrayer = true;
-        await saveAzkarRecord(record);
-      } catch (e) { console.error('Error logging to worship tracker:', e); }
+      if (reachedFirstDailyCompletion) {
+        try {
+          const today = getTodayDate();
+          const azkarRecord = await getAzkarRecord(today);
+          const record = azkarRecord || { date: today, morning: false, evening: false, sleep: false, wakeup: false, afterPrayer: false };
+          record.afterPrayer = true;
+          await saveAzkarRecord(record);
+        } catch (e) { console.error('Error logging to worship tracker:', e); }
+      }
     }
 
     maybeShowCompletionAd(previousRounds, nextRounds);
@@ -908,12 +1274,13 @@ export default function TasbihScreen() {
   }, [
     manualCountInput,
     selectedTasbih,
-    completedTasbihat,
     vibrationEnabled,
     saveProgress,
     trackTypeIncrement,
     scheduleRewardsSync,
     maybeShowCompletionAd,
+    markTasbihCompletedToday,
+    getTodayPointBearingAmount,
   ]);
 
   const handleShare = async () => {
@@ -930,6 +1297,7 @@ export default function TasbihScreen() {
   const daysCount = Object.keys(dailyStats).length || 1;
   const avgPerDay = Math.round(allTimeTotal / daysCount);
   const progressPct = Math.round((count / selectedTasbih.target) * 100);
+  const selectedIsYunusDua = isYunusDuaTasbih(selectedTasbih);
 
   const hasBg = settings?.display?.appBackground && settings.display.appBackground !== 'none';
 
@@ -1103,6 +1471,29 @@ export default function TasbihScreen() {
               {isArabic && selectedTasbih.transliteration && showTranslation && (
                 <Text style={[s.selectedTranslit, { color: C.textSec }]}>{selectedTasbih.transliteration}</Text>
               )}
+              {selectedIsYunusDua && (
+                <TouchableOpacity
+                  style={[s.targetOverrideBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  onPress={openTargetModal}
+                  activeOpacity={0.75}
+                >
+                  <View style={s.targetOverrideIcon}>
+                    <MaterialCommunityIcons name="counter" size={20} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Text style={s.targetOverrideTitle}>
+                      {isArabic ? 'اختر عدد التكرار' : 'Choose repeat count'}
+                    </Text>
+                    <Text style={s.targetOverrideSubtitle}>
+                      {isArabic ? 'يُحسب في النقاط كإكمال واحد' : 'Counts as one completion for points'}
+                    </Text>
+                  </View>
+                  <View style={s.targetOverrideValue}>
+                    <Text style={s.targetOverrideValueText}>{String(selectedTasbih.target)}</Text>
+                    <MaterialCommunityIcons name="pencil" size={13} color={GREEN} />
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -1119,7 +1510,7 @@ export default function TasbihScreen() {
         </View>
 
         {/* ===== VIRTUE CARD ===== */}
-        {showVirtue && getPresetVirtue(selectedTasbih.id) && (
+        {showVirtue && getPresetVirtue(selectedTasbih.id, selectedTasbih.virtue) && (
           <View style={s.virtueContainer}>
             {/* Virtue Card */}
             <View style={[s.virtueCard, { 
@@ -1138,17 +1529,17 @@ export default function TasbihScreen() {
                 textAlign: isRTL ? 'right' : 'left', 
                 writingDirection: isRTL ? 'rtl' : 'ltr' 
               }]}>
-                {getPresetVirtue(selectedTasbih.id)}
+                {getPresetVirtue(selectedTasbih.id, selectedTasbih.virtue)}
               </Text>
               
               {/* Source reference */}
-              {getPresetReference(selectedTasbih.id) && (
+              {getPresetReference(selectedTasbih.id, selectedTasbih.reference) && (
                 <Text style={[s.virtueSource, { 
                   color: C.textSec, 
                   textAlign: isRTL ? 'right' : 'left',
                   writingDirection: isRTL ? 'rtl' : 'ltr'
                 }]}>
-                  {getPresetReference(selectedTasbih.id)}
+                  {getPresetReference(selectedTasbih.id, selectedTasbih.reference)}
                 </Text>
               )}
             </View>
@@ -1309,7 +1700,7 @@ export default function TasbihScreen() {
                         <Text style={[s.listItemTarget, { color: C.textSec }]}>× {item.target}</Text>
                         {getPresetGrade(item.id) && <View style={s.gradeBadge}><Text style={s.gradeBadgeText}>{getPresetGrade(item.id)}</Text></View>}
                       </View>
-                      {getPresetVirtue(item.id) && <Text style={[s.listItemVirtue, { color: C.textSec, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>{getPresetVirtue(item.id)}</Text>}
+                      {getPresetVirtue(item.id, item.virtue) && <Text style={[s.listItemVirtue, { color: C.textSec, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>{getPresetVirtue(item.id, item.virtue)}</Text>}
                     </View>
                     {selectedTasbih.id === item.id && <MaterialCommunityIcons name="check-circle" size={24} color={GREEN} />}
                   </TouchableOpacity>
@@ -1352,6 +1743,60 @@ export default function TasbihScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* ===== TARGET OVERRIDE MODAL ===== */}
+      <Modal visible={showTargetModal} animationType="slide" transparent onRequestClose={() => setShowTargetModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, {
+            height: 'auto',
+            backgroundColor: colors.modalSurface,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          }]}>
+            <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[s.modalTitle, { color: C.text }]}>
+                {isArabic ? 'تحديد العدد' : 'Set Target'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowTargetModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[s.inputLabel, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {isArabic ? 'العدد الذي تريد التسبيح به' : 'Your personal target'}
+            </Text>
+            <TextInput
+              style={[s.stepperInput, s.manualInput, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(120,120,128,0.16)', color: C.text }]}
+              value={targetInput}
+              onChangeText={setTargetInput}
+              placeholder="100"
+              placeholderTextColor={C.textSec}
+              keyboardType="number-pad"
+              textAlign="center"
+              autoFocus
+            />
+
+            <View style={[s.manualQuickRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              {[1, 33, 100].map(value => (
+                <TouchableOpacity key={value} style={s.manualQuickBtn} onPress={() => setTargetInput(String(value))}>
+                  <Text style={s.manualQuickText}>{String(value)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[s.targetOverrideHint, { color: C.textSec, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {isArabic
+                ? 'هذا العدد للتسبيح فقط. في النقاط ولوحة الشرف يُحسب إكماله كتسبيحة واحدة.'
+                : 'This is only your recitation target. Points and rankings count one completion.'}
+            </Text>
+
+            <TouchableOpacity style={s.saveBtn} onPress={saveSelectedTargetOverride}>
+              <Text style={s.saveBtnText}>{t('common.save')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ===== CUSTOM TASBIH MODAL ===== */}
@@ -1630,6 +2075,59 @@ const _s = StyleSheet.create({
     marginTop: 2, textAlign: 'center', fontStyle: 'italic',
     lineHeight: 22, includeFontPadding: false,
   },
+  targetOverrideBtn: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    gap: 10,
+    marginTop: 12,
+    marginHorizontal: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: GREEN + '24',
+    borderWidth: 1,
+    borderColor: GREEN + '55',
+  },
+  targetOverrideIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: GREEN,
+  },
+  targetOverrideTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: fontBold(),
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  targetOverrideSubtitle: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 11,
+    fontFamily: fontMedium(),
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  targetOverrideValue: {
+    minWidth: 58,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  targetOverrideValueText: {
+    color: GREEN,
+    fontSize: 17,
+    fontFamily: fontBold(),
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
   selectedVirtue: {
     fontSize: 12, fontFamily: fontRegular(),
     marginTop: 4, textAlign: 'center',
@@ -1873,6 +2371,13 @@ const _s = StyleSheet.create({
     fontFamily: fontSemiBold(),
     lineHeight: 20,
     includeFontPadding: false,
+  },
+  targetOverrideHint: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    lineHeight: 20,
+    includeFontPadding: false,
+    marginBottom: 12,
   },
   saveBtn: {
     backgroundColor: GREEN, padding: 14, borderRadius: 14, alignItems: 'center', marginTop: 4,

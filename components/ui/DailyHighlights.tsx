@@ -31,7 +31,7 @@ import { getLanguage, t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
-import { getCachedPrayerTimes, getNextPrayer } from '@/lib/prayer-times';
+import { getCachedPrayerTimes, getNextPrayer, getPrayerTranslationKey } from '@/lib/prayer-times';
 import { AppIcon } from '@/components/ui/AppIcon';
 const STORY_CACHE_KEY = 'story_of_day_cache';
 const HIGHLIGHTS_ORDER_KEY = '@highlights_order';
@@ -157,7 +157,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
         if (!times || !mounted) return;
         const next = getNextPrayer(times);
         if (next && mounted) {
-          const prayerLabel = t(`prayer.${next.name}`) || next.name;
+          const prayerLabel = t(getPrayerTranslationKey(next.name)) || next.name;
           setNextPrayerTitle(`${prayerLabel} — ${next.time}`);
         }
       } catch { /* silent */ }

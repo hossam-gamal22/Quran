@@ -26,7 +26,7 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { Styled } from '../components/Styled';
 
 // ==================== Types ====================
@@ -117,18 +117,19 @@ const DEFAULT_SECTIONS: HomeSection[] = [
 const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
   { id: 'qibla', nameAr: 'القبلة', nameEn: 'Qibla', icon: 'compass', color: '#5856D6', enabled: true, order: 0, route: '' },
   { id: 'favorites', nameAr: 'المحفوظات', nameEn: 'Favorites', icon: 'heart', color: '#FF6B6B', enabled: true, order: 1, route: '' },
-  { id: 'ayat_kursi', nameAr: 'آية الكرسي', nameEn: 'Ayat Al-Kursi', icon: 'shield-star', color: '#DAA520', enabled: true, order: 2, route: '' },
-  { id: 'surah_kahf', nameAr: 'سورة الكهف', nameEn: 'Al-Kahf', icon: 'book-open-page-variant', color: '#3a7ca5', enabled: true, order: 3, route: '' },
-  { id: 'surah_yasin', nameAr: 'سورة يس', nameEn: 'Yasin', icon: 'book-open-page-variant', color: '#5d4e8c', enabled: true, order: 4, route: '' },
-  { id: 'surah_mulk', nameAr: 'سورة الملك', nameEn: 'Al-Mulk', icon: 'book-open-page-variant', color: '#0D9488', enabled: true, order: 5, route: '' },
-  { id: 'names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#c17f59', enabled: true, order: 6, route: '/names' },
-  { id: 'tasbih', nameAr: 'التسبيح', nameEn: 'Tasbih', icon: 'counter', color: '#2f7659', enabled: true, order: 7, route: '' },
-  { id: 'salawat', nameAr: 'الصلاة على النبي', nameEn: 'Salawat', icon: 'star-crescent', color: '#e91e63', enabled: true, order: 8, route: '' },
-  { id: 'istighfar', nameAr: 'الاستغفار', nameEn: 'Istighfar', icon: 'heart', color: '#8B5CF6', enabled: true, order: 9, route: '' },
-  { id: 'hajj', nameAr: 'الحج والعمرة', nameEn: 'Hajj & Umrah', icon: 'star-crescent', color: '#0D9488', enabled: true, order: 10, route: '' },
-  { id: 'seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#6366F1', enabled: true, order: 11, route: '/seerah' },
-  { id: 'benefit_azkar', nameAr: 'فضل الأذكار', nameEn: 'Azkar Benefits', icon: 'information', color: '#f5a623', enabled: true, order: 12, route: '' },
-  { id: 'radio', nameAr: 'إذاعة القرآن', nameEn: 'Quran Radio', icon: 'radio', color: '#22C55E', enabled: true, order: 13, route: '' },
+  { id: 'question_answer', nameAr: 'سؤال وجواب', nameEn: 'Q&A', icon: 'frequently-asked-questions', color: '#0d8e62', enabled: true, order: 2, route: '/question-answer' },
+  { id: 'ayat_kursi', nameAr: 'آية الكرسي', nameEn: 'Ayat Al-Kursi', icon: 'shield-star', color: '#DAA520', enabled: true, order: 3, route: '' },
+  { id: 'surah_kahf', nameAr: 'سورة الكهف', nameEn: 'Al-Kahf', icon: 'book-open-page-variant', color: '#3a7ca5', enabled: true, order: 4, route: '' },
+  { id: 'surah_yasin', nameAr: 'سورة يس', nameEn: 'Yasin', icon: 'book-open-page-variant', color: '#5d4e8c', enabled: true, order: 5, route: '' },
+  { id: 'surah_mulk', nameAr: 'سورة الملك', nameEn: 'Al-Mulk', icon: 'book-open-page-variant', color: '#0D9488', enabled: true, order: 6, route: '' },
+  { id: 'names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#c17f59', enabled: true, order: 7, route: '/names' },
+  { id: 'tasbih', nameAr: 'التسبيح', nameEn: 'Tasbih', icon: 'counter', color: '#2f7659', enabled: true, order: 8, route: '' },
+  { id: 'salawat', nameAr: 'الصلاة على النبي', nameEn: 'Salawat', icon: 'star-crescent', color: '#e91e63', enabled: true, order: 9, route: '' },
+  { id: 'istighfar', nameAr: 'الاستغفار', nameEn: 'Istighfar', icon: 'heart', color: '#8B5CF6', enabled: true, order: 10, route: '' },
+  { id: 'hajj', nameAr: 'الحج والعمرة', nameEn: 'Hajj & Umrah', icon: 'star-crescent', color: '#0D9488', enabled: true, order: 11, route: '' },
+  { id: 'seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#6366F1', enabled: true, order: 12, route: '/seerah' },
+  { id: 'benefit_azkar', nameAr: 'فضل الأذكار', nameEn: 'Azkar Benefits', icon: 'information', color: '#f5a623', enabled: true, order: 13, route: '' },
+  { id: 'radio', nameAr: 'إذاعة القرآن', nameEn: 'Quran Radio', icon: 'radio', color: '#22C55E', enabled: true, order: 14, route: '' },
   // صفحات إضافية يمكن إضافتها للوصول السريع
   { id: 'page_browse_tafsir', nameAr: 'استعراض التفسير', nameEn: 'Browse Tafsir', icon: 'book-search', color: '#3a7ca5', enabled: false, order: 14, route: '/browse-tafsir' },
   { id: 'page_hijri', nameAr: 'التقويم الهجري', nameEn: 'Hijri Calendar', icon: 'calendar-month', color: '#0D9488', enabled: false, order: 15, route: '/hijri' },
@@ -136,6 +137,7 @@ const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
   { id: 'page_daily_dua', nameAr: 'دعاء اليوم', nameEn: 'Daily Dua', icon: 'hands-pray', color: '#c17f59', enabled: false, order: 17, route: '/daily-dua' },
   { id: 'page_ruqya', nameAr: 'الرقية الشرعية', nameEn: 'Ruqya', icon: 'shield-check', color: '#e91e63', enabled: false, order: 18, route: '/ruqya' },
   { id: 'page_companions', nameAr: 'قصص الصحابة', nameEn: 'Companions', icon: 'account-group', color: '#2f7659', enabled: false, order: 19, route: '/companions' },
+  { id: 'page_religious_stories', nameAr: 'قصص دينية', nameEn: 'Religious Stories', icon: 'book-heart', color: '#6d5dfc', enabled: false, order: 20, route: '/religious-stories' },
   { id: 'page_quran_bookmarks', nameAr: 'إشارات المصحف', nameEn: 'Quran Bookmarks', icon: 'bookmark', color: '#4CAF50', enabled: false, order: 20, route: '/quran-bookmarks' },
   { id: 'page_worship_tracker', nameAr: 'تتبع العبادات', nameEn: 'Worship Tracker', icon: 'chart-line', color: '#2f7659', enabled: false, order: 21, route: '/worship-tracker' },
   { id: 'page_temp', nameAr: 'الصفحة المؤقتة', nameEn: 'Temp Page', icon: 'file-document-outline', color: '#FF9800', enabled: false, order: 22, route: '/temp-page' },
@@ -201,38 +203,42 @@ export default function HomePageManager() {
 
   // Load config from Firestore
   useEffect(() => {
-    const load = async () => {
-      try {
-        const docRef = doc(db, FIRESTORE_DOC);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const data = snap.data() as Partial<HomePageConfig>;
-          setConfig({
-            highlights: {
-              items: data.highlights?.items?.length
-                ? data.highlights.items.map((h, i) => ({ ...DEFAULT_HIGHLIGHTS.find(d => d.id === h.id) || {}, ...h, order: h.order ?? i }))
-                : DEFAULT_HIGHLIGHTS,
-            },
-            sections: {
-              items: data.sections?.items?.length
-                ? data.sections.items.map((s, i) => ({ ...DEFAULT_SECTIONS.find(d => d.id === s.id) || {}, ...s, order: s.order ?? i }))
-                : DEFAULT_SECTIONS,
-            },
-            quickAccess: {
-              items: data.quickAccess?.items?.length
-                ? data.quickAccess.items.map((q, i) => ({ ...DEFAULT_QUICK_ACCESS.find(d => d.id === q.id) || {}, ...q, order: q.order ?? i }))
-                : DEFAULT_QUICK_ACCESS,
-            },
-            dailyContent: { ...DEFAULT_DAILY_CONTENT, ...data.dailyContent },
-          });
-        }
-      } catch (err) {
-        console.error('Error loading home page config:', err);
-      } finally {
-        setIsLoading(false);
+    const docRef = doc(db, FIRESTORE_DOC);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as Partial<HomePageConfig>;
+        const savedQuickAccess = data.quickAccess?.items?.length
+          ? data.quickAccess.items
+          : DEFAULT_QUICK_ACCESS;
+        const quickAccessWithRequiredItems = DEFAULT_QUICK_ACCESS
+          .filter(defaultItem => defaultItem.id === 'question_answer' && !savedQuickAccess.some(item => item.id === defaultItem.id))
+          .concat(savedQuickAccess)
+          .map((q, i) => ({ ...DEFAULT_QUICK_ACCESS.find(d => d.id === q.id) || {}, ...q, order: q.order ?? i }));
+
+        setConfig({
+          highlights: {
+            items: data.highlights?.items?.length
+              ? data.highlights.items.map((h, i) => ({ ...DEFAULT_HIGHLIGHTS.find(d => d.id === h.id) || {}, ...h, order: h.order ?? i }))
+              : DEFAULT_HIGHLIGHTS,
+          },
+          sections: {
+            items: data.sections?.items?.length
+              ? data.sections.items.map((s, i) => ({ ...DEFAULT_SECTIONS.find(d => d.id === s.id) || {}, ...s, order: s.order ?? i }))
+              : DEFAULT_SECTIONS,
+          },
+          quickAccess: {
+            items: quickAccessWithRequiredItems,
+          },
+          dailyContent: { ...DEFAULT_DAILY_CONTENT, ...data.dailyContent },
+        });
       }
-    };
-    load();
+      setIsLoading(false);
+    }, (err) => {
+      console.error('Error loading home page config:', err);
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   // Save config to Firestore
@@ -388,6 +394,19 @@ export default function HomePageManager() {
   const sortedHighlights = [...config.highlights.items].sort((a, b) => a.order - b.order);
   const sortedSections = [...config.sections.items].sort((a, b) => a.order - b.order);
   const sortedQuickAccess = [...config.quickAccess.items].sort((a, b) => a.order - b.order);
+  const visibleQuickAccess = sortedQuickAccess.filter(item => item.enabled);
+  const visibleSections = sortedSections.filter(item => item.enabled);
+  const iconText = (icon: string) => {
+    if (icon === 'compass') return 'قب';
+    if (icon === 'heart') return 'حف';
+    if (icon === 'frequently-asked-questions') return 'س؟';
+    if (icon === 'shield-star') return 'آ';
+    if (icon === 'book-open-page-variant') return 'قر';
+    if (icon === 'star-crescent') return '☪';
+    if (icon === 'counter') return 'تس';
+    if (icon === 'radio') return 'ر';
+    return '•';
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -443,6 +462,70 @@ export default function HomePageManager() {
         </div>
         <ExternalLink className="w-5 h-5 text-accent-light group-hover:translate-x-[-4px] transition-transform" />
       </Link>
+
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-5 rounded-2xl border border-admin-border bg-admin-surface/60 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-white font-semibold">معاينة فعلية مختصرة</h3>
+              <p className="text-xs text-slate-400 mt-1">مبنية من نفس `homePageConfig` الذي يقرأه التطبيق.</p>
+            </div>
+            <span className="text-xs text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded-full">Realtime</span>
+          </div>
+          <div className="rounded-[28px] border-4 border-slate-700 bg-[#0b1421] p-4 max-w-[340px] mx-auto">
+            <div className="rounded-2xl bg-emerald-600 p-4 text-white mb-4">
+              <p className="text-lg font-bold">السلام عليكم</p>
+              <p className="text-sm opacity-80">البانر الترحيبي يدار من صفحة الرسالة الترحيبية</p>
+            </div>
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-xs">{visibleQuickAccess.length} عناصر مفعلة</span>
+                <span className="text-white text-sm font-semibold">الوصول السريع</span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {visibleQuickAccess.slice(0, 8).map(item => (
+                  <div key={item.id} className="rounded-2xl bg-white/[0.08] border border-white/10 p-2 text-center min-h-[76px]">
+                    <Styled className="mx-auto mb-2 w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white" css={{ backgroundColor: item.color }}>
+                      {iconText(item.icon)}
+                    </Styled>
+                    <p className="text-[10px] leading-4 text-white line-clamp-2">{item.nameAr}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {visibleSections.filter(section => !['welcome_banner', 'highlights', 'quick_access', 'ads'].includes(section.id)).slice(0, 4).map(section => (
+                <div key={section.id} className="rounded-xl bg-white/[0.08] border border-white/10 px-3 py-2 flex items-center justify-between">
+                  <span className="text-slate-500 text-xs">{section.id}</span>
+                  <span className="text-white text-sm font-semibold">{section.titleAr || section.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-7 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+          <h3 className="text-blue-100 font-semibold mb-3">ما الذي يطبقه التطبيق فعلا؟</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm text-blue-100/80 leading-7">
+            <div className="rounded-xl bg-black/10 border border-blue-400/20 p-3">
+              <p className="text-blue-100 font-semibold mb-1">الوصول السريع</p>
+              <p>يقرأ عناصر الإدارة، لكن التطبيق يجبر “سؤال وجواب” في الخانة الثالثة حتى لو لم يكن موجودا في المستند القديم.</p>
+            </div>
+            <div className="rounded-xl bg-black/10 border border-blue-400/20 p-3">
+              <p className="text-blue-100 font-semibold mb-1">الأقسام</p>
+              <p>الترتيب والإخفاء/الإظهار يقرأه التطبيق من `homePageConfig` باشتراك لحظي.</p>
+            </div>
+            <div className="rounded-xl bg-black/10 border border-blue-400/20 p-3">
+              <p className="text-blue-100 font-semibold mb-1">البانر الترحيبي</p>
+              <p>النص والصور والجدولة ليست هنا، بل في صفحة “الرسالة الترحيبية” وتظهر بأولوية أعلى من البانر الافتراضي.</p>
+            </div>
+            <div className="rounded-xl bg-black/10 border border-blue-400/20 p-3">
+              <p className="text-blue-100 font-semibold mb-1">تخصيص المستخدم</p>
+              <p>لو المستخدم عدل الوصول السريع محليا، التطبيق يدمج إعداد الإدارة ويحافظ على العناصر الإجبارية.</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ==================== Collapsible Sections ==================== */}
       <div className="space-y-3">

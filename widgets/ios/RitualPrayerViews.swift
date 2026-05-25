@@ -42,11 +42,16 @@ private func ritualLabel(_ ar: String, isArabic: Bool) -> String {
     case "الفجر": return "Fajr"
     case "الشروق": return "Sunrise"
     case "الظهر": return "Dhuhr"
+    case "صلاة الجمعة": return "Jumuah"
     case "العصر": return "Asr"
     case "المغرب": return "Maghrib"
     case "العشاء": return "Isha"
     default: return ar
     }
+}
+
+private func ritualDefaultDhuhrArabic() -> String {
+    Calendar(identifier: .gregorian).component(.weekday, from: Date()) == 6 ? "صلاة الجمعة" : "الظهر"
 }
 
 private func ritualGlyph(_ key: String) -> String {
@@ -95,7 +100,7 @@ struct RitualPrayerPair: View {
     private var isArabic: Bool { (entry.language ?? "ar") == "ar" }
 
     var body: some View {
-        let arName = entry.data?.nextPrayerNameAr ?? "الظهر"
+        let arName = entry.data?.nextPrayerNameAr ?? ritualDefaultDhuhrArabic()
         let displayName = isArabic ? ritualStretch(arName, 5) : ritualLabel(arName, isArabic: false)
         let time = entry.data?.nextPrayerTime ?? "--:--"
         let countdown = ritualCountdown(entry.data?.timeRemaining ?? "", isArabic: isArabic)
@@ -214,7 +219,7 @@ struct RitualPrayerCompact: View {
     private var isArabic: Bool { (entry.language ?? "ar") == "ar" }
 
     var body: some View {
-        let arName = entry.data?.nextPrayerNameAr ?? "الظهر"
+        let arName = entry.data?.nextPrayerNameAr ?? ritualDefaultDhuhrArabic()
         let name = isArabic ? ritualStretch(arName, 3) : ritualLabel(arName, isArabic: false)
         let time = entry.data?.nextPrayerTime ?? "--:--"
         let countdown = ritualCountdown(entry.data?.timeRemaining ?? "", isArabic: isArabic)
@@ -247,7 +252,7 @@ struct RitualPrayerSimple: View {
     private var isArabic: Bool { (entry.language ?? "ar") == "ar" }
 
     var body: some View {
-        let arName = entry.data?.nextPrayerNameAr ?? "الظهر"
+        let arName = entry.data?.nextPrayerNameAr ?? ritualDefaultDhuhrArabic()
         let name = isArabic ? ritualStretch(arName, 5) : ritualLabel(arName, isArabic: false)
         let time = entry.data?.nextPrayerTime ?? "--:--"
         let countdown = ritualCountdown(entry.data?.timeRemaining ?? "", isArabic: isArabic)
@@ -285,7 +290,7 @@ struct RitualPrayerSerene: View {
     private let order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
     var body: some View {
-        let arName = entry.data?.nextPrayerNameAr ?? "الظهر"
+        let arName = entry.data?.nextPrayerNameAr ?? ritualDefaultDhuhrArabic()
         let nextLabel = isArabic ? arName : ritualLabel(arName, isArabic: false)
         let nextTime = entry.data?.nextPrayerTime ?? "--:--"
         let countdown = ritualCountdown(entry.data?.timeRemaining ?? "", isArabic: isArabic)

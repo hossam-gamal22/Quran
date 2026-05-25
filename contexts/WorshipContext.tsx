@@ -22,6 +22,7 @@ import {
   DailyFastingRecord,
   DailyQuranRecord,
   DailyAzkarRecord,
+  AzkarType,
   WorshipStats,
   PrayerStats,
   FastingStats,
@@ -109,8 +110,8 @@ interface WorshipContextType {
   getQuranForDate: (date: string) => Promise<DailyQuranRecord | null>;
   
   // دوال الأذكار
-  toggleAzkarType: (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => Promise<boolean>;
-  markAzkarDone: (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => Promise<void>;
+  toggleAzkarType: (type: AzkarType) => Promise<boolean>;
+  markAzkarDone: (type: AzkarType) => Promise<void>;
   getAzkarForDate: (date: string) => Promise<DailyAzkarRecord | null>;
   
   // دوال عامة
@@ -511,7 +512,7 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   // دوال الأذكار
   // ========================================
 
-  const toggleAzkarType = useCallback(async (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => {
+  const toggleAzkarType = useCallback(async (type: AzkarType) => {
     const today = getTodayDate();
     const result = await toggleAzkar(today, type);
     
@@ -530,7 +531,7 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     return await getAzkarRecord(date);
   }, []);
 
-  const markAzkarDone = useCallback(async (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => {
+  const markAzkarDone = useCallback(async (type: AzkarType) => {
     const today = getTodayDate();
     await markAzkarCompleted(today, type);
     // Refresh in-memory state so all consumers see the update immediately

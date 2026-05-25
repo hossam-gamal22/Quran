@@ -1,7 +1,7 @@
 // app/seasonal/ashura.tsx
 // صفحة يوم عاشوراء - روح المسلم
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,12 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
 import TranslatedText from '@/components/ui/TranslatedText';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
+import { useSeasonalCMS } from '@/lib/content-api';
+import { getHijriDate, hijriToGregorian } from '@/lib/hijri-date';
+import { formatDate, getFastingRecord, saveFastingRecord } from '@/lib/worship-storage';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 // ========================================
 // الثوابت
@@ -99,8 +105,32 @@ const RECOMMENDED_ACTIONS = [
   { id: 'fast_9', icon: 'food-off', title: 'صيام التاسع', subtitle: 'للمخالفة' },
   { id: 'fast_10', icon: 'food-off', title: 'صيام العاشر', subtitle: 'الأساسي' },
   { id: 'dua', icon: '🤲', title: 'الدعاء', subtitle: 'والاستغفار' },
-  { id: 'sadaqa', icon: 'hand-coin', title: 'الصدقة', subtitle: 'والتوسعة على العيال' },
+  { id: 'sadaqa', icon: 'hand-coin', title: 'الصدقة', subtitle: 'وصلة الرحم' },
 ];
+
+type AshuraDua = {
+  id: string;
+  title?: string;
+  titleKey?: string;
+  arabic: string;
+  translation?: string;
+};
+
+type AshuraAction = {
+  id: string;
+  icon: string;
+  title: string;
+  labelKey?: string;
+  subtitle?: string;
+  color?: string;
+};
+
+type CMSAshuraAction = {
+  id: string;
+  icon: string;
+  labelKey: string;
+  color: string;
+};
 
 // ========================================
 // مكونات فرعية
@@ -252,7 +282,7 @@ const VirtueCard: React.FC<VirtueCardProps> = ({ virtue, isDarkMode, index }) =>
 };
 
 interface ActionItemProps {
-  action: typeof RECOMMENDED_ACTIONS[0];
+  action: AshuraAction;
   isCompleted: boolean;
   onToggle: () => void;
   isDarkMode: boolean;
@@ -264,6 +294,7 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
   const { t } = useSettings();
   const isRTL = useIsRTL();
   const ashuraColor = getAshuraColor(isDarkMode);
+  const actionColor = action.color || ashuraColor;
   const titleMap: Record<string, string> = {
     fast_9: t('seasonal.ashura.actionFast9'),
     fast_10: t('seasonal.ashura.actionFast10'),
@@ -276,6 +307,8 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
     dua: t('seasonal.ashura.actionDuaSub'),
     sadaqa: t('seasonal.ashura.actionSadaqaSub'),
   };
+  const title = action.labelKey || titleMap[action.id] || action.title;
+  const subtitle = action.subtitle || subMap[action.id] || '';
   return (
     <TouchableOpacity
       style={[
@@ -290,12 +323,14 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
       }}
       activeOpacity={0.7}
     >
-      <View style={[styles.actionIcon, { backgroundColor: `${ashuraColor}15` }, isCompleted && styles.actionIconCompleted]}>
-        <AppIcon name={action.icon} size={22} color={isCompleted ? '#fff' : ashuraColor} />
+      <View style={[styles.actionIcon, { backgroundColor: `${actionColor}15` }, isCompleted && styles.actionIconCompleted]}>
+        <AppIcon name={action.icon} size={22} color={isCompleted ? '#fff' : actionColor} />
       </View>
       <View style={styles.actionContent}>
-        <Text style={[styles.actionTitle, { color: isCompleted && !isDarkMode ? '#1B5E20' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{titleMap[action.id] || action.title}</Text>
-        <Text style={[styles.actionSubtitle, { color: isCompleted && !isDarkMode ? 'rgba(27,94,32,0.75)' : colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subMap[action.id] || action.subtitle}</Text>
+        <Text style={[styles.actionTitle, { color: isCompleted && !isDarkMode ? '#1B5E20' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>
+        {subtitle ? (
+          <Text style={[styles.actionSubtitle, { color: isCompleted && !isDarkMode ? 'rgba(27,94,32,0.75)' : colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subtitle}</Text>
+        ) : null}
       </View>
       {isCompleted && (
         <MaterialCommunityIcons name="check-circle" size={24} color="#0d8e62" />
@@ -324,6 +359,94 @@ export default function AshuraScreen() {
   const [fastedDays, setFastedDays] = useState<number[]>([]);
   const [completedActions, setCompletedActions] = useState<string[]>([]);
 
+  const localAshuraDuas = useMemo<AshuraDua[]>(() => [
+    {
+      id: 'world_akhirah_good',
+      title: 'دعاء جامع',
+      arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً، وَفِي الْآخِرَةِ حَسَنَةً، وَقِنَا عَذَابَ النَّارِ',
+      translation: 'دعاء قرآني جامع للخير والنجاة.',
+    },
+    {
+      id: 'forgiveness',
+      title: 'الاستغفار',
+      arabic: 'رَبَّنَا ظَلَمْنَا أَنْفُسَنَا، وَإِنْ لَمْ تَغْفِرْ لَنَا وَتَرْحَمْنَا لَنَكُونَنَّ مِنَ الْخَاسِرِينَ',
+      translation: 'دعاء قرآني جامع للتوبة وطلب الرحمة.',
+    },
+    {
+      id: 'pre_iftar',
+      title: 'دعاء قبل الإفطار',
+      arabic: 'اللَّهُمَّ إِنِّي لَكَ صُمْتُ، وَعَلَى رِزْقِكَ أَفْطَرْتُ، وَبِكَ آمَنْتُ، وَعَلَيْكَ تَوَكَّلْتُ',
+      translation: 'دعاء يقال عند الإفطار.',
+    },
+    {
+      id: 'glorification',
+      title: 'تسبيح وتحميد',
+      arabic: 'سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَلَا إِلَهَ إِلَّا اللَّهُ، وَاللَّهُ أَكْبَرُ',
+      translation: 'الباقيات الصالحات.',
+    },
+    {
+      id: 'sufficiency',
+      title: 'دعاء النجاة',
+      arabic: 'حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ',
+      translation: 'دعاء التوكل والاكتفاء بالله.',
+    },
+    {
+      id: 'gratitude',
+      title: 'دعاء الشكر',
+      arabic: 'الْحَمْدُ لِلَّهِ الَّذِي بِنِعْمَتِهِ تَتِمُّ الصَّالِحَاتُ',
+      translation: 'حمد لله على إتمام النعم.',
+    },
+    {
+      id: 'seek_refuge',
+      title: 'استعاذة',
+      arabic: 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ',
+      translation: 'استعاذة عامة بكلمات الله.',
+    },
+    {
+      id: 'divine_protection',
+      title: 'دعاء الحفظ',
+      arabic: 'اللَّهُمَّ إِنِّي أَعُوذُ بِوَجْهِكَ الْكَرِيمِ وَكَلِمَاتِكَ التَّامَّاتِ مِنْ شَرِّ مَا أَنْتَ آخِذٌ بِنَاصِيَتِهِ',
+      translation: 'دعاء جامع للحفظ والوقاية.',
+    },
+    {
+      id: 'comprehensive_good',
+      title: 'دعاء جامع للخير',
+      arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنَ الْخَيْرِ كُلِّهِ، عَاجِلِهِ وَآجِلِهِ، مَا عَلِمْتُ مِنْهُ وَمَا لَمْ أَعْلَمْ',
+      translation: 'دعاء يجمع طلب الخير في الدنيا والآخرة.',
+    },
+    {
+      id: 'pardon_and_mercy',
+      title: 'طلب العفو والمغفرة',
+      arabic: 'رَبَّنَا وَلَا تُحَمِّلْنَا مَا لَا طَاقَةَ لَنَا بِهِ، وَاعْفُ عَنَّا وَاغْفِرْ لَنَا وَارْحَمْنَا',
+      translation: 'دعاء قرآني للعفو والمغفرة والرحمة.',
+    },
+  ], []);
+
+  const localAshuraActions = useMemo<CMSAshuraAction[]>(() => (
+    RECOMMENDED_ACTIONS.map((action) => ({
+      id: action.id,
+      icon: action.icon,
+      labelKey: action.title,
+      color: action.id.startsWith('fast') ? getAshuraColor(isDarkMode) : '#0d8e62',
+    }))
+  ), [isDarkMode]);
+
+  const { duas: ashuraDuas, checklist: rawRecommendedActions } = useSeasonalCMS<AshuraDua, CMSAshuraAction>(
+    'ashura',
+    localAshuraDuas,
+    localAshuraActions
+  );
+
+  const recommendedActions = useMemo<AshuraAction[]>(() => (
+    rawRecommendedActions.map((action, index) => ({
+      id: action.id || `cms-ashura-action-${index}`,
+      icon: action.icon || 'check',
+      title: action.labelKey || '',
+      labelKey: action.labelKey,
+      color: action.color || getAshuraColor(isDarkMode),
+    }))
+  ), [rawRecommendedActions, isDarkMode]);
+
   const isAshuraActive = currentSeason?.type === 'ashura' || currentSeason?.type === 'muharram';
   const currentDay = currentSeason?.currentDay || 1;
 
@@ -333,11 +456,36 @@ export default function AshuraScreen() {
     setIsRefreshing(false);
   }, [refreshSeasonalData]);
 
+  const syncRewards = useCallback(() => {
+    getUserId()
+      .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const hijri = getHijriDate();
+    Promise.all(
+      FASTING_DAYS.map(async (day) => {
+        const date = formatDate(hijriToGregorian(hijri.year, 1, day.day));
+        const record = await getFastingRecord(date);
+        return record?.fasted ? day.day : null;
+      })
+    )
+      .then((days) => setFastedDays(days.filter((day): day is number => typeof day === 'number')))
+      .catch(() => {});
+  }, []);
+
   const toggleFastingDay = (day: number) => {
     setFastedDays((prev) => {
       if (prev.includes(day)) {
+        const hijri = getHijriDate();
+        const date = formatDate(hijriToGregorian(hijri.year, 1, day));
+        saveFastingRecord({ date, fasted: false }).then(syncRewards).catch(() => {});
         return prev.filter((d) => d !== day);
       }
+      const hijri = getHijriDate();
+      const date = formatDate(hijriToGregorian(hijri.year, 1, day));
+      saveFastingRecord({ date, fasted: true, type: 'voluntary' }).then(syncRewards).catch(() => {});
       return [...prev, day];
     });
   };
@@ -387,6 +535,7 @@ export default function AshuraScreen() {
           />
         }
       >
+        <ContentLanguageNotice style={{ marginHorizontal: 0 }} />
         {/* بطاقة الحديث */}
         <Animated.View entering={FadeIn.duration(500)}>
           <View style={[styles.hadithCard, { backgroundColor: colors.card }]}>
@@ -412,6 +561,31 @@ export default function AshuraScreen() {
           </View>
         </Animated.View>
 
+        {ashuraDuas.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('seasonal.ashura.duasSection')}
+            </Text>
+            {ashuraDuas.map((dua, index) => (
+              <Animated.View key={dua.id || index} entering={FadeInDown.delay(120 + index * 80).duration(400)}>
+                <View style={[styles.cmsDuaCard, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.cmsDuaTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                    {dua.title || dua.titleKey || ''}
+                  </Text>
+                  <Text style={[styles.cmsDuaArabic, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}>
+                    {dua.arabic}
+                  </Text>
+                  {!isArabic && dua.translation ? (
+                    <Text style={[styles.cmsDuaTranslation, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                      {dua.translation}
+                    </Text>
+                  ) : null}
+                </View>
+              </Animated.View>
+            ))}
+          </>
+        )}
+
         {/* أيام الصيام */}
         <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.fastingDays')}</Text>
         {FASTING_DAYS.map((day, index) => (
@@ -436,7 +610,7 @@ export default function AshuraScreen() {
         {/* الأعمال المستحبة */}
         <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.recommendedActions')}</Text>
         <View style={[styles.actionsCard, { backgroundColor: colors.card }]}>
-          {RECOMMENDED_ACTIONS.map((action) => (
+          {recommendedActions.map((action) => (
             <ActionItem
               key={action.id}
               action={action}
@@ -674,6 +848,29 @@ const _styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
     lineHeight: 20,
+  },
+
+  // أدعية وأذكار من لوحة التحكم
+  cmsDuaCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+  },
+  cmsDuaTitle: {
+    fontSize: 15,
+    fontFamily: fontBold(),
+    marginBottom: 10,
+  },
+  cmsDuaArabic: {
+    fontSize: 17,
+    fontFamily: fontRegular(),
+    lineHeight: 30,
+  },
+  cmsDuaTranslation: {
+    fontSize: 13,
+    fontFamily: fontRegular(),
+    lineHeight: 22,
+    marginTop: 10,
   },
 
   // الأعمال المستحبة

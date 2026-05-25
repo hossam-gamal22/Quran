@@ -135,6 +135,7 @@ import ThemesPage from './pages/Themes';
 import OnboardingManager from './pages/OnboardingManager';
 import RouteGuide from './pages/RouteGuide';
 import AppContentManager from './pages/AppContentManager';
+import EngagementNotifications from './pages/EngagementNotifications';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -186,7 +187,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'التقويم والمواسم',
     icon: Calendar,
     items: [
-      { path: '/islamic-events', icon: CalendarDays, label: 'المناسبات الإسلامية' },
       { path: '/hijri-overrides', icon: Globe, label: 'تعديلات الهجري' },
       { path: '/seasonal', icon: Calendar, label: 'المحتوى الموسمي' },
     ],
@@ -206,6 +206,8 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Bell,
     items: [
       { path: '/notifications', icon: Bell, label: 'إدارة الإشعارات' },
+      { path: '/engagement-notifications', icon: Bell, label: 'إشعارات تحفيزية تلقائية' },
+      { path: '/islamic-events', icon: CalendarHeart, label: 'إشعارات المناسبات (تلقائي)' },
     ],
   },
   {
@@ -507,6 +509,7 @@ const App: React.FC = () => {
               <Route path="/azkar" element={<AzkarManager />} />
               <Route path="/duas" element={<DuasManager />} />
               <Route path="/notifications" element={<Notifications />} />
+              <Route path="/engagement-notifications" element={<EngagementNotifications />} />
               <Route path="/quran-themes" element={<QuranThemesManager />} />
               <Route path="/tasbih-presets" element={<TasbihPresetsManager />} />
               <Route path="/islamic-events" element={<IslamicEventsManager />} />

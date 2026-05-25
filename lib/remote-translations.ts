@@ -16,7 +16,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -41,8 +41,41 @@ const COLLECTION_NAME = 'translations';
 const remoteStrings = new Map<LangCode, Record<string, any>>();
 const versions = new Map<LangCode, number>();
 let initialized = false;
+let activeLang: LangCode | null = null;
+let unsubscribeSnapshot: (() => void) | null = null;
+const listeners = new Set<() => void>();
 
 // ─── Core Functions ──────────────────────────────────────────────────────────
+
+function isGeneratedPlaceholderTranslation(value: string): boolean {
+  const normalized = value.trim().toLowerCase().replace(/[_-]/g, ' ');
+  return /^(virtue|reference|benefit|title|subtitle|label|body)?[a-z]+(?:tasbih|azkar|dua|dhikr|daily|seasonal|prayer|quran|default)\s+default\s+\d+$/.test(normalized);
+}
+
+function sanitizeRemoteStrings(input: Record<string, any>): Record<string, any> {
+  const output: Record<string, any> = {};
+
+  Object.entries(input || {}).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      if (!isGeneratedPlaceholderTranslation(value)) {
+        output[key] = value;
+      }
+      return;
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const nested = sanitizeRemoteStrings(value);
+      if (Object.keys(nested).length > 0) {
+        output[key] = nested;
+      }
+      return;
+    }
+
+    output[key] = value;
+  });
+
+  return output;
+}
 
 /**
  * Load cached remote translations for a specific language.
@@ -54,13 +87,36 @@ async function loadCachedTranslations(lang: LangCode): Promise<void> {
     if (cached) {
       const pack: RemoteTranslationPack = JSON.parse(cached);
       if (pack.strings && typeof pack.strings === 'object') {
-        remoteStrings.set(lang, pack.strings);
+        remoteStrings.set(lang, sanitizeRemoteStrings(pack.strings));
         versions.set(lang, pack.version || 0);
       }
     }
   } catch {
     // Cache miss or corruption — will try Firestore
   }
+}
+
+async function applyRemotePack(lang: LangCode, data: RemoteTranslationPack): Promise<boolean> {
+  if (!data.strings || typeof data.strings !== 'object') return false;
+
+  const sanitizedStrings = sanitizeRemoteStrings(data.strings);
+
+  remoteStrings.set(lang, sanitizedStrings);
+  versions.set(lang, data.version || 0);
+
+  await AsyncStorage.setItem(`${CACHE_KEY_PREFIX}${lang}`, JSON.stringify({
+    ...data,
+    strings: sanitizedStrings,
+  }));
+  listeners.forEach(listener => {
+    try {
+      listener();
+    } catch {
+      // Listener updates should never break translation hydration.
+    }
+  });
+
+  return true;
 }
 
 /**
@@ -85,16 +141,35 @@ async function fetchRemoteTranslations(lang: LangCode): Promise<boolean> {
       return false;
     }
 
-    remoteStrings.set(lang, data.strings);
-    versions.set(lang, remoteVersion);
-
-    // Cache for offline use
-    await AsyncStorage.setItem(`${CACHE_KEY_PREFIX}${lang}`, JSON.stringify(data));
-
-    return true;
+    return await applyRemotePack(lang, data);
   } catch {
     // Firestore unavailable — use cache
     return false;
+  }
+}
+
+function subscribeToRemotePack(lang: LangCode): void {
+  if (activeLang === lang && unsubscribeSnapshot) return;
+  if (unsubscribeSnapshot) {
+    unsubscribeSnapshot();
+    unsubscribeSnapshot = null;
+  }
+  activeLang = lang;
+
+  try {
+    unsubscribeSnapshot = onSnapshot(
+      doc(db, COLLECTION_NAME, lang),
+      (docSnap) => {
+        if (!docSnap.exists()) return;
+        const data = docSnap.data() as RemoteTranslationPack;
+        applyRemotePack(lang, data).catch(() => {});
+      },
+      () => {
+        // Cache remains active when Firestore listener is unavailable.
+      },
+    );
+  } catch {
+    unsubscribeSnapshot = null;
   }
 }
 
@@ -106,6 +181,7 @@ export async function initRemoteTranslations(lang: LangCode): Promise<void> {
   // Load cached translations instantly
   await loadCachedTranslations(lang);
   initialized = true;
+  subscribeToRemotePack(lang);
 
   // Check for updates in background (non-blocking)
   fetchRemoteTranslations(lang).catch(() => {});
@@ -123,6 +199,7 @@ export function getRemoteTranslation(key: string, lang: LangCode): string | null
 
   // Try flat key first (e.g., "tabs.home" as a single key)
   if (typeof strings[key] === 'string') {
+    if (isGeneratedPlaceholderTranslation(strings[key])) return null;
     return strings[key];
   }
 
@@ -137,7 +214,8 @@ export function getRemoteTranslation(key: string, lang: LangCode): string | null
     }
   }
 
-  return typeof value === 'string' ? value : null;
+  if (typeof value !== 'string') return null;
+  return isGeneratedPlaceholderTranslation(value) ? null : value;
 }
 
 /**
@@ -153,7 +231,13 @@ export function areRemoteTranslationsLoaded(): boolean {
  */
 export async function refreshRemoteTranslations(lang: LangCode): Promise<void> {
   await loadCachedTranslations(lang);
+  subscribeToRemotePack(lang);
   await fetchRemoteTranslations(lang);
+}
+
+export function subscribeRemoteTranslationChanges(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 /**

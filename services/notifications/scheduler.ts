@@ -15,6 +15,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES, getAdhanChannelId, getReminderChannelId } from './channels';
 import { resolveSoundKeyWithDowngrade } from '../../lib/sound-downgrade';
+import { uiText } from '@/lib/ui-text';
 
 /**
  * Resolve a sound key to the correct platform value for notification content.
@@ -73,7 +74,7 @@ export async function schedulePrayerNotification({
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: `\u{1F54C} ${prayerName}`,
-        body: '\u0627\u0636\u063A\u0637 \u0644\u0644\u0641\u062A\u062D',
+        body: uiText({ ar: 'اضغط للفتح', en: 'Tap to open' }),
         sound: soundValue,
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: {
@@ -107,7 +108,7 @@ export async function scheduleReminderNotification({
   title,
   body,
   triggerDate,
-  selectedSound = 'general_reminder',
+  selectedSound = 'default',
   data = {},
 }: {
   title: string;

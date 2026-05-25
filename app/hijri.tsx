@@ -16,7 +16,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { APP_CONFIG } from '../constants/app';
-import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBidh, getAyyamAlBidhEvent } from '../lib/hijri-date';
+import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBidh, getAyyamAlBidhEvent, setCachedHijriOffset } from '../lib/hijri-date';
 import type { IslamicEventDetails } from '../lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -27,7 +27,7 @@ import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchIslamicEvents, fetchGoogleCalendarEvents } from '@/lib/admin-data-api';
+import { fetchIslamicEvents, fetchGoogleCalendarEvents, subscribeToIslamicEvents } from '@/lib/admin-data-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { fontBold } from '@/lib/fonts';
@@ -146,13 +146,37 @@ export default function HijriScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem(HIJRI_OFFSET_KEY).then(val => {
-      if (val !== null) setHijriOffset(parseInt(val, 10) || 0);
+      if (val !== null) {
+        const offset = parseInt(val, 10) || 0;
+        setHijriOffset(offset);
+        setCachedHijriOffset(offset);
+      }
     }).catch(() => {});
 
-    // Fetch admin-managed events from Firestore
-    fetchIslamicEvents(DEFAULT_ISLAMIC_EVENTS as any).then((events) => {
-      if (events.length > 0) setIslamicEvents(events as unknown as IslamicEventDetails[]);
-    });
+    let adminEvents: IslamicEventDetails[] = DEFAULT_ISLAMIC_EVENTS;
+    let googleCalendarEvents: IslamicEventDetails[] = [];
+    let isMounted = true;
+
+    const publishEvents = () => {
+      if (!isMounted) return;
+      setIslamicEvents([...adminEvents, ...googleCalendarEvents]);
+    };
+
+    // Live-listen to admin-managed events from Firestore.
+    const unsubscribeIslamicEvents = subscribeToIslamicEvents(
+      DEFAULT_ISLAMIC_EVENTS as any,
+      (events) => {
+        adminEvents = events as unknown as IslamicEventDetails[];
+        publishEvents();
+      },
+      () => {
+        fetchIslamicEvents(DEFAULT_ISLAMIC_EVENTS as any).then((events) => {
+          if (!isMounted || events.length === 0) return;
+          adminEvents = events as unknown as IslamicEventDetails[];
+          publishEvents();
+        }).catch(() => {});
+      },
+    );
 
     // Fetch Google Calendar events (admin-managed)
     fetchGoogleCalendarEvents().then((gcalEvents) => {
@@ -171,10 +195,16 @@ export default function HijriScreen() {
             importance: e.importance || 'minor',
           }));
         if (mapped.length > 0) {
-          setIslamicEvents(prev => [...prev, ...mapped]);
+          googleCalendarEvents = mapped;
+          publishEvents();
         }
       }
     }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+      unsubscribeIslamicEvents();
+    };
   }, []);
 
   // Process date param
@@ -346,6 +376,7 @@ export default function HijriScreen() {
 
   const saveOffset = async (offset: number) => {
     setHijriOffset(offset);
+    setCachedHijriOffset(offset);
     try {
       await AsyncStorage.setItem(HIJRI_OFFSET_KEY, String(offset));
     } catch {}
@@ -403,6 +434,11 @@ export default function HijriScreen() {
           day.isToday && styles.dayCellToday,
           isSelected && { backgroundColor: colors.primary + '30', borderColor: colors.primary, borderWidth: 1 },
           isBlessedPeriod && day.isCurrentMonth && styles.blessedPeriodCell,
+          day.isToday && {
+            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : colors.primary + '1F',
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.92)' : colors.primary,
+            borderWidth: isDarkMode ? 1.5 : 1,
+          },
         ]}
         onPress={() => setSelectedDay(day)}
         activeOpacity={0.7}
@@ -415,9 +451,10 @@ export default function HijriScreen() {
         <Text style={[
           styles.gregorianDayText,
           { color: colors.text, opacity },
-          day.isToday && { color: colors.primaryText, fontWeight: '700' },
+          day.isToday && { color: isDarkMode ? '#FFFFFF' : colors.primaryText, fontWeight: '700' },
           isSelected && { color: colors.primaryText },
           isBlessedPeriod && day.isCurrentMonth && { color: isDarkMode ? '#F5A623' : '#92630B' },
+          day.isToday && isDarkMode && { color: '#FFFFFF' },
         ]}>
           {day.day}
         </Text>
@@ -427,6 +464,7 @@ export default function HijriScreen() {
             { color: colors.textLight, opacity: opacity * 0.7 },
             day.hijriDay === 1 && { color: colors.primaryText, fontWeight: '600' },
             isBlessedPeriod && day.isCurrentMonth && { color: isDarkMode ? '#F5A623' : '#92630B', opacity: 0.7 },
+            day.isToday && isDarkMode && { color: '#FFFFFF', opacity: 0.85, fontWeight: '600' },
           ]}>
             {day.hijriDay}
           </Text>

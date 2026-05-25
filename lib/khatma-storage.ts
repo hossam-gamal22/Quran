@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { recordKhatmaCompletion } from './worship-storage';
 
 // ===== STORAGE KEYS =====
 const KHATMA_STORAGE_KEY = '@rooh_muslim_khatmas';
@@ -317,8 +318,12 @@ export const recordPageRead = async (
     }
 
     // Check if khatma is completed (all 604 pages read)
+    const wasCompleted = khatma.isCompleted;
     if (khatma.readPages.length >= TOTAL_QURAN_PAGES) {
       khatma.isCompleted = true;
+      if (!wasCompleted) {
+        await recordKhatmaCompletion(getTodayDateString(), `${khatma.id}:${khatma.startDate}`);
+      }
     }
 
     await updateKhatma(khatma);

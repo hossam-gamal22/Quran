@@ -22,10 +22,12 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
+import { TranslatedText } from '@/components/ui/TranslatedText';
 import { runNotificationSelfTest, type SelfTestReport, type SelfTestStatus } from '@/lib/notification-self-test';
 import { runScheduleHealthCheck } from '@/lib/schedule-health-check';
 import { forceRescheduleAllFromStorage } from '@/lib/notifications-manager';
 import { getTelemetrySummary } from '@/lib/notification-telemetry';
+import { uiDateLocale, uiText } from '@/lib/ui-text';
 
 const STATUS_COLORS: Record<SelfTestStatus, string> = {
   pass: '#0d8e62',
@@ -41,12 +43,15 @@ const STATUS_ICONS: Record<SelfTestStatus, keyof typeof MaterialCommunityIcons.g
   skip: 'minus-circle',
 };
 
-const STATUS_LABELS: Record<SelfTestStatus, string> = {
-  pass: 'سليم',
-  warning: 'تحذير',
-  fail: 'فشل',
-  skip: 'متجاهَل',
-};
+function statusLabel(status: SelfTestStatus): string {
+  const labels: Record<SelfTestStatus, string> = {
+    pass: uiText({ ar: 'سليم', en: 'Healthy' }),
+    warning: uiText({ ar: 'تحذير', en: 'Warning' }),
+    fail: uiText({ ar: 'فشل', en: 'Failed' }),
+    skip: uiText({ ar: 'متجاهَل', en: 'Skipped' }),
+  };
+  return labels[status];
+}
 
 export default function NotificationsHealthScreen() {
   const colors = useColors();
@@ -114,7 +119,7 @@ export default function NotificationsHealthScreen() {
     <BackgroundWrapper>
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <StatusBar style="auto" />
-        <UniversalHeader title="صحة الإشعارات" />
+        <UniversalHeader title={uiText({ ar: 'صحة الإشعارات', en: 'Notification Health' })} />
 
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -132,10 +137,10 @@ export default function NotificationsHealthScreen() {
               </View>
               <Text style={[styles.heroTitle, { color: colors.text }]}>
                 {report.overallStatus === 'pass'
-                  ? 'النظام يعمل بشكل سليم'
+                  ? uiText({ ar: 'النظام يعمل بشكل سليم', en: 'System is healthy' })
                   : report.overallStatus === 'warning'
-                  ? 'هناك تحذيرات'
-                  : 'يحتاج إصلاح'}
+                  ? uiText({ ar: 'هناك تحذيرات', en: 'Warnings found' })
+                  : uiText({ ar: 'يحتاج إصلاح', en: 'Needs repair' })}
               </Text>
               <View style={styles.heroStats}>
                 <Text style={[styles.heroStat, { color: STATUS_COLORS.pass }]}>{report.passCount} ✓</Text>
@@ -148,7 +153,9 @@ export default function NotificationsHealthScreen() {
           {loading && !report && (
             <View style={styles.loaderWrap}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={[styles.loaderText, { color: colors.textLight }]}>يتم فحص النظام…</Text>
+              <Text style={[styles.loaderText, { color: colors.textLight }]}>
+                {uiText({ ar: 'يتم فحص النظام...', en: 'Checking the system...' })}
+              </Text>
             </View>
           )}
 
@@ -161,7 +168,7 @@ export default function NotificationsHealthScreen() {
                 disabled={loading}
               >
                 <MaterialCommunityIcons name="refresh" size={18} color="#fff" />
-                <Text style={styles.actionBtnText}>إعادة الفحص</Text>
+                <Text style={styles.actionBtnText}>{uiText({ ar: 'إعادة الفحص', en: 'Recheck' })}</Text>
               </TouchableOpacity>
 
               {(report.failCount > 0 || report.warnCount > 0) && (
@@ -175,7 +182,7 @@ export default function NotificationsHealthScreen() {
                   ) : (
                     <MaterialCommunityIcons name="auto-fix" size={18} color="#fff" />
                   )}
-                  <Text style={styles.actionBtnText}>إصلاح فوري</Text>
+                  <Text style={styles.actionBtnText}>{uiText({ ar: 'إصلاح فوري', en: 'Repair now' })}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -196,24 +203,24 @@ export default function NotificationsHealthScreen() {
                 />
                 <View style={[styles.stepInfo, { marginHorizontal: 12 }]}>
                   <View style={[styles.stepHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <Text style={[styles.stepLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <TranslatedText from="ar" style={[styles.stepLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                       {step.label}
-                    </Text>
+                    </TranslatedText>
                     <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[step.status] + '20' }]}>
                       <Text style={[styles.statusBadgeText, { color: STATUS_COLORS[step.status] }]}>
-                        {STATUS_LABELS[step.status]}
+                        {statusLabel(step.status)}
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.stepDetails, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <TranslatedText from="ar" style={[styles.stepDetails, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
                     {step.details}
-                  </Text>
+                  </TranslatedText>
                   {step.fixHint && (
                     <View style={[styles.hintBox, { backgroundColor: STATUS_COLORS[step.status] + '12' }]}>
                       <MaterialCommunityIcons name="lightbulb-outline" size={14} color={STATUS_COLORS[step.status]} />
-                      <Text style={[styles.hintText, { color: STATUS_COLORS[step.status], textAlign: isRTL ? 'right' : 'left' }]}>
+                      <TranslatedText from="ar" style={[styles.hintText, { color: STATUS_COLORS[step.status], textAlign: isRTL ? 'right' : 'left' }]}>
                         {step.fixHint}
-                      </Text>
+                      </TranslatedText>
                     </View>
                   )}
                 </View>
@@ -228,12 +235,12 @@ export default function NotificationsHealthScreen() {
               style={[styles.telemetryCard, { backgroundColor: colors.card }]}
             >
               <Text style={[styles.telemetryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                إحصائيات آخر 7 أيام
+                {uiText({ ar: 'إحصائيات آخر 7 أيام', en: 'Last 7 days stats' })}
               </Text>
               <View style={[styles.telemetryRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <TelStat label="مجدولة" value={telemetry.counters.scheduled} color={colors.primary} />
-                <TelStat label="وصلت" value={telemetry.counters.received} color={STATUS_COLORS.pass} />
-                <TelStat label="فُتحت" value={telemetry.counters.opened} color={STATUS_COLORS.warning} />
+                <TelStat label={uiText({ ar: 'مجدولة', en: 'Scheduled' })} value={telemetry.counters.scheduled} color={colors.primary} />
+                <TelStat label={uiText({ ar: 'وصلت', en: 'Received' })} value={telemetry.counters.received} color={STATUS_COLORS.pass} />
+                <TelStat label={uiText({ ar: 'فُتحت', en: 'Opened' })} value={telemetry.counters.opened} color={STATUS_COLORS.warning} />
               </View>
               {Object.keys(telemetry.deliveryRates).length > 0 && (
                 <View style={styles.ratesList}>
@@ -252,7 +259,7 @@ export default function NotificationsHealthScreen() {
 
           {report && (
             <Text style={[styles.timestamp, { color: colors.textLight }]}>
-              آخر فحص: {new Date(report.ranAt).toLocaleString('ar-EG')}
+              {uiText({ ar: 'آخر فحص', en: 'Last check' })}: {new Date(report.ranAt).toLocaleString(uiDateLocale())}
             </Text>
           )}
         </ScrollView>

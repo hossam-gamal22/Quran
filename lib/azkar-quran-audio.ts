@@ -120,3 +120,10 @@ export const SURAH_NAMES_AR: Readonly<Record<number, string>> = {
 export function getSurahArabicName(surah: number): string {
   return SURAH_NAMES_AR[surah] || `سورة ${surah}`;
 }
+
+export function getGlobalAyahNumber(surah: number, ayah: number): number | null {
+  if (!Number.isInteger(surah) || surah < 1 || surah > 114) return null;
+  const maxAyah = SURAH_AYAH_COUNTS[surah - 1] ?? 0;
+  if (!Number.isInteger(ayah) || ayah < 1 || ayah > maxAyah) return null;
+  return SURAH_OFFSETS[surah - 1] + ayah;
+}

@@ -36,8 +36,12 @@ const MIN_FONT_SCALE = 0.5;
 // Short-content mode: when natural content height is well below the available
 // canvas, upscale all text uniformly so the card looks visually balanced
 // instead of leaving large empty space below the source reference.
-const MAX_UPSCALE = 1.5;
+const MAX_UPSCALE = 1.75;
 const TARGET_FILL = 0.85;
+const STORY_TARGET_FILL = 0.97;
+const SHARE_FONT_REGULAR = 'Rubik-Regular';
+const SHARE_FONT_SEMIBOLD = 'Rubik-SemiBold';
+const SHARE_FONT_BOLD = 'Rubik-Bold';
 
 // ─── Public API ───
 export interface IslamicShareCardHandle {
@@ -57,7 +61,11 @@ export interface IslamicShareCardProps {
   noteText?: string;
   onCapture?: (uri: string) => void;
   /** Render custom content (e.g. multi-page QCF verses) instead of arabicText */
-  renderCustomContent?: () => React.ReactNode;
+  renderCustomContent?: (scale: number) => React.ReactNode;
+  showOrnaments?: boolean;
+  maxLongFontScale?: number;
+  forceLongContentToStory?: boolean;
+  footerPlacement?: 'bottom' | 'after-content';
 }
 
 // ─── SVG sub-components ───
@@ -206,6 +214,10 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
       noteText,
       onCapture,
       renderCustomContent,
+      showOrnaments = true,
+      maxLongFontScale = 1,
+      forceLongContentToStory = true,
+      footerPlacement = 'bottom',
     } = props;
 
     const viewShotRef = useRef<ViewShot>(null);
@@ -228,36 +240,37 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
       CAPTURE_WIDTH * (getSizeConfig(key).height / getSizeConfig(key).width) - CHROME_H;
 
     // Long-content detection: content overflows the 4:5 portrait canvas at
-    // base font scale. When true, we force 9:16 and shrink fonts.
+    // base font scale. Cards can either force 9:16 or keep the selected ratio
+    // and shrink the content to fit.
     const isLong = measuredContentH !== null && measuredContentH > availableContentH('portrait');
 
-    // Effective size key: long content is forced to story (9:16).
-    const effectiveSize: ImageSizeKey = isLong ? 'story' : selectedSize;
+    const effectiveSize: ImageSizeKey = isLong && forceLongContentToStory ? 'story' : selectedSize;
     const effectiveSizeConfig = getSizeConfig(effectiveSize);
 
     // Font scale applied to text styles. In long mode we shrink so content
-    // fits the 9:16 canvas; in short mode we grow so content fills ~85% of
-    // the selected canvas (avoiding a big empty area below the source line).
+    // fits the selected canvas; in short mode we grow so content fills the
+    // selected canvas more confidently (especially 9:16 story exports).
     const fontScale = useMemo(() => {
       if (measuredContentH === null || measuredContentH <= 0) return 1;
       if (isLong) {
-        const target = availableContentH('story');
+        const target = availableContentH(forceLongContentToStory ? 'story' : selectedSize);
         const raw = target / measuredContentH;
-        return Math.max(MIN_FONT_SCALE, Math.min(1, raw));
+        return Math.max(MIN_FONT_SCALE, Math.min(maxLongFontScale, raw));
       }
       const avail = availableContentH(selectedSize);
       if (avail <= 0) return 1;
-      const raw = (avail * TARGET_FILL) / measuredContentH;
+      const targetFill = selectedSize === 'story' ? STORY_TARGET_FILL : TARGET_FILL;
+      const raw = (avail * targetFill) / measuredContentH;
       return Math.max(1, Math.min(MAX_UPSCALE, raw));
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLong, measuredContentH, selectedSize]);
+    }, [forceLongContentToStory, isLong, maxLongFontScale, measuredContentH, selectedSize]);
 
     // Card height: normally derived from selected ratio. If even at min scale
     // the content still overflows, grow the card vertically as a final safety
     // net so nothing is ever clipped.
     const baseCaptureH = CAPTURE_WIDTH * (effectiveSizeConfig.height / effectiveSizeConfig.width);
     const scaledContentH = measuredContentH !== null ? measuredContentH * fontScale : 0;
-    const captureH = isLong && scaledContentH + CHROME_H > baseCaptureH
+    const captureH = isLong && forceLongContentToStory && scaledContentH + CHROME_H > baseCaptureH
       ? Math.ceil(scaledContentH + CHROME_H)
       : baseCaptureH;
 
@@ -267,8 +280,8 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
 
     const doCapture = async (sizeKey: ImageSizeKey = selectedSize) => {
       if (!viewShotRef.current) throw new Error('ViewShot ref not ready');
-      // Honor long-content override: ignore caller's sizeKey if content is long.
-      const effKey: ImageSizeKey = isLong ? 'story' : sizeKey;
+      // Honor long-content override only for cards that opt into it.
+      const effKey: ImageSizeKey = isLong && forceLongContentToStory ? 'story' : sizeKey;
       const config = getSizeConfig(effKey);
       // Output dimensions: width fixed at config.width, height scales with the
       // actual rendered card height (which may exceed config.height in the
@@ -327,14 +340,14 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
       });
       return (
         <>
-          <OrnamentDivider />
+          {showOrnaments ? <OrnamentDivider /> : null}
 
           {showBasmala && (
             <Text style={[s.basmalaText, scaleText(32)]}>{'\uFDFD'}</Text>
           )}
 
           {renderCustomContent ? (
-            renderCustomContent()
+            renderCustomContent(scale)
           ) : qcfGlyphs && qcfFontFamily ? (
             <Text
               style={[s.mainText, { fontFamily: qcfFontFamily, fontSize: 30 * scale, lineHeight: 30 * 2.0 * scale }]}
@@ -358,7 +371,7 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
             <Text style={[s.noteText, scaleText(13)]}>{`"${noteText}"`}</Text>
           ) : null}
 
-          <OrnamentDivider />
+          {showOrnaments ? <OrnamentDivider /> : null}
 
           {sourceText ? (
             <View style={s.sourceRow}>
@@ -371,39 +384,59 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
     };
 
     // ─── Card content renderer (used by capture + preview) ───
-    const renderCard = () => (
-      <View style={[s.card, { height: captureH }]}>
-        {/* SVG background */}
-        <SvgBackground w={CAPTURE_WIDTH} h={captureH} />
-
-        {/* Top gold strip */}
-        <View style={s.goldStrip} />
-
-        {/* Category band */}
-        <View style={s.categoryBand}>
-          <View style={s.categoryInner}>
-            <View style={s.categoryLine} />
-            <Text style={s.categoryStar}>{'\u2726'}</Text>
-            <Text style={s.categoryText}>{categoryLabel}</Text>
-            <Text style={s.categoryStar}>{'\u2726'}</Text>
-            <View style={s.categoryLine} />
-          </View>
-        </View>
-
-        {/* Content area — top-aligned in long mode so first line is always visible */}
-        <View style={[s.contentArea, isLong && { justifyContent: 'flex-start' }]}>
-          {renderContentChildren(fontScale)}
-        </View>
-
-        {/* Footer — app logo only */}
-        <View style={s.footer}>
-          <Image source={logoSource} style={s.footerLogo} resizeMode="contain" />
-        </View>
-
-        {/* Bottom gold strip */}
-        <View style={s.goldStrip} />
+    const renderFooter = () => (
+      <View style={s.footer}>
+        <Image source={logoSource} style={s.footerLogo} resizeMode="contain" />
       </View>
     );
+
+    // ─── Card content renderer (used by capture + preview) ───
+    const renderCard = () => {
+      const packedFooter = footerPlacement === 'after-content';
+      return (
+        <View style={[s.card, { height: captureH }]}>
+          {/* SVG background */}
+          <SvgBackground w={CAPTURE_WIDTH} h={captureH} />
+
+          {/* Top gold strip */}
+          <View style={s.goldStrip} />
+
+          {/* Category band */}
+          <View style={s.categoryBand}>
+            <View style={s.categoryInner}>
+              <View style={s.categoryLine} />
+              <Text style={s.categoryStar}>{'\u2726'}</Text>
+              <Text style={s.categoryText}>{categoryLabel}</Text>
+              <Text style={s.categoryStar}>{'\u2726'}</Text>
+              <View style={s.categoryLine} />
+            </View>
+          </View>
+
+          {packedFooter ? <View style={s.packedSpacer} /> : null}
+
+          {/* Content area — top-aligned in long mode so first line is always visible */}
+          <View style={[
+            s.contentArea,
+            isLong && { justifyContent: 'flex-start' },
+            packedFooter && s.contentAreaPacked,
+          ]}>
+            {renderContentChildren(fontScale)}
+          </View>
+
+          {packedFooter ? (
+            <>
+              {renderFooter()}
+              <View style={s.packedSpacer} />
+            </>
+          ) : (
+            renderFooter()
+          )}
+
+          {/* Bottom gold strip */}
+          <View style={s.goldStrip} />
+        </View>
+      );
+    };
 
     const isDark = isDarkMode;
 
@@ -454,10 +487,10 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
                 style={{ maxHeight: 420, width: '100%' }}
                 contentContainerStyle={{ paddingBottom: 8 }}
               >
-                {/* Size tabs — 4:5 disabled when content is long */}
+                {/* Size tabs — 4:5 disabled only when long content opts into 9:16 */}
                 <View style={[s.segmented, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)' }]}>
                   {IMAGE_SIZE_OPTIONS.map(opt => {
-                    const disabled = isLong && opt.key === 'portrait';
+                    const disabled = forceLongContentToStory && isLong && opt.key === 'portrait';
                     const active = effectiveSize === opt.key;
                     return (
                       <TouchableOpacity
@@ -488,7 +521,7 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
                   })}
                 </View>
 
-                {isLong && (
+                {forceLongContentToStory && isLong && (
                   <Text style={[s.longHint, { color: colors.textLight }]}>
                     {'\u062A\u0645 \u0627\u062E\u062A\u064A\u0627\u0631 9:16 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0644\u064A\u0638\u0647\u0631 \u0627\u0644\u0646\u0635 \u0643\u0627\u0645\u0644\u0627\u064B'}
                   </Text>
@@ -585,7 +618,7 @@ const s = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
-    fontFamily: 'Amiri-Bold',
+    fontFamily: SHARE_FONT_BOLD,
     textAlign: 'center',
     writingDirection: 'rtl',
   },
@@ -597,10 +630,13 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  contentAreaPacked: {
+    flex: 0,
+  },
   basmalaText: {
     color: GOLD,
     fontSize: 32,
-    fontFamily: 'Amiri',
+    fontFamily: SHARE_FONT_REGULAR,
     textAlign: 'center',
     marginBottom: 12,
     opacity: 0.7,
@@ -610,7 +646,7 @@ const s = StyleSheet.create({
     fontSize: 32,
     lineHeight: 32 * 2.1,
     fontWeight: '700',
-    fontFamily: 'Amiri-Bold',
+    fontFamily: SHARE_FONT_BOLD,
     textAlign: 'center',
     writingDirection: 'rtl',
   },
@@ -618,7 +654,7 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 15,
     lineHeight: 15 * 1.8,
-    fontFamily: 'Amiri',
+    fontFamily: SHARE_FONT_REGULAR,
     textAlign: 'center',
     marginTop: 14,
     paddingHorizontal: 8,
@@ -629,7 +665,7 @@ const s = StyleSheet.create({
     color: 'rgba(201,168,68,0.75)',
     fontSize: 14,
     lineHeight: 14 * 1.8,
-    fontFamily: 'Amiri',
+    fontFamily: SHARE_FONT_REGULAR,
     textAlign: 'center',
     marginTop: 10,
     writingDirection: 'rtl',
@@ -639,7 +675,7 @@ const s = StyleSheet.create({
   noteText: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: 13,
-    fontFamily: 'Amiri-Italic',
+    fontFamily: SHARE_FONT_REGULAR,
     textAlign: 'center',
     marginTop: 10,
     fontStyle: 'italic',
@@ -655,7 +691,7 @@ const s = StyleSheet.create({
   sourceText: {
     color: '#D9B84E',
     fontSize: 15,
-    fontFamily: 'Amiri-Italic',
+    fontFamily: SHARE_FONT_SEMIBOLD,
     fontStyle: 'italic',
     writingDirection: 'rtl',
   },
@@ -672,6 +708,9 @@ const s = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 14,
+  },
+  packedSpacer: {
+    flex: 1,
   },
   // ── Hidden capture ──
   hiddenCapture: {

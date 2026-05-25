@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import defaultArIcon from '../../../assets/images/icons/icon.png';
 import defaultEnIcon from '../../../assets/images/icons/icon_en.png';
 import ramadanIcon from '../../../assets/images/icons/seasonal/ramadan.png';
@@ -55,6 +55,7 @@ type SeasonName =
 type LangCode = 'ar' | 'en' | 'fr' | 'de' | 'es' | 'tr' | 'ur' | 'id' | 'ms' | 'hi' | 'bn' | 'ru';
 
 type LocalizedText = Partial<Record<LangCode, string>>;
+type SeasonalLocalizedText = Partial<Record<SeasonName, LocalizedText>>;
 
 interface AppIconsConfig {
   version: number;
@@ -67,6 +68,9 @@ interface AppIconsConfig {
   // Multilingual maps (preferred).
   alertTitleI18n: LocalizedText;
   alertMessageI18n: LocalizedText;
+  // Seasonal alert messages shown when the active icon is seasonal.
+  seasonalAlertTitleI18n: SeasonalLocalizedText;
+  seasonalAlertMessageI18n: SeasonalLocalizedText;
   // Seasonal switching.
   mode: IconMode;
   manualIcon: SeasonalIconKey | null;
@@ -129,6 +133,92 @@ const DEFAULT_SEASONAL_MAP: Record<SeasonName, SeasonalIconKey> = {
   shaban: 'default_ar',
 };
 
+const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
+  ramadan: {
+    ar: 'رمضان مبارك',
+    en: 'Ramadan Mubarak',
+  },
+  hajj: {
+    ar: 'موسم حج مبارك',
+    en: 'Blessed Hajj Season',
+  },
+  dhul_hijjah: {
+    ar: 'أيام مباركة',
+    en: 'Blessed Days',
+  },
+  eid_fitr: {
+    ar: 'عيد فطر مبارك',
+    en: 'Eid al-Fitr Mubarak',
+  },
+  eid_adha: {
+    ar: 'عيد أضحى مبارك',
+    en: 'Eid al-Adha Mubarak',
+  },
+  mawlid: {
+    ar: 'ذكرى المولد النبوي',
+    en: 'Mawlid Reminder',
+  },
+  ashura: {
+    ar: 'يوم عاشوراء',
+    en: 'Day of Ashura',
+  },
+  muharram: {
+    ar: 'عام هجري مبارك',
+    en: 'Blessed Hijri Year',
+  },
+  rajab: {
+    ar: 'شهر رجب',
+    en: 'Rajab',
+  },
+  shaban: {
+    ar: 'شعبان مبارك',
+    en: 'Blessed Shaban',
+  },
+};
+
+const DEFAULT_SEASONAL_ALERT_MESSAGES: SeasonalLocalizedText = {
+  ramadan: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة رمضان. كل عام وأنتم بخير، وتقبل الله منا ومنكم الصيام والقيام.',
+    en: 'The app icon has been updated for Ramadan. Ramadan Mubarak, and may Allah accept your fasting and prayers.',
+  },
+  hajj: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة موسم الحج. تقبل الله من الحجاج حجهم، ومنكم صالح الأعمال.',
+    en: 'The app icon has been updated for Hajj season. May Allah accept the pilgrims Hajj and your good deeds.',
+  },
+  dhul_hijjah: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة العشر الأوائل من ذي الحجة. أكثروا فيها من الذكر والعمل الصالح.',
+    en: 'The app icon has been updated for the first ten days of Dhul Hijjah. May these blessed days be filled with remembrance and good deeds.',
+  },
+  eid_fitr: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة عيد الفطر. كل عام وأنتم بخير، وتقبل الله منا ومنكم.',
+    en: 'The app icon has been updated for Eid al-Fitr. Eid Mubarak, and may Allah accept from us and from you.',
+  },
+  eid_adha: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة عيد الأضحى. كل عام وأنتم بخير، وتقبل الله طاعتكم.',
+    en: 'The app icon has been updated for Eid al-Adha. Eid Mubarak, and may Allah accept your worship.',
+  },
+  mawlid: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة ذكرى المولد النبوي. اللهم صل وسلم وبارك على نبينا محمد.',
+    en: 'The app icon has been updated for the Mawlid reminder. Peace and blessings be upon Prophet Muhammad.',
+  },
+  ashura: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة عاشوراء. تقبل الله صيامكم وصالح أعمالكم.',
+    en: 'The app icon has been updated for Ashura. May Allah accept your fasting and good deeds.',
+  },
+  muharram: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة بداية العام الهجري. نسأل الله أن يجعله عام خير وبركة.',
+    en: 'The app icon has been updated for the Hijri new year. May Allah make it a year of goodness and blessings.',
+  },
+  rajab: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة شهر رجب، أحد الأشهر الحرم. نسأل الله أن يبارك لنا فيه.',
+    en: 'The app icon has been updated for Rajab, one of the sacred months. May Allah bless it for us.',
+  },
+  shaban: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة شهر شعبان. اللهم بارك لنا فيه وبلغنا رمضان.',
+    en: 'The app icon has been updated for Shaban. May Allah bless it for us and let us reach Ramadan.',
+  },
+};
+
 const DEFAULT_CONFIG: AppIconsConfig = {
   version: 0,
   alertEnabled: true,
@@ -144,6 +234,8 @@ const DEFAULT_CONFIG: AppIconsConfig = {
     ar: 'تم تحديث أيقونة التطبيق بنجاح! استمتع بالتصميم الجديد',
     en: 'The app icon has been updated! Enjoy the new design',
   },
+  seasonalAlertTitleI18n: DEFAULT_SEASONAL_ALERT_TITLES,
+  seasonalAlertMessageI18n: DEFAULT_SEASONAL_ALERT_MESSAGES,
   mode: 'auto',
   manualIcon: null,
   seasonalMap: { ...DEFAULT_SEASONAL_MAP },
@@ -153,6 +245,122 @@ const DEFAULT_CONFIG: AppIconsConfig = {
 
 const FIRESTORE_DOC = 'appConfig/appIcons';
 
+const SEASON_PRIORITY: SeasonName[] = [
+  'eid_fitr',
+  'eid_adha',
+  'mawlid',
+  'ashura',
+  'ramadan',
+  'hajj',
+  'dhul_hijjah',
+  'muharram',
+  'rajab',
+  'shaban',
+];
+
+const SEASON_RANGES: Record<SeasonName, { start: { month: number; day: number }; end: { month: number; day: number } }> = {
+  ramadan: { start: { month: 9, day: 1 }, end: { month: 9, day: 30 } },
+  hajj: { start: { month: 12, day: 8 }, end: { month: 12, day: 13 } },
+  mawlid: { start: { month: 3, day: 12 }, end: { month: 3, day: 12 } },
+  eid_fitr: { start: { month: 10, day: 1 }, end: { month: 10, day: 3 } },
+  eid_adha: { start: { month: 12, day: 10 }, end: { month: 12, day: 13 } },
+  dhul_hijjah: { start: { month: 12, day: 1 }, end: { month: 12, day: 10 } },
+  ashura: { start: { month: 1, day: 9 }, end: { month: 1, day: 10 } },
+  muharram: { start: { month: 1, day: 1 }, end: { month: 1, day: 30 } },
+  rajab: { start: { month: 7, day: 1 }, end: { month: 7, day: 30 } },
+  shaban: { start: { month: 8, day: 1 }, end: { month: 8, day: 30 } },
+};
+
+const HIJRI_MONTHS_AR = [
+  'محرم',
+  'صفر',
+  'ربيع الأول',
+  'ربيع الثاني',
+  'جمادى الأولى',
+  'جمادى الآخرة',
+  'رجب',
+  'شعبان',
+  'رمضان',
+  'شوال',
+  'ذو القعدة',
+  'ذي الحجة',
+];
+
+function isHijriLeapYear(year: number): boolean {
+  return ((11 * year + 14) % 30) < 11;
+}
+
+function getHijriMonthDays(year: number, month: number): number {
+  if (month % 2 === 1) return 30;
+  if (month === 12) return isHijriLeapYear(year) ? 30 : 29;
+  return 29;
+}
+
+function getHijriDateForPreview(date: Date = new Date()) {
+  const g = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const gd = date.getDate();
+  const a = Math.floor((14 - m) / 12);
+  const y = g + 4800 - a;
+  const mo = m + 12 * a - 3;
+  const julianDay =
+    gd +
+    Math.floor((153 * mo + 2) / 5) +
+    365 * y +
+    Math.floor(y / 4) -
+    Math.floor(y / 100) +
+    Math.floor(y / 400) -
+    32045;
+
+  const l = julianDay - 1948440 + 10632;
+  const n = Math.floor((l - 1) / 10631);
+  const l2 = l - 10631 * n + 354;
+  const j =
+    Math.floor((10985 - l2) / 5316) * Math.floor((50 * l2) / 17719) +
+    Math.floor(l2 / 5670) * Math.floor((43 * l2) / 15238);
+  const l3 =
+    l2 -
+    Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) -
+    Math.floor(j / 16) * Math.floor((15238 * j) / 43) +
+    29;
+
+  let year = 30 * n + j - 30;
+  let month = Math.floor((24 * (l3 - 1)) / 709);
+  let day = l3 - Math.floor((709 * month) / 24);
+  const maxDays = getHijriMonthDays(year, month);
+  if (day > maxDays) {
+    day -= maxDays;
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+
+  return { year, month, day, label: `${day} ${HIJRI_MONTHS_AR[month - 1]} ${year}` };
+}
+
+function isDateInRange(
+  current: { month: number; day: number },
+  start: { month: number; day: number },
+  end: { month: number; day: number }
+) {
+  const currentValue = (current.month - 1) * 30 + current.day;
+  const startValue = (start.month - 1) * 30 + start.day;
+  const endValue = (end.month - 1) * 30 + end.day;
+  return currentValue >= startValue && currentValue <= endValue;
+}
+
+function getCurrentSeasonForPreview(date: Date = new Date()): { season: SeasonName | null; hijriLabel: string } {
+  const hijri = getHijriDateForPreview(date);
+  const active = SEASON_PRIORITY.find((season) => {
+    const range = SEASON_RANGES[season];
+    return isDateInRange({ month: hijri.month, day: hijri.day }, range.start, range.end);
+  });
+
+  return { season: active ?? null, hijriLabel: hijri.label };
+}
+
 // ─── Component ───────────────────────────────────────────
 
 export default function AppIconManager() {
@@ -161,13 +369,14 @@ export default function AppIconManager() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeLang, setActiveLang] = useState<LangCode>('ar');
+  const [activeSeasonAlert, setActiveSeasonAlert] = useState<SeasonName>('ramadan');
 
   // ─── Load ────────────────────────────────────────────
 
   useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, FIRESTORE_DOC));
+    const unsubscribe = onSnapshot(
+      doc(db, FIRESTORE_DOC),
+      (snap) => {
         if (snap.exists()) {
           const data = snap.data() as Partial<AppIconsConfig>;
           setConfig({
@@ -176,14 +385,27 @@ export default function AppIconManager() {
             seasonalMap: { ...DEFAULT_SEASONAL_MAP, ...(data.seasonalMap ?? {}) },
             alertTitleI18n: { ...DEFAULT_CONFIG.alertTitleI18n, ...(data.alertTitleI18n ?? {}) },
             alertMessageI18n: { ...DEFAULT_CONFIG.alertMessageI18n, ...(data.alertMessageI18n ?? {}) },
+            seasonalAlertTitleI18n: {
+              ...DEFAULT_SEASONAL_ALERT_TITLES,
+              ...(data.seasonalAlertTitleI18n ?? {}),
+            },
+            seasonalAlertMessageI18n: {
+              ...DEFAULT_SEASONAL_ALERT_MESSAGES,
+              ...(data.seasonalAlertMessageI18n ?? {}),
+            },
           });
+        } else {
+          setConfig(DEFAULT_CONFIG);
         }
-      } catch (err) {
+        setLoading(false);
+      },
+      (err) => {
         console.error('Error loading app icons config:', err);
-      } finally {
         setLoading(false);
       }
-    })();
+    );
+
+    return unsubscribe;
   }, []);
 
   // ─── Save ────────────────────────────────────────────
@@ -222,12 +444,27 @@ export default function AppIconManager() {
     return m;
   }, []);
 
-  const previewIcon: SeasonalIconKey =
-    config.mode === 'manual' && config.manualIcon
-      ? config.manualIcon
-      : config.mode === 'language_only'
-      ? 'default_ar'
-      : 'default_ar';
+  const currentSeason = useMemo(() => getCurrentSeasonForPreview(), []);
+
+  const resolvePreviewIcon = (language: LangCode, season: SeasonName | null): SeasonalIconKey => {
+    const languageDefault: SeasonalIconKey = language === 'ar' ? 'default_ar' : 'default_en';
+
+    if (config.mode === 'language_only') return languageDefault;
+    if (config.mode === 'manual' && config.manualIcon) return config.manualIcon;
+
+    if (config.mode === 'auto' && season && config.enabledSeasons.includes(season)) {
+      const mapped = config.seasonalMap[season] ?? DEFAULT_SEASONAL_MAP[season];
+      if (mapped !== 'default_ar' && mapped !== 'default_en') return mapped;
+    }
+
+    return languageDefault;
+  };
+
+  const previewArIcon = resolvePreviewIcon('ar', currentSeason.season);
+  const previewOtherIcon = resolvePreviewIcon('en', currentSeason.season);
+  const currentSeasonLabel = currentSeason.season
+    ? SEASONS.find((s) => s.key === currentSeason.season)?.nameAr ?? currentSeason.season
+    : 'لا يوجد موسم نشط';
 
   // ─── Loading state ───────────────────────────────────
 
@@ -365,6 +602,7 @@ export default function AppIconManager() {
             {SEASONS.map((s) => {
               const enabled = config.enabledSeasons.includes(s.key);
               const mapped = config.seasonalMap[s.key] ?? DEFAULT_SEASONAL_MAP[s.key];
+              const seasonalMsgPreview = config.seasonalAlertMessageI18n[s.key]?.ar ?? '';
               return (
                 <div
                   key={s.key}
@@ -393,7 +631,12 @@ export default function AppIconManager() {
                     />
                   </button>
 
-                  <div className="flex-1 text-white text-sm font-medium">{s.nameAr}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white text-sm font-medium">{s.nameAr}</div>
+                    <div className="text-xs text-admin-muted truncate mt-0.5">
+                      {seasonalMsgPreview || 'لا توجد رسالة موسمية مخصصة'}
+                    </div>
+                  </div>
 
                   <div className="w-10 h-10 rounded-xl overflow-hidden bg-admin-surface-light border border-admin-border flex-shrink-0">
                     {iconByKey[mapped]?.image && (
@@ -536,34 +779,199 @@ export default function AppIconManager() {
                 </div>
               );
             })()}
+
+            <div className="border-t border-admin-border pt-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-accent-light" />
+                <div>
+                  <h3 className="text-sm font-semibold text-white">رسائل التنبيه الموسمية</h3>
+                  <p className="text-xs text-admin-muted mt-0.5">
+                    تظهر هذه الرسالة بدل النص العام عندما تكون أيقونة الموسم هي الأيقونة الفعلية للمستخدم.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {SEASONS.map((season) => {
+                  const active = activeSeasonAlert === season.key;
+                  const filled = !!(
+                    config.seasonalAlertTitleI18n[season.key]?.[activeLang] &&
+                    config.seasonalAlertMessageI18n[season.key]?.[activeLang]
+                  );
+                  return (
+                    <button
+                      key={season.key}
+                      type="button"
+                      onClick={() => setActiveSeasonAlert(season.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                        active
+                          ? 'bg-accent text-white'
+                          : filled
+                          ? 'bg-accent/15 text-accent-light hover:bg-accent/25'
+                          : 'bg-admin-bg text-admin-muted hover:text-white'
+                      }`}
+                    >
+                      {season.nameAr} {filled && !active ? '✓' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {(() => {
+                const lang = LANGUAGES.find((x) => x.code === activeLang)!;
+                const season = SEASONS.find((x) => x.key === activeSeasonAlert)!;
+                const dir = lang.rtl ? 'rtl' : 'ltr';
+                const seasonalTitle = config.seasonalAlertTitleI18n[season.key]?.[lang.code] ?? '';
+                const seasonalMessage = config.seasonalAlertMessageI18n[season.key]?.[lang.code] ?? '';
+                const mapped = config.seasonalMap[season.key] ?? DEFAULT_SEASONAL_MAP[season.key];
+                const icon = iconByKey[mapped];
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-admin-muted block mb-1.5">
+                          عنوان تنبيه {season.nameAr} ({lang.nameAr})
+                        </label>
+                        <input
+                          type="text"
+                          value={seasonalTitle}
+                          onChange={(e) =>
+                            setConfig((p) => ({
+                              ...p,
+                              seasonalAlertTitleI18n: {
+                                ...p.seasonalAlertTitleI18n,
+                                [season.key]: {
+                                  ...(p.seasonalAlertTitleI18n[season.key] ?? {}),
+                                  [lang.code]: e.target.value,
+                                },
+                              },
+                            }))
+                          }
+                          dir={dir}
+                          className="bg-admin-bg border border-admin-border rounded-xl px-4 py-3 text-white text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none w-full"
+                          placeholder={`Season title in ${lang.nameEn}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-admin-muted block mb-1.5">
+                          نص تنبيه {season.nameAr} ({lang.nameAr})
+                        </label>
+                        <textarea
+                          value={seasonalMessage}
+                          onChange={(e) =>
+                            setConfig((p) => ({
+                              ...p,
+                              seasonalAlertMessageI18n: {
+                                ...p.seasonalAlertMessageI18n,
+                                [season.key]: {
+                                  ...(p.seasonalAlertMessageI18n[season.key] ?? {}),
+                                  [lang.code]: e.target.value,
+                                },
+                              },
+                            }))
+                          }
+                          dir={dir}
+                          rows={3}
+                          className="bg-admin-bg border border-admin-border rounded-xl px-4 py-3 text-white text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none w-full resize-none"
+                          placeholder={`Season message in ${lang.nameEn}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-admin-bg border border-admin-border p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-admin-surface-light border border-admin-border flex-shrink-0">
+                          {icon?.image && (
+                            <img src={icon.image} alt={icon.nameAr} className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs text-admin-muted">معاينة التنبيه</div>
+                          <div className="text-sm font-semibold text-white truncate">{season.nameAr}</div>
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-admin-surface border border-admin-border p-3" dir={dir}>
+                        <div className="text-sm font-semibold text-white">
+                          {seasonalTitle || config.alertTitleI18n[lang.code] || 'عنوان التنبيه'}
+                        </div>
+                        <div className="text-xs text-admin-muted leading-relaxed mt-2">
+                          {seasonalMessage || config.alertMessageI18n[lang.code] || 'نص التنبيه'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
       </div>
 
       {/* Preview */}
-      <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-medium text-admin-muted mb-1">معاينة الأيقونة الحالية</h3>
-            <div className="text-white font-semibold">
-              {iconByKey[previewIcon]?.nameAr ?? 'الافتراضية'}
-            </div>
-            <div className="text-xs text-admin-muted mt-1">
-              {config.mode === 'auto' && 'سيتم اختيار الأيقونة تلقائياً عند بداية كل موسم'}
-              {config.mode === 'manual' && 'الأيقونة الحالية ثابتة (وضع يدوي)'}
-              {config.mode === 'language_only' && 'يتم التبديل بين العربي والإنجليزي حسب لغة المستخدم'}
-            </div>
+      <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-white">الأيقونة الفعلية التي ستظهر للمستخدم</h3>
+            <p className="text-sm text-admin-muted">
+              المعاينة محسوبة بنفس منطق التطبيق: الوضع المختار + الموسم الحالي + لغة المستخدم.
+            </p>
           </div>
-          <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-xl flex-shrink-0 bg-admin-surface-light border border-admin-border">
-            {iconByKey[previewIcon]?.image && (
-              <img
-                src={iconByKey[previewIcon].image}
-                alt={iconByKey[previewIcon].nameAr}
-                className="w-full h-full object-cover"
-              />
-            )}
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="px-3 py-1.5 rounded-full bg-admin-bg text-admin-muted border border-admin-border">
+              التاريخ الهجري: {currentSeason.hijriLabel}
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-accent/10 text-accent-light border border-accent/25">
+              الموسم الحالي: {currentSeasonLabel}
+            </span>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            {
+              title: 'مستخدم اللغة العربية',
+              desc: 'يستخدم الأيقونة العربية الافتراضية عند عدم وجود موسم أو عند اختيار حسب اللغة فقط.',
+              iconKey: previewArIcon,
+            },
+            {
+              title: 'مستخدم الإنجليزية وباقي اللغات',
+              desc: 'كل لغة غير العربية تستخدم أيقونة الإنجليزي كافتراضي، والموسم يغلّبها إذا كان مفعلاً.',
+              iconKey: previewOtherIcon,
+            },
+          ].map((item) => {
+            const icon = iconByKey[item.iconKey];
+            return (
+              <div
+                key={item.title}
+                className="flex items-center gap-4 rounded-2xl bg-admin-bg border border-admin-border p-4"
+              >
+                <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-xl flex-shrink-0 bg-admin-surface-light border border-admin-border">
+                  {icon?.image && (
+                    <img
+                      src={icon.image}
+                      alt={icon.nameAr}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-white font-semibold">{item.title}</div>
+                  <div className="text-accent-light text-sm font-medium mt-1">
+                    {icon?.nameAr ?? 'غير محدد'}
+                  </div>
+                  <div className="text-xs text-admin-muted mt-1 leading-relaxed">{item.desc}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-4 py-3 text-sm text-blue-200 leading-relaxed">
+          {config.mode === 'auto' && 'في الوضع التلقائي: لو يوجد موسم مفعّل حالياً يتم استخدام أيقونة الموسم، ولو لا يوجد موسم يتم الرجوع لأيقونة اللغة.'}
+          {config.mode === 'manual' && 'في الوضع اليدوي: كل المستخدمين يحصلون على نفس الأيقونة التي اخترتها، بغض النظر عن اللغة أو الموسم.'}
+          {config.mode === 'language_only' && 'في وضع حسب اللغة فقط: العربي يحصل على الأيقونة العربية، وأي لغة أخرى تحصل على أيقونة الإنجليزي.'}
+          </div>
       </div>
 
       {/* Save */}

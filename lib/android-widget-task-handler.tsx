@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SharedWidgetData } from './widget-data';
+import { getPrayerNameAr, getPrayerNameEn } from './prayer-times';
 
 import {
   SnapshotWidget,
@@ -20,6 +21,12 @@ import {
 } from '@/components/widgets/android/SnapshotWidget';
 import { LockedWidget } from '@/components/widgets/android/LockedWidget';
 import { AppNotOpenedWidget } from '@/components/widgets/android/AppNotOpenedWidget';
+import { AzkarFlexWidget } from '@/components/widgets/android/AzkarFlexWidget';
+
+/** Widget ids that bypass the PNG snapshot pipeline and render as live
+ *  FlexWidget trees. Lets the 15-minute content alarm produce visible
+ *  cycling — each refresh reads `azkarPools` + current minute fresh. */
+const LIVE_AZKAR_WIDGET_IDS = new Set(['azkarMorning', 'azkarEvening', 'dailyDhikr']);
 
 const WIDGET_DATA_KEY = 'widget_shared_data';
 const SUBSCRIPTION_STATE_KEY = '@subscription_state';
@@ -116,7 +123,7 @@ function generateFallbackData(): SharedWidgetData {
   // Basic prayer names
   const prayerNames = [
     { name: 'Fajr', nameAr: 'الفجر' },
-    { name: 'Dhuhr', nameAr: 'الظهر' },
+    { name: getPrayerNameEn('dhuhr', now), nameAr: getPrayerNameAr('dhuhr', now) },
     { name: 'Asr', nameAr: 'العصر' },
     { name: 'Maghrib', nameAr: 'المغرب' },
     { name: 'Isha', nameAr: 'العشاء' },
@@ -247,12 +254,12 @@ async function refreshPrayerWidgetData(
     const snapshot = computeFlatSnapshot(inputs, now, 7);
     // Map prayer keys to display names.
     const nameMap: Record<string, { en: string; ar: string }> = {
-      fajr:    { en: 'Fajr',    ar: 'الفجر' },
-      sunrise: { en: 'Sunrise', ar: 'الشروق' },
-      dhuhr:   { en: 'Dhuhr',   ar: 'الظهر' },
-      asr:     { en: 'Asr',     ar: 'العصر' },
-      maghrib: { en: 'Maghrib', ar: 'المغرب' },
-      isha:    { en: 'Isha',    ar: 'العشاء' },
+      fajr:    { en: getPrayerNameEn('fajr', now),    ar: getPrayerNameAr('fajr', now) },
+      sunrise: { en: getPrayerNameEn('sunrise', now), ar: getPrayerNameAr('sunrise', now) },
+      dhuhr:   { en: getPrayerNameEn('dhuhr', now),   ar: getPrayerNameAr('dhuhr', now) },
+      asr:     { en: getPrayerNameEn('asr', now),     ar: getPrayerNameAr('asr', now) },
+      maghrib: { en: getPrayerNameEn('maghrib', now), ar: getPrayerNameAr('maghrib', now) },
+      isha:    { en: getPrayerNameEn('isha', now),    ar: getPrayerNameAr('isha', now) },
     };
     const formatHHMM = (ms: number) => {
       const d = new Date(ms);
@@ -338,6 +345,23 @@ async function renderSnapshotWidget(
 ): Promise<void> {
   const target = resolveTarget(widgetName);
   if (!target) return;
+
+  // Azkar / Daily-Dhikr widgets render LIVE via FlexWidget so they cycle
+  // visibly when the 15-min content alarm fires — no PNG to regenerate.
+  // Each task-handler invocation reads sharedData + current time and picks
+  // the active content without relying on app foreground snapshot pumping.
+  if (LIVE_AZKAR_WIDGET_IDS.has(target.id)) {
+    renderWidget(
+      <AzkarFlexWidget
+        widgetId={target.id as 'azkarMorning' | 'azkarEvening' | 'dailyDhikr'}
+        size={target.size as 'small' | 'medium'}
+        data={data}
+        clickUri={widgetDeepLink(target.id)}
+      />,
+    );
+    return;
+  }
+
   const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
   const routeKey = snapshotRouteKeyForPlacement(target.id, target.size, theme);
   const manifestEntry = data.snapshotManifest?.[routeKey];

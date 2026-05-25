@@ -7,14 +7,14 @@
  * هذا الموديول يفحص:
  *  1) هل المفتاح المختار من الأصوات المثبَّتة (premium)؟
  *  2) لو نعم، هل المستخدم premium حالياً؟
- *  3) لو لا، يرجع المفتاح الافتراضي (makkah للأذان، general_reminder لباقي الأنواع)
+ *  3) لو لا، يرجع المفتاح الافتراضي (makkah للأذان، default لباقي الأنواع)
  */
 
 import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES } from '../services/notifications/channels';
 import { getCachedInstalledSounds } from './notification-sound-installer';
 
 const DEFAULT_ADHAN_KEY = 'makkah';
-const DEFAULT_REMINDER_KEY = 'general_reminder';
+const DEFAULT_REMINDER_KEY = 'default';
 
 /**
  * يُرجع true لو المفتاح المعطى لصوت مثبَّت عبر التنزيل (premium-gated).

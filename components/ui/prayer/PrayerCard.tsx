@@ -27,6 +27,7 @@ import {
   getTimeRemaining,
   formatPrayerTime,
   getPrayerIcon,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -131,7 +132,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
     );
   }
 
-  const prayerNameLocalized = t(`prayer.${nextPrayer.name}`);
+  const prayerNameLocalized = t(getPrayerTranslationKey(nextPrayer.name));
   const prayerIcon = getPrayerIcon(nextPrayer.name);
 
   return (

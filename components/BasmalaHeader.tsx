@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { TranslatedText } from '@/components/ui/TranslatedText';
 
 const basmalaImage = require('@/assets/images/quran/basmala.png');
 
@@ -18,9 +19,9 @@ export const BasmalaHeader: React.FC<BasmalaHeaderProps> = ({ style, tintColor }
   if (imageError) {
     return (
       <View style={[styles.container, style]}>
-        <Text style={[styles.fallbackText, { color: tintColor ?? '#C9A84C' }]}>
+        <TranslatedText from="ar" type="quran" style={[styles.fallbackText, { color: tintColor ?? '#C9A84C' }]}>
           بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-        </Text>
+        </TranslatedText>
       </View>
     );
   }

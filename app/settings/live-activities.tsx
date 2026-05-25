@@ -37,6 +37,8 @@ import {
 } from '@/lib/live-activities';
 import { refreshLiveActivityIfEnabled, getLastRefreshResult } from '@/lib/live-activity-sync';
 import Constants from 'expo-constants';
+import { uiText } from '@/lib/ui-text';
+import { getPrayerNameAr, getPrayerNameEn, getPrayerTranslationKey, type PrayerName } from '@/lib/prayer-times';
 
 export default function LiveActivitiesSettingsScreen() {
   const { isDarkMode, t } = useSettings();
@@ -84,9 +86,12 @@ export default function LiveActivitiesSettingsScreen() {
         const nativeErr = getLastLiveActivityError();
         const detail = nativeErr || result.reason || 'unknown';
         Alert.alert(
-          'تعذّر تشغيل النشاط الحي',
-          `السبب: ${detail}\n\nافتح لوحة التشخيص أدناه للتفاصيل.`,
-          [{ text: 'حسناً' }]
+          uiText({ ar: 'تعذّر تشغيل النشاط الحي', en: 'Could not start Live Activity' }),
+          uiText({
+            ar: `السبب: ${detail}\n\nافتح لوحة التشخيص أدناه للتفاصيل.`,
+            en: `Reason: ${detail}\n\nOpen the diagnostics panel below for details.`,
+          }),
+          [{ text: uiText({ ar: 'حسناً', en: 'OK' }) }]
         );
         setDiagOpen(true);
       }
@@ -169,7 +174,7 @@ export default function LiveActivitiesSettingsScreen() {
                     color={colors.muted}
                   />
                   <Text style={[styles.diagToggleLabel, { color: colors.muted }]}>
-                    تشخيص
+                    {uiText({ ar: 'تشخيص', en: 'Diagnostics' })}
                   </Text>
                 </TouchableOpacity>
                 {diagOpen && (
@@ -187,7 +192,7 @@ export default function LiveActivitiesSettingsScreen() {
                     </Text>
                     {!!getLastLiveActivityError() && (
                       <Text style={[styles.diagLine, { color: '#ef5350' }]} numberOfLines={4}>
-                        Last error: {getLastLiveActivityError()}
+                        {uiText({ ar: 'آخر خطأ', en: 'Last error' })}: {getLastLiveActivityError()}
                       </Text>
                     )}
                     {!!lastTestResult && (
@@ -205,7 +210,7 @@ export default function LiveActivitiesSettingsScreen() {
                           timeRemainingMinutes: 30,
                           allPrayers: [
                             { name: 'Fajr', nameAr: 'الفجر', time: '04:30', passed: true },
-                            { name: 'Dhuhr', nameAr: 'الظهر', time: '12:00', passed: true },
+                            { name: getPrayerNameEn('dhuhr'), nameAr: getPrayerNameAr('dhuhr'), time: '12:00', passed: true },
                             { name: 'Asr', nameAr: 'العصر', time: '15:30', passed: false },
                             { name: 'Maghrib', nameAr: 'المغرب', time: '18:00', passed: false },
                             { name: 'Isha', nameAr: 'العشاء', time: '19:30', passed: false },
@@ -218,15 +223,21 @@ export default function LiveActivitiesSettingsScreen() {
                         await refreshStatus();
                         if (!ok) {
                           Alert.alert(
-                            'فشل اختبار النشاط الحي',
-                            `الخطأ من النظام:\n\n${err ?? 'سبب غير معروف'}`,
-                            [{ text: 'حسناً' }]
+                            uiText({ ar: 'فشل اختبار النشاط الحي', en: 'Live Activity test failed' }),
+                            uiText({
+                              ar: `الخطأ من النظام:\n\n${err ?? 'سبب غير معروف'}`,
+                              en: `System error:\n\n${err ?? 'Unknown reason'}`,
+                            }),
+                            [{ text: uiText({ ar: 'حسناً', en: 'OK' }) }]
                           );
                         } else {
                           Alert.alert(
-                            'تم تشغيل النشاط الحي',
-                            'تحقق الآن من شاشة القفل أو Dynamic Island.',
-                            [{ text: 'حسناً' }]
+                            uiText({ ar: 'تم تشغيل النشاط الحي', en: 'Live Activity started' }),
+                            uiText({
+                              ar: 'تحقق الآن من شاشة القفل أو Dynamic Island.',
+                              en: 'Check the Lock Screen or Dynamic Island now.',
+                            }),
+                            [{ text: uiText({ ar: 'حسناً', en: 'OK' }) }]
                           );
                         }
                       }}
@@ -234,7 +245,7 @@ export default function LiveActivitiesSettingsScreen() {
                       style={[styles.openSettingsBtn, { marginTop: 10 }]}
                     >
                       <MaterialCommunityIcons name="play-circle-outline" size={18} color="#fff" />
-                      <Text style={styles.openSettingsBtnLabel}>اختبار النشاط الآن</Text>
+                      <Text style={styles.openSettingsBtnLabel}>{uiText({ ar: 'اختبار النشاط الآن', en: 'Test activity now' })}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -287,7 +298,9 @@ export default function LiveActivitiesSettingsScreen() {
                 <MaterialCommunityIcons name="mosque" size={20} color="#0d8e62" />
                 <Text style={[styles.previewAppName, { color: colors.text }]}>{t('common.appName')}</Text>
               </View>
-              <Text style={[styles.previewPrayer, { color: colors.text }]}>{t('liveActivities.previewNextPrayer')}</Text>
+              <Text style={[styles.previewPrayer, { color: colors.text }]}>
+                {`${t('prayer.nextPrayer')}: ${t(getPrayerTranslationKey('dhuhr'))}`}
+              </Text>
               <Text style={[styles.previewTime, { color: '#0d8e62' }]}>{localizeNumber('02:30:15')}</Text>
               {style === 'prayer_times_sunrise' && (
                 <Text style={[styles.previewExtra, { color: colors.muted }]}>{t('liveActivities.previewSunrise')}</Text>
@@ -302,7 +315,7 @@ export default function LiveActivitiesSettingsScreen() {
                   { key: 'isha', time: localizeNumber('19:50') },
                 ].map((p, i) => (
                   <View key={p.key} style={styles.previewTimeItem}>
-                    <Text style={[styles.previewTimeLabel, { color: colors.muted }]}>{t(`prayer.${p.key}`)}</Text>
+                    <Text style={[styles.previewTimeLabel, { color: colors.muted }]}>{t(getPrayerTranslationKey(p.key as PrayerName))}</Text>
                     <Text style={[styles.previewTimeVal, { color: i === 3 ? '#0d8e62' : colors.text }]}>
                       {p.time}
                     </Text>

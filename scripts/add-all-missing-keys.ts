@@ -1061,7 +1061,7 @@ const NEW_NAMESPACES: Record<string, NamespaceData> = {
   };`,
     values: {
       description: { ar: 'تطبيق إسلامي شامل', en: 'A comprehensive Islamic app' },
-      emailSubject: { ar: 'تواصل معنا - روح المسلم', en: 'Contact Us - Ruh Al-Muslim' },
+      emailSubject: { ar: 'تواصل معنا - روح المسلم', en: 'Contact Us - Rooh Al-Muslim' },
       features: { ar: 'المزايا', en: 'Features' },
       stats: { ar: 'الإحصائيات', en: 'Statistics' },
       subtitle: { ar: 'رفيقك الإيماني', en: 'Your spiritual companion' },
@@ -1180,7 +1180,7 @@ const NEW_NAMESPACES: Record<string, NamespaceData> = {
       getStarted: { ar: 'ابدأ الآن', en: 'Get Started' },
       skip: { ar: 'تخطي', en: 'Skip' },
       welcomeDesc: { ar: 'رفيقك الإيماني في كل لحظة', en: 'Your spiritual companion at every moment' },
-      welcomeTitle: { ar: 'أهلاً بك في روح المسلم', en: 'Welcome to Ruh Al-Muslim' },
+      welcomeTitle: { ar: 'أهلاً بك في روح المسلم', en: 'Welcome to Rooh Al-Muslim' },
     }
   },
 };
@@ -1202,7 +1202,7 @@ const EXISTING_NS_MISSING: Record<string, Record<string, MissingKeyData>> = {
     reorderHighlights: { ar: 'إعادة ترتيب المميزات', en: 'Reorder Highlights' },
     hajjUmrahSection: { ar: 'قسم الحج والعمرة', en: 'Hajj & Umrah Section' },
     hadithOfDay: { ar: 'حديث اليوم', en: 'Hadith of the Day' },
-    quoteOfDay: { ar: 'حكمة اليوم', en: 'Quote of the Day' },
+    quoteOfDay: { ar: 'حكمة اليوم', en: 'Wisdom of the Day' },
     anotherHadith: { ar: 'حديث آخر', en: 'Another Hadith' },
     anotherWisdom: { ar: 'حكمة أخرى', en: 'Another Wisdom' },
     customize: { ar: 'تخصيص', en: 'Customize' },
@@ -1341,7 +1341,7 @@ const EXISTING_NS_MISSING: Record<string, Record<string, MissingKeyData>> = {
 
   common: {
     appBackgrounds: { ar: 'خلفيات التطبيق', en: 'App Backgrounds' },
-    appSharingSig: { ar: 'من تطبيق روح المسلم', en: 'From Ruh Al-Muslim app' },
+    appSharingSig: { ar: 'من تطبيق روح المسلم', en: 'From Rooh Al-Muslim app' },
     change: { ar: 'تغيير', en: 'Change' },
     colors: { ar: 'ألوان', en: 'Colors' },
     count: { ar: 'عدد', en: 'Count' },
@@ -1350,7 +1350,7 @@ const EXISTING_NS_MISSING: Record<string, Record<string, MissingKeyData>> = {
     default: { ar: 'افتراضي', en: 'Default' },
     deleteBackground: { ar: 'حذف الخلفية', en: 'Delete Background' },
     errorLoadContent: { ar: 'خطأ في تحميل المحتوى', en: 'Error loading content' },
-    fromApp: { ar: 'من تطبيق روح المسلم', en: 'From Ruh Al-Muslim' },
+    fromApp: { ar: 'من تطبيق روح المسلم', en: 'From Rooh Al-Muslim' },
     gradients: { ar: 'تدرجات', en: 'Gradients' },
     hour: { ar: 'ساعة', en: 'hour' },
     image: { ar: 'صورة', en: 'Image' },
@@ -1536,7 +1536,7 @@ const EXISTING_NS_MISSING: Record<string, Record<string, MissingKeyData>> = {
     duaOfDay: { ar: 'دعاء اليوم', en: 'Dua of the Day' },
     enterDhikrNameAndText: { ar: 'أدخل اسم ونص الذكر', en: 'Enter dhikr name and text' },
     enterValidNumber: { ar: 'أدخل رقماً صحيحاً', en: 'Enter a valid number' },
-    fromApp: { ar: 'من تطبيق روح المسلم', en: 'From Ruh Al-Muslim' },
+    fromApp: { ar: 'من تطبيق روح المسلم', en: 'From Rooh Al-Muslim' },
     goBack: { ar: 'العودة', en: 'Go Back' },
     grid: { ar: 'شبكة', en: 'Grid' },
     hideTranslation: { ar: 'إخفاء الترجمة', en: 'Hide Translation' },

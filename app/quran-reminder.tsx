@@ -45,7 +45,6 @@ const SOUND_OPTIONS: { key: NotificationSoundType; nameKey: string }[] = [
   { key: 'subhanallah', nameKey: 'quranReminder.subhanallah' },
   { key: 'alhamdulillah', nameKey: 'quranReminder.alhamdulillah' },
   { key: 'istighfar', nameKey: 'quranReminder.astaghfirullah' },
-  { key: 'general_reminder', nameKey: 'quranReminder.reminderTone' },
   { key: 'silent', nameKey: 'quranReminder.silent' },
 ];
 

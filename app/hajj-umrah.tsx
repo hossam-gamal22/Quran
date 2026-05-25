@@ -281,7 +281,7 @@ const HAJJ_SECTIONS: RitualSection[] = [
     ],
   },
   {
-    title: 'يوم التروية (٨ ذو الحجة)',
+    title: 'يوم التروية (٨ ذي الحجة)',
     titleEn: 'Day of Tarwiyah (8th Dhul Hijjah)',
     icon: 'tent',
     description: 'التوجه إلى منى والمبيت بها استعداداً ليوم عرفة.',
@@ -307,7 +307,7 @@ const HAJJ_SECTIONS: RitualSection[] = [
     ],
   },
   {
-    title: 'يوم عرفة (٩ ذو الحجة)',
+    title: 'يوم عرفة (٩ ذي الحجة)',
     titleEn: 'Day of Arafah (9th Dhul Hijjah)',
     icon: 'image-filter-hdr',
     description: 'ركن الحج الأعظم — قال النبي ﷺ: "الحَجُّ عَرَفَةُ". لا يصح الحج بدونه.',
@@ -384,7 +384,7 @@ const HAJJ_SECTIONS: RitualSection[] = [
     description: 'رمي جمرة العقبة الكبرى يوم النحر، ثم الجمرات الثلاث أيام التشريق.',
     descriptionEn: 'Throwing at Jamarat al-Aqaba on the Day of Sacrifice, then all three Jamarat on the Days of Tashriq.',
     steps: [
-      { text: 'يوم النحر (١٠ ذو الحجة): رمي جمرة العقبة الكبرى فقط بسبع حصيات بعد طلوع الشمس.', en: 'Day of Sacrifice (10th Dhul Hijjah): throw seven pebbles at Jamarat al-Aqaba only, after sunrise.' },
+      { text: 'يوم النحر (١٠ ذي الحجة): رمي جمرة العقبة الكبرى فقط بسبع حصيات بعد طلوع الشمس.', en: 'Day of Sacrifice (10th Dhul Hijjah): throw seven pebbles at Jamarat al-Aqaba only, after sunrise.' },
       { text: 'التكبير مع كل حصاة: "بِسْمِ اللَّهِ، اللَّهُ أَكْبَرُ".', en: 'Say Takbir with each pebble: "In the name of Allah, Allah is the Greatest."' },
       { text: 'قطع التلبية عند أول حصاة من رمي جمرة العقبة.', en: 'Stop the Talbiyah upon throwing the first pebble at Jamarat al-Aqaba.' },
       { text: 'أيام التشريق (١١-١٢-١٣): رمي الجمرات الثلاث كل يوم بعد الزوال.', en: 'Days of Tashriq (11-12-13): throw at all three Jamarat each day after noon.' },
@@ -562,7 +562,7 @@ const DUAS_BY_RITUAL: DuaRitualGroup[] = [
     ],
   },
   {
-    title: 'أدعية يوم التروية (٨ ذو الحجة)',
+    title: 'أدعية يوم التروية (٨ ذي الحجة)',
     titleEn: 'Day of Tarwiyah Supplications (8th Dhul Hijjah)',
     icon: 'tent',
     duas: [
@@ -572,7 +572,7 @@ const DUAS_BY_RITUAL: DuaRitualGroup[] = [
     ],
   },
   {
-    title: 'أدعية يوم عرفة (٩ ذو الحجة)',
+    title: 'أدعية يوم عرفة (٩ ذي الحجة)',
     titleEn: 'Day of Arafah Supplications (9th Dhul Hijjah)',
     icon: 'image-filter-hdr',
     duas: [

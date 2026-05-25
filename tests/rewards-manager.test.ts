@@ -5,6 +5,7 @@ const { asyncStorage, firestoreState, monthlyStats } = vi.hoisted(() => ({
   monthlyStats: {
     prayers: 0,
     quranPages: 0,
+    khatmas: 0,
     azkar: 0,
     tasbih: 0,
     fasting: 0,
@@ -23,7 +24,7 @@ const { asyncStorage, firestoreState, monthlyStats } = vi.hoisted(() => ({
         quran: 3,
         prayer: 5,
         tasbih: 1,
-        khatma: 5,
+        khatma: 100,
         fasting: 4,
       },
       currentMonth: '',
@@ -152,6 +153,7 @@ import {
   autoSelectMonthlyWinners,
   getCurrentMonth,
   getMonthlyLeaderboard,
+  mergeCurrentUserIntoLeaderboard,
   syncMonthlyEngagementFromLocalWorship,
   syncPendingScores,
   updateMonthlyScore,
@@ -164,6 +166,7 @@ describe('rewards-manager monthly sync', () => {
     Object.assign(monthlyStats, {
       prayers: 0,
       quranPages: 0,
+      khatmas: 0,
       azkar: 0,
       tasbih: 0,
       fasting: 0,
@@ -194,11 +197,12 @@ describe('rewards-manager monthly sync', () => {
     expect(asyncStorage.get('@pending_monthly_scores')).toBeUndefined();
   });
 
-  it('overrides worship activity from local stats while keeping app_open and merge bonuses', async () => {
+  it('preserves higher cloud worship activity while keeping app_open and merge bonuses', async () => {
     const month = getCurrentMonth();
     Object.assign(monthlyStats, {
       prayers: 3,
       quranPages: 4,
+      khatmas: 1,
       azkar: 1,
       tasbih: 5,
       fasting: 1,
@@ -221,15 +225,47 @@ describe('rewards-manager monthly sync', () => {
 
     expect(result?.activities).toEqual({
       app_open: 2,
-      prayer: 3,
+      prayer: 100,
       quran: 6,
+      khatma: 1,
       azkar: 1,
       tasbih: 5,
       fasting: 1,
     });
-    expect(result?.score).toBe(46);
+    expect(result?.score).toBe(631);
     expect(result?.mergeBonus?.mergedFrom).toBe('old-user');
-    expect(firestoreState.users.get('u1')?.monthlyEngagement.score).toBe(46);
+    expect(firestoreState.users.get('u1')?.monthlyEngagement.score).toBe(631);
+  });
+
+  it('uploads higher local worship activity when it exceeds the cloud copy', async () => {
+    const month = getCurrentMonth();
+    Object.assign(monthlyStats, {
+      prayers: 12,
+      quranPages: 10,
+      khatmas: 0,
+      azkar: 3,
+      tasbih: 50,
+      fasting: 0,
+    });
+    firestoreState.users.set('u1', {
+      displayName: 'User One',
+      monthlyEngagement: {
+        month,
+        score: 11,
+        activities: { app_open: 2, prayer: 1, quran: 2 },
+      },
+    });
+
+    const result = await syncMonthlyEngagementFromLocalWorship('u1');
+
+    expect(result?.activities).toMatchObject({
+      app_open: 2,
+      prayer: 12,
+      quran: 10,
+      azkar: 3,
+      tasbih: 50,
+    });
+    expect(firestoreState.users.get('u1')?.monthlyEngagement.score).toBe(148);
   });
 
   it('uses month-scoped leaderboard queries and filters hidden, placeholder, and nameless users', async () => {
@@ -262,11 +298,34 @@ describe('rewards-manager monthly sync', () => {
     ]);
   });
 
-  it('auto-selects previous-month winners and grants app-readable admin premium', async () => {
+  it('re-sorts the leaderboard after merging the current user recalculated score', () => {
+    const board = [
+      { userId: 'rank-9', displayName: 'Rank 9', score: 758 },
+      { userId: 'me', displayName: 'Me Old', score: 700 },
+      { userId: 'rank-11', displayName: 'Rank 11', score: 569 },
+      { userId: 'rank-12', displayName: 'Rank 12', score: 554 },
+      { userId: 'rank-13', displayName: 'Rank 13', score: 513 },
+    ];
+
+    expect(mergeCurrentUserIntoLeaderboard(
+      board,
+      { userId: 'me', displayName: 'Me', score: 533 },
+      20,
+    )).toEqual([
+      { userId: 'rank-9', displayName: 'Rank 9', score: 758 },
+      { userId: 'rank-11', displayName: 'Rank 11', score: 569 },
+      { userId: 'rank-12', displayName: 'Rank 12', score: 554 },
+      { userId: 'me', displayName: 'Me', score: 533 },
+      { userId: 'rank-13', displayName: 'Rank 13', score: 513 },
+    ]);
+  });
+
+  it('keeps app-side monthly winner selection read-only; server grants premium', async () => {
     const previousMonth = '2026-04-v2';
     firestoreState.config.currentMonth = '';
     firestoreState.config.currentWinners = [];
     firestoreState.config.history = [];
+    firestoreState.config.processedMonth = undefined;
     firestoreState.config.rewardDurationDays = 30;
 
     firestoreState.users.set('first', {
@@ -293,28 +352,13 @@ describe('rewards-manager monthly sync', () => {
 
     await autoSelectMonthlyWinners();
 
-    expect(firestoreState.config.currentMonth).toBe(previousMonth);
-    expect(firestoreState.config.processedMonth).toBe(previousMonth);
-    expect(firestoreState.config.currentWinners.map((w: any) => w.userId)).toEqual([
-      'first',
-      'second',
-      'third',
-    ]);
-    expect(firestoreState.config.history[0].month).toBe(previousMonth);
+    expect(firestoreState.config.currentMonth).toBe('');
+    expect(firestoreState.config.processedMonth).toBeUndefined();
+    expect(firestoreState.config.currentWinners).toEqual([]);
+    expect(firestoreState.config.history).toEqual([]);
 
-    for (const userId of ['first', 'second', 'third']) {
-      const premium = firestoreState.users.get(userId)?.adminPremium;
-      expect(premium).toMatchObject({
-        granted: true,
-        grantedBy: 'auto_reward_system',
-        plan: 'monthly',
-        reason: `فائز في مسابقة الشهر ${previousMonth}`,
-      });
-      expect(typeof premium.expiresAt).toBe('string');
-      expect(Number.isNaN(new Date(premium.expiresAt).getTime())).toBe(false);
+    for (const userId of ['first', 'second', 'third', 'fourth', 'hidden-winner']) {
+      expect(firestoreState.users.get(userId)?.adminPremium).toBeUndefined();
     }
-
-    expect(firestoreState.users.get('fourth')?.adminPremium).toBeUndefined();
-    expect(firestoreState.users.get('hidden-winner')?.adminPremium).toBeUndefined();
   });
 });

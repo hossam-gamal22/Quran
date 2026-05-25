@@ -23,6 +23,30 @@
         { "fieldPath": "monthlyEngagement.month", "order": "ASCENDING" },
         { "fieldPath": "monthlyEngagement.score", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "userPrayerSettings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fallbackEnabled", "order": "ASCENDING" },
+        { "fieldPath": "refreshReminderAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userPrayerSettings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fallbackEnabled", "order": "ASCENDING" },
+        { "fieldPath": "localScheduleExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userPrayerSettings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fallbackEnabled", "order": "ASCENDING" },
+        { "fieldPath": "nextPrayerAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

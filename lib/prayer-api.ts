@@ -3,6 +3,7 @@
 // ============================================
 
 import { t, getLanguage } from '@/lib/i18n';
+import { getPrayerNameEn, getPrayerTranslationKey } from '@/lib/prayer-times';
 
 const ALADHAN_API_BASE = 'https://api.aladhan.com/v1';
 
@@ -100,7 +101,7 @@ export function getPrayerNames(): { [key: string]: { ar: string; en: string } } 
   return {
     Fajr: { ar: t('prayer.fajr'), en: 'Fajr' },
     Sunrise: { ar: t('prayer.sunrise'), en: 'Sunrise' },
-    Dhuhr: { ar: t('prayer.dhuhr'), en: 'Dhuhr' },
+    Dhuhr: { ar: t(getPrayerTranslationKey('dhuhr')), en: getPrayerNameEn('dhuhr') },
     Asr: { ar: t('prayer.asr'), en: 'Asr' },
     Maghrib: { ar: t('prayer.maghrib'), en: 'Maghrib' },
     Isha: { ar: t('prayer.isha'), en: 'Isha' },

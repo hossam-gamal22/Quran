@@ -636,7 +636,7 @@ function ReorderView({
           <Text
             style={{
               color: isCorrect ? '#0d8e62' : '#b00020',
-              fontFamily: 'Cairo-Bold',
+              fontFamily: 'Rubik-Bold',
               marginTop: 8,
               textAlign: 'center',
             }}
@@ -669,7 +669,7 @@ function ReorderView({
         })}
       </View>
       <TouchableOpacity onPress={onReset} style={{ alignSelf: 'center' }}>
-        <Text style={{ color: colors.textLight, fontFamily: 'Cairo-SemiBold', fontSize: 12 }}>
+        <Text style={{ color: colors.textLight, fontFamily: 'Rubik-SemiBold', fontSize: 12 }}>
           ↺ {mt('retry')}
         </Text>
       </TouchableOpacity>
@@ -761,7 +761,7 @@ const modalStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
-  title: { fontFamily: 'Cairo-Bold', fontSize: 18, textAlign: 'center' },
+  title: { fontFamily: 'Rubik-Bold', fontSize: 18, textAlign: 'center' },
 });
 
 const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
@@ -771,34 +771,34 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     emptyText: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 14,
       textAlign: 'center',
     },
     position: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     qTypeLabel: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 16,
       textAlign: 'center',
     },
     setupCard: { padding: 16, gap: 12 },
     setupTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 16,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     setupHint: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -806,7 +806,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     inputsRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 },
     inputLabel: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       marginBottom: 4,
       textAlign: isRTL ? 'right' : 'left',
@@ -818,7 +818,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: 'center',
       borderWidth: 1,
@@ -838,7 +838,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     surahPickerName: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 18,
       lineHeight: 32,
       textAlign: isRTL ? 'right' : 'left',
@@ -846,7 +846,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     surahPickerMeta: {
       color: colors.textLight,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -863,7 +863,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.text,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 14,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -892,12 +892,12 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     surahOptionNumberText: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 12,
     },
     surahOptionName: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 18,
       lineHeight: 32,
       textAlign: isRTL ? 'right' : 'left',
@@ -905,7 +905,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     surahOptionMeta: {
       color: colors.textLight,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -916,7 +916,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       alignItems: 'center',
       marginTop: 8,
     },
-    primaryBtnText: { color: '#fff', fontFamily: 'Cairo-Bold', fontSize: 15 },
+    primaryBtnText: { color: '#fff', fontFamily: 'Rubik-Bold', fontSize: 15 },
     outlineBtn: {
       paddingVertical: 14,
       paddingHorizontal: 24,
@@ -925,10 +925,10 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       borderWidth: 1.5,
       borderColor: 'rgba(255,255,255,0.2)',
     },
-    outlineBtnText: { fontFamily: 'Cairo-Bold', fontSize: 15 },
+    outlineBtnText: { fontFamily: 'Rubik-Bold', fontSize: 15 },
     actionsRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 16, justifyContent: 'center' },
     resultCard: { padding: 24, gap: 12, alignItems: 'center' },
-    resultTitle: { color: colors.text, fontFamily: 'Cairo-Bold', fontSize: 18 },
-    resultScore: { color: colors.primary, fontFamily: 'Cairo-Bold', fontSize: 36 },
-    resultLabel: { color: colors.textLight, fontFamily: 'Cairo-SemiBold', fontSize: 14 },
+    resultTitle: { color: colors.text, fontFamily: 'Rubik-Bold', fontSize: 18 },
+    resultScore: { color: colors.primary, fontFamily: 'Rubik-Bold', fontSize: 36 },
+    resultLabel: { color: colors.textLight, fontFamily: 'Rubik-SemiBold', fontSize: 14 },
   });

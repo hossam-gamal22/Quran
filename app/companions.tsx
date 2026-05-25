@@ -1,17 +1,18 @@
 // app/companions.tsx
 // صفحة قصص الصحابة - روح المسلم
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
   Platform,
+  TextInput,
   LayoutAnimation,
   UIManager,
-  Share,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -26,15 +27,20 @@ import { t, getLanguage } from '@/lib/i18n';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { NativeTabs } from '@/components/ui/NativeTabs';
-import { exportAsPDF, showAdThenExport, PdfTemplate } from '@/lib/pdf-export';
-import { PdfTemplatePicker } from '@/components/ui/PdfTemplatePicker';
+import { showAdThenExport } from '@/lib/pdf-export';
+import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
+import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
+import type { IslamicPdfSection } from '@/lib/pdf/islamicPdfTemplate';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
-import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useCompanionsContent } from '@/lib/content-api';
+import { useAzkarAudio } from '@/hooks/use-azkar-audio';
+import { expandCompanionStory } from '@/data/full-story-texts';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
@@ -46,12 +52,13 @@ import { Spacing } from '@/constants/theme';
 const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
+const AUDIO_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
 // ========================================
 // أنواع البيانات
 // ========================================
 
-type CategoryKey = 'ashara' | 'muhajirun' | 'ansar' | 'mothers';
+type CategoryKey = 'ashara' | 'muhajirun' | 'ansar' | 'mothers' | 'daughters';
 
 interface Companion {
   id: string;
@@ -66,6 +73,11 @@ interface Companion {
   virtuesEn: string[];
   videoUrl?: string;
   videoTitle?: string;
+  audioUrl?: string;
+  audioTitle?: string;
+  audioStoragePath?: string;
+  transcript?: string;
+  transcriptEn?: string;
 }
 
 interface Category {
@@ -83,6 +95,7 @@ const CATEGORIES: Category[] = [
   { key: 'muhajirun', title: 'المهاجرون', icon: 'road-variant' },
   { key: 'ansar', title: 'الأنصار', icon: 'home-heart' },
   { key: 'mothers', title: 'أمهات المؤمنين', icon: 'heart-multiple' },
+  { key: 'daughters', title: 'بنات النبي ﷺ', icon: 'flower' },
 ];
 
 const CATEGORY_KEYS: Record<CategoryKey, string> = {
@@ -90,7 +103,28 @@ const CATEGORY_KEYS: Record<CategoryKey, string> = {
   muhajirun: 'companions.categoryMuhajirun',
   ansar: 'companions.categoryAnsar',
   mothers: 'companions.categoryMothers',
+  daughters: 'companions.categoryDaughters',
 };
+
+function normalizeSearchText(value?: string) {
+  return (value || '')
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/[ًٌٍَُِّْ]/g, '')
+    .trim();
+}
+
+function companionSearchText(companion: Companion) {
+  return normalizeSearchText([
+    companion.nameAr,
+    companion.nameEn,
+    companion.brief,
+    companion.briefEn,
+  ].filter(Boolean).join(' '));
+}
 
 // ========================================
 // بيانات الصحابة
@@ -430,6 +464,50 @@ const COMPANIONS: Companion[] = [
     virtues: ['من أعلم الصحابة بالقرآن', 'أول من جهر بالقرآن في مكة', 'ساقاه أثقل من أُحد عند الله', 'ملازم النبي ﷺ وخادمه'],
     virtuesEn: ["Most knowledgeable of the companions in the Quran", "First to recite the Quran aloud in Makkah", "His legs are heavier than Uhud in the sight of Allah", "Constant companion and servant of the Prophet ﷺ"],
   },
+  {
+    id: 'hamza',
+    nameAr: 'حمزة بن عبد المطلب',
+    nameEn: 'Hamza ibn Abd al-Muttalib',
+    category: 'muhajirun',
+    brief: 'أسد الله وسيد الشهداء، عمّ النبي ﷺ وأخوه من الرضاعة',
+    briefEn: 'Lion of Allah and Master of the Martyrs, uncle of the Prophet ﷺ and his foster brother',
+    story: [
+      'هو حمزة بن عبد المطلب بن هاشم القرشي، عمّ النبي ﷺ. وُلد بمكة قبل النبي ﷺ بعامين على أرجح الأقوال. وكانت أمه هالة بنت أهيب قد أرضعته كما أرضعت محمداً ﷺ، فصار عمه وأخاه من الرضاعة معاً. كان في الجاهلية رجلاً قوياً شجاعاً مغرماً بالصيد والقنص.',
+      'أسلم بسبب موقف غضب فيه لابن أخيه. مرّ بسوق مكة بعد رحلة صيد فأخبرته جارية أن أبا جهل آذى النبي ﷺ وشتمه. فدخل المسجد الحرام وضرب أبا جهل بقوسه ضربة شجّت رأسه، ثم قال: "أتشتمه وأنا على دينه أقول ما يقول؟" ثم نزل عليه نور الهداية فأعلن إسلامه، فكان إسلامه قوة عظيمة للمسلمين.',
+      'شارك في غزوة بدر وقتل عتبة بن ربيعة في مبارزة عظيمة. وفي غزوة أحد سنة 3 هـ كان يقاتل ببسالة، فتربّص به وحشي بن حرب — عبد حبشي استأجرته هند بنت عتبة لتأخذ بثأرها — فرماه بحربة من خلفه فاستشهد رضي الله عنه. ثم مزّقت هند جسده وأخذت كبده، فحزن النبي ﷺ حزناً شديداً.',
+      'لما رأى النبي ﷺ جسده بكى بكاءً شديداً وقال: "لن أصاب بمثلك أبداً." ثم قال كلمته الخالدة: "حمزة سيد الشهداء." وقد أسلم وحشي بعد ذلك، فكفّر عن قتله لحمزة بقتل مسيلمة الكذاب في معركة اليمامة بالحربة نفسها.',
+    ],
+    storyEn: [
+      'He is Hamza ibn Abd al-Muttalib ibn Hashim al-Qurashi, the uncle of the Prophet ﷺ. He was born in Makkah two years before the Prophet ﷺ on the strongest opinions. His mother Halah bint Uhayb had nursed him as she nursed Muhammad ﷺ, so he was both his uncle and his foster brother. In the Jahiliyyah he was a strong, brave man devoted to hunting.',
+      'He embraced Islam in a moment of anger for his nephew. Passing the market of Makkah after a hunting trip, a slave-girl told him that Abu Jahl had harmed and insulted the Prophet ﷺ. He entered the Sacred Mosque and struck Abu Jahl on the head with his bow, then said: "Do you insult him while I am on his religion saying what he says?" The light of guidance then descended on him and he announced his Islam — a great strength for the Muslims.',
+      "He fought at Badr and killed Utbah ibn Rabi'ah in a great duel. At Uhud in 3 AH he fought valiantly, but Wahshi ibn Harb — an Abyssinian slave hired by Hind bint Utbah to take her revenge — lay in wait and pierced him with a javelin from behind. He was martyred, and Hind then tore at his body and took his liver. The Prophet ﷺ grieved severely.",
+      'When the Prophet ﷺ saw his body, he wept severely and said: "I shall never be afflicted like this again." Then he spoke his immortal word: "Hamza is the master of the martyrs." Wahshi himself later embraced Islam and atoned by killing Musaylamah the Liar at the Battle of Yamamah with the very same javelin.',
+    ],
+    virtues: ['أسد الله وأسد رسوله', 'سيد الشهداء', 'عمّ النبي ﷺ وأخوه من الرضاعة', 'قتل عتبة بن ربيعة في بدر'],
+    virtuesEn: ['Lion of Allah and His Messenger', 'Master of the Martyrs', 'Uncle of the Prophet ﷺ and his foster brother', "Killed Utbah ibn Rabi'ah at Badr"],
+  },
+  {
+    id: 'salman-farisi',
+    nameAr: 'سلمان الفارسي',
+    nameEn: 'Salman al-Farisi',
+    category: 'muhajirun',
+    brief: 'الباحث عن الحق الذي قال فيه النبي ﷺ: "سلمان منا أهل البيت"',
+    briefEn: 'The seeker of truth of whom the Prophet ﷺ said: "Salman is one of us, the People of the House"',
+    story: [
+      'وُلد سلمان في قرية جَيّ من قرى أصبهان بفارس، في أسرة من النبلاء، وكان أبوه ديقاناً (مالكاً كبيراً للأرض) ومن قادة المجوس عبدة النار. لكنه ترك دين أبيه بعد أن رأى نصارى يصلون في كنيسة فمالت نفسه إلى دينهم. هرب من بيت أبيه ولحق بقافلة إلى الشام بحثاً عن الحق.',
+      'تنقّل بين الرهبان من الشام إلى الموصل إلى نصيبين إلى عمورية. ولما اقترب أجل آخر راهب أخبره أن زمن نبي قد أظلّ، يبعث من أرض العرب، مهاجره إلى أرض ذات نخل بين حرّتين، له علامات: لا يأكل الصدقة ويأكل الهدية، وبين كتفيه خاتم النبوة.',
+      'سافر مع تجار من بني كلب، فخدعوه وباعوه عبداً ليهودي بوادي القرى، ثم باعه إلى قريب له في يثرب. هكذا وصل إلى أرض النبي ﷺ. ولما هاجر النبي ﷺ إلى المدينة، اختبره بالعلامات الثلاث ثم سقط ساجداً يقبّل قدميه. أُعتق بمكاتبة سيده بمساعدة النبي ﷺ والصحابة.',
+      'في غزوة الخندق اقترح حفر خندق حول المدينة — وكانت فكرة فارسية لم يعرفها العرب — فأنقذ الله بها المسلمين. تنازع المهاجرون والأنصار عليه، فقال النبي ﷺ: "سلمان منا أهل البيت." ولّاه عمر على المدائن فعاش زاهداً يبيع الخوص من يده، يفرّق عطاءه على الفقراء. توفي رضي الله عنه سنة 35 هـ بالمدائن.',
+    ],
+    storyEn: [
+      "Salman was born in a village called Jayy in Isfahan, Persia, into a noble family. His father was a dihqan (great landowner) and a leader of the Magian fire-worshippers. He abandoned his father's religion after seeing Christians praying in a church and feeling drawn to their faith. He fled his father's house and joined a caravan to Sham seeking the truth.",
+      "He moved between monks from Sham to Mosul, Nasibin, and Amuria. As the last monk's end approached, he told Salman that the time of a prophet had dawned — sent from the land of the Arabs, his place of emigration a land of palms between two lava plains, with three signs: he does not eat charity but accepts gifts, and between his shoulders is the seal of prophethood.",
+      "He travelled with traders of Banu Kalb who betrayed him and sold him as a slave to a Jew in al-Qura, then to his relative in Yathrib. Thus he reached the land of the Prophet ﷺ. After the Hijrah, Salman tested the Prophet ﷺ with the three signs, then fell prostrate kissing his feet. He was freed by a contract of manumission with help from the Prophet ﷺ and the Companions.",
+      "At the Battle of the Trench, he proposed digging a trench around Madinah — a Persian idea unknown to the Arabs — by which Allah saved the Muslims. When the Muhajirun and Ansar disputed over him, the Prophet ﷺ said: \"Salman is one of us, the People of the House.\" Umar appointed him governor of al-Mada'in where he lived ascetic, weaving palm leaves with his own hand and distributing his stipend to the poor. He died, may Allah be pleased with him, in 35 AH at al-Mada'in.",
+    ],
+    virtues: ['من أهل بيت النبي ﷺ', 'صاحب فكرة الخندق', 'باحث صادق عن الحق قطع آلاف الأميال', 'زاهد ولّي المدائن فاكتفى بكسب يده'],
+    virtuesEn: ["One of the Prophet's ﷺ household", 'Originator of the Trench strategy', 'Sincere seeker of truth who travelled thousands of miles', "An ascetic governor of al-Mada'in who ate from his own labour"],
+  },
 
   // ── الأنصار ──
   {
@@ -497,6 +575,50 @@ const COMPANIONS: Companion[] = [
     ],
     virtues: ['مضيف النبي ﷺ في المدينة', 'شهد جميع الغزوات', 'جاهد حتى آخر حياته', 'دُفن عند أسوار القسطنطينية'],
     virtuesEn: ["Host of the Prophet ﷺ in Madinah", "Present at all the battles", "Fought in the cause of Allah until the end of his life", "Buried near the walls of Constantinople"],
+  },
+  {
+    id: 'handhalah',
+    nameAr: 'حنظلة بن أبي عامر',
+    nameEn: 'Handhalah ibn Abi Amir',
+    category: 'ansar',
+    brief: 'غسيل الملائكة — ترك ليلة عرسه ليلحق بالنبي ﷺ في أحد',
+    briefEn: 'Washed by the Angels — he left his wedding night to join the Prophet ﷺ at Uhud',
+    story: [
+      'هو حنظلة بن أبي عامر الأنصاري الأوسي، رضي الله عنه. كان أبوه أبو عامر الراهب رجلاً اشتُهر بالتدين قبل الإسلام، لكنه رفض الإسلام حين جاء النبي ﷺ، وذهب إلى مكة يحرّض قريشاً على المسلمين. أما حنظلة فآمن مع النبي ﷺ، وخالف أباه وأخلص لله.',
+      'تزوج جميلة بنت عبد الله بن أبيّ بن سلول — وكان أبوها رأس المنافقين في المدينة، لكنها آمنت برسول الله ﷺ. ودخل بها ليلة زفافه. وفي الفجر سمع منادي الجهاد ينادي بالخروج إلى أحد. كان عريساً ليلته الأولى، له رخصة شرعية أن يبقى ويغتسل، لكنه آثر اللحاق بالنبي ﷺ.',
+      'قام من فراش العرس مسرعاً، لبس ثيابه على عجل وحمل سيفه ولم يغتسل من الجنابة. لحق بالجيش في طريقه إلى أحد. وفي ساحة المعركة هاجم أبا سفيان بن حرب — قائد المشركين — وكاد يقتله، حتى رماه شدّاد بن الأسود برمح من خلفه، ثم تكاثروا عليه فاستشهد رضي الله عنه.',
+      'بعد المعركة قال النبي ﷺ متعجباً: "إن صاحبكم تغسّله الملائكة." فسألوا زوجته جميلة عن حاله، فأخبرتهم أنه خرج جنباً حين سمع نداء الجهاد. فكان غسله بأيدي الملائكة بين السماء والأرض، وبقي لقبه إلى يومنا هذا: غسيل الملائكة.',
+    ],
+    storyEn: [
+      'He is Handhalah ibn Abi Amir al-Ansari al-Awsi, may Allah be pleased with him. His father, Abu Amir "the Monk," had been famous for piety before Islam but refused Islam when the Prophet ﷺ came, going to Makkah to incite Quraysh against the Muslims. Handhalah, however, believed with the Prophet ﷺ, opposed his father, and devoted himself to Allah.',
+      "He married Jamilah bint Abdullah ibn Ubayy ibn Salul — whose father was the head of the hypocrites in Madinah, yet she believed in the Messenger of Allah ﷺ. He entered upon her on his wedding night. At dawn he heard the caller to jihad announcing the march to Uhud. He was a bridegroom on his first night, with a legitimate dispensation to stay and perform ghusl, but he preferred to catch up with the Prophet ﷺ.",
+      'He rose from the wedding bed in haste, dressed quickly, took his sword, and did not perform ghusl from impurity. He overtook the army on its way to Uhud. In battle he attacked Abu Sufyan ibn Harb — commander of the polytheists — and nearly killed him, until Shaddad ibn al-Aswad pierced him with a spear from behind. Others bore down on him, and he was martyred.',
+      'After the battle the Prophet ﷺ said in wonder: "Your companion is being washed by the angels." They asked his wife Jamilah about his condition, and she told them he had set out in a state of major impurity when he heard the call to jihad. His washing was by the hands of angels between sky and earth, and his title has remained to this day: "the one washed by the angels."',
+    ],
+    virtues: ['غسّلته الملائكة بين السماء والأرض', 'استشهد في غزوة أحد', 'ترك ليلة عرسه استجابة لنداء الجهاد', 'كاد أن يقتل أبا سفيان بن حرب'],
+    virtuesEn: ['Washed by the angels between sky and earth', 'Martyred at the Battle of Uhud', 'Left his wedding night for the call to jihad', 'Nearly killed Abu Sufyan ibn Harb'],
+  },
+  {
+    id: 'umm-sulaym',
+    nameAr: 'أم سُليم بنت ملحان',
+    nameEn: 'Umm Sulaym bint Milhan',
+    category: 'ansar',
+    brief: 'الصحابية التي جعلت إسلام خاطبها مهرها، فكان مهرها الإسلام',
+    briefEn: "The female Companion who made her suitor's Islam her dowry — so her dowry was Islam itself",
+    story: [
+      'هي أم سُليم بنت ملحان الأنصارية، رضي الله عنها، أم خادم النبي ﷺ أنس بن مالك. كانت من السابقات إلى الإسلام في المدينة، آمنت قبل كثير من رجال قومها، وربّت ابنها أنساً على القرآن. وكان زوجها الأول مالك بن النضر مشركاً، فلما أسلمت غضب وغادر إلى الشام ومات في غربته.',
+      'صارت أرملة بابن صغير، فخطبها أبو طلحة الأنصاري — زيد بن سهل — من سادات الخزرج وأغنيائهم، وكان لا يزال على الشرك. بعث إليها بمهر عظيم، فردّت عليه بكلمات صارت من أعظم كلمات النساء: "والله إن مثلك ما يُرَدّ، ولكنك رجل كافر، وأنا امرأة مسلمة لا يحلّ لي أن أتزوجك. فإن أسلمت فذاك مهري، والله ما أريد منك ذهباً ولا فضة."',
+      'دخلت كلمتها قلب أبي طلحة ولم تخرج. أسلم بين يدي النبي ﷺ ثم رجع إليها، فتزوجها على هذا المهر الذي ليس له نظير في الدنيا: الإسلام. قال أحد الصحابة: "ما سمعنا بمهر قط كان أعظم من مهر أم سُليم: الإسلام." وأنجبت له ولداً اسمه أبو عمير، فمات صغيراً، فصبرت واحتسبت، فعوّضها الله بعبد الله الذي رزقه الله تسعة من الولد كلهم قرأوا القرآن.',
+      'ذكرها النبي ﷺ في الجنة قبل موتها فقال: "دخلت الجنة فسمعت خشفة، فقلت: من هذا؟ قالوا: الغميصاء بنت ملحان أم أنس بن مالك." فبقي ذكرها نوراً في تاريخ المرأة المسلمة.',
+    ],
+    storyEn: [
+      "She is Umm Sulaym bint Milhan al-Ansariyyah, may Allah be pleased with her, mother of the Prophet's ﷺ servant Anas ibn Malik. She was among the early Muslims of Madinah, accepting Islam before many of the men of her people, and raised her son Anas upon the Qur'an. Her first husband, Malik ibn al-Nadr, was a polytheist; when she embraced Islam he was angered and left for Sham, where he died.",
+      'She became a widow with a small son. Then Abu Talhah al-Ansari — Zayd ibn Sahl — among the chiefs and wealthiest of the Khazraj, still a polytheist, proposed to her with a great dowry. She answered him with words that became among the greatest words of women: "By Allah, a man like you is not refused. But you are a disbelieving man, and I am a Muslim woman; it is not lawful for me to marry you. If you embrace Islam, that is my dowry. By Allah I want no gold or silver from you."',
+      "Her words entered Abu Talhah's heart and did not leave. He embraced Islam before the Prophet ﷺ and returned to her — and she married him upon this dowry without parallel in the world: Islam. A Companion said: \"We have never heard of a dowry greater than the dowry of Umm Sulaym — Islam.\" She bore him a son named Abu Umayr, who died young. She bore the loss patiently, and Allah compensated her with Abdullah, to whom Allah granted nine children, all reciting the Qur'an.",
+      "The Prophet ﷺ mentioned her in Paradise before her death, saying: \"I entered Paradise and heard footsteps, and asked: Who is this? They said: al-Ghumaysa' bint Milhan, the mother of Anas ibn Malik.\" Her memory remains a light in the history of the Muslim woman.",
+    ],
+    virtues: ['مهرها كان الإسلام — أعظم مهر في التاريخ', 'أم خادم رسول الله ﷺ أنس بن مالك', 'بشّرها النبي ﷺ بالجنة قبل موتها', 'صبرت على موت ابنها أبي عمير'],
+    virtuesEn: ['Her dowry was Islam — the greatest dowry in history', "Mother of the Prophet's ﷺ servant Anas ibn Malik", 'The Prophet ﷺ gave her glad tidings of Paradise before her death', 'Patient over the death of her son Abu Umayr'],
   },
 
   // ── أمهات المؤمنين ──
@@ -566,6 +688,456 @@ const COMPANIONS: Companion[] = [
     virtues: ['حافظة المصحف الشريف', 'صوّامة قوّامة', 'من القليلات اللواتي يعرفن الكتابة', 'ابنة الفاروق عمر'],
     virtuesEn: ["Guardian of the Holy Mushaf", "Devout in fasting and prayer", "Among the few literate women of her era", "Daughter of al-Faruq Umar"],
   },
+
+  // ───────────────────── أمهات المؤمنين (تكملة) ─────────────────────
+  {
+    id: 'sawdah',
+    nameAr: 'سودة بنت زمعة',
+    nameEn: 'Sawdah bint Zam\'ah',
+    category: 'mothers',
+    brief: 'أول من تزوجها النبي ﷺ بعد خديجة، صاحبة الحلم والكرم',
+    briefEn: 'The first woman the Prophet ﷺ married after Khadijah, distinguished by forbearance and generosity',
+    story: [
+      'هي سودة بنت زمعة بن قيس القرشية العامرية. أسلمت قديمًا في مكة، وكانت ممن هاجر إلى الحبشة الهجرة الثانية مع زوجها الأول السكران بن عمرو. لما رجعت ومات زوجها، تزوجها النبي ﷺ في السنة العاشرة من البعثة بعد وفاة خديجة، وكان عمرها يومئذ يقارب الخمسين.',
+      'كانت سيدةً جليلةً سخيةً، تحب النبي ﷺ حبًا شديدًا، وتحب نساءه. لما كبرت وخشيت أن يطلقها النبي ﷺ، وهبت ليلتها لعائشة، إيثارًا لرسول الله ﷺ، وحبًا في البقاء من أزواجه في الدنيا والآخرة. أنزل الله في حقها: وإن امرأة خافت من بعلها نشوزًا أو إعراضًا فلا جناح عليهما أن يصلحا بينهما صلحًا.',
+      'كانت متفانية في خدمة بيت النبي ﷺ. تعتني بأمر المهاجرين، وتساعد عائشة في حفظ الحديث. روت عن النبي ﷺ خمسة أحاديث. توفيت في خلافة عمر بن الخطاب سنة 23 هـ بالمدينة، ودُفنت بالبقيع.',
+    ],
+    storyEn: [
+      "She is Sawdah bint Zam'ah ibn Qays al-Qurashiyyah al-Amiriyyah. She embraced Islam early in Makkah and was among those who emigrated to Abyssinia in the second emigration with her first husband, al-Sakran ibn Amr. When she returned and her husband died, the Prophet ﷺ married her in the tenth year of the mission after Khadijah's death; she was nearly fifty at the time.",
+      "She was a noble, generous lady who loved the Prophet ﷺ deeply and loved his wives. When she grew old and feared the Prophet ﷺ would divorce her, she gave her night to A'isha, preferring the Messenger of Allah ﷺ and loving to remain among his wives in this world and the next. Allah revealed about her: 'And if a woman fears from her husband contempt or evasion, there is no sin upon them if they make terms of settlement between them.'",
+      "She was devoted to serving the Prophet's ﷺ household. She cared for the affairs of the Muhajirun and helped A'isha in preserving hadith. She narrated five hadiths from the Prophet ﷺ. She died in Umar ibn al-Khattab's caliphate in 23 AH in Madinah and was buried in al-Baqi'.",
+    ],
+    virtues: ['أول من تزوجها النبي ﷺ بعد خديجة', 'وهبت ليلتها لعائشة إيثارًا', 'من السابقات إلى الإسلام', 'هاجرت إلى الحبشة'],
+    virtuesEn: ['First woman the Prophet ﷺ married after Khadijah', 'Gave her night to A\'isha out of preference', 'Among the early Muslims', 'Emigrated to Abyssinia'],
+  },
+  {
+    id: 'umm-salama',
+    nameAr: 'أم سلمة هند بنت أبي أمية',
+    nameEn: 'Umm Salamah Hind bint Abi Umayyah',
+    category: 'mothers',
+    brief: 'صاحبة الرأي السديد في صلح الحديبية، آخر أمهات المؤمنين وفاة',
+    briefEn: 'Owner of the wise counsel at Hudaybiyyah, the last of the Mothers of the Believers to die',
+    story: [
+      'هي هند بنت أبي أمية حذيفة المخزومية. أسلمت قديمًا مع زوجها أبي سلمة عبد الله بن عبد الأسد، وكانا من السابقين، وهاجرا إلى الحبشة مرتين، ثم إلى المدينة. أصيب أبو سلمة في غزوة أحد، ومات من جراحه. حزنت عليه أم سلمة حزنًا شديدًا، ودعت بدعاء النبي ﷺ: اللهم أجرني في مصيبتي واخلف لي خيرًا منها. فعوّضها الله بزواج النبي ﷺ.',
+      'تزوجها النبي ﷺ في السنة الرابعة من الهجرة، وكانت أرملة ذات أولاد. كانت من أعقل النساء وأحسنهن رأيًا. في صلح الحديبية، حين أمر النبي ﷺ الصحابة أن يحلقوا وينحروا ولم يبادر أحد إيمانًا منهم بأن الصلح فيه ظلم لهم، استشار النبي ﷺ أم سلمة. أشارت عليه أن يخرج ولا يكلم أحدًا حتى ينحر بنفسه ويحلق. ففعل، فقام الصحابة كلهم يفعلون كما فعل.',
+      'كانت من فقيهات الصحابة، روت عن النبي ﷺ ثلاثمئة وثمانية وسبعين حديثًا. توفيت في خلافة يزيد بن معاوية سنة 61 هـ بالمدينة، وكان عمرها قاربت التسعين. كانت آخر أمهات المؤمنين وفاة، فكان موتها نهاية عصر الزوجات الطاهرات.',
+    ],
+    storyEn: [
+      "She is Hind bint Abi Umayyah Hudhayfah al-Makhzumiyyah. She embraced Islam early with her husband Abu Salamah Abdullah ibn Abd al-Asad; they were among the foremost, and emigrated to Abyssinia twice and then to Madinah. Abu Salamah was wounded at Uhud and died of his wounds. Umm Salamah grieved deeply and supplicated with the supplication the Prophet ﷺ taught: 'O Allah, reward me for my calamity and replace it with something better.' Allah replaced it with marriage to the Prophet ﷺ.",
+      "The Prophet ﷺ married her in the fourth year of the Hijrah; she was a widow with children. She was among the wisest of women with the best counsel. At the Treaty of Hudaybiyyah, when the Prophet ﷺ ordered the Companions to shave and slaughter and none stepped forward — believing there was wrong done to them in the treaty — the Prophet ﷺ consulted Umm Salamah. She advised him to go out, speak to no one, and slaughter and shave himself. He did, and all the Companions rose and did as he did.",
+      "She was among the female jurists of the Companions, narrating from the Prophet ﷺ three hundred and seventy-eight hadiths. She died in Yazid ibn Mu'awiyah's caliphate in 61 AH in Madinah at nearly ninety years of age. She was the last of the Mothers of the Believers to die, marking the end of the era of the pure wives.",
+    ],
+    virtues: ['صاحبة الرأي السديد في الحديبية', 'هاجرت الهجرتين', 'من فقيهات الصحابة', 'آخر أمهات المؤمنين وفاة'],
+    virtuesEn: ['Owner of the wise counsel at Hudaybiyyah', 'Made both emigrations', 'Among the female jurists of the Companions', 'Last of the Mothers of the Believers to die'],
+  },
+  {
+    id: 'zaynab-jahsh',
+    nameAr: 'زينب بنت جحش',
+    nameEn: 'Zaynab bint Jahsh',
+    category: 'mothers',
+    brief: 'التي زوّجها الله من فوق سبع سماوات',
+    briefEn: 'The one whom Allah married to His Messenger from above seven heavens',
+    story: [
+      'هي زينب بنت جحش بن رئاب الأسدية. ابنة عمة النبي ﷺ، فهي ابنة أميمة بنت عبد المطلب. أسلمت قديمًا وهاجرت إلى المدينة. زوّجها النبي ﷺ من زيد بن حارثة مولاه ليكسر بزواجها به الفوارق الطبقية، فقد كانت شريفة قرشية وزيد عبدًا معتقًا.',
+      'لم يدم الزواج طويلًا لاختلاف الطباع. طلقها زيد بعد فترة. أنزل الله في شأنها قرآنًا فريدًا: فلما قضى زيد منها وطرًا زوجناكها لكي لا يكون على المؤمنين حرج في أزواج أدعيائهم إذا قضوا منهن وطرًا. زوّجها الله من نبيه ﷺ مباشرة من فوق سبع سماوات، دون أن يخطبها أحد. كانت تفتخر على زوجات النبي ﷺ وتقول: زوجكن أهاليكن وزوجني الله من فوق سبع سماوات.',
+      'كانت كثيرة الصدقة، تعمل بيدها وتتصدّق بكل ما تكسب. قال النبي ﷺ عنها: أسرعكن لحاقًا بي أطولكن يدًا. ظنّت كل من زوجاته أن المقصود طول اليد الحقيقية. وكانت أم المؤمنين سودة أطولهن. لكن بعد سنوات، ماتت زينب أولًا، فعلمن أن المقصود طول اليد في الصدقة. توفيت سنة 20 هـ في خلافة عمر، ودُفنت بالبقيع.',
+    ],
+    storyEn: [
+      "She is Zaynab bint Jahsh ibn Ri'ab al-Asadiyyah. The cousin of the Prophet ﷺ, daughter of Umaymah bint Abd al-Muttalib. She embraced Islam early and emigrated to Madinah. The Prophet ﷺ married her to Zayd ibn Harithah, his freed slave, to break class distinctions through her marriage to him — she was a noble Qurashi and Zayd was a freed slave.",
+      "The marriage did not last long due to differences in temperament. Zayd divorced her after a period. Allah revealed about her a unique Qur'an: 'When Zayd had no further need of her, We married her to you, so that there should be no difficulty for the believers concerning the wives of their adopted sons when they have no further need of them.' Allah married her to His Prophet ﷺ directly from above seven heavens, with no human proposing. She used to take pride before the Prophet's wives, saying: 'Your families married you off, but Allah married me from above seven heavens.'",
+      "She was much given to charity, working with her hand and giving everything she earned. The Prophet ﷺ said about her: 'The first of you to follow me will be the one with the longest hand.' Each of his wives thought the longest physical hand was meant; Mother of the Believers Sawdah was the tallest. But years later, Zaynab died first, and they knew the longest hand meant the longest in charity. She died in 20 AH in Umar's caliphate and was buried in al-Baqi'.",
+    ],
+    virtues: ['زوّجها الله من فوق سبع سماوات', 'أطول زوجات النبي ﷺ يدًا بالصدقة', 'ابنة عمة النبي ﷺ', 'أول من لحق بالنبي بعد وفاته من زوجاته'],
+    virtuesEn: ['Married to the Prophet ﷺ from above seven heavens', 'The Prophet\'s wife with the longest hand in charity', 'The Prophet\'s ﷺ cousin', 'The first of his wives to follow him after his death'],
+  },
+  {
+    id: 'juwayriyya',
+    nameAr: 'جويرية بنت الحارث',
+    nameEn: 'Juwayriyya bint al-Harith',
+    category: 'mothers',
+    brief: 'أعتق بزواجها مئة بيت من بني المصطلق',
+    briefEn: 'Through her marriage, a hundred households of Banu al-Mustaliq were freed',
+    story: [
+      'هي جويرية بنت الحارث بن أبي ضرار، سيد بني المصطلق من خزاعة. وقعت في الأسر بعد غزوة بني المصطلق سنة 5 هـ. كان والدها سيدًا، وقد كرهت أن تكون أمَةً عند صحابي. سألت النبي ﷺ أن يعينها على فدائها من ثابت بن قيس بن شماس الذي وقعت في سهمه.',
+      'فقال لها النبي ﷺ: أو خيرٌ من ذلك؟ قالت: وما هو يا رسول الله؟ قال: أقضي عنك كتابتك وأتزوجك. قالت: نعم يا رسول الله. تزوجها النبي ﷺ. لما سمع الصحابة بزواجها، قالوا: أصهار رسول الله ﷺ. فأطلقوا ما بأيديهم من سبي بني المصطلق. أعتق بزواجها مئة بيت من قومها.',
+      'قالت عائشة: ما رأينا امرأة أعظم بركة على قومها منها. كانت أم المؤمنين كثيرة العبادة. روى مسلم أن النبي ﷺ خرج من عندها لصلاة الصبح وهي في مصلاها، ثم رجع قبل الضحى فوجدها في مصلاها. قال: ما زلتِ على الحال التي فارقتك عليها؟ قالت: نعم. توفيت سنة 56 هـ، ودُفنت بالبقيع.',
+    ],
+    storyEn: [
+      "She is Juwayriyya bint al-Harith ibn Abi Dirar, chief of Banu al-Mustaliq of Khuza'ah. She was captured after the Battle of Banu al-Mustaliq in 5 AH. Her father was a chief, and she disliked being a slave-girl to a Companion. She asked the Prophet ﷺ to help her with her ransom from Thabit ibn Qays ibn Shammas, in whose share she had fallen.",
+      "The Prophet ﷺ said to her: 'Or shall I offer you something better?' She said: 'What is it, O Messenger of Allah?' He said: 'I will pay your contract for you and marry you.' She said: 'Yes, O Messenger of Allah.' The Prophet ﷺ married her. When the Companions heard of her marriage, they said: 'In-laws of the Messenger of Allah ﷺ.' They released all the captives of Banu al-Mustaliq in their possession. Through her marriage a hundred households of her people were freed.",
+      "A'isha said: 'We have not seen a woman greater in blessing to her people than her.' The Mother of the Believers was much given to worship. Muslim narrated that the Prophet ﷺ left her at Fajr while she was in her place of prayer, returned before Duha, and found her still in her place of prayer. He said: 'Are you still in the state I left you in?' She said: 'Yes.' She died in 56 AH and was buried in al-Baqi'.",
+    ],
+    virtues: ['أعتق بزواجها مئة بيت', 'كثيرة الذكر والعبادة', 'بنت سيد بني المصطلق', 'بركة على قومها'],
+    virtuesEn: ['Through her marriage 100 households were freed', 'Much given to remembrance and worship', 'Daughter of the chief of Banu al-Mustaliq', 'A blessing upon her people'],
+  },
+  {
+    id: 'safiyya',
+    nameAr: 'صفية بنت حيي',
+    nameEn: 'Safiyya bint Huyayy',
+    category: 'mothers',
+    brief: 'بنت سيد بني النضير، صبرت على فقد أهلها وأسلمت',
+    briefEn: 'Daughter of the chief of Banu al-Nadir, who bore the loss of her family and embraced Islam',
+    story: [
+      'هي صفية بنت حيي بن أخطب، سيد بني النضير من يهود المدينة، تنتسب إلى هارون أخي موسى عليهما السلام. سُبيت في غزوة خيبر سنة 7 هـ بعد أن قُتل أبوها وزوجها في المعركة. وقعت في سهم دحية الكلبي أولًا، ثم اشتراها النبي ﷺ منه وأعتقها وتزوجها، وجعل عتقها صداقها.',
+      'كانت صفية ذات عقل وأدب. واجهت في بيت النبي ﷺ بعض الأذى من أمهات المؤمنين بسبب أصلها اليهودي. شكت إلى النبي ﷺ مرة أن نساءه يعيّرنها بأنها بنت يهودي. علّمها النبي ﷺ كيف ترد بحكمة، قال لها: قولي لهنّ: إن أبي هارون وعمي موسى وزوجي محمد. لما قالت ذلك، سكتن ولم يجدن ردًّا.',
+      'كانت تحب النبي ﷺ حبًا شديدًا. في مرض النبي ﷺ الأخير، قالت: يا رسول الله، والله لوددت أن الذي بك بي. ظنّ بعض زوجاته أنها تتظاهر، فعرف النبي ﷺ نواياهن وقال: إنها لصادقة. توفيت سنة 50 هـ في خلافة معاوية، ودُفنت بالبقيع. تركت بمالها ثلث ميراثها لابن أخت لها كان يهوديًا، رحمةً بقرابتها.',
+    ],
+    storyEn: [
+      "She is Safiyya bint Huyayy ibn Akhtab, chief of Banu al-Nadir of the Jews of Madinah, descending from Harun, brother of Musa. She was captured at the Battle of Khaybar in 7 AH after her father and husband were killed in the battle. She first fell in the share of Dihyah al-Kalbi, then the Prophet ﷺ bought her from him, freed her, married her, and made her freeing her dowry.",
+      "Safiyya was wise and refined. In the Prophet's ﷺ house she faced some harm from the Mothers of the Believers because of her Jewish origin. She once complained to the Prophet ﷺ that his wives taunted her with being a Jew's daughter. The Prophet ﷺ taught her how to reply wisely: 'Say to them: My father is Harun, my uncle is Musa, and my husband is Muhammad.' When she said this, they were silent and found no reply.",
+      "She loved the Prophet ﷺ deeply. In the Prophet's ﷺ final illness she said: 'O Messenger of Allah, by Allah, I wish what is upon you were upon me.' Some of his wives thought she pretended, but the Prophet ﷺ knew their intentions and said: 'She is truthful.' She died in 50 AH in Mu'awiyah's caliphate and was buried in al-Baqi'. She left from her wealth a third of her inheritance to a sister's son who was Jewish, out of mercy to her relatives.",
+    ],
+    virtues: ['من نسل هارون عليه السلام', 'صبرت على فقد أهلها', 'ذكية حكيمة الرد', 'أوصت لقرابتها اليهود رحمةً'],
+    virtuesEn: ['Descended from Harun, peace be upon him', 'Bore the loss of her family with patience', 'Wise and clever in reply', 'Bequeathed to her Jewish relatives out of mercy'],
+  },
+  {
+    id: 'umm-habiba',
+    nameAr: 'أم حبيبة رملة بنت أبي سفيان',
+    nameEn: 'Umm Habibah Ramlah bint Abi Sufyan',
+    category: 'mothers',
+    brief: 'هاجرت إلى الحبشة، وزوّجها النجاشي بالنيابة عن النبي ﷺ',
+    briefEn: 'Emigrated to Abyssinia; the Negus contracted her marriage on the Prophet\'s ﷺ behalf',
+    story: [
+      'هي رملة بنت أبي سفيان بن حرب الأموية. ابنة أبي سفيان زعيم قريش في الجاهلية. أسلمت قبل أبيها بسنوات، وهاجرت مع زوجها عبيد الله بن جحش إلى الحبشة. كان زوجها قد ارتد عن الإسلام في الحبشة وتنصّر، فهجرته وثبتت على دينها.',
+      'لما علم النبي ﷺ بحالها، أرسل إلى النجاشي ملك الحبشة يخطبها من رسوله. وافق النجاشي، وقام بالعقد بنفسه نيابةً عن النبي ﷺ، وأمهرها أربعمئة دينار من ماله الخاص. كانت هذه الزيجة من أعجب الزيجات: زوج في المدينة، زوجة في الحبشة، ووليّ ملك مسلم في إفريقيا.',
+      'رجعت إلى المدينة سنة 7 هـ بعد فتح خيبر. لما دخلت بيت النبي ﷺ، كان أبوها أبو سفيان لا يزال مشركًا. زاره مرة في المدينة فأراد أن يجلس على فراش النبي ﷺ، فطوته دونه. سألها: يا بنية، أرغبت بهذا الفراش عني، أم رغبت بي عنه؟ قالت: بل هو فراش رسول الله ﷺ، وأنت رجل مشرك نجس. قال: لقد أصابك يا بنية بعدي شر. لاحقًا أسلم أبو سفيان في فتح مكة. توفيت أم حبيبة سنة 44 هـ.',
+    ],
+    storyEn: [
+      "She is Ramlah bint Abi Sufyan ibn Harb al-Umawiyyah. Daughter of Abu Sufyan, chief of Quraysh in the Jahiliyyah. She embraced Islam years before her father and emigrated with her husband Ubaydullah ibn Jahsh to Abyssinia. Her husband had apostatised from Islam in Abyssinia and become a Christian. She left him and stood firm on her religion.",
+      "When the Prophet ﷺ learned of her condition, he sent to the Negus, king of Abyssinia, to propose to her from his messenger. The Negus agreed and conducted the contract himself on the Prophet's ﷺ behalf, paying her a dowry of four hundred dinars from his own wealth. This marriage was among the most remarkable: a husband in Madinah, a wife in Abyssinia, and a Muslim king as guardian in Africa.",
+      "She returned to Madinah in 7 AH after the conquest of Khaybar. When she entered the Prophet's ﷺ house, her father Abu Sufyan was still a polytheist. He visited her once in Madinah and wanted to sit on the Prophet's ﷺ bed; she folded it away from him. He asked: 'My daughter, did you keep this bed from me, or did you keep me from it?' She said: 'Rather, it is the bed of the Messenger of Allah ﷺ, and you are a polytheist, impure man.' He said: 'Some evil has touched you after me, my daughter.' Abu Sufyan later embraced Islam at the conquest of Makkah. Umm Habibah died in 44 AH.",
+    ],
+    virtues: ['هاجرت إلى الحبشة', 'زوّجها النجاشي بأمر النبي ﷺ', 'ثبتت على دينها رغم ردة زوجها', 'ابنة أبي سفيان زعيم قريش'],
+    virtuesEn: ['Emigrated to Abyssinia', 'The Negus married her to the Prophet ﷺ', 'Stood firm despite her husband\'s apostasy', 'Daughter of Abu Sufyan, chief of Quraysh'],
+  },
+  {
+    id: 'maymuna',
+    nameAr: 'ميمونة بنت الحارث',
+    nameEn: 'Maymunah bint al-Harith',
+    category: 'mothers',
+    brief: 'آخر من تزوجها النبي ﷺ، توفيت حيث تزوجها',
+    briefEn: 'The last woman the Prophet ﷺ married; she died where he married her',
+    story: [
+      'هي ميمونة بنت الحارث الهلالية. أختها أم الفضل لبابة زوجة العباس عم النبي ﷺ. تزوجها النبي ﷺ سنة 7 هـ في عمرة القضاء بمكان اسمه سَرِف قرب مكة. كانت أرملة، وهي آخر من تزوج النبي ﷺ من النساء.',
+      'كانت ميمونة من الفقيهات الصوّامات القوّامات. روت عن النبي ﷺ ستة وأربعين حديثًا، اشتهرت بالأحاديث الفقهية في الطهارة والغسل والصيام. كان ابن أختها ابن عباس يتعلم منها كثيرًا من فقه النساء، ومن ذلك حديث المبيت في بيتها الذي اشتهر برؤية ابن عباس صلاة النبي ﷺ في الليل.',
+      'توفيت ميمونة سنة 51 هـ بنفس المكان الذي تزوجها فيه النبي ﷺ — سَرِف. كانت ذاهبة من المدينة إلى مكة، فمرضت في الطريق وماتت في سَرِف. دفنت هناك. وقفت عائشة على قبرها وقالت: لقد تزوجها رسول الله ﷺ في سرف وماتت في سرف، فدفناها في موضع بنائها بها. سبحان الذي بدأها أنشأها زوجة هناك، وأرجعها روحها هناك.',
+    ],
+    storyEn: [
+      "She is Maymunah bint al-Harith al-Hilaliyyah. Her sister Umm al-Fadl Lubabah was the wife of al-Abbas, the Prophet's ﷺ uncle. The Prophet ﷺ married her in 7 AH at the Compensatory Umrah at a place called Sarif near Makkah. She was a widow, and she was the last woman the Prophet ﷺ married.",
+      "Maymunah was among the female jurists, much given to fasting and night prayer. She narrated from the Prophet ﷺ forty-six hadiths and was famous for jurisprudential hadiths on purity, ritual washing, and fasting. Her nephew Ibn Abbas learned much women's jurisprudence from her, including the famous hadith of his night in her house where Ibn Abbas saw the Prophet ﷺ pray at night.",
+      "Maymunah died in 51 AH in the very place the Prophet ﷺ had married her — Sarif. She was traveling from Madinah to Makkah, fell ill on the road, and died at Sarif. She was buried there. A'isha stood over her grave and said: 'The Messenger of Allah ﷺ married her at Sarif, and she died at Sarif, and we buried her in the very place of her consummation.' Glory to the One who began her as a wife there and returned her soul there.",
+    ],
+    virtues: ['آخر من تزوجها النبي ﷺ', 'فقيهة محدّثة', 'خالة ابن عباس ترجمان القرآن', 'ماتت حيث تزوجها بسَرِف'],
+    virtuesEn: ['Last woman the Prophet ﷺ married', 'A jurist and narrator of hadith', 'Aunt of Ibn Abbas, Translator of the Qur\'an', 'Died where she was married, at Sarif'],
+  },
+  {
+    id: 'zaynab-khuzayma',
+    nameAr: 'زينب بنت خزيمة (أم المساكين)',
+    nameEn: 'Zaynab bint Khuzaymah (Mother of the Poor)',
+    category: 'mothers',
+    brief: 'لُقّبت بأم المساكين لكثرة إطعامها الفقراء',
+    briefEn: 'Nicknamed "Mother of the Poor" for her frequent feeding of the destitute',
+    story: [
+      'هي زينب بنت خزيمة بن الحارث العامرية الهلالية. كانت قبل الإسلام تُلقّب بـ أم المساكين لشدة كرمها على الفقراء، وكثرة إطعامها لهم. تزوجها قبل النبي ﷺ عبيدة بن الحارث بن المطلب، فاستشهد في غزوة بدر.',
+      'تزوجها النبي ﷺ في السنة الثالثة من الهجرة بعد وفاة عبيدة. كانت تكره أن يفوتها النبي ﷺ، فلما عرضها عليها قبلت في الحال. لم تمكث في بيت النبي ﷺ طويلًا — يقول أكثر العلماء إنها مكثت ثمانية أشهر فقط أو نحوها، ثم توفيت.',
+      'صلى عليها النبي ﷺ ودفنها بالبقيع. كانت أول زوجة للنبي ﷺ تموت في حياته بعد خديجة. لم تترك أولادًا منه. بقيت سيرتها في الذاكرة الإسلامية كنموذج للمرأة الكريمة، التي يفتح بيتها للفقراء قبل أن يعرفهم أحد. ذكرها يبقى علامةً على أن الكرم مع المحتاج طريق إلى محبة الناس وذكرهم الحسن.',
+    ],
+    storyEn: [
+      "She is Zaynab bint Khuzaymah ibn al-Harith al-Amiriyyah al-Hilaliyyah. Before Islam she was nicknamed 'Mother of the Poor' for her great generosity to the destitute and her frequent feeding of them. Before the Prophet ﷺ she married Ubaydah ibn al-Harith ibn al-Muttalib, who was martyred at the Battle of Badr.",
+      "The Prophet ﷺ married her in the third year of the Hijrah after Ubaydah's death. She disliked missing the Prophet ﷺ, so when he offered marriage she accepted at once. She did not stay in the Prophet's ﷺ house long — most scholars say she stayed only about eight months — then she died.",
+      "The Prophet ﷺ prayed over her and buried her in al-Baqi'. She was the first of the Prophet's ﷺ wives to die in his lifetime after Khadijah. She left no children from him. Her life remained in Islamic memory as a model of the generous woman who opens her house to the poor before anyone knows them. Her remembrance is a sign that generosity to the needy is a road to people's love and good remembrance.",
+    ],
+    virtues: ['أم المساكين', 'أول زوجات النبي ﷺ موتًا بعد خديجة', 'أرملة شهيد بدر', 'لم تمكث في بيت النبي طويلًا'],
+    virtuesEn: ['Mother of the Poor', 'First of the Prophet\'s ﷺ wives to die after Khadijah', 'Widow of a martyr of Badr', 'Did not stay in the Prophet\'s house long'],
+  },
+
+  // ───────────────────── الأنصار (تكملة) ─────────────────────
+  {
+    id: 'ubayy',
+    nameAr: 'أُبيّ بن كعب',
+    nameEn: 'Ubayy ibn Ka\'b',
+    category: 'ansar',
+    brief: 'سيد القراء، وأقرأ الأمة لكتاب الله',
+    briefEn: 'Master of the reciters, and the most learned in reciting the Book of Allah',
+    story: [
+      'هو أُبيّ بن كعب بن قيس الأنصاري الخزرجي النجاري. من سادة الأنصار. أسلم في بيعة العقبة الثانية، فهو من السابقين. كان من القلائل في يثرب الذين يقرأون ويكتبون. اختاره النبي ﷺ من كتاب الوحي.',
+      'كان أعلم الصحابة بالقرآن. قال النبي ﷺ: أقرؤكم أُبيّ. وقال: إن الله أمرني أن أقرأ عليك القرآن. قال أُبيّ: آلله سمّاني لك؟ قال النبي: نعم. فبكى أُبيّ وقال: وقد ذُكرت عند رب العالمين؟ قال: نعم. فبكى أُبيّ بكاءً شديدًا. هذه شهادة من السماء بأن أُبيّ سيد القراء.',
+      'روى عن النبي ﷺ مئة وأربعة وستين حديثًا. شهد بدرًا وأحدًا والخندق وسائر الغزوات. كان من جامعي القرآن في حياة النبي ﷺ. في خلافة عثمان، كان أحد الأربعة الذين كلّفهم عثمان بنسخ المصحف العثماني. توفي في خلافة عثمان سنة 32 هـ بالمدينة.',
+    ],
+    storyEn: [
+      "He is Ubayy ibn Ka'b ibn Qays al-Ansari al-Khazraji al-Najjari. Among the chiefs of the Ansar. He embraced Islam at the Second Pledge of Aqabah, among the foremost. He was among the few in Yathrib who could read and write. The Prophet ﷺ chose him as one of the scribes of revelation.",
+      "He was the most knowledgeable of the Companions in the Qur'an. The Prophet ﷺ said: 'The best reciter among you is Ubayy.' He also said: 'Allah has commanded me to recite the Qur'an to you.' Ubayy said: 'Did Allah name me to you?' The Prophet said: 'Yes.' Ubayy wept and said: 'I have been mentioned before the Lord of the Worlds?' He said: 'Yes.' Ubayy wept greatly. This is a testimony from the sky that Ubayy is the master of reciters.",
+      "He narrated from the Prophet ﷺ one hundred and sixty-four hadiths. He witnessed Badr, Uhud, the Trench, and the rest of the battles. He was among those who collected the Qur'an in the Prophet's ﷺ lifetime. In Uthman's caliphate he was one of the four whom Uthman charged with copying the Uthmanic Mushaf. He died in Uthman's caliphate in 32 AH in Madinah.",
+    ],
+    virtues: ['سيد القراء', 'كاتب الوحي', 'جامع للقرآن في حياة النبي', 'قرأ الله عليه القرآن من فوق سبع سماوات'],
+    virtuesEn: ['Master of the reciters', 'Scribe of revelation', 'Collected the Qur\'an in the Prophet\'s lifetime', 'Allah recited the Qur\'an to him from above seven heavens'],
+  },
+  {
+    id: 'ubada',
+    nameAr: 'عبادة بن الصامت',
+    nameEn: 'Ubadah ibn al-Samit',
+    category: 'ansar',
+    brief: 'أحد النقباء في بيعة العقبة، فاتح حمص وقاضيها',
+    briefEn: 'One of the chiefs at the Pledge of Aqabah, conqueror and judge of Homs',
+    story: [
+      'هو عبادة بن الصامت بن قيس الأنصاري الخزرجي. كان من النقباء الاثني عشر الذين بايعوا النبي ﷺ في بيعة العقبة الثانية. شارك في كل غزوات النبي ﷺ. كان طويل القامة، شجاعًا، صريحًا في الحق لا يخاف لومة لائم.',
+      'كان من حافظي القرآن في حياة النبي ﷺ، ومن مفسّريه. أُرسل إلى أهل الصُّفّة يعلّمهم القرآن. هو الذي روى حديث: لا ضرر ولا ضرار، وأحاديث كثيرة في الأحكام والمعاملات. في خلافة عمر، أرسله إلى الشام مع معاذ بن جبل وأبي الدرداء لتعليم الناس الإسلام.',
+      'تولى قضاء حمص وفلسطين. كان قاضيًا صارمًا، لا يخاف من أحد. لما رأى من معاوية بن أبي سفيان أمرًا يخالف الشرع، أنكر عليه، فكتب معاوية إلى عثمان يشكوه. كتب عثمان لمعاوية: خل بين عبادة وبين الشام، فإنما أراد ما أنزل الله. توفي بفلسطين سنة 34 هـ، ودُفن في الرملة، وقبره معروف بها إلى اليوم.',
+    ],
+    storyEn: [
+      "He is Ubadah ibn al-Samit ibn Qays al-Ansari al-Khazraji. He was one of the twelve chiefs who pledged to the Prophet ﷺ at the Second Pledge of Aqabah. He participated in every campaign of the Prophet ﷺ. He was tall, brave, and candid in truth, fearing no blamer's blame.",
+      "He was among the memorisers of the Qur'an in the Prophet's ﷺ lifetime and among its interpreters. He was sent to the people of al-Suffah to teach them the Qur'an. He narrated the hadith: 'No harm and no reciprocal harm,' and many hadiths on rulings and dealings. In Umar's caliphate he was sent to Sham with Mu'adh ibn Jabal and Abu al-Darda' to teach the people Islam.",
+      "He took the judgeship of Homs and Palestine. He was a strict judge, fearing no one. When he saw Mu'awiyah ibn Abi Sufyan doing something against the Shari'ah, he objected. Mu'awiyah wrote to Uthman complaining. Uthman wrote to Mu'awiyah: 'Leave Ubadah alone with Sham; he only wants what Allah revealed.' He died in Palestine in 34 AH and was buried in al-Ramlah, his grave is known there to this day.",
+    ],
+    virtues: ['أحد النقباء الاثني عشر', 'صريح في الحق لا يخاف لومة لائم', 'قاضي حمص وفلسطين', 'علّم أهل الشام القرآن'],
+    virtuesEn: ['One of the twelve chiefs', 'Candid in truth, fearing no blame', 'Judge of Homs and Palestine', 'Taught the people of Sham the Qur\'an'],
+  },
+  {
+    id: 'usayd',
+    nameAr: 'أُسيد بن حُضير',
+    nameEn: 'Usayd ibn Hudayr',
+    category: 'ansar',
+    brief: 'من السبعين في بيعة العقبة، الذي اختلطت أصوات الملائكة بقراءته',
+    briefEn: 'One of the seventy at the Pledge of Aqabah, whose recitation the angels mingled with',
+    story: [
+      'هو أُسيد بن حُضير بن سماك الأنصاري الأوسي. ابن خال سعد بن معاذ. أسلم على يد مصعب بن عمير قبل بيعة العقبة الكبرى. كان من سادات الأوس، رجلًا حكيمًا فطنًا. لما أسلم، تبعه قومه بنو عبد الأشهل في الإسلام.',
+      'شارك في غزوات النبي ﷺ ابتداءً من بدر. كان من أحسن الصحابة صوتًا في قراءة القرآن. روى البخاري ومسلم أنه قرأ ليلةً سورة البقرة، وفرسه مربوطة بقربه، فاضطرب الفرس. أمسك عن القراءة فهدأ. ثم قرأ، فاضطرب الفرس مرة أخرى. خشي أُسيد على ابنه يحيى الصغير الذي كان قريبًا، فالتفت. فرأى مثل الظلة فيها مصابيح تعرج إلى السماء.',
+      'لما أخبر النبي ﷺ، قال: تلك الملائكة كانت تستمع لك. لو قرأت لأصبحت الملائكة لا تتوارى منك ينظر إليها الناس. هذه شهادة عظيمة — ملائكة تنزل من السماء لتستمع لرجل يقرأ القرآن. توفي أُسيد في خلافة عمر سنة 20 هـ، وحمل عمر جنازته بنفسه، ودفنه بالبقيع.',
+    ],
+    storyEn: [
+      "He is Usayd ibn Hudayr ibn Simak al-Ansari al-Awsi. The cousin of Sa'd ibn Mu'adh. He embraced Islam at the hand of Mus'ab ibn Umayr before the Great Pledge of Aqabah. He was among the chiefs of the Aws, wise and astute. When he embraced Islam, his people Banu Abd al-Ashhal followed him into Islam.",
+      "He participated in the campaigns of the Prophet ﷺ starting from Badr. He had one of the most beautiful voices among the Companions in reciting the Qur'an. Bukhari and Muslim narrated that he was reciting Surah al-Baqarah one night with his horse tied near him, and the horse stirred. He stopped reciting and it calmed. He recited again, and the horse stirred again. Usayd feared for his young son Yahya who was nearby, so he turned. He saw something like a canopy with lamps ascending to the sky.",
+      "When he informed the Prophet ﷺ, he said: 'Those were the angels listening to you. Had you recited more, the angels would not have hidden from you in the morning; people would see them.' This is a great testimony — angels descending from the sky to listen to a man recite the Qur'an. Usayd died in Umar's caliphate in 20 AH; Umar carried his bier himself and buried him in al-Baqi'.",
+    ],
+    virtues: ['اختلطت قراءته بأصوات الملائكة', 'أسلمت قبيلته بإسلامه', 'من النقباء الاثني عشر', 'حمل عمر بن الخطاب جنازته'],
+    virtuesEn: ['His recitation was mingled with the voices of the angels', 'His tribe embraced Islam through his Islam', 'One of the twelve chiefs', 'Umar ibn al-Khattab carried his bier'],
+  },
+  {
+    id: 'jabir',
+    nameAr: 'جابر بن عبد الله',
+    nameEn: 'Jabir ibn Abdullah',
+    category: 'ansar',
+    brief: 'من حفظة الحديث، روى عن النبي ﷺ 1540 حديثًا',
+    briefEn: 'A memoriser of hadith, narrating 1,540 hadiths from the Prophet ﷺ',
+    story: [
+      'هو جابر بن عبد الله بن عمرو بن حرام الأنصاري الخزرجي السلمي. وُلد قبل الهجرة بنحو 16 سنة. أبوه عبد الله من النقباء الاثني عشر، استشهد في غزوة أحد. كان جابر صغيرًا يومئذ. شارك في غزوات النبي ﷺ بعد ذلك ابتداءً من الخندق، وقيل شهد 19 غزوة.',
+      'حدثت معه قصة عجيبة في غزوة ذات الرقاع. كان مع النبي ﷺ في الطريق، فاحتاج جابر إلى أن يعود إلى المدينة. أمر النبي ﷺ جمله أن يكون قويًا، فصار جمله أسبق جمل في الجيش. ثم اشترى النبي ﷺ منه الجمل بأوقية، واشترط أن يحمله إلى المدينة، فحمله جابر. وفي المدينة، أعطاه النبي ﷺ الجمل هدية مع ثمنه. كرم النبي ﷺ.',
+      'أبوه عبد الله استشهد في أحد، وترك ديونًا كثيرة على ولده جابر. اشتدت ديونه. ذهب إلى النبي ﷺ يطلب الدعاء. دعا النبي ﷺ، فأنبت الله في بستان جابر تمرًا كثيرًا قضى به ديون أبيه. كان من فقهاء الصحابة، روى عن النبي ﷺ 1540 حديثًا، فهو من أكثر الصحابة رواية. توفي بالمدينة سنة 78 هـ وعمره 94 سنة، وكان آخر من توفي من الصحابة بالمدينة.',
+    ],
+    storyEn: [
+      "He is Jabir ibn Abdullah ibn Amr ibn Haram al-Ansari al-Khazraji al-Sulami. He was born about 16 years before the Hijrah. His father Abdullah was one of the twelve chiefs and was martyred at the Battle of Uhud. Jabir was young at the time. He participated in the campaigns of the Prophet ﷺ afterward starting from the Trench; it is said he witnessed 19 campaigns.",
+      "A remarkable story happened with him at the campaign of Dhat al-Riqa'. He was with the Prophet ﷺ on the road and needed to return to Madinah. The Prophet ﷺ ordered his camel to be strong, and his camel became the fastest in the army. The Prophet ﷺ then bought the camel from him for an ounce, stipulating that he carry him to Madinah, which Jabir did. In Madinah, the Prophet ﷺ gave him the camel as a gift with its price. The Prophet's ﷺ generosity.",
+      "His father Abdullah was martyred at Uhud, leaving many debts upon his son Jabir. His debts pressed heavily. He went to the Prophet ﷺ requesting supplication. The Prophet ﷺ supplicated, and Allah caused much fruit to grow in Jabir's garden, with which he paid his father's debts. He was among the jurists of the Companions, narrating 1,540 hadiths from the Prophet ﷺ, making him among the most prolific narrators. He died in Madinah in 78 AH at 94 years old, the last Companion to die in Madinah.",
+    ],
+    virtues: ['روى 1540 حديثًا عن النبي', 'ابن شهيد أحد', 'دعا له النبي فقضى دينه', 'آخر صحابي توفي بالمدينة'],
+    virtuesEn: ['Narrated 1,540 hadiths from the Prophet', 'Son of a martyr of Uhud', 'The Prophet supplicated and his debt was paid', 'Last Companion to die in Madinah'],
+  },
+  {
+    id: 'anas',
+    nameAr: 'أنس بن مالك',
+    nameEn: 'Anas ibn Malik',
+    category: 'ansar',
+    brief: 'خادم رسول الله ﷺ، عاش معه عشر سنين، ثاني أكثر الصحابة رواية للحديث',
+    briefEn: 'Servant of the Messenger of Allah ﷺ, lived with him for ten years, second-most prolific narrator of hadith',
+    story: [
+      'هو أنس بن مالك بن النضر الأنصاري الخزرجي النجاري. وُلد قبل الهجرة بعشر سنين. أمه أم سُليم بنت ملحان — التي مهرها الإسلام (انظر قصصها). لما هاجر النبي ﷺ إلى المدينة، جاءت به أمه إليه وقالت: يا رسول الله، هذا أنس غلامك، يخدمك. فقبله النبي ﷺ. كان عمره عشر سنين.',
+      'خدم النبي ﷺ عشر سنين كاملة، حتى توفي ﷺ. قال أنس: خدمتُ رسول الله ﷺ عشر سنين، فما قال لي لشيء فعلتُه: لمَ فعلت؟ ولا لشيء لم أفعله: لمَ لم تفعل؟ كان لطيفًا مع غلمانه أعظم اللطف. دعا له النبي ﷺ: اللهم أكثر ماله وولده، وبارك له فيما أعطيته.',
+      'استجاب الله الدعاء. عاش أنس 103 سنين، وكان من أغنى الأنصار، ورأى من ولده وولد ولده أكثر من مئة. روى عن النبي ﷺ 2286 حديثًا، فهو ثاني أكثر الصحابة رواية بعد أبي هريرة. توفي بالبصرة سنة 93 هـ، وكان آخر صحابي توفي بها، وفي عمومًا من آخر الصحابة وفاة.',
+    ],
+    storyEn: [
+      "He is Anas ibn Malik ibn al-Nadr al-Ansari al-Khazraji al-Najjari. He was born ten years before the Hijrah. His mother was Umm Sulaym bint Milhan — whose dowry was Islam (see her story). When the Prophet ﷺ emigrated to Madinah, his mother brought him and said: 'O Messenger of Allah, this is Anas, your servant boy, to serve you.' The Prophet ﷺ accepted him. He was ten years old.",
+      "He served the Prophet ﷺ a full ten years until the Prophet ﷺ died. Anas said: 'I served the Messenger of Allah ﷺ ten years, and he never said to me for something I did: Why did you do it? Nor for something I did not do: Why did you not do it?' He was the gentlest of people with his servants. The Prophet ﷺ supplicated for him: 'O Allah, increase his wealth and children, and bless him in what You have given him.'",
+      "Allah answered the supplication. Anas lived 103 years, was among the wealthiest of the Ansar, and saw of his children and grandchildren more than a hundred. He narrated from the Prophet ﷺ 2,286 hadiths, the second-most prolific Companion after Abu Hurayrah. He died in Basra in 93 AH, the last Companion to die there, and generally among the last of the Companions to die.",
+    ],
+    virtues: ['خادم رسول الله ﷺ عشر سنين', 'دعا له النبي بطول العمر والمال والولد', 'روى 2286 حديثًا', 'آخر الصحابة بالبصرة'],
+    virtuesEn: ['Served the Messenger of Allah ﷺ for ten years', 'The Prophet supplicated for long life, wealth, and children', 'Narrated 2,286 hadiths', 'Last Companion to die in Basra'],
+  },
+
+  // ───────────────────── المهاجرون (تكملة) ─────────────────────
+  {
+    id: 'abu-hurayra',
+    nameAr: 'أبو هريرة عبد الرحمن بن صخر الدوسي',
+    nameEn: 'Abu Hurayrah Abd al-Rahman ibn Sakhr al-Dawsi',
+    category: 'muhajirun',
+    brief: 'أكثر الصحابة رواية للحديث، روى عن النبي 5374 حديثًا',
+    briefEn: 'Most prolific narrator of hadith, narrating 5,374 hadiths from the Prophet',
+    story: [
+      'هو عبد الرحمن بن صخر الدوسي من قبيلة دوس باليمن. كني أبا هريرة لأنه كان يحمل هرة صغيرة دائمًا. أسلم على يد الطفيل بن عمرو الدوسي في اليمن قبل الهجرة، ثم هاجر إلى المدينة سنة 7 هـ بعد فتح خيبر.',
+      'لازم النبي ﷺ ثلاث سنين فقط — من السنة 7 إلى السنة 11 هـ — لكنه كان من أحرص الناس على العلم. ترك التجارة والكسب وآثر صحبة النبي ﷺ. كان من أهل الصُّفة الذين يعيشون في المسجد على ما يأتيهم من الصدقة. كان دائم الجلوس عند النبي ﷺ، يستمع ويحفظ.',
+      'دعا له النبي ﷺ بحفظ العلم. قال أبو هريرة: قلت يا رسول الله، إني أسمع منك حديثًا كثيرًا أنساه. قال: ابسط رداءك. فبسطه، فحدّث ثم قال: ضمّه. فضمّه. قال أبو هريرة: فما نسيتُ شيئًا بعده. روى 5374 حديثًا، فهو أكثر الصحابة رواية. تولى إمارة المدينة في خلافة مروان بن الحكم. توفي بالمدينة سنة 57 أو 58 هـ.',
+    ],
+    storyEn: [
+      "He is Abd al-Rahman ibn Sakhr al-Dawsi of the tribe of Daws in Yemen. He was nicknamed Abu Hurayrah (Father of the Kitten) because he always carried a small kitten. He embraced Islam at the hand of al-Tufayl ibn Amr al-Dawsi in Yemen before the Hijrah, then emigrated to Madinah in 7 AH after the conquest of Khaybar.",
+      "He accompanied the Prophet ﷺ only three years — from 7 to 11 AH — but was the most eager of people for knowledge. He left trade and earning and preferred the company of the Prophet ﷺ. He was among the People of al-Suffah who lived in the mosque on charity. He was constantly seated by the Prophet ﷺ, listening and memorising.",
+      "The Prophet ﷺ supplicated for him with the memorisation of knowledge. Abu Hurayrah said: 'I said: O Messenger of Allah, I hear from you much hadith and I forget it.' He said: 'Spread out your cloak.' He spread it; the Prophet spoke, then said: 'Wrap it.' He wrapped it. Abu Hurayrah said: 'I have not forgotten anything after it.' He narrated 5,374 hadiths, the most of any Companion. He took the governorship of Madinah in Marwan ibn al-Hakam's caliphate. He died in Madinah in 57 or 58 AH.",
+    ],
+    virtues: ['أكثر الصحابة رواية للحديث', 'دعا له النبي بحفظ العلم', 'من أهل الصُّفّة', 'لزم النبي ﷺ لطلب العلم'],
+    virtuesEn: ['Most prolific narrator of hadith', 'The Prophet supplicated for him with memorisation', 'Of the People of al-Suffah', 'Devoted himself to the Prophet ﷺ for knowledge'],
+  },
+  {
+    id: 'ibn-umar',
+    nameAr: 'عبد الله بن عمر',
+    nameEn: 'Abdullah ibn Umar',
+    category: 'muhajirun',
+    brief: 'أعلم الصحابة باتباع السنة، ابن أمير المؤمنين عمر',
+    briefEn: 'Most knowledgeable Companion in following the Sunnah, son of the Commander of the Believers Umar',
+    story: [
+      'هو عبد الله بن عمر بن الخطاب القرشي العدوي. وُلد بمكة قبل البعثة بسنوات قليلة. أسلم مع أبيه عمر وهو صغير. هاجر مع أبيه إلى المدينة وعمره عشر سنين. تربى في بيت عمر، فجمع بين فقه أبيه وملازمة النبي ﷺ.',
+      'كان شديد التمسك بالسنة. قال ابن مسعود: أكثرنا اتباعًا لسنة النبي ﷺ عبد الله بن عمر. كان إذا رأى النبي ﷺ يفعل شيئًا في مكان، عمل مثله في نفس المكان حرفًا بحرف. كان يصلي حيث صلى النبي، ويقف حيث وقف، حتى أنه كان يبرك بعيره حيث برك بعير النبي.',
+      'روى عن النبي ﷺ 2630 حديثًا. كان من أعلم الصحابة، يلتفّ حوله طلاب العلم. اعتزل الفتنة كلها — لم يبايع عليًا ولا معاوية، ولم يشارك في الجمل ولا صفين. عاش بعد وفاة النبي ﷺ زاهدًا فقيهًا. ندم على ترك بيعة الإمام، وقال: ما آسى على شيء كأسفي على أني لم أقاتل الفئة الباغية كما أمرني الله. توفي بمكة سنة 73 هـ.',
+    ],
+    storyEn: [
+      "He is Abdullah ibn Umar ibn al-Khattab al-Qurashi al-Adawi. He was born in Makkah a few years before the mission. He embraced Islam with his father Umar while young. He emigrated with his father to Madinah at ten years old. He was raised in Umar's house, combining his father's jurisprudence with companionship of the Prophet ﷺ.",
+      "He was extremely strict in following the Sunnah. Ibn Mas'ud said: 'The most of us in following the Sunnah of the Prophet ﷺ is Abdullah ibn Umar.' Whenever he saw the Prophet ﷺ do something in a place, he did the same in the same place exactly. He would pray where the Prophet prayed, stand where he stood, even kneel his camel where the Prophet's camel knelt.",
+      "He narrated from the Prophet ﷺ 2,630 hadiths. He was among the most knowledgeable Companions, with students of knowledge gathering around him. He withdrew from all the trials — he pledged allegiance neither to Ali nor Mu'awiyah and participated in neither the Camel nor Siffin. He lived after the Prophet's ﷺ death as an ascetic jurist. He regretted leaving the pledge to the Imam and said: 'I regret nothing as much as I regret not having fought the transgressing party as Allah commanded me.' He died in Makkah in 73 AH.",
+    ],
+    virtues: ['أعلم الصحابة باتباع السنة', 'روى 2630 حديثًا', 'ابن الفاروق عمر', 'زاهد فقيه اعتزل الفتنة'],
+    virtuesEn: ['Most knowledgeable Companion in following the Sunnah', 'Narrated 2,630 hadiths', 'Son of al-Faruq Umar', 'Ascetic jurist who withdrew from the trial'],
+  },
+  {
+    id: 'ibn-abbas',
+    nameAr: 'عبد الله بن عباس',
+    nameEn: 'Abdullah ibn Abbas',
+    category: 'muhajirun',
+    brief: 'حبر الأمة وترجمان القرآن، ابن عم النبي ﷺ',
+    briefEn: 'Scholar of the Ummah and Translator of the Qur\'an, the Prophet\'s ﷺ cousin',
+    story: [
+      'هو عبد الله بن العباس بن عبد المطلب الهاشمي. ابن عم النبي ﷺ. وُلد قبل الهجرة بثلاث سنين، ومات النبي ﷺ وله 13 سنة. مع صغر عمره، كان من أعلم الصحابة بالقرآن وفقهه، لأن النبي ﷺ دعا له. قال: اللهم فقّهه في الدين، وعلّمه التأويل.',
+      'استجاب الله الدعاء. صار ابن عباس من أعلم الناس بتفسير القرآن، حتى لقّبوه بـ ترجمان القرآن و حبر الأمة. كان عمر بن الخطاب يستشيره رغم صغره. يجلس مع كبار الصحابة في مجلس الخلافة، ويأخذ برأيه. قال عنه ابن مسعود: نِعم ترجمان القرآن ابن عباس.',
+      'روى عن النبي ﷺ 1660 حديثًا. كان كثير الجلوس مع الصحابة لجمع علومهم. قال: علمت أن العلم لا يجمعه إلا الجد والتقصد، فكنت أبيت على عتبة باب الصحابي حتى يخرج فأسأله. تولى ولاية البصرة لعلي بن أبي طالب. عاش طويلًا، وعمي في آخر حياته. توفي بالطائف سنة 68 هـ.',
+    ],
+    storyEn: [
+      "He is Abdullah ibn al-Abbas ibn Abd al-Muttalib al-Hashimi. The cousin of the Prophet ﷺ. He was born three years before the Hijrah; the Prophet ﷺ died when he was 13. Despite his youth, he was among the most knowledgeable Companions in the Qur'an and its jurisprudence, because the Prophet ﷺ supplicated for him: 'O Allah, grant him understanding in religion and teach him interpretation.'",
+      "Allah answered the supplication. Ibn Abbas became the most knowledgeable of people in tafsir of the Qur'an, until they nicknamed him 'Translator of the Qur'an' and 'Scholar of the Ummah.' Umar ibn al-Khattab would consult him despite his youth. He would sit with senior Companions in the caliphate council, and his opinion was taken. Ibn Mas'ud said: 'The best Translator of the Qur'an is Ibn Abbas.'",
+      "He narrated from the Prophet ﷺ 1,660 hadiths. He sat frequently with the Companions to gather their knowledge. He said: 'I knew that knowledge could only be gathered through earnestness, so I would spend the night at a Companion's doorstep until he came out and I asked him.' He took the governorship of Basra for Ali ibn Abi Talib. He lived long and went blind at the end of his life. He died in Ta'if in 68 AH.",
+    ],
+    virtues: ['ترجمان القرآن', 'حبر الأمة', 'دعا له النبي بالعلم والفهم', 'استشاره عمر رغم صغره'],
+    virtuesEn: ['Translator of the Qur\'an', 'Scholar of the Ummah', 'The Prophet supplicated for him with knowledge', 'Umar consulted him despite his youth'],
+  },
+  {
+    id: 'jaafar',
+    nameAr: 'جعفر بن أبي طالب',
+    nameEn: 'Ja\'far ibn Abi Talib',
+    category: 'muhajirun',
+    brief: 'ذو الجناحين، أشبه الناس بالنبي ﷺ خَلقًا وخُلُقًا',
+    briefEn: 'The Two-Winged One, the most similar to the Prophet ﷺ in appearance and character',
+    story: [
+      'هو جعفر بن أبي طالب بن عبد المطلب الهاشمي. ابن عم النبي ﷺ، وأخو علي بن أبي طالب الأكبر بعشر سنين. أسلم من السابقين الأولين، وهاجر إلى الحبشة في الهجرة الثانية مع جماعة من المسلمين. صار رئيسهم في الحبشة.',
+      'لما أرسلت قريش عمرو بن العاص وعبد الله بن أبي ربيعة إلى النجاشي ليردّ المسلمين، كلّمهم النجاشي. فقام جعفر يدافع عنهم بكلامه العظيم. قرأ على النجاشي أول سورة مريم — في قصة عيسى وأمه — فبكى النجاشي والقساوسة. ثم قال للنجاشي: ما يقولون عنا، أنه قال عن عيسى ما لا يحب نسمعه. فقال جعفر بإيمان وثبات: نقول هو عبد الله ورسوله، ابن مريم العذراء البتول. فقبل النجاشي قوله وحمى المسلمين.',
+      'بقي جعفر في الحبشة 13 سنة. ثم عاد إلى المدينة سنة 7 هـ بعد فتح خيبر. ففرح به النبي ﷺ فرحًا شديدًا، وقال: ما أدري بأيهما أنا أسرّ، بفتح خيبر أم بقدوم جعفر! ثم استشهد جعفر في غزوة مؤتة سنة 8 هـ، حين قاتل الروم. قُطعت يداه وهو يحمل راية المسلمين. قال النبي ﷺ: إن الله أبدل جعفرًا جناحين يطير بهما في الجنة حيث شاء. فلُقّب جعفر بـ ذي الجناحين.',
+    ],
+    storyEn: [
+      "He is Ja'far ibn Abi Talib ibn Abd al-Muttalib al-Hashimi. The cousin of the Prophet ﷺ and brother of Ali ibn Abi Talib by ten years older. He embraced Islam among the very first and emigrated to Abyssinia in the second emigration with a group of Muslims. He became their leader in Abyssinia.",
+      "When Quraysh sent Amr ibn al-As and Abdullah ibn Abi Rabi'ah to the Negus to return the Muslims, the Negus spoke to them. Ja'far rose defending them with his great speech. He recited to the Negus the beginning of Surah Maryam — the story of Jesus and his mother — and the Negus and the bishops wept. The Negus said: 'They say you have said about Jesus what we do not love to hear.' Ja'far said with faith and steadfastness: 'We say he is a servant of Allah and His Messenger, son of the virgin Mary.' The Negus accepted his speech and protected the Muslims.",
+      "Ja'far remained in Abyssinia 13 years. He then returned to Madinah in 7 AH after the conquest of Khaybar. The Prophet ﷺ rejoiced greatly at his arrival and said: 'I do not know which makes me happier — the conquest of Khaybar or Ja'far's arrival!' Then Ja'far was martyred at the Battle of Mu'tah in 8 AH while fighting the Romans. His hands were cut off while carrying the Muslims' banner. The Prophet ﷺ said: 'Allah has replaced Ja'far's hands with two wings; he flies with them in Paradise wherever he wishes.' Ja'far was named 'Dhul Janahayn' (the Two-Winged).",
+    ],
+    virtues: ['ذو الجناحين يطير في الجنة', 'أشبه الناس بالنبي ﷺ', 'أمير المسلمين في الحبشة', 'استشهد في مؤتة'],
+    virtuesEn: ['The Two-Winged who flies in Paradise', 'The most similar to the Prophet ﷺ', 'Leader of the Muslims in Abyssinia', 'Martyred at Mu\'tah'],
+  },
+  {
+    id: 'zayd-haritha',
+    nameAr: 'زيد بن حارثة',
+    nameEn: 'Zayd ibn Harithah',
+    category: 'muhajirun',
+    brief: 'مولى رسول الله، الوحيد المسمى في القرآن من الصحابة',
+    briefEn: 'Freed slave of the Messenger of Allah, the only Companion named in the Qur\'an',
+    story: [
+      'هو زيد بن حارثة بن شراحيل الكلبي. وُلد في الجاهلية في قبيلة كلب. سُبي وهو صغير في غارة بين القبائل، وبيع عبدًا. اشترته خديجة بنت خويلد، وأهدته للنبي ﷺ قبل البعثة. أعتقه النبي ﷺ.',
+      'بحث أبوه حارثة عنه سنين، حتى علم مكانه عند النبي ﷺ. جاء يطلبه. خيّره النبي ﷺ بين أن يبقى معه أو يذهب مع أبيه. اختار زيد البقاء مع النبي ﷺ — قبل البعثة! قال: ما كنت لأختار عليك أحدًا أبدًا. تبنّاه النبي ﷺ، فكان يُدعى زيد بن محمد، حتى نزل قوله تعالى: ادعوهم لآبائهم. فرجع إلى اسم أبيه الحقيقي.',
+      'كان زيد من أحب الناس إلى النبي ﷺ. أمّره النبي ﷺ على غزوات كثيرة، وكان رابع من أسلم — بعد خديجة وعلي وأبي بكر. ذكره الله في القرآن باسمه، فهو الصحابي الوحيد المسمى صراحة في القرآن: فلما قضى زيد منها وطرًا زوجناكها. استشهد زيد في غزوة مؤتة سنة 8 هـ قائدًا للجيش الإسلامي. كان أول قتلى المؤمنين في تلك المعركة.',
+    ],
+    storyEn: [
+      "He is Zayd ibn Harithah ibn Sharahil al-Kalbi. He was born in the Jahiliyyah in the tribe of Kalb. He was captured young in a raid between tribes and sold as a slave. Khadijah bint Khuwaylid bought him and gave him as a gift to the Prophet ﷺ before the mission. The Prophet ﷺ freed him.",
+      "His father Harithah searched for him for years until he learned of his place with the Prophet ﷺ. He came to claim him. The Prophet ﷺ gave Zayd the choice between staying with him or going with his father. Zayd chose to stay with the Prophet ﷺ — before the mission! He said: 'I would never choose anyone over you.' The Prophet ﷺ adopted him, and he came to be called Zayd ibn Muhammad, until Allah's words came down: 'Call them by their fathers.' He returned to his real father's name.",
+      "Zayd was among the most beloved of people to the Prophet ﷺ. The Prophet ﷺ appointed him over many campaigns, and he was the fourth to embrace Islam — after Khadijah, Ali, and Abu Bakr. Allah mentioned him by name in the Qur'an, making him the only Companion explicitly named: 'When Zayd had no further need of her, We married her to you.' Zayd was martyred at the Battle of Mu'tah in 8 AH as commander of the Muslim army. He was the first of the believers killed in that battle.",
+    ],
+    virtues: ['الصحابي الوحيد المسمى في القرآن', 'مولى رسول الله ﷺ', 'رابع من أسلم', 'استشهد في مؤتة قائدًا'],
+    virtuesEn: ['Only Companion named in the Qur\'an', 'Freed slave of the Messenger of Allah ﷺ', 'Fourth to embrace Islam', 'Martyred at Mu\'tah as commander'],
+  },
+
+  // ───────────────────── بنات النبي ﷺ ─────────────────────
+  {
+    id: 'fatima',
+    nameAr: 'فاطمة الزهراء',
+    nameEn: 'Fatimah al-Zahra\'',
+    category: 'daughters',
+    brief: 'سيدة نساء أهل الجنة، بنت رسول الله ﷺ، زوج علي وأم الحسن والحسين',
+    briefEn: 'Lady of the women of Paradise, daughter of the Messenger of Allah ﷺ, wife of Ali, mother of Hasan and Husayn',
+    story: [
+      'هي فاطمة بنت محمد بن عبد الله ﷺ. وُلدت بمكة قبل البعثة بخمس سنوات، أصغر بنات النبي ﷺ من خديجة. لُقّبت بـ الزهراء، و البتول، و سيدة نساء العالمين، و أم أبيها.',
+      'تزوجها علي بن أبي طالب ابن عم النبي ﷺ في السنة الثانية من الهجرة. كان مهرها درعًا اشتراها بأربعمئة درهم. عاشت معه حياة فقر وكرامة، تطحن القمح بيدها حتى مجلت يداها، وتسقي الماء حتى أثّر القربة على صدرها. سألت أباها النبي ﷺ خادمًا، فعلّمها بدل الخادم تسبيحة فاطمة المشهورة: سبحان الله 33 مرة، الحمد لله 33 مرة، الله أكبر 34 مرة، عند النوم.',
+      'كانت أحب الناس إلى النبي ﷺ. كان إذا قدم من سفر، بدأ بها قبل غيره. كان يقبّل يدها ويجلسها بجواره. قال النبي ﷺ: فاطمة سيدة نساء أهل الجنة. وقال: فاطمة بضعة مني، من آذاها فقد آذاني. أنجبت للنبي ﷺ ذريّته الباقية: الحسن، الحسين، زينب، أم كلثوم.',
+      'كانت أول أهل بيت النبي ﷺ يلحق به بعد وفاته. مرضت بعد وفاته بستة أشهر فقط، وتوفيت سنة 11 هـ، وعمرها 28 أو 29 سنة. كانت قد بشّرها النبي ﷺ قبل موته بأنها أول أهله لحاقًا به. غسّلتها أسماء بنت عميس، ودفنها علي بن أبي طالب ليلًا بالبقيع.',
+    ],
+    storyEn: [
+      "She is Fatimah bint Muhammad ibn Abdullah ﷺ. She was born in Makkah five years before the mission, the youngest of the Prophet's ﷺ daughters from Khadijah. She was nicknamed al-Zahra (the Radiant), al-Batul (the Pure), Sayyidat Nisa al-Alamin (Lady of the Women of the Worlds), and Umm Abiha (Mother of her Father).",
+      "Ali ibn Abi Talib, the Prophet's ﷺ cousin, married her in the second year of the Hijrah. Her dowry was a coat of mail he bought for four hundred dirhams. She lived with him a life of poverty and dignity, grinding wheat with her hand until her hands blistered, drawing water until the waterskin marked her chest. She asked her father the Prophet ﷺ for a servant; he taught her instead the famous Tasbih of Fatimah: SubhanAllah 33 times, Alhamdulillah 33 times, Allahu Akbar 34 times, at bedtime.",
+      "She was the most beloved of people to the Prophet ﷺ. When he returned from travel, he would begin with her before others. He would kiss her hand and seat her beside him. The Prophet ﷺ said: 'Fatimah is the lady of the women of Paradise.' He said: 'Fatimah is a part of me; whoever harms her has harmed me.' She bore the Prophet's ﷺ remaining offspring: Hasan, Husayn, Zaynab, Umm Kulthum.",
+      "She was the first of the Prophet's ﷺ household to follow him after his death. She fell ill only six months after his death and died in 11 AH at 28 or 29 years old. The Prophet ﷺ had given her glad tidings before his death that she would be the first of his household to follow him. Asma' bint Umays washed her, and Ali ibn Abi Talib buried her at night in al-Baqi'.",
+    ],
+    virtues: ['سيدة نساء أهل الجنة', 'بنت رسول الله ﷺ', 'زوج علي وأم الحسنين', 'أول أهل البيت لحاقًا بالنبي'],
+    virtuesEn: ['Lady of the women of Paradise', 'Daughter of the Messenger of Allah ﷺ', 'Wife of Ali and mother of Hasan and Husayn', 'First of the Prophet\'s household to follow him'],
+  },
+  {
+    id: 'zaynab-prophet',
+    nameAr: 'زينب بنت رسول الله',
+    nameEn: 'Zaynab bint Rasulillah',
+    category: 'daughters',
+    brief: 'كبرى بنات النبي ﷺ، التي قال عنها: خير بناتي',
+    briefEn: 'Eldest daughter of the Prophet ﷺ, of whom he said: "The best of my daughters"',
+    story: [
+      'هي زينب بنت محمد بن عبد الله ﷺ. كبرى بنات النبي ﷺ من خديجة. وُلدت قبل البعثة بعشر سنين. تزوجها قبل البعثة ابن خالتها أبو العاص بن الربيع، وكان رجلًا كريمًا تاجرًا، لكنه لم يسلم في البداية.',
+      'لما هاجر النبي ﷺ إلى المدينة، بقيت زينب مع زوجها في مكة. شارك أبو العاص في غزوة بدر مع المشركين، فأُسر. أرسلت زينب فدية له، وأرسلت قلادة لأمها خديجة. لما رأى النبي ﷺ القلادة، رقّ لها، وردّ الفدية وأطلق سراح أبي العاص. اشترط النبي ﷺ أن يرسل زينب إلى المدينة، فأرسلها.',
+      'في طريقها من مكة إلى المدينة، اعترضها هبار بن الأسود وضربها بالرمح فأسقطت جنينها. ماتت بعد ذلك بسنين من آثار تلك الضربة. أسلم زوجها أبو العاص بعد فتح مكة، فردّ النبي ﷺ زينب إليه. لم تعش طويلًا بعد ذلك. توفيت سنة 8 هـ في المدينة، فحزن عليها النبي ﷺ حزنًا شديدًا.',
+    ],
+    storyEn: [
+      "She is Zaynab bint Muhammad ibn Abdullah ﷺ. The eldest of the Prophet's ﷺ daughters from Khadijah. She was born ten years before the mission. Before the mission she married her maternal cousin Abu al-As ibn al-Rabi, a generous merchant who did not initially embrace Islam.",
+      "When the Prophet ﷺ emigrated to Madinah, Zaynab stayed with her husband in Makkah. Abu al-As participated in the Battle of Badr with the polytheists and was captured. Zaynab sent ransom for him along with a necklace for her mother Khadijah. When the Prophet ﷺ saw the necklace, he was moved; he returned the ransom and freed Abu al-As. The Prophet ﷺ stipulated that he send Zaynab to Madinah, which he did.",
+      "On her way from Makkah to Madinah, Habbar ibn al-Aswad intercepted her and struck her with a spear; she miscarried. She died years later from the effects of that blow. Her husband Abu al-As embraced Islam after the conquest of Makkah, and the Prophet ﷺ returned Zaynab to him. She did not live long after that. She died in 8 AH in Madinah, and the Prophet ﷺ grieved deeply for her.",
+    ],
+    virtues: ['كبرى بنات النبي ﷺ', 'صبرت على فراق زوجها في مكة', 'تحملت ضربة هبار في الهجرة', 'قال النبي عنها: خير بناتي'],
+    virtuesEn: ['Eldest daughter of the Prophet ﷺ', 'Endured separation from her husband in Makkah', 'Bore Habbar\'s blow during the emigration', 'The Prophet said: "The best of my daughters"'],
+  },
+  {
+    id: 'ruqayyah',
+    nameAr: 'رقية بنت رسول الله',
+    nameEn: 'Ruqayyah bint Rasulillah',
+    category: 'daughters',
+    brief: 'زوج عثمان بن عفان، هاجرت إلى الحبشة مرتين',
+    briefEn: 'Wife of Uthman ibn Affan, emigrated to Abyssinia twice',
+    story: [
+      'هي رقية بنت محمد بن عبد الله ﷺ. ثانية بنات النبي ﷺ من خديجة. وُلدت بمكة قبل البعثة بسبع سنوات. كانت من أجمل نساء قريش. خطبها قبل البعثة عتبة بن أبي لهب، ابن عم النبي ﷺ، لكن لما نزلت سورة المسد في أبيه أبي لهب، طلّقها قبل البناء بها.',
+      'تزوجها عثمان بن عفان بعد إسلامه. كانا من أوائل المسلمين. هاجرا معًا إلى الحبشة في الهجرة الأولى — أول رجل وامرأة هاجرا في الإسلام. قال النبي ﷺ لما خرجا: إنهما أول أهل بيت هاجر بعد لوط. كانت قصتهما إيمان كامل وزواج مبارك.',
+      'هاجرت إلى المدينة مع زوجها. مرضت قبل غزوة بدر. تأخر عثمان عن الغزوة ليرعاها بأمر النبي ﷺ. ماتت في يوم وقعة بدر سنة 2 هـ، فعاد عثمان حزينًا، لكن النبي ﷺ ضرب له بسهم من غنائم بدر وأجر. ثم زوّج النبي ﷺ عثمان بأختها أم كلثوم بعد ذلك. لذلك لُقّب عثمان بذي النورين.',
+    ],
+    storyEn: [
+      "She is Ruqayyah bint Muhammad ibn Abdullah ﷺ. The second of the Prophet's ﷺ daughters from Khadijah. She was born in Makkah seven years before the mission. She was among the most beautiful women of Quraysh. Utbah ibn Abi Lahab, the Prophet's ﷺ cousin, was engaged to her before the mission, but when Surah al-Masad was revealed about his father Abu Lahab, he divorced her before consummation.",
+      "Uthman ibn Affan married her after his Islam. They were both among the early Muslims. They emigrated together to Abyssinia in the first emigration — the first man and woman to emigrate in Islam. The Prophet ﷺ said when they went out: 'They are the first family to emigrate after Lot.' Their story was complete faith and a blessed marriage.",
+      "She emigrated to Madinah with her husband. She fell ill before the Battle of Badr. Uthman stayed behind from the battle to care for her by the Prophet's ﷺ order. She died on the day of Badr in 2 AH; Uthman returned grieving, but the Prophet ﷺ allotted him a share of Badr's spoils and reward. The Prophet ﷺ then married Uthman to her sister Umm Kulthum. That is why Uthman was nicknamed Dhu al-Nurayn (Possessor of the Two Lights).",
+    ],
+    virtues: ['زوج عثمان بن عفان', 'هاجرت إلى الحبشة مرتين', 'أول من هاجر بأهله بعد لوط', 'ماتت يوم بدر'],
+    virtuesEn: ['Wife of Uthman ibn Affan', 'Emigrated to Abyssinia twice', 'First to emigrate with family after Lot', 'Died on the day of Badr'],
+  },
+  {
+    id: 'umm-kulthum-daughter',
+    nameAr: 'أم كلثوم بنت رسول الله',
+    nameEn: 'Umm Kulthum bint Rasulillah',
+    category: 'daughters',
+    brief: 'ثالثة بنات النبي ﷺ، تزوجها عثمان بعد أختها رقية',
+    briefEn: 'Third daughter of the Prophet ﷺ, married by Uthman after her sister Ruqayyah',
+    story: [
+      'هي أم كلثوم بنت محمد بن عبد الله ﷺ. ثالثة بنات النبي ﷺ من خديجة. وُلدت بمكة قبل البعثة بست سنين. خطبها قبل البعثة عتيبة بن أبي لهب — أخو عتبة الذي خطب رقية — وعندما نزلت سورة المسد في أبيه، طلّقها قبل البناء بها.',
+      'بقيت في بيت أبيها سنين، حتى توفيت أختها رقية يوم بدر. زوّجها النبي ﷺ من عثمان بن عفان سنة 3 هـ. قال النبي ﷺ: لو كان عندي ثالثة لزوّجتك إياها يا عثمان. كانت أم كلثوم من الصابرات الصالحات، تشبه أختها رقية في خلقها ودينها.',
+      'عاشت مع عثمان ست سنين تقريبًا. توفيت سنة 9 هـ في المدينة، ولم تنجب أولادًا. صلى عليها النبي ﷺ ودفنها بالبقيع، وحزن عليها حزنًا شديدًا. بقيت من بناته بعد ذلك فاطمة الزهراء فقط. مات النبي ﷺ ولم تبق له من ذريته إلا فاطمة، التي ماتت بعده بستة أشهر، ومن نسلها بقي ذريّته كلها — الحسن والحسين ومن بعدهما.',
+    ],
+    storyEn: [
+      "She is Umm Kulthum bint Muhammad ibn Abdullah ﷺ. The third of the Prophet's ﷺ daughters from Khadijah. She was born in Makkah six years before the mission. Before the mission Utaybah ibn Abi Lahab — brother of Utbah who was engaged to Ruqayyah — was engaged to her. When Surah al-Masad was revealed about his father, he divorced her before consummation.",
+      "She remained in her father's house for years, until her sister Ruqayyah died on the day of Badr. The Prophet ﷺ married her to Uthman ibn Affan in 3 AH. The Prophet ﷺ said: 'If I had a third, I would have married her to you, Uthman.' Umm Kulthum was among the patient and righteous, resembling her sister Ruqayyah in character and religion.",
+      "She lived with Uthman about six years. She died in 9 AH in Madinah, leaving no children. The Prophet ﷺ prayed over her and buried her in al-Baqi', and grieved deeply for her. Of his daughters only Fatimah al-Zahra remained after that. The Prophet ﷺ died with only Fatimah remaining of his offspring; she died six months after him, and through her line all his descendants remain — Hasan, Husayn, and those after them.",
+    ],
+    virtues: ['ثالثة بنات النبي ﷺ', 'زوج عثمان ذي النورين بعد رقية', 'صبرت على فقد أختها', 'دفنت بالبقيع'],
+    virtuesEn: ['Third daughter of the Prophet ﷺ', 'Wife of Uthman Dhu al-Nurayn after Ruqayyah', 'Endured the loss of her sister', 'Buried in al-Baqi\''],
+  },
 ];
 
 
@@ -625,6 +1197,166 @@ function getCompanionName(companion: Companion): string {
   return getLanguage() === 'ar' ? companion.nameAr : companion.nameEn;
 }
 
+function splitStoryParagraphs(text: string): string[] {
+  return text
+    .split(/\n{2,}/)
+    .map(part => part.trim())
+    .filter(Boolean);
+}
+
+function getCompanionTranscript(companion: Companion): string {
+  const lang = getLanguage();
+  if (lang === 'ar') {
+    const transcript = companion.transcript?.trim() || '';
+    const storyText = companion.story.join('\n\n').trim();
+    return transcript.length >= storyText.length ? transcript : storyText;
+  }
+  const transcript = companion.transcriptEn?.trim() || '';
+  const storyText = companion.storyEn.join('\n\n').trim();
+  return transcript.length >= storyText.length ? transcript : storyText;
+}
+
+function getCompanionStoryParagraphs(companion: Companion): string[] {
+  const transcript = getCompanionTranscript(companion);
+  const paragraphs = splitStoryParagraphs(transcript);
+  if (paragraphs.length) return paragraphs;
+  return getLanguage() === 'ar' ? companion.story : companion.storyEn;
+}
+
+const COMPANION_PDF_CHARS_PER_LINE = 50;
+const COMPANION_PDF_FIRST_PAGE_LINES = 15;
+const COMPANION_PDF_CONTINUATION_LINES = 15;
+
+function estimateCompanionPdfLines(paragraph: string): number {
+  return Math.max(1, Math.ceil(Array.from(paragraph).length / COMPANION_PDF_CHARS_PER_LINE));
+}
+
+function splitCompanionPdfParagraph(paragraph: string, maxLines: number): string[] {
+  const maxChars = COMPANION_PDF_CHARS_PER_LINE * maxLines;
+  if (Array.from(paragraph).length <= maxChars) return [paragraph];
+
+  const parts: string[] = [];
+  let remaining = paragraph.trim();
+  while (Array.from(remaining).length > maxChars) {
+    const chars = Array.from(remaining);
+    const windowText = chars.slice(0, maxChars).join('');
+    const punctuationCut = Math.max(
+      windowText.lastIndexOf('،'),
+      windowText.lastIndexOf('؛'),
+      windowText.lastIndexOf('.'),
+      windowText.lastIndexOf('؟'),
+      windowText.lastIndexOf('!'),
+    );
+    const spaceCut = windowText.lastIndexOf(' ');
+    const cutIndex = punctuationCut > maxChars * 0.55
+      ? punctuationCut + 1
+      : Math.max(spaceCut, Math.floor(maxChars * 0.75));
+    parts.push(chars.slice(0, cutIndex).join('').trim());
+    remaining = chars.slice(cutIndex).join('').trim();
+  }
+  if (remaining) parts.push(remaining);
+  return parts;
+}
+
+function buildCompanionPdfStorySections(story: string[], storyTitle: string): IslamicPdfSection[] {
+  const sections: IslamicPdfSection[] = [];
+  let currentBody: string[] = [];
+  let currentLines = 0;
+
+  const flush = () => {
+    if (!currentBody.length) return;
+    sections.push({
+      title: sections.length === 0 ? storyTitle : undefined,
+      body: currentBody,
+      continuation: sections.length > 0,
+      keepTogether: true,
+      largeText: true,
+    });
+    currentBody = [];
+    currentLines = 0;
+  };
+
+  const pushParagraph = (paragraph: string) => {
+    let remaining = paragraph.trim();
+    while (remaining) {
+      const limit = sections.length === 0 ? COMPANION_PDF_FIRST_PAGE_LINES : COMPANION_PDF_CONTINUATION_LINES;
+      const availableLines = limit - currentLines;
+
+      if (availableLines <= 0) {
+        flush();
+        continue;
+      }
+
+      const remainingLines = estimateCompanionPdfLines(remaining);
+      if (remainingLines <= availableLines) {
+        currentBody.push(remaining);
+        currentLines += remainingLines;
+        remaining = '';
+        continue;
+      }
+
+      if (currentBody.length && availableLines >= 1) {
+        const [head, ...tail] = splitCompanionPdfParagraph(remaining, availableLines);
+        if (head) {
+          currentBody.push(head);
+          currentLines += estimateCompanionPdfLines(head);
+          remaining = tail.join(' ').trim();
+          flush();
+          continue;
+        }
+      }
+
+      if (currentBody.length) {
+        flush();
+        continue;
+      }
+
+      const [head, ...tail] = splitCompanionPdfParagraph(remaining, limit);
+      if (!head) break;
+      currentBody.push(head);
+      currentLines += estimateCompanionPdfLines(head);
+      remaining = tail.join(' ').trim();
+      flush();
+    }
+  };
+
+  story.forEach(pushParagraph);
+
+  flush();
+  return sections.length ? sections : [{ title: storyTitle, body: story, keepTogether: true, largeText: true }];
+}
+
+function getListenCopy() {
+  const lang = getLanguage();
+  return lang === 'ar'
+    ? {
+        title: 'استمع للقصة',
+        subtitle: 'صوت القصة مع النص والتمرير التلقائي',
+        open: 'فتح صفحة الاستماع',
+        noAudio: 'لم يتم إضافة ملف الصوت بعد',
+        noAudioHint: 'الصوت غير متاح لهذه القصة حاليًا.',
+        play: 'تشغيل',
+        pause: 'إيقاف مؤقت',
+        transcript: 'نص القصة',
+        autoScrollOn: 'إيقاف التمرير',
+        autoScrollOff: 'تشغيل التمرير',
+        audioSource: 'الصوت',
+      }
+    : {
+        title: 'Listen to the story',
+        subtitle: 'Story audio with synced auto-scroll text',
+        open: 'Open listening page',
+        noAudio: 'No audio file has been added yet',
+        noAudioHint: 'Audio is not available for this story yet.',
+        play: 'Play',
+        pause: 'Pause',
+        transcript: 'Story text',
+        autoScrollOn: 'Pause scroll',
+        autoScrollOff: 'Resume scroll',
+        audioSource: 'Audio',
+      };
+}
+
 function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCardProps) {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_s, colors.fs);
@@ -680,6 +1412,7 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
 interface StoryDetailProps {
   companion: Companion;
   onBack: () => void;
+  onListen: () => void;
   onShare: () => void;
   onToggleFav: () => void;
   isFav: boolean;
@@ -687,7 +1420,288 @@ interface StoryDetailProps {
   colors: ReturnType<typeof useColors>;
 }
 
-function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMode, colors }: StoryDetailProps) {
+interface StoryListenEntryProps {
+  companion: Companion;
+  onPress: () => void;
+  isDarkMode: boolean;
+  colors: ReturnType<typeof useColors>;
+}
+
+function StoryListenEntry({ companion, onPress, isDarkMode, colors }: StoryListenEntryProps) {
+  const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
+  const copy = getListenCopy();
+  const hasAudio = !!companion.audioUrl?.trim();
+  if (!hasAudio) return null;
+
+  return (
+    <View style={s.detailSectionOuter}>
+      <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
+          <MaterialCommunityIcons name="headphones" size={18} color={colors.text} />
+        </View>
+        <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+          {copy.title}
+        </Text>
+      </View>
+
+      <Pressable onPress={onPress} style={s.listenEntryOuter}>
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 25 : 10}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            s.listenEntryOverlay,
+            {
+              backgroundColor: isDarkMode ? 'rgba(6,79,47,0.14)' : 'rgba(6,79,47,0.08)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        />
+        <View style={[s.listenEntryContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[s.listenEntryIcon, { backgroundColor: hasAudio ? ACCENT : ACCENT_LIGHT }]}>
+            <MaterialCommunityIcons name={hasAudio ? 'play' : 'text-box-outline'} size={26} color={hasAudio ? '#fff' : colors.text} />
+          </View>
+          <View style={s.listenEntryText}>
+            <Text style={[s.listenEntryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {companion.audioTitle?.trim() || companion.videoTitle?.trim() || copy.open}
+            </Text>
+            <Text style={[s.listenEntrySubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {hasAudio ? copy.subtitle : copy.noAudioHint}
+            </Text>
+          </View>
+          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={colors.textLight} />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+interface StoryListeningProps {
+  companion: Companion;
+  onBack: () => void;
+  isDarkMode: boolean;
+  colors: ReturnType<typeof useColors>;
+}
+
+function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListeningProps) {
+  const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
+  const copy = getListenCopy();
+  const transcript = useMemo(() => getCompanionTranscript(companion), [companion]);
+  const transcriptRef = useRef<ScrollView>(null);
+  const scrollMetricsRef = useRef({ viewportHeight: 0, contentHeight: 0 });
+  const finishAdShownRef = useRef(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const hasAudio = !!companion.audioUrl?.trim();
+  const handlePlaybackStatusUpdate = useCallback((status: any) => {
+    if (!status?.isLoaded || !status.didJustFinish || finishAdShownRef.current) return;
+    finishAdShownRef.current = true;
+    setAutoScroll(false);
+    showInterstitial({
+      allowInSacredContext: false,
+      ignoreSmartSessionDelay: true,
+    }).catch(() => {});
+  }, []);
+  const {
+    isPlaying,
+    isLoading,
+    currentPosition,
+    duration,
+    error,
+    formattedPosition,
+    formattedDuration,
+    playbackRate,
+    setPlaybackRate,
+    togglePlayPause,
+  } = useAzkarAudio({
+    audioUrl: companion.audioUrl,
+    onPlaybackStatusUpdate: handlePlaybackStatusUpdate,
+  });
+
+  useEffect(() => {
+    if (!autoScroll || duration <= 0) return;
+    const { viewportHeight, contentHeight } = scrollMetricsRef.current;
+    const maxScroll = Math.max(contentHeight - viewportHeight, 0);
+    if (maxScroll <= 0) return;
+    const progress = Math.min(Math.max(currentPosition / duration, 0), 1);
+    transcriptRef.current?.scrollTo({ y: maxScroll * progress, animated: true });
+  }, [autoScroll, currentPosition, duration]);
+
+  return (
+    <View style={s.detailContainer}>
+      <View style={[s.detailHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Pressable
+          onPress={onBack}
+          style={[s.detailBackBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
+        >
+          <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={26} color={colors.text} />
+        </Pressable>
+        <Text style={[s.detailHeaderTitle, { color: colors.text }]} numberOfLines={1}>
+          {copy.title}
+        </Text>
+        <View style={s.headerSpacer} />
+      </View>
+
+      <ScrollView
+        style={s.detailScroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.listenPageContent}
+      >
+        <View style={s.audioPanelOuter}>
+          <BlurView
+            intensity={Platform.OS === 'ios' ? 25 : 10}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              s.audioPanelOverlay,
+              {
+                backgroundColor: isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.08)',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+              },
+            ]}
+          />
+          <View style={s.audioPanelContent}>
+            <View style={[s.audioTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[s.listenEntryIcon, { backgroundColor: ACCENT }]}>
+                <MaterialCommunityIcons name="headphones" size={24} color="#fff" />
+              </View>
+              <View style={s.listenEntryText}>
+                <Text style={[s.listenEntryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {companion.audioTitle?.trim() || companion.videoTitle?.trim() || getCompanionName(companion)}
+                </Text>
+                <Text style={[s.listenEntrySubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {copy.audioSource}
+                </Text>
+              </View>
+            </View>
+
+            <View style={s.audioProgressTrack}>
+              <View
+                style={[
+                  s.audioProgressFill,
+                  { width: duration > 0 ? `${Math.min(Math.max(currentPosition / duration, 0), 1) * 100}%` : '0%' },
+                ]}
+              />
+            </View>
+
+            <View style={s.audioControlsRow}>
+              <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedPosition}</Text>
+              <Pressable
+                onPress={togglePlayPause}
+                disabled={!hasAudio || isLoading}
+                style={[s.audioPlayButton, (!hasAudio || isLoading) && s.audioPlayButtonDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel={isPlaying ? copy.pause : copy.play}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name={isPlaying ? 'pause' : 'play'} size={30} color="#fff" />
+                )}
+              </Pressable>
+              <Text style={[s.audioTime, { color: colors.textLight }]}>{duration > 0 ? formattedDuration : '--:--'}</Text>
+            </View>
+
+            <View style={[s.audioSpeedRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[s.audioSpeedLabel, { color: colors.textLight }]}>{getLanguage() === 'ar' ? 'السرعة' : 'Speed'}</Text>
+              {AUDIO_SPEEDS.map((speed) => {
+                const active = Math.abs(playbackRate - speed) < 0.01;
+                return (
+                  <Pressable
+                    key={speed}
+                    onPress={() => setPlaybackRate(speed)}
+                    style={[s.audioSpeedButton, active && s.audioSpeedButtonActive]}
+                  >
+                    <Text style={[s.audioSpeedButtonText, active && s.audioSpeedButtonTextActive]}>{speed}x</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {!hasAudio && (
+              <Text style={[s.audioNotice, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {copy.noAudio}. {copy.noAudioHint}
+              </Text>
+            )}
+            {!!error && (
+              <Text style={[s.audioNotice, { color: '#ef4444', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {error}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <InlineMrecAd screen="companions" darkMode={isDarkMode} />
+
+        <View style={s.detailSectionOuter}>
+          <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
+              <MaterialCommunityIcons name="book-open-page-variant" size={18} color={colors.text} />
+            </View>
+            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {copy.transcript}
+            </Text>
+            <Pressable
+              onPress={() => setAutoScroll((prev) => !prev)}
+              style={[s.autoScrollToggle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+              accessibilityRole="button"
+              accessibilityLabel={autoScroll ? copy.autoScrollOn : copy.autoScrollOff}
+            >
+              <MaterialCommunityIcons name={autoScroll ? 'pause' : 'play'} size={14} color="#fff" />
+              <Text style={s.autoScrollToggleText}>
+                {autoScroll ? copy.autoScrollOn : copy.autoScrollOff}
+              </Text>
+            </Pressable>
+          </View>
+          <View style={s.transcriptOuter}>
+            <BlurView
+              intensity={Platform.OS === 'ios' ? 25 : 10}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                s.detailGlassOverlay,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(6,79,47,0.08)' : 'rgba(6,79,47,0.08)',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                },
+              ]}
+            />
+            <ScrollView
+              ref={transcriptRef}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              onScrollBeginDrag={() => setAutoScroll(false)}
+              onLayout={(event) => {
+                scrollMetricsRef.current.viewportHeight = event.nativeEvent.layout.height;
+              }}
+              onContentSizeChange={(_, height) => {
+                scrollMetricsRef.current.contentHeight = height;
+              }}
+              contentContainerStyle={s.transcriptContent}
+            >
+              <Text style={[s.storyParagraph, { color: colors.text, textAlign: getLanguage() === 'ar' ? 'right' : 'left', writingDirection: getLanguage() === 'ar' ? 'rtl' : 'ltr' }]}>
+                {transcript}
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+
+        <InlineMrecAd screen="companions" darkMode={isDarkMode} />
+      </ScrollView>
+
+      <BannerAdComponent screen="companions" />
+    </View>
+  );
+}
+
+function StoryDetail({ companion, onBack, onListen, onShare, onToggleFav, isFav, isDarkMode, colors }: StoryDetailProps) {
   const isRTL = useIsRTL();
   const { t } = useTranslation();
   const s = useScaledStyles(_s, colors.fs);
@@ -716,15 +1730,6 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             ]}
           >
             <MaterialCommunityIcons name={isFav ? 'heart' : 'heart-outline'} size={20} color={isFav ? '#ef4444' : colors.text} />
-          </Pressable>
-          <Pressable
-            onPress={onShare}
-            style={[
-              s.detailShareBtn,
-              { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
-            ]}
-          >
-            <MaterialCommunityIcons name="share-variant" size={20} color={colors.text} />
           </Pressable>
         </View>
       </View>
@@ -780,14 +1785,11 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
           </View>
         </View>
 
-        <EmbeddedVideo
-          source={companion.videoUrl}
-          title={companion.videoTitle}
+        <StoryListenEntry
+          companion={companion}
+          onPress={onListen}
+          isDarkMode={isDarkMode}
           colors={colors}
-          style={s.detailVideo}
-          onBeforePlay={async () => {
-            await showInterstitial({ allowInSacredContext: false });
-          }}
         />
 
         {/* Story */}
@@ -796,13 +1798,14 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
               <MaterialCommunityIcons name="book-open-variant" size={18} color={colors.text} />
             </View>
-            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            <Text style={[s.detailSectionTitle, { flex: 1, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('companions.story')}
             </Text>
+            <PdfShareButton onPress={onShare} />
           </View>
-          <View style={s.detailGlassOuter}>
+          <View style={[s.detailGlassOuter, s.storyScrollOuter]}>
             <BlurView
-             
+
               intensity={Platform.OS === 'ios' ? 25 : 10}
               tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
               style={StyleSheet.absoluteFill}
@@ -820,9 +1823,16 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 },
               ]}
             />
-            <View style={s.detailGlassContent}>
-              {(getLanguage() === 'ar' ? companion.story : companion.storyEn).map((paragraph, idx) => {
-                const stories = getLanguage() === 'ar' ? companion.story : companion.storyEn;
+            {/* Bounded story box: the long companion biographies would otherwise push */}
+            {/* virtues/audio cards off-screen and force the reader to scroll the entire */}
+            {/* page. Internal scroll keeps the rest of the detail view reachable. */}
+            <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              contentContainerStyle={s.detailGlassContent}
+            >
+              {getCompanionStoryParagraphs(companion).map((paragraph, idx) => {
+                const stories = getCompanionStoryParagraphs(companion);
                 const lang = getLanguage();
                 return lang === 'ar' || lang === 'en' ? (
                   <Text
@@ -850,7 +1860,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                   </TranslatedText>
                 );
               })}
-            </View>
+            </ScrollView>
           </View>
         </View>
 
@@ -925,22 +1935,35 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             ]}
           />
           <View style={s.detailFooterContent}>
-            {getLanguage() === 'ar' ? (
-              <>
-                <Text style={[s.detailFooterText, { color: colors.text }]}>رضي الله عنه وأرضاه</Text>
-                <Text style={[s.detailFooterNote, { color: colors.textLight }]}>اللهم اجمعنا بهم مع النبي ﷺ في الفردوس الأعلى</Text>
-              </>
-            ) : getLanguage() === 'en' ? (
-              <>
-                <Text style={[s.detailFooterText, { color: colors.text }]}>May Allah be pleased with him</Text>
-                <Text style={[s.detailFooterNote, { color: colors.textLight }]}>O Allah, gather us with them and the Prophet ﷺ in the highest Paradise</Text>
-              </>
-            ) : (
-              <>
-                <TranslatedText from="en" type="section" style={[s.detailFooterText, { color: colors.text }]}>May Allah be pleased with him</TranslatedText>
-                <TranslatedText from="en" type="section" style={[s.detailFooterNote, { color: colors.textLight }]}>O Allah, gather us with them and the Prophet ﷺ in the highest Paradise</TranslatedText>
-              </>
-            )}
+            {(() => {
+              const isFemale = companion.category === 'mothers' || companion.category === 'daughters';
+              const lang = getLanguage();
+              if (lang === 'ar') {
+                return (
+                  <>
+                    <Text style={[s.detailFooterText, { color: colors.text }]}>
+                      {isFemale ? 'رضي الله عنها وأرضاها' : 'رضي الله عنه وأرضاه'}
+                    </Text>
+                    <Text style={[s.detailFooterNote, { color: colors.textLight }]}>اللهم اجمعنا بهم مع النبي ﷺ في الفردوس الأعلى</Text>
+                  </>
+                );
+              }
+              const enText = isFemale ? 'May Allah be pleased with her' : 'May Allah be pleased with him';
+              if (lang === 'en') {
+                return (
+                  <>
+                    <Text style={[s.detailFooterText, { color: colors.text }]}>{enText}</Text>
+                    <Text style={[s.detailFooterNote, { color: colors.textLight }]}>O Allah, gather us with them and the Prophet ﷺ in the highest Paradise</Text>
+                  </>
+                );
+              }
+              return (
+                <>
+                  <TranslatedText from="en" type="section" style={[s.detailFooterText, { color: colors.text }]}>{enText}</TranslatedText>
+                  <TranslatedText from="en" type="section" style={[s.detailFooterNote, { color: colors.textLight }]}>O Allah, gather us with them and the Prophet ﷺ in the highest Paradise</TranslatedText>
+                </>
+              );
+            })()}
           </View>
         </View>
       </ScrollView>
@@ -960,17 +1983,32 @@ export default function CompanionsScreen() {
   const colors = useColors();
   const s = useScaledStyles(_s, colors.fs);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('ashara');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanion, setSelectedCompanion] = useState<Companion | null>(null);
+  const [listeningCompanion, setListeningCompanion] = useState<Companion | null>(null);
   const [companionFav, setCompanionFav] = useState(false);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const { id: companionIdParam } = useLocalSearchParams<{ id?: string }>();
 
   // CMS data with hardcoded fallback
-  const { companions: allCompanions } = useCompanionsContent(COMPANIONS, CATEGORIES);
+  const { companions: cmsCompanions } = useCompanionsContent(COMPANIONS, CATEGORIES);
+  const allCompanions = useMemo(
+    () => cmsCompanions.map((companion) => expandCompanionStory(companion)),
+    [cmsCompanions]
+  );
 
-  const filteredCompanions = allCompanions.filter(c => c.category === activeCategory);
+  const filteredCompanions = useMemo(() => {
+    const query = normalizeSearchText(searchQuery);
+    return allCompanions.filter((companion) => {
+      if (companion.category !== activeCategory) return false;
+      if (!query) return true;
+      return companionSearchText(companion).includes(query);
+    });
+  }, [activeCategory, allCompanions, searchQuery]);
+  const searchPlaceholder = getLanguage() === 'ar' ? 'ابحث باسم الصحابي...' : 'Search companions...';
+  const noSearchResults = getLanguage() === 'ar' ? 'لا توجد نتائج مطابقة.' : 'No matching companions.';
 
   // Auto-select companion from URL param (e.g., from favorites navigation)
   useEffect(() => {
@@ -988,6 +2026,7 @@ export default function CompanionsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveCategory(key);
+    setSearchQuery('');
   }, []);
 
   const handleSelectCompanion = useCallback((companion: Companion) => {
@@ -999,49 +2038,47 @@ export default function CompanionsScreen() {
 
   const handleBack = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setListeningCompanion(null);
     setSelectedCompanion(null);
   }, []);
 
-  const handleShare = useCallback(async () => {
-    if (!selectedCompanion) return;
-    const lang = getLanguage();
-    const brief = lang === 'ar' ? selectedCompanion.brief : selectedCompanion.briefEn;
-    const story = lang === 'ar' ? selectedCompanion.story : selectedCompanion.storyEn;
-    const virtues = lang === 'ar' ? selectedCompanion.virtues : selectedCompanion.virtuesEn;
-    const text = `📖 ${getCompanionName(selectedCompanion)}\n\n${brief}\n\n${story.join('\n\n')}\n\n✨ ${t('companions.virtues')}:\n${virtues.map(v => `• ${v}`).join('\n')}\n\n— ${t('common.fromApp')}`;
-    try {
-      await Share.share({ message: text });
-    } catch {
-      // user cancelled
-    }
-  }, [selectedCompanion, t]);
-
-  const handleExportPDF = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowTemplatePicker(true);
+  const handleListenBack = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setListeningCompanion(null);
   }, []);
 
-  const doExport = useCallback((template: PdfTemplate) => {
-    const lang = getLanguage();
-    const html = CATEGORIES.map(cat => {
-      const catCompanions = allCompanions.filter(c => c.category === cat.key);
-      const companionHtml = catCompanions.map(comp => {
-        const storyData = lang === 'ar' ? comp.story : comp.storyEn;
-        const virtuesData = lang === 'ar' ? comp.virtues : comp.virtuesEn;
-        const briefData = lang === 'ar' ? comp.brief : comp.briefEn;
-        const storyHtml = storyData.map(p => `<p>${p}</p>`).join('');
-        const virtuesHtml = virtuesData.map(v => `<div class="virtue-item">${v}</div>`).join('');
-        return `<div class="section">
-          <div class="section-title">${getCompanionName(comp)}</div>
-          <div class="section-desc">${briefData}</div>
-          ${storyHtml}
-          ${virtuesHtml ? `<div style="margin-top:8px"><div class="steps-label">${t('companions.virtues')}:</div>${virtuesHtml}</div>` : ''}
-        </div>`;
-      }).join('');
-      return `<h2>${t(CATEGORY_KEYS[cat.key])}</h2>${companionHtml}`;
-    }).join('');
-    return showAdThenExport(() => exportAsPDF(t('companions.title'), html, template));
-  }, [t, allCompanions]);
+  const handleOpenListen = useCallback(async () => {
+    if (!selectedCompanion) return;
+    if (!selectedCompanion.audioUrl?.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await showInterstitial({ allowInSacredContext: false, ignoreSmartSessionDelay: true });
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setListeningCompanion(selectedCompanion);
+  }, [selectedCompanion]);
+
+  const handleShare = useCallback(async () => {
+    if (!selectedCompanion) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const lang = getLanguage();
+      const brief = lang === 'ar' ? selectedCompanion.brief : selectedCompanion.briefEn;
+      const story = getCompanionStoryParagraphs(selectedCompanion);
+      const virtues = lang === 'ar' ? selectedCompanion.virtues : selectedCompanion.virtuesEn;
+      const storySections = buildCompanionPdfStorySections(story, t('companions.story'));
+      await showAdThenExport(() => shareIslamicPdf({
+        title: getCompanionName(selectedCompanion),
+        subtitle: lang === 'ar' ? undefined : selectedCompanion.nameAr,
+        shortDescription: brief,
+        category: t('companions.title'),
+        footerTitle: 'رُوح المسلم',
+        sections: storySections,
+        virtues,
+      }));
+    } catch (pdfError) {
+      setPdfErrorVisible(true);
+      console.log('Companion PDF sharing failed', pdfError);
+    }
+  }, [selectedCompanion, t]);
 
   const handleToggleFav = useCallback(async () => {
     if (!selectedCompanion) return;
@@ -1057,6 +2094,20 @@ export default function CompanionsScreen() {
     setCompanionFav(nowSaved);
   }, [selectedCompanion]);
 
+  // Listening view
+  if (listeningCompanion) {
+    return (
+      <ScreenContainer edges={['top', 'left', 'right']} screenKey="companions">
+        <StoryListening
+          companion={listeningCompanion}
+          onBack={handleListenBack}
+          isDarkMode={isDarkMode}
+          colors={colors}
+        />
+      </ScreenContainer>
+    );
+  }
+
   // Detail view
   if (selectedCompanion) {
     return (
@@ -1064,11 +2115,20 @@ export default function CompanionsScreen() {
         <StoryDetail
           companion={selectedCompanion}
           onBack={handleBack}
+          onListen={handleOpenListen}
           onShare={handleShare}
           onToggleFav={handleToggleFav}
           isFav={companionFav}
           isDarkMode={isDarkMode}
           colors={colors}
+        />
+        <PdfShareErrorModal
+          visible={pdfErrorVisible}
+          onRetry={() => {
+            setPdfErrorVisible(false);
+            handleShare();
+          }}
+          onClose={() => setPdfErrorVisible(false)}
         />
       </ScreenContainer>
     );
@@ -1080,7 +2140,6 @@ export default function CompanionsScreen() {
       {/* Header */}
       <UniversalHeader
         backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
-        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' } }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('companions.title')}</Text>
@@ -1130,6 +2189,41 @@ export default function CompanionsScreen() {
         />
       </View>
 
+      <View style={s.searchOuter}>
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 20 : 8}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            s.searchOverlay,
+            {
+              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.62)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        />
+        <View style={[s.searchContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <MaterialCommunityIcons name="magnify" size={21} color={colors.textLight} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={searchPlaceholder}
+            placeholderTextColor={colors.textLight}
+            style={[s.searchInput, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+            returnKeyType="search"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+          />
+          {!!searchQuery && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+            </Pressable>
+          )}
+        </View>
+      </View>
+
       {/* Companions list */}
       <ScrollView
         ref={scrollRef}
@@ -1137,6 +2231,7 @@ export default function CompanionsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.listContent}
       >
+        <ContentLanguageNotice />
         {/* Count badge */}
         <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
           <Text style={[s.countText, { color: colors.text }]}>
@@ -1144,15 +2239,22 @@ export default function CompanionsScreen() {
           </Text>
         </View>
 
-        {filteredCompanions.map(companion => (
-          <CompanionCard
-            key={companion.id}
-            companion={companion}
-            onPress={() => handleSelectCompanion(companion)}
-            isDarkMode={isDarkMode}
-            colors={colors}
-          />
-        ))}
+        {filteredCompanions.length === 0 ? (
+          <View style={s.emptySearchBox}>
+            <MaterialCommunityIcons name="magnify-close" size={30} color={colors.textLight} />
+            <Text style={[s.emptySearchText, { color: colors.text }]}>{noSearchResults}</Text>
+          </View>
+        ) : (
+          filteredCompanions.map(companion => (
+            <CompanionCard
+              key={companion.id}
+              companion={companion}
+              onPress={() => handleSelectCompanion(companion)}
+              isDarkMode={isDarkMode}
+              colors={colors}
+            />
+          ))
+        )}
 
         {/* Footer */}
         <View style={s.footerOuter}>
@@ -1184,12 +2286,6 @@ export default function CompanionsScreen() {
         </View>
       </ScrollView>
       <BannerAdComponent screen="companions" />
-      <PdfTemplatePicker
-        visible={showTemplatePicker}
-        onClose={() => setShowTemplatePicker(false)}
-        onSelect={doExport}
-        pageType="companions"
-      />
     </ScreenContainer>
   );
 }
@@ -1258,6 +2354,31 @@ const _s = StyleSheet.create({
     lineHeight: 22,
     includeFontPadding: false,
   },
+  searchOuter: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  searchOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+  },
+  searchContent: {
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    minHeight: 52,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: fontSemiBold(),
+    fontSize: 14,
+    lineHeight: 22,
+    paddingVertical: 0,
+  },
 
   // List
   listScroll: {
@@ -1282,6 +2403,19 @@ const _s = StyleSheet.create({
     fontSize: 13,
     lineHeight: 22,
     includeFontPadding: false,
+  },
+  emptySearchBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 24,
+    marginBottom: 12,
+  },
+  emptySearchText: {
+    fontFamily: fontSemiBold(),
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   cardOuter: {
     borderRadius: 18,
@@ -1353,6 +2487,10 @@ const _s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerSpacer: {
+    width: 38,
+    height: 38,
+  },
   detailScroll: {
     flex: 1,
   },
@@ -1404,8 +2542,162 @@ const _s = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  detailVideo: {
+  listenEntryOuter: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  listenEntryOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  listenEntryContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: Spacing.md,
+  },
+  listenEntryIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listenEntryText: {
+    flex: 1,
+  },
+  listenEntryTitle: {
+    fontFamily: fontSemiBold(),
+    fontSize: 16,
+    lineHeight: 26,
+  },
+  listenEntrySubtitle: {
+    fontFamily: fontRegular(),
+    fontSize: 13,
+    lineHeight: 21,
+    marginTop: 2,
+  },
+  listenPageContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 120,
+  },
+  audioPanelOuter: {
+    borderRadius: 20,
+    overflow: 'hidden',
     marginBottom: 20,
+  },
+  audioPanelOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  audioPanelContent: {
+    padding: 18,
+    gap: 14,
+  },
+  audioTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  audioProgressTrack: {
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(6,79,47,0.18)',
+    overflow: 'hidden',
+  },
+  audioProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: ACCENT,
+  },
+  audioControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  audioPlayButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT,
+  },
+  audioPlayButtonDisabled: {
+    opacity: 0.45,
+  },
+  audioTime: {
+    width: 62,
+    fontFamily: fontSemiBold(),
+    fontSize: 13,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  audioSpeedRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  audioSpeedLabel: {
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  audioSpeedButton: {
+    minWidth: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  audioSpeedButtonActive: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
+  },
+  audioSpeedButtonText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  audioSpeedButtonTextActive: {
+    color: '#fff',
+  },
+  audioNotice: {
+    fontFamily: fontRegular(),
+    fontSize: 13,
+    lineHeight: 22,
+  },
+  autoScrollToggle: {
+    marginStart: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: ACCENT,
+  },
+  autoScrollToggleText: {
+    color: '#fff',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  transcriptOuter: {
+    height: 390,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  transcriptContent: {
+    padding: 18,
   },
 
   // Detail sections
@@ -1433,6 +2725,12 @@ const _s = StyleSheet.create({
   detailGlassOuter: {
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  // Fixed height for the story section so the long biographical transcripts
+  // scroll inside a box instead of stretching the entire detail page. Mirrors
+  // the height used by the audio "listen" view (transcriptOuter, 390).
+  storyScrollOuter: {
+    height: 460,
   },
   detailGlassOverlay: {
     ...StyleSheet.absoluteFillObject,

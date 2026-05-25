@@ -178,7 +178,7 @@ function buildHtml(
   ${content}
   <div class="footer">
     <div class="app-name">روح المسلم</div>
-    <div>Ruh Al-Muslim</div>
+    <div>Rooh Al-Muslim</div>
   </div>
 </body>
 </html>`;

@@ -59,22 +59,31 @@ export default function SDUIScreen() {
   return (
     <BackgroundWrapper>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-            <MaterialCommunityIcons
-              name={isRTL ? 'arrow-right' : 'arrow-left'}
-              size={24}
-              color={isDarkMode ? '#fff' : '#1a1a1a'}
-            />
-          </TouchableOpacity>
-          {config.title ? (
-            <Text style={[styles.headerTitle, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>
-              {config.title}
-            </Text>
-          ) : null}
-          <View style={{ width: 40 }} />
-        </View>
+        {config.settings?.headerStyle !== 'hidden' && (
+          <View
+            style={[
+              styles.header,
+              {
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                backgroundColor: config.settings?.headerStyle === 'transparent' ? 'transparent' : undefined,
+              },
+            ]}
+          >
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+              <MaterialCommunityIcons
+                name={isRTL ? 'arrow-right' : 'arrow-left'}
+                size={24}
+                color={isDarkMode ? '#fff' : '#1a1a1a'}
+              />
+            </TouchableOpacity>
+            {config.title ? (
+              <Text style={[styles.headerTitle, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>
+                {config.title}
+              </Text>
+            ) : null}
+            <View style={{ width: 40 }} />
+          </View>
+        )}
 
         {/* SDUI Sections */}
         <ScrollView

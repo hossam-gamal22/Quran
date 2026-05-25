@@ -33,6 +33,8 @@ import {
   requestNotificationPermissions,
 } from '../lib/khatma-notifications';
 import { useSubscription } from './SubscriptionContext';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 // ===== TYPES =====
 interface KhatmaContextType {
@@ -107,6 +109,12 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
 
   const { isPremium } = useSubscription();
 
+  const syncRewardsAfterKhatmaChange = useCallback(() => {
+    getUserId()
+      .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+      .catch(() => {});
+  }, []);
+
   const createKhatma = useCallback(
     async (name: string, duration: KhatmaDuration, reminderTime: string | null = null) => {
       // Limit free users to 1 active khatma
@@ -170,10 +178,11 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
       }
       
       await refreshKhatmas();
+      syncRewardsAfterKhatmaChange();
       return true;
     }
     return false;
-  }, [activeKhatma, refreshKhatmas]);
+  }, [activeKhatma, refreshKhatmas, syncRewardsAfterKhatmaChange]);
 
   const recordProgress = useCallback(
     async (pages: number) => {
@@ -188,11 +197,12 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
         }
         
         await refreshKhatmas();
+        syncRewardsAfterKhatmaChange();
         return true;
       }
       return false;
     },
-    [activeKhatma, refreshKhatmas]
+    [activeKhatma, refreshKhatmas, syncRewardsAfterKhatmaChange]
   );
 
   const recordPageRead = useCallback(
@@ -206,11 +216,12 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
           await cancelKhatmaReminder(updated.id);
         }
         await refreshKhatmas();
+        syncRewardsAfterKhatmaChange();
         return true;
       }
       return false;
     },
-    [activeKhatma, refreshKhatmas]
+    [activeKhatma, refreshKhatmas, syncRewardsAfterKhatmaChange]
   );
 
   const handleResetKhatma = useCallback(async () => {

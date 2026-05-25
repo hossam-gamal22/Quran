@@ -70,7 +70,7 @@ describe('worship-storage monthly activity stats', () => {
       '2026-05-03': { date: '2026-05-03', fasted: false },
     });
     setJson('worship_quran_records', {
-      '2026-05-01': { date: '2026-05-01', pagesRead: 3 },
+      '2026-05-01': { date: '2026-05-01', pagesRead: 3, khatmaCompletions: 1 },
       '2026-04-30': { date: '2026-04-30', pagesRead: 9 },
     });
     setJson('worship_azkar_records', {
@@ -95,7 +95,8 @@ describe('worship-storage monthly activity stats', () => {
       prayers: 3,
       fasting: 1,
       quranPages: 3,
-      azkar: 2,
+      khatmas: 1,
+      azkar: 3,
       tasbih: 15,
     });
   });
@@ -109,6 +110,29 @@ describe('worship-storage monthly activity stats', () => {
         sleep: false,
         wakeup: true,
         afterPrayer: false,
+      },
+    });
+
+    await expect(getMonthlyActivityStats(2026, 5)).resolves.toMatchObject({
+      azkar: 3,
+    });
+  });
+
+  it('combines manually tracked azkar types with deduped per-zikr completions', async () => {
+    setJson('worship_azkar_records', {
+      '2026-05-01': {
+        date: '2026-05-01',
+        morning: true,
+        evening: true,
+        sleep: false,
+        wakeup: false,
+        afterPrayer: false,
+        zikrCount: 2,
+        completedZikrIds: ['1:10', '1:11'],
+        typeCompletionSources: {
+          morning: 'manual',
+          evening: 'category',
+        },
       },
     });
 

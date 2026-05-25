@@ -36,6 +36,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getAllQuranRecords, DailyQuranRecord, getTodayDate } from '@/lib/worship-storage';
 import { Colors, DarkColors } from '@/constants/theme';
 import { t, getDateLocale } from '@/lib/i18n';
+import { uiText } from '@/lib/ui-text';
 
 const { width } = Dimensions.get('window');
 
@@ -391,8 +392,8 @@ export default function QuranTrackerScreen() {
                 activeOpacity={0.75}
               >
                 <MaterialCommunityIcons name="minus" size={20} color={todayPages <= 0 ? colors.textLight : '#c17f59'} />
-                <Text style={[styles.quickAddTitle, { color: colors.text }]}>تراجع</Text>
-                <Text style={[styles.quickAddLabel, { color: colors.textLight }]}>صفحة -1</Text>
+                <Text style={[styles.quickAddTitle, { color: colors.text }]}>{uiText({ ar: 'تراجع', en: 'Undo' })}</Text>
+                <Text style={[styles.quickAddLabel, { color: colors.textLight }]}>{uiText({ ar: 'صفحة -1', en: '-1 page' })}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.quickAddButton, { backgroundColor: '#c17f5918', borderColor: '#c17f59' }]}
@@ -400,7 +401,7 @@ export default function QuranTrackerScreen() {
                 activeOpacity={0.75}
               >
                 <MaterialCommunityIcons name="book-plus" size={20} color="#c17f59" />
-                <Text style={[styles.quickAddTitle, { color: '#c17f59' }]}>إضافة صفحة</Text>
+                <Text style={[styles.quickAddTitle, { color: '#c17f59' }]}>{uiText({ ar: 'إضافة صفحة', en: 'Add page' })}</Text>
                 <Text style={[styles.quickAddLabel, { color: '#c17f59' }]}>+1</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -409,7 +410,7 @@ export default function QuranTrackerScreen() {
                 activeOpacity={0.75}
               >
                 <MaterialCommunityIcons name="target" size={20} color="#c17f59" />
-                <Text style={[styles.quickAddTitle, { color: colors.text }]}>إكمال الهدف</Text>
+                <Text style={[styles.quickAddTitle, { color: colors.text }]}>{uiText({ ar: 'إكمال الهدف', en: 'Complete goal' })}</Text>
                 <Text style={[styles.quickAddLabel, { color: colors.textLight }]}>+{dailyGoal}</Text>
               </TouchableOpacity>
             </View>

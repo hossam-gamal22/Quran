@@ -146,18 +146,20 @@ export function OfflineModal() {
         <Pressable
           style={[
             styles.card,
-            { backgroundColor: colors.card === 'rgba(255,255,255,0.1)' || colors.card === 'rgba(0,0,0,0.06)'
-                ? '#1a1f2b'
-                : colors.card },
+            {
+              backgroundColor: colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)',
+              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+            },
           ]}
           onPress={() => {/* prevent dismiss when tapping card */}}
         >
-          <MaterialCommunityIcons
-            name="wifi-off"
-            size={48}
-            color={colors.text}
-            style={styles.icon}
-          />
+          <View style={[styles.iconCircle, { backgroundColor: colors.isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.10)' }]}>
+            <MaterialCommunityIcons
+              name="wifi-off"
+              size={42}
+              color="#f59e0b"
+            />
+          </View>
           <Text style={[styles.title, { color: colors.text, fontFamily: fontBold() }]}>
             {t('network.noConnectionTitle')}
           </Text>
@@ -201,14 +203,25 @@ const _styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    width: '85%',
-    maxWidth: 360,
-    borderRadius: 20,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 28,
+    paddingHorizontal: 22,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    elevation: 8,
   },
-  icon: {
+  iconCircle: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   title: {

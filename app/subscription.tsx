@@ -39,7 +39,6 @@ const PREMIUM_FEATURES = [
   'subscription.featurePremiumWidgets',
   'subscription.featureAdvancedKhatma',
   'subscription.featureAdvancedStats',
-  'subscription.supportDev',
 ] as const;
 
 export default function SubscriptionScreen() {
@@ -48,12 +47,11 @@ export default function SubscriptionScreen() {
   const { isDarkMode } = colors;
   const isRTL = useIsRTL();
   const router = useRouter();
-  const { t, language } = useTranslation();
+  const { t } = useTranslation();
   const {
     isPremium,
     currentPlan,
     products,
-    features,
     config,
     isLoading,
     isSubscriptionEnabled,
@@ -62,7 +60,6 @@ export default function SubscriptionScreen() {
     showLifetime,
     showYearly,
     showMonthly,
-    badgeText,
     lifetimePriceOverride,
     refetchProducts,
   } = useSubscription();
@@ -154,12 +151,11 @@ export default function SubscriptionScreen() {
     );
   }
 
-  const isArabic = language === 'ar';
   const productsMissing = products.length === 0;
 
   const allPlanCards: { plan: SubscriptionPlan; badge?: string; popular?: boolean }[] = [
     ...(showMonthly ? [{ plan: 'monthly' as SubscriptionPlan }] : []),
-    ...(showYearly ? [{ plan: 'yearly' as SubscriptionPlan, badge: badgeText || t('subscription.bestValue'), popular: true }] : []),
+    ...(showYearly ? [{ plan: 'yearly' as SubscriptionPlan, badge: t('subscription.bestValue'), popular: true }] : []),
     ...(showLifetime ? [{ plan: 'lifetime' as SubscriptionPlan, badge: t('subscription.oneTimePurchase') }] : []),
   ];
   const planCards = allPlanCards;
@@ -208,9 +204,7 @@ export default function SubscriptionScreen() {
           >
             <MaterialCommunityIcons name="refresh" size={20} color={colors.text} />
             <Text style={{ flex: 1, color: colors.text, fontFamily: fontMedium(), fontSize: 13, textAlign: isRTL ? 'right' : 'left' }}>
-              {isArabic
-                ? 'الأسعار غير متاحة حاليًا. اضغط لإعادة تحميل الأسعار.'
-                : 'Prices unavailable right now. Tap to reload.'}
+              {t('subscription.pricesUnavailableReload')}
             </Text>
           </TouchableOpacity>
         )}

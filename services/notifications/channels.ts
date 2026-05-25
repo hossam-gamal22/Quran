@@ -17,6 +17,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '@/lib/i18n';
+import { uiText } from '@/lib/ui-text';
 
 // Bump this whenever channel config changes (sounds, importance, etc.)
 // Forces a delete+recreate of all channels on next app launch.
@@ -37,7 +38,15 @@ const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
 // v22: Force recreate adhan channels after real-device full-adhan QA so stale
 // Android channels created without a custom sound cannot keep producing silent
 // test notifications.
-const CURRENT_CHANNELS_VERSION = '22';
+// v24: Promote reminder and general channels to MAX importance so every
+// sounded app notification is eligible for heads-up display and sound.
+// v25: Add the `complete` reminder channel alias for completion/report sounds.
+// v26: Default reminder sound now routes to the `general` channel (system
+// default), and the updated `morning_adhkar.mp3` asset requires channel
+// recreation since Android caches channel sounds immutably.
+// v27: Removed the `reminder_general_reminder` channel after deleting the
+// general_reminder.mp3 asset — the system default sound replaces it.
+const CURRENT_CHANNELS_VERSION = '27';
 
 export const ANDROID_FULL_ADHAN_CHANNEL_ID = 'adhan_full_visual';
 
@@ -63,8 +72,8 @@ export const ADHAN_SOUND_FILES: Record<string, string> = {
 // ─── Notification/reminder sound filename map (all files in assets/sounds/) ──
 export const NOTIFICATION_SOUND_FILES: Record<string, string> = {
   alhamdulillah:       'alhamdulillah.mp3',
+  complete:            'notif_daily_summary.mp3',
   evening_adhkar:      'evening_adhkar.mp3',
-  general_reminder:    'general_reminder.mp3',
   istighfar:           'istighfar.mp3',
   morning_adhkar:      'morning_adhkar.mp3',
   notif_after_prayer:  'notif_after_prayer.mp3',
@@ -111,14 +120,14 @@ export function getAdhanChannelId(soundKey?: string): string {
  * Returns a channel ID like 'reminder_salawat'. All channels are pre-created at startup.
  */
 export function getReminderChannelId(soundKey?: string): string {
-  if (!soundKey || soundKey === 'default') return 'reminder_general_reminder';
+  if (!soundKey || soundKey === 'default') return 'general';
   if (soundKey === 'silent') return 'silent';
   // Strip .mp3 if passed with extension
   const key = soundKey.replace(/\.mp3$/, '');
   if (NOTIFICATION_SOUND_FILES[key]) return `reminder_${key}`;
   // Some callers pass adhan sound keys for reminders
   if (ADHAN_SOUND_FILES[key]) return `adhan_${key}`;
-  return 'reminder_general_reminder'; // fallback
+  return 'general'; // fallback → system default sound
 }
 
 // ─── Channel Initialization ─────────────────────────────────────────────────
@@ -139,10 +148,10 @@ export async function initializeAllNotificationChannels(): Promise<void> {
   try {
     // Channel groups for organization in Android settings
     await Notifications.setNotificationChannelGroupAsync('prayer', {
-      name: 'أوقات الصلاة',
+      name: uiText({ ar: 'أوقات الصلاة', en: 'Prayer Times' }),
     });
     await Notifications.setNotificationChannelGroupAsync('reminders', {
-      name: 'التذكيرات والأذكار',
+      name: uiText({ ar: 'التذكيرات والأذكار', en: 'Reminders and Adhkar' }),
     });
   } catch (e) {
     console.warn('[Channels] Failed to create channel groups:', e);
@@ -155,7 +164,7 @@ export async function initializeAllNotificationChannels(): Promise<void> {
     const soundFile = resolveSoundFile(filename);
     try {
       await Notifications.setNotificationChannelAsync(channelId, {
-        name: `أذان - ${key}`,
+        name: `${uiText({ ar: 'أذان', en: 'Adhan' })} - ${key}`,
         groupId: 'prayer',
         importance: Notifications.AndroidImportance.MAX,
         sound: soundFile,
@@ -176,7 +185,7 @@ export async function initializeAllNotificationChannels(): Promise<void> {
   // does not overlap with the full MediaPlayer audio.
   try {
     await Notifications.setNotificationChannelAsync(ANDROID_FULL_ADHAN_CHANNEL_ID, {
-      name: 'الأذان الكامل',
+      name: uiText({ ar: 'الأذان الكامل', en: 'Full Adhan' }),
       groupId: 'prayer',
       importance: Notifications.AndroidImportance.MAX,
       sound: null,
@@ -196,9 +205,9 @@ export async function initializeAllNotificationChannels(): Promise<void> {
     const soundFile = resolveSoundFile(filename);
     try {
       await Notifications.setNotificationChannelAsync(channelId, {
-        name: `تذكير - ${key}`,
+        name: `${uiText({ ar: 'تذكير', en: 'Reminder' })} - ${key}`,
         groupId: 'reminders',
-        importance: Notifications.AndroidImportance.HIGH,
+        importance: Notifications.AndroidImportance.MAX,
         sound: soundFile,
         vibrationPattern: [0, 250, 250, 250],
         enableVibrate: true,
@@ -213,7 +222,7 @@ export async function initializeAllNotificationChannels(): Promise<void> {
   // --- SILENT CHANNEL ---
   try {
     await Notifications.setNotificationChannelAsync('silent', {
-      name: 'صامت',
+      name: uiText({ ar: 'صامت', en: 'Silent' }),
       importance: Notifications.AndroidImportance.HIGH,
       sound: null,
       enableVibrate: false,
@@ -226,8 +235,8 @@ export async function initializeAllNotificationChannels(): Promise<void> {
   // --- GENERAL CHANNEL (system default sound — used by app-update-checker, refresh reminders) ---
   try {
     await Notifications.setNotificationChannelAsync('general', {
-      name: t('notifications.generalChannel') || 'إشعارات عامة',
-      importance: Notifications.AndroidImportance.HIGH,
+      name: t('notifications.generalChannel') || uiText({ ar: 'إشعارات عامة', en: 'General Notifications' }),
+      importance: Notifications.AndroidImportance.MAX,
       sound: 'default',
       enableVibrate: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,

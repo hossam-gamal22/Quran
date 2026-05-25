@@ -67,14 +67,14 @@ export default function TermsOfUseScreen() {
           titleAr="القبول بالشروط"
           titleEn="Acceptance of Terms"
           bodyAr={'باستخدامك لتطبيق "روح المسلم"، فإنك توافق على هذه الشروط. إذا كنت لا توافق عليها، يرجى عدم استخدام التطبيق.'}
-          bodyEn={'By using the "Ruh Al-Muslim" app, you agree to these terms. If you do not agree, please do not use the app.'}
+          bodyEn={'By using the "Rooh Al-Muslim" app, you agree to these terms. If you do not agree, please do not use the app.'}
         />
 
         <Section
           titleAr="الغرض من التطبيق"
           titleEn="Purpose of the App"
           bodyAr={'تطبيق "روح المسلم" هو تطبيق إسلامي يهدف إلى مساعدة المسلمين في عباداتهم اليومية، ويشمل:\n• قراءة القرآن الكريم والاستماع إليه\n• متابعة أوقات الصلاة\n• الأذكار والأدعية\n• التسبيح والاستغفار\n• ختمة القرآن\n• الرقية الشرعية\n• أسماء الله الحسنى'}
-          bodyEn={'Ruh Al-Muslim is an Islamic app designed to help Muslims with their daily worship, including:\n• Reading and listening to the Holy Quran\n• Tracking prayer times\n• Adhkar and supplications\n• Tasbih and Istighfar\n• Quran Khatma\n• Ruqyah (spiritual healing)\n• Names of Allah'}
+          bodyEn={'Rooh Al-Muslim is an Islamic app designed to help Muslims with their daily worship, including:\n• Reading and listening to the Holy Quran\n• Tracking prayer times\n• Adhkar and supplications\n• Tasbih and Istighfar\n• Quran Khatma\n• Ruqyah (spiritual healing)\n• Names of Allah'}
         />
 
         <Section

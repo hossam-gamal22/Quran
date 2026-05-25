@@ -1,7 +1,7 @@
 // app/seasonal/ramadan.tsx
 // صفحة موسم رمضان - روح المسلم
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,23 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getLanguage } from '@/lib/i18n';
 import TranslatedText from '@/components/ui/TranslatedText';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
+import { uiText } from '@/lib/ui-text';
 import { useSeasonalCMS } from '@/lib/content-api';
+import {
+  addQuranPages,
+  formatDate,
+  getAzkarRecord,
+  getFastingRecord,
+  getPrayerRecord,
+  getQuranRecord,
+  incrementAzkarZikrCount,
+  removeAzkarZikrCompletion,
+  saveFastingRecord,
+  updatePrayerStatus,
+} from '@/lib/worship-storage';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -50,30 +66,73 @@ const CARD_WIDTH = (width - 48) / 2;
 const RAMADAN_COLOR = '#0d8e62';
 const RAMADAN_GRADIENT = ['#0d8e62', '#1d4a3a'];
 
-const RAMADAN_DUAS = [
+type RamadanDua = {
+  id: string;
+  titleKey: string;
+  arabic: string;
+  translation: string;
+};
+
+const RAMADAN_DUAS: RamadanDua[] = [
   {
     id: 'iftar',
-    titleKey: 'ramadan.iftarDua' as const,
-    arabic: 'ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الأَجْرُ إِنْ شَاءَ اللَّهُ',
+    titleKey: 'ramadan.iftarDua',
+    arabic: 'ذَهَبَ الظَّمَأُ، وَابْتَلَّتِ الْعُرُوقُ، وَثَبَتَ الأَجْرُ إِنْ شَاءَ اللَّهُ',
     translation: 'The thirst has gone, the veins are moistened and the reward is confirmed, if Allah wills.',
   },
   {
     id: 'laylat_qadr',
-    titleKey: 'ramadan.laylatQadrDua' as const,
-    arabic: 'اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي',
-    translation: 'O Allah, You are Forgiving and love forgiveness, so forgive me.',
+    titleKey: 'ramadan.laylatQadrDua',
+    arabic: 'اللَّهُمَّ إِنَّكَ عَفُوٌّ كَرِيمٌ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي',
+    translation: 'O Allah, You are Pardoning and love pardon, so pardon me.',
   },
   {
-    id: 'suhoor',
-    titleKey: 'ramadan.suhoorDua' as const,
-    arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ بِرَحْمَتِكَ الَّتِي وَسِعَتْ كُلَّ شَيْءٍ أَنْ تَغْفِرَ لِي',
-    translation: 'O Allah, I ask You by Your mercy which encompasses all things, to forgive me.',
+    id: 'world_akhirah_good',
+    titleKey: 'دعاء جامع',
+    arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً، وَفِي الْآخِرَةِ حَسَنَةً، وَقِنَا عَذَابَ النَّارِ',
+    translation: 'Our Lord, grant us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.',
   },
   {
-    id: 'quran',
-    titleKey: 'ramadan.quranCompletionDua' as const,
-    arabic: 'اللَّهُمَّ ارْحَمْنِي بِالْقُرْآنِ وَاجْعَلْهُ لِي إِمَامًا وَنُورًا وَهُدًى وَرَحْمَةً',
-    translation: 'O Allah, have mercy on me through the Quran, and make it for me a guide, light, guidance and mercy.',
+    id: 'repentance',
+    titleKey: 'دعاء التوبة',
+    arabic: 'رَبَّنَا ظَلَمْنَا أَنْفُسَنَا، وَإِنْ لَمْ تَغْفِرْ لَنَا وَتَرْحَمْنَا لَنَكُونَنَّ مِنَ الْخَاسِرِينَ',
+    translation: 'Our Lord, we have wronged ourselves. If You do not forgive us and have mercy on us, we will be among the losers.',
+  },
+  {
+    id: 'pardon_and_mercy',
+    titleKey: 'طلب العفو والمغفرة',
+    arabic: 'رَبَّنَا وَلَا تُحَمِّلْنَا مَا لَا طَاقَةَ لَنَا بِهِ، وَاعْفُ عَنَّا وَاغْفِرْ لَنَا وَارْحَمْنَا',
+    translation: 'Our Lord, do not burden us with what we cannot bear; pardon us, forgive us, and have mercy on us.',
+  },
+  {
+    id: 'pre_iftar',
+    titleKey: 'دعاء قبل الإفطار',
+    arabic: 'اللَّهُمَّ إِنِّي لَكَ صُمْتُ، وَعَلَى رِزْقِكَ أَفْطَرْتُ، وَبِكَ آمَنْتُ، وَعَلَيْكَ تَوَكَّلْتُ',
+    translation: 'O Allah, for You I fasted, by Your provision I broke my fast, in You I believed, and upon You I relied.',
+  },
+  {
+    id: 'forgiveness',
+    titleKey: 'دعاء المغفرة',
+    arabic: 'اللَّهُمَّ اغْفِرْ لِي ذَنْبِي كُلَّهُ، دِقَّهُ وَجِلَّهُ، وَأَوَّلَهُ وَآخِرَهُ، وَعَلَانِيَتَهُ وَسِرَّهُ',
+    translation: 'O Allah, forgive all my sins — minor and major, first and last, public and private.',
+  },
+  {
+    id: 'guidance_and_chastity',
+    titleKey: 'دعاء الهداية',
+    arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْهُدَى وَالتُّقَى وَالْعَفَافَ وَالْغِنَى',
+    translation: 'O Allah, I ask You for guidance, piety, chastity, and self-sufficiency.',
+  },
+  {
+    id: 'paradise_protection',
+    titleKey: 'دعاء بالجنة والاستعاذة من النار',
+    arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْجَنَّةَ، وَأَعُوذُ بِكَ مِنَ النَّارِ',
+    translation: 'O Allah, I ask You for Paradise and I seek refuge in You from the Fire.',
+  },
+  {
+    id: 'good_ending',
+    titleKey: 'دعاء حسن الخاتمة',
+    arabic: 'اللَّهُمَّ اخْتِمْ لَنَا بِخَيْرٍ، وَتَوَفَّنَا وَأَنْتَ رَاضٍ عَنَّا',
+    translation: 'O Allah, seal our lives with goodness, and take us back to You while You are pleased with us.',
   },
 ];
 
@@ -89,8 +148,11 @@ const DAILY_CHECKLIST = [
 const LAST_TEN_NIGHTS = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
 const ODD_NIGHTS = [21, 23, 25, 27, 29];
 
-type RamadanDua = typeof RAMADAN_DUAS[number];
 type ChecklistItem = typeof DAILY_CHECKLIST[number];
+
+const seasonalLabel = (value: string): string => (
+  /^[a-z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/.test(value) ? t(value) : value
+);
 
 // ========================================
 // مكونات فرعية
@@ -270,7 +332,7 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
           <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
         </View>
         <Text style={[styles.checklistLabel, { color: isChecked && !isDarkMode ? '#1B5E20' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-          {t(item.labelKey)}
+          {seasonalLabel(item.labelKey)}
         </Text>
         <View
           style={[
@@ -314,7 +376,7 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
         <View style={styles.duaIconContainer}>
           <AppIcon name="🤲" size={24} color={RAMADAN_COLOR} />
         </View>
-        <Text style={[styles.duaTitle, { color: colors.text, textAlign: 'center' }]}>{t(dua.titleKey)}</Text>
+        <Text style={[styles.duaTitle, { color: colors.text, textAlign: 'center' }]}>{seasonalLabel(dua.titleKey)}</Text>
         {isArabicLang ? (
           <Text style={[styles.duaPreview, { color: colors.textLight, textAlign: 'center', writingDirection: 'rtl' }]} numberOfLines={2}>
             {dua.arabic}
@@ -440,27 +502,85 @@ export default function RamadanScreen() {
     }
   }, [currentDay, completedDays, markDayCompleted]);
 
+  const getRamadanGregorianDate = useCallback((day: number) => {
+    const hijriNow = getHijriDate();
+    return formatDate(hijriToGregorian(hijriNow.year, 9, day));
+  }, []);
+
+  const syncRewards = useCallback(() => {
+    getUserId()
+      .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (currentDay <= 0) return;
+    const date = getRamadanGregorianDate(currentDay);
+    const zikrKey = `seasonal:ramadan:${date}:azkar`;
+    Promise.all([
+      getFastingRecord(date),
+      getPrayerRecord(date),
+      getQuranRecord(date),
+      getAzkarRecord(date),
+    ])
+      .then(([fastingRecord, prayerRecord, quranRecord, azkarRecord]) => {
+        setDailyChecklist((prev) => ({
+          ...prev,
+          fasting: !!fastingRecord?.fasted,
+          fajr: prayerRecord?.fajr === 'prayed' || prayerRecord?.fajr === 'late',
+          quran: (Number(quranRecord?.pagesRead) || 0) >= 20,
+          azkar: !!azkarRecord?.completedZikrIds?.includes(zikrKey),
+        }));
+      })
+      .catch(() => {});
+  }, [currentDay, getRamadanGregorianDate]);
+
   const handleChecklistToggle = useCallback((itemId: string) => {
-    setDailyChecklist((prev) => {
-      const newState = { ...prev, [itemId]: !prev[itemId] };
+    const newState = { ...dailyChecklist, [itemId]: !dailyChecklist[itemId] };
+    const isChecked = !!newState[itemId];
+    setDailyChecklist(newState);
 
-      // تحديث الإحصائيات
-      if (itemId === 'fasting' && newState[itemId]) {
-        updateProgress({ fastingDays: (seasonalProgress?.stats.fastingDays || 0) + 1 });
+    const date = currentDay > 0 ? getRamadanGregorianDate(currentDay) : formatDate(new Date());
+    (async () => {
+      if (itemId === 'fasting') {
+        await saveFastingRecord({ date, fasted: isChecked, type: 'ramadan' });
+        updateProgress({
+          fastingDays: Math.max(0, (seasonalProgress?.stats.fastingDays || 0) + (isChecked ? 1 : -1)),
+        });
+      } else if (itemId === 'fajr') {
+        await updatePrayerStatus(date, 'fajr', isChecked ? 'prayed' : 'none');
+      } else if (itemId === 'quran') {
+        await addQuranPages(date, isChecked ? 20 : -20);
+        updateProgress({
+          quranPages: Math.max(0, (seasonalProgress?.stats.quranPages || 0) + (isChecked ? 20 : -20)),
+        });
+      } else if (itemId === 'azkar') {
+        const zikrKey = `seasonal:ramadan:${date}:azkar`;
+        if (isChecked) {
+          await incrementAzkarZikrCount(date, zikrKey);
+        } else {
+          await removeAzkarZikrCompletion(date, zikrKey);
+        }
       }
-      if (itemId === 'quran' && newState[itemId]) {
-        updateProgress({ quranPages: (seasonalProgress?.stats.quranPages || 0) + 20 });
-      }
+      syncRewards();
+    })().catch(() => {});
 
-      // التحقق من اكتمال اليوم
-      const allChecked = dailyChecklistItems.every((item) => newState[item.id]);
-      if (allChecked && !completedDays.includes(currentDay)) {
-        markDayCompleted(currentDay);
-      }
-
-      return newState;
-    });
-  }, [seasonalProgress, updateProgress, completedDays, currentDay, markDayCompleted]);
+    // التحقق من اكتمال اليوم
+    const allChecked = dailyChecklistItems.every((item) => newState[item.id]);
+    if (allChecked && !completedDays.includes(currentDay)) {
+      markDayCompleted(currentDay);
+    }
+  }, [
+    completedDays,
+    currentDay,
+    dailyChecklist,
+    dailyChecklistItems,
+    getRamadanGregorianDate,
+    markDayCompleted,
+    seasonalProgress,
+    syncRewards,
+    updateProgress,
+  ]);
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
@@ -504,6 +624,7 @@ export default function RamadanScreen() {
           />
         }
       >
+        <ContentLanguageNotice style={{ marginHorizontal: 0 }} />
         {/* بطاقة اليوم المميز */}
         {specialDay && isRamadanActive && (
           <Animated.View entering={FadeIn.duration(500)}>
@@ -563,7 +684,7 @@ export default function RamadanScreen() {
             />
             <StatsCard
               icon="percent"
-              label={'النسبة المئوية'}
+              label={uiText({ ar: 'النسبة المئوية', en: 'Percentage' })}
               value={stats.khatmaProgress}
               unit="%"
               color="#4a3d73"
@@ -662,7 +783,7 @@ export default function RamadanScreen() {
           >
             <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.duaModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {selectedDua ? t(selectedDua.titleKey) : ''}
+                {selectedDua ? seasonalLabel(selectedDua.titleKey) : ''}
               </Text>
               <TouchableOpacity onPress={() => setSelectedDua(null)} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialCommunityIcons
@@ -681,9 +802,11 @@ export default function RamadanScreen() {
                 {selectedDua?.arabic || ''}
               </TranslatedText>
             )}
-            <Text style={[styles.duaModalTranslation, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {selectedDua?.translation}
-            </Text>
+            {!isArabic && selectedDua?.translation ? (
+              <Text style={[styles.duaModalTranslation, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {selectedDua.translation}
+              </Text>
+            ) : null}
             <TouchableOpacity style={[styles.duaModalButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="content-copy" size={20} color="#fff" />
               <Text style={styles.duaModalButtonText}>{t('ramadan.copyDua')}</Text>

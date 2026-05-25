@@ -228,5 +228,8 @@ export function getPrayerInfo(prayer: SalatiPrayerType): PrayerInfo {
  */
 export function getPrayerName(prayer: SalatiPrayerType, language: string = 'ar'): string {
   const info = PRAYER_CONFIG[prayer];
+  if (prayer === 'dhuhr' && new Date().getDay() === 5) {
+    return language === 'ar' ? 'صلاة الجمعة' : 'Jumuah Prayer';
+  }
   return language === 'ar' ? info.nameAr : info.nameEn;
 }

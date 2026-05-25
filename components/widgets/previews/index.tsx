@@ -11,6 +11,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getLanguage } from '@/lib/i18n';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
 import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
+import { getVerseQcfData } from '@/lib/qcf-page-data';
+import { getPageFontFamily, isPageFontLoaded, loadPageFont } from '@/lib/qcf-font-loader';
+import { getPrayerNameAr, getPrayerNameEn } from '@/lib/prayer-times';
 
 /**
  * Re-format a prayer time from its raw epoch into the language-current
@@ -55,6 +58,15 @@ import {
 } from './shared';
 import { useWidgetSnapshotCapture, useWidgetForcedTheme, useWidgetPreviewData } from './snapshot-capture-context';
 import { AnchorReporter } from './anchor-reporter';
+import {
+  detectQuranTitle,
+  splitAzkarChunks,
+  pickAzkarSlot,
+  resolveAzkarBodyText,
+  quranTitleToEnglish,
+  cleanEnglishTranslation,
+  pickLongEnglishAzkarPage,
+} from '@/lib/widget-azkar-helpers';
 
 // ────────────────────────────────────────────────────────
 // Glass card shell — dark blur tile that mirrors .ultraThinMaterial
@@ -139,6 +151,15 @@ function isArabicLang(forced?: Lang): boolean {
 const num = (n: number, ar?: boolean): string => {
   return (ar ?? isArabicLang()) ? latinToArabicDigits(n) : String(n);
 };
+
+function englishAzkarFontSize(text: string, size: PreviewSize): number {
+  if (size === 'small') return text.length > 180 ? 10 : text.length > 120 ? 11 : text.length > 80 ? 12 : 14;
+  if (text.length > 240) return 15;
+  if (text.length > 200) return 16;
+  if (text.length > 160) return 18;
+  if (text.length > 110) return 20;
+  return 22;
+}
 
 /**
  * Reads the user's widget-customisation choices from `SettingsContext.display.*`
@@ -685,7 +706,7 @@ const PRAYER_ROWS: {
 }[] = [
   { keyAr: 'الفجر', keyEn: 'Fajr', time: '05:35', icon: 'weather-sunset-up' },
   { keyAr: 'الشروق', keyEn: 'Sunrise', time: '06:49', icon: 'white-balance-sunny' },
-  { keyAr: 'الظهر', keyEn: 'Dhuhr', time: '12:17', icon: 'weather-sunny', isNext: true },
+  { keyAr: getPrayerNameAr('dhuhr'), keyEn: getPrayerNameEn('dhuhr'), time: '12:17', icon: 'weather-sunny', isNext: true },
   { keyAr: 'العصر', keyEn: 'Asr', time: '03:32', icon: 'weather-hazy' },
   { keyAr: 'المغرب', keyEn: 'Maghrib', time: '06:42', icon: 'weather-sunset' },
   { keyAr: 'العشاء', keyEn: 'Isha', time: '08:19', icon: 'weather-night' },
@@ -1151,36 +1172,43 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
   const truePrevPrev = resolvePreviewPrayerItem(sharedData, false);
   const nextName = ar ? (trueNextPrev?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextPrev?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
   const previousName = ar ? (truePrevPrev?.nameAr ?? sharedData?.prayer?.previousPrayerNameAr ?? 'العشاء') : (truePrevPrev?.name ?? sharedData?.prayer?.previousPrayerName ?? 'Isha');
-  const items = [
-    {
-      label: ar ? 'الصلاة القادمة' : 'Next Prayer',
-      name: nextName,
-      time: noWrapPrayerTime(fmt(
-        formatPrayerTimeForPreview(trueNextPrev?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar)
-        ?? trueNextPrev?.time
-        ?? sharedData?.prayer?.nextPrayerTime
-        ?? '04:14'
-      )),
-      sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar),
-      icon: 'weather-sunset-up' as const,
-    },
-    {
-      label: ar ? 'الصلاة السابقة' : 'Previous Prayer',
-      name: previousName,
-      time: noWrapPrayerTime(fmt(
-        formatPrayerTimeForPreview(truePrevPrev?.epochMs ?? sharedData?.prayer?.previousPrayerAtEpochMs, ar)
-        ?? truePrevPrev?.time
-        ?? '08:18'
-      )),
-      sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, false), fmt, ar, 'previous'),
-      icon: 'weather-night' as const,
-    },
-  ];
+  const nextItem = {
+    label: ar ? 'الصلاة القادمة' : 'Next Prayer',
+    name: nextName,
+    time: noWrapPrayerTime(fmt(
+      formatPrayerTimeForPreview(trueNextPrev?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar)
+      ?? trueNextPrev?.time
+      ?? sharedData?.prayer?.nextPrayerTime
+      ?? '04:14'
+    )),
+    sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar),
+    icon: 'weather-sunset-up' as const,
+  };
+  const previousItem = {
+    label: ar ? 'الصلاة السابقة' : 'Previous Prayer',
+    name: previousName,
+    time: noWrapPrayerTime(fmt(
+      formatPrayerTimeForPreview(truePrevPrev?.epochMs ?? sharedData?.prayer?.previousPrayerAtEpochMs, ar)
+      ?? truePrevPrev?.time
+      ?? '08:18'
+    )),
+    sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, false), fmt, ar, 'previous'),
+    icon: 'weather-night' as const,
+  };
+  // Order follows the widget's localized name reading direction:
+  //   Arabic "الصلاة السابقة والقادمة" → السابقة-RIGHT, القادمة-LEFT
+  //     → render [next, previous] under forced LTR (first child = left).
+  //   English "Previous & Next" → Previous-LEFT, Next-RIGHT
+  //     → render [previous, next] under LTR (first child = left).
+  // Without this swap the English gallery + Android bake shows Next on the
+  // left even though the widget label reads "Previous & Next" left-to-right.
+  const items = ar ? [nextItem, previousItem] : [previousItem, nextItem];
   return (
     <GlassTile size={size} padding={isAndroid ? 18 : undefined} palette={p}>
-      {/* direction:'ltr' fixes snapshot PNG so القادمة is always LEFT and
-          السابقة always RIGHT — matching the LTR overlay anchor positions
-          (x=91 for next, x=238 for previous) in SnapshotWidget.tsx */}
+      {/* direction:'ltr' so the array order maps directly to visual L→R.
+          The Android overlay coordinates in SnapshotWidget.tsx mirror the
+          same language-conditional swap so the live countdown text lands
+          on the card the snapshot bake placed underneath it. */}
       <View style={{ flex: 1, flexDirection: 'row', gap: isAndroid ? 8 : 10, direction: 'ltr' }}>
         {items.map((item, i) => (
           <View
@@ -1246,87 +1274,197 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
 // Verse preview
 // ────────────────────────────────────────────────────────
 
-const SAMPLE_VERSE = 'رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا';
-const SAMPLE_TRANSLATION = 'Our Lord, do not impose blame upon us if we have forgotten or erred';
-const SAMPLE_SURAH_AR = 'البقرة';
-const SAMPLE_SURAH_EN = 'Al-Baqarah';
-const SAMPLE_AYAH = 286;
+const SAMPLE_VERSE = 'وَنَٰدَيْنَٰهُ مِن جَانِبِ ٱلطُّورِ ٱلْأَيْمَنِ وَقَرَّبْنَٰهُ نَجِيًّۭا';
+const SAMPLE_TRANSLATION = 'And We called him from the side of the mount at [his] right and brought him near, confiding [to him].';
+const SAMPLE_SURAH_AR = 'مريم';
+const SAMPLE_SURAH_EN = 'Maryam';
+const SAMPLE_SURAH_NUMBER = 19;
+const SAMPLE_AYAH = 52;
+
+function verseArabicFontSize(size: PreviewSize, ar: boolean, arabicChars: number, qcfWordCount: number): number {
+  const effectiveWords = qcfWordCount > 0 ? qcfWordCount : Math.ceil(arabicChars / 8);
+  if (size === 'small') {
+    if (arabicChars > 100 || effectiveWords > 8) return 16;
+    if (arabicChars > 70 || effectiveWords > 6) return 19;
+    return 24;
+  }
+
+  if (arabicChars > 200) return 26;
+  if (arabicChars > 115 || effectiveWords > 10) return ar ? 34 : 31;
+  if (arabicChars > 82 || effectiveWords > 8) return ar ? 40 : 37;
+  if (arabicChars > 58 || effectiveWords > 6) return ar ? 46 : 42;
+  if (arabicChars > 38 || effectiveWords > 4) return ar ? 52 : 47;
+  return ar ? 58 : 52;
+}
 
 export function VersePreview({ size, language }: { size: PreviewSize; language?: Lang }) {
-  const { isArabic: ar, numerals, palette: p, fontVariant } = usePreviewSettings(language);
-  const widgetFont = useWidgetFontFamily(fontVariant);
-  const dims = getSizeDims(size);
-  const showTranslation = !ar && size !== 'small';
-  const lines = showTranslation ? 2 : size === 'small' ? 3 : 4;
-  const showWm = size !== 'small';
-  const wmFs = size === 'medium' ? 36 : 50;
-  const wmFill = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
-  const ayahLabel = applyNumerals(SAMPLE_AYAH, numerals, ar);
+  const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
+  // Pull the live ayah from `sharedData.verse` first: this is the same
+  // payload written by the app's daily-ayah pipeline (including admin
+  // override), so tapping the widget opens the exact same ayah.
+  const sharedData = useWidgetPreviewData();
+  const sharedVerse = sharedData?.verse;
+  const pool = sharedData?.versePool;
+  const liveEntry = (() => {
+    if (sharedVerse?.arabic && typeof (sharedVerse as any).surahNumber === 'number') {
+      return {
+        arabic: sharedVerse.arabic,
+        translation: sharedVerse.translation ?? '',
+        surahName: sharedVerse.surahName,
+        englishSurahName: sharedVerse.surahNameEn,
+        surahNumber: (sharedVerse as any).surahNumber,
+        ayahNumber: sharedVerse.numberInSurah || sharedVerse.ayahNumber,
+      };
+    }
+    if (!pool || !Array.isArray(pool.entries) || pool.entries.length === 0) return null;
+    const now = new Date();
+    const startOfYear = Date.UTC(now.getFullYear(), 0, 0);
+    const todayDOY = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - startOfYear) / 86400000);
+    const yearDelta = now.getFullYear() - pool.seedYear;
+    const daysElapsed = yearDelta * 365 + (todayDOY - pool.seedDayOfYear);
+    const idx = ((daysElapsed % pool.entries.length) + pool.entries.length) % pool.entries.length;
+    return pool.entries[idx] ?? null;
+  })();
+  const arabicText = liveEntry?.arabic ?? SAMPLE_VERSE;
+  const translation = (((liveEntry as any)?.translation) ?? '').trim();
+  const rawSurahName = liveEntry?.surahName ?? (ar ? SAMPLE_SURAH_AR : SAMPLE_SURAH_EN);
+  // Strip tashkeel + Quranic annotation marks + leading "سورة" word — mirrors
+  // `cleanSurahName()` in `lib/verse-pool.ts` and the Swift helper.
+  const cleanedSurahName = rawSurahName
+    .replace(/[ً-ٟۖ-ۭ]/g, '')
+    .replace(/[ٱ]/g, 'ا')
+    .replace(/^سورة\s+/, '')
+    .trim();
+  const englishSurahName = (((liveEntry as any)?.englishSurahName) ?? '').trim();
+  // English mode prefers the romanized surah name (e.g. "Az-Zukhruf") when
+  // available; falls back to the cleaned Arabic name.
+  const surahName = (ar ? cleanedSurahName : (englishSurahName || cleanedSurahName))
+    .replace(/\s+[\d٠-٩]+$/, '')
+    .trim();
+  const ayahNumber = liveEntry?.ayahNumber ?? SAMPLE_AYAH;
+  const ayahLabel = applyNumerals(ayahNumber, numerals, ar);
+  const qcfData = React.useMemo(() => {
+    const entryQcfPage = (liveEntry as any)?.qcfPage;
+    const entryQcfGlyphs = (liveEntry as any)?.qcfGlyphs;
+    if (typeof entryQcfPage === 'number' && Array.isArray(entryQcfGlyphs) && entryQcfGlyphs.length > 0) {
+      return { page: entryQcfPage, glyphs: entryQcfGlyphs as string[] };
+    }
+    return getVerseQcfData(liveEntry?.surahNumber ?? SAMPLE_SURAH_NUMBER, ayahNumber);
+  }, [ayahNumber, liveEntry]);
+  const qcfDarkMode = !p.isLight;
+  const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(() => (
+    qcfData && isPageFontLoaded(qcfData.page, qcfDarkMode)
+      ? getPageFontFamily(qcfData.page, qcfDarkMode)
+      : null
+  ));
+  useEffect(() => {
+    let cancelled = false;
+    if (!qcfData) {
+      setQcfFontFamily(null);
+      return () => { cancelled = true; };
+    }
+    const family = getPageFontFamily(qcfData.page, qcfDarkMode);
+    if (isPageFontLoaded(qcfData.page, qcfDarkMode)) {
+      setQcfFontFamily(family);
+      return () => { cancelled = true; };
+    }
+    setQcfFontFamily(null);
+    loadPageFont(qcfData.page, qcfDarkMode)
+      .then(() => {
+        if (!cancelled) setQcfFontFamily(family);
+      })
+      .catch(() => {
+        if (!cancelled) setQcfFontFamily(null);
+      });
+    return () => { cancelled = true; };
+  }, [qcfData?.page, qcfDarkMode]);
+  const qcfDisplay = qcfData?.glyphs.join('\u200A') ?? arabicText;
+  const arabicCharCount = arabicText.length;
+  const arabicFs = verseArabicFontSize(size, ar, arabicCharCount, qcfData?.glyphs.length ?? 0);
+  const bracketFs = Math.round(arabicFs * 0.92);
+  const verseSideInset = size === 'small' ? 32 : 36;
+  const translationFs = size === 'small'
+    ? (translation.length > 90 ? 13 : 14)
+    : translation.length > 95 ? 18 : 20;
   return (
     <GlassTile size={size} padding={0} palette={p}>
-      <View style={{ flex: 1 }}>
-        {showWm ? (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: size === 'small' ? 14 : 20, paddingTop: ar ? 18 : 16, paddingBottom: ar ? 8 : 8 }}>
+        <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: verseSideInset, marginTop: ar ? 2 : 0, marginBottom: ar ? 0 : -8 }}>
           <Text
-            pointerEvents="none"
-            numberOfLines={1}
+            allowFontScaling={false}
+            style={{
+              position: 'absolute',
+              right: 0,
+              fontFamily: 'KFGQPCUthmanic',
+              fontSize: bracketFs,
+              lineHeight: Math.round(bracketFs * 1.15),
+              color: p.text,
+              includeFontPadding: false,
+            }}
+          >
+            ﴿
+          </Text>
+          <View style={{ alignSelf: 'stretch', overflow: 'hidden' }}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.38}
+              allowFontScaling={false}
+              style={{
+                fontFamily: qcfFontFamily ?? 'KFGQPCUthmanic',
+                fontSize: arabicFs,
+                color: p.text,
+                textAlign: 'center',
+                writingDirection: 'rtl',
+                lineHeight: Platform.select({
+                  android: Math.round(arabicFs * 1.18),
+                  default: Math.round(arabicFs * 1.24),
+                }),
+                includeFontPadding: false,
+              }}
+            >
+              {qcfFontFamily ? qcfDisplay : arabicText}
+            </Text>
+          </View>
+          <Text
+            allowFontScaling={false}
             style={{
               position: 'absolute',
               left: 0,
-              right: 0,
-              bottom: dims.height * 0.12,
-              textAlign: 'center',
-              fontFamily: ar ? widgetFont : 'Rubik-Bold',
-              fontSize: wmFs,
-              color: wmFill,
-              writingDirection: ar ? 'rtl' : 'ltr',
-              paddingTop: ar ? Math.round(wmFs * 0.55) : 0,
-              includeFontPadding: false,
-            }}
-          >
-            {ar ? 'آيـة اليـوم' : 'Verse of Day'}
-          </Text>
-        ) : null}
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: size === 'small' ? 16 : 18 }}>
-          <Text
-            numberOfLines={lines}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}
-            style={{
               fontFamily: 'KFGQPCUthmanic',
-              fontSize: size === 'small' ? 16 : size === 'medium' ? 20 : 24,
+              fontSize: bracketFs,
+              lineHeight: Math.round(bracketFs * 1.15),
               color: p.text,
-              textAlign: 'center',
-              writingDirection: 'rtl',
-              // Android line metrics are taller — tighter lineHeight prevents
-              // the last word ("أَخْطَأَنَا") from wrapping to an orphaned line.
-              lineHeight: Platform.select({
-                android: size === 'small' ? 22 : size === 'medium' ? 28 : 34,
-                default: size === 'small' ? 28 : size === 'medium' ? 34 : 40,
-              }),
               includeFontPadding: false,
             }}
           >
-            {SAMPLE_VERSE}
-          </Text>
-          {showTranslation ? (
-            <Text
-              numberOfLines={2}
-              style={{
-                fontFamily: 'Rubik-Regular',
-                fontSize: size === 'medium' ? 11 : 13,
-                color: p.muted,
-                textAlign: 'center',
-                marginTop: 6,
-                lineHeight: size === 'medium' ? 16 : 18,
-              }}
-            >
-              {SAMPLE_TRANSLATION}
-            </Text>
-          ) : null}
-          <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: 8 }}>
-            {ar ? `${SAMPLE_SURAH_AR} · ${ayahLabel}` : `${SAMPLE_SURAH_EN} · ${ayahLabel}`}
+            ﴾
           </Text>
         </View>
+        {!ar && translation.length > 0 ? (
+          <Text
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            allowFontScaling={false}
+            style={{
+              fontFamily: 'Rubik-Medium',
+              fontSize: translationFs,
+              color: p.text,
+              opacity: 0.88,
+              textAlign: 'center',
+              writingDirection: 'ltr',
+              lineHeight: Math.round(translationFs * 1.35),
+              marginTop: size === 'small' ? -2 : -4,
+              includeFontPadding: false,
+            }}
+          >
+            {translation}
+          </Text>
+        ) : null}
+        <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: ar ? 8 : 7 }}>
+          {ar ? `سورة ${surahName}  ${ayahLabel}` : `Surah ${surahName}  ${ayahLabel}`}
+        </Text>
       </View>
     </GlassTile>
   );
@@ -1340,10 +1478,11 @@ export function AzkarMorningPreview({ size, language }: { size: PreviewSize; lan
   return (
     <AzkarPreview
       size={size}
+      pool="morning"
       title="أذكار الصباح"
       titleEn="Morning Adhkar"
-      sample="أصبحنا وأصبح الملك لله والحمد لله"
-      sampleEn="We have reached the morning and at this very time unto Allah belongs all sovereignty"
+      fallbackSample="أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لله، وَالحَمْدُ لله، لا إله إلا الله وحده لا شريك له"
+      fallbackSampleEn="We have reached the morning and at this very time unto Allah belongs all sovereignty"
       language={language}
     />
   );
@@ -1353,53 +1492,107 @@ export function AzkarEveningPreview({ size, language }: { size: PreviewSize; lan
   return (
     <AzkarPreview
       size={size}
+      pool="evening"
       title="أذكار المساء"
       titleEn="Evening Adhkar"
-      sample="اللهم صل وسلم على نبينا محمد"
-      sampleEn="O Allah, send blessings and peace upon our Prophet Muhammad"
+      fallbackSample="أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لله، وَالحَمْدُ لله، لا إله إلا الله وحده لا شريك له"
+      fallbackSampleEn="We have reached the evening and at this very time unto Allah belongs all sovereignty"
       language={language}
     />
   );
 }
 
-function AzkarPreview({ size, title, titleEn, sample, sampleEn, language }: { size: PreviewSize; title: string; titleEn: string; sample: string; sampleEn?: string; language?: Lang }) {
+/**
+ * Shared azkar preview body. Reads the morning / evening pool from shared
+ * widget data and picks the active (zikr, chunkIndex) for the current minute
+ * using the same `pickAzkarSlot` helper that iOS's SwiftUI view calls — so
+ * the gallery + Android bake render the EXACT same chunk that iOS displays
+ * at the same moment. Falls back to a hardcoded "أصبحنا/أمسينا" sample when
+ * the pool hasn't been built yet (fresh install, before first app open).
+ */
+function AzkarPreview({
+  size,
+  pool: poolKey,
+  title,
+  titleEn,
+  fallbackSample,
+  fallbackSampleEn,
+  language,
+}: {
+  size: PreviewSize;
+  pool: 'morning' | 'evening';
+  title: string;
+  titleEn: string;
+  fallbackSample: string;
+  fallbackSampleEn?: string;
+  language?: Lang;
+}) {
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
-  const azkarFs = size === 'small' ? 15 : 20;
+  const sharedData = useWidgetPreviewData();
   const fillText = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
-  const lines = size === 'small' ? 3 : 4;
-  const displaySample = ar ? sample : (sampleEn ?? sample);
+
+  // Live cycling — match iOS BundledAzkar.currentSlot:
+  //   • pick (zikr, chunkIndex) by minute-of-day
+  //   • Quran content → "قراءة <name>" in Rubik-Bold
+  //   • everything else → current ≤140-char chunk in Rubik-Regular
+  const pool = sharedData?.azkarPools?.[poolKey];
+  const slot = pickAzkarSlot(pool, new Date());
+  const fallback = ar ? fallbackSample : (fallbackSampleEn ?? fallbackSample);
+  // Language-aware body resolution: Arabic chunk in Arabic mode, English
+  // translation (or "Recite …") in English mode.
+  const { text: bodyText, isQuran } = resolveAzkarBodyText(slot, fallback, ar);
+  const count = Math.max(1, slot?.zikr.count ?? 10);
+
+  // Font sizing matches iOS AzkarQuoteView:
+  //   Quran title → Rubik-Bold (largest)
+  //   Arabic chunk → Rubik-Regular
+  //   English translation → Rubik-Bold with length-aware sizing so it stays
+  //     large without clipping.
+  const bodyFont = isQuran || !ar ? 'Rubik-Bold' : 'Rubik-Regular';
+  const bodyFs = isQuran
+    ? (size === 'small' ? 16 : 21)
+    : ar
+      ? (size === 'small' ? 13 : 17)
+      : englishAzkarFontSize(bodyText, size);
+  const contentPadding = ar
+    ? { paddingHorizontal: 12, paddingVertical: 8 }
+    : { paddingHorizontal: 20, paddingVertical: 14 };
+
   return (
-    <GlassTile size={size} palette={p}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text
-          numberOfLines={1}
-          style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, marginBottom: 6 }}
-        >
-          {ar ? title : titleEn}
-        </Text>
-        <View style={{ flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+    <GlassTile size={size} padding={ar ? undefined : 0} palette={p}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', ...contentPadding }}>
+        {/* Title row hidden in English — the gallery + iOS widget label
+            below the tile already say "Morning/Evening Adhkar", and the
+            freed space goes to the (longer) translation body. */}
+        {ar ? (
           <Text
-            numberOfLines={lines}
+            numberOfLines={1}
+            style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted }}
+          >
+            {title}
+          </Text>
+        ) : null}
+        <View style={{ flex: 1, alignSelf: 'stretch', alignItems: ar ? 'center' : 'stretch', justifyContent: 'center', paddingBottom: ar ? 0 : 8 }}>
+          <Text
+            numberOfLines={ar ? 3 : 5}
             adjustsFontSizeToFit
-            minimumFontScale={0.55}
+            minimumFontScale={ar ? 0.85 : 0.68}
             allowFontScaling={false}
             style={{
-              fontFamily: ar ? 'Amiri' : 'Rubik-Regular',
-              fontSize: azkarFs,
+              fontFamily: bodyFont,
+              fontSize: bodyFs,
               color: fillText,
-              textAlign: 'center',
+              textAlign: ar ? 'center' : 'left',
               writingDirection: ar ? 'rtl' : 'ltr',
-              lineHeight: ar
-                ? Platform.select({ android: Math.round(azkarFs * 1.25), default: Math.round(azkarFs * 1.5) })
-                : Math.round(azkarFs * 1.15),
+              lineHeight: Math.round(bodyFs * (ar ? 1.3 : 1.18)),
               includeFontPadding: false,
             }}
           >
-            {displaySample}
+            {bodyText}
           </Text>
         </View>
-        <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, marginTop: 6 }}>
-          {`${applyNumerals(10, numerals, ar)}×`}
+        <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, position: ar ? 'relative' : 'absolute', bottom: ar ? undefined : 10, alignSelf: 'center' }}>
+          {`×${applyNumerals(count, numerals, ar)}`}
         </Text>
       </View>
     </GlassTile>
@@ -1514,50 +1707,110 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
 
 export function DailyDhikrPreview({ size, language }: { size: PreviewSize; language?: Lang }) {
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
-  // Android lineHeight must be tighter — adjustsFontSizeToFit behaves differently
-  // across platforms causing "العظيم" to overflow to a 4th line on Android.
-  const lineH = Platform.select({
-    android: size === 'small' ? 22 : 28,
-    default: size === 'small' ? 28 : 36,
-  });
+  const sharedData = useWidgetPreviewData();
+  const dhikr = sharedData?.dhikr;
+  const arabicSource = (dhikr?.arabic && dhikr.arabic.length > 0)
+    ? dhikr.arabic
+    : 'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ';
+  const translation = dhikr?.translation || '';
+  const count = Math.max(1, dhikr?.count ?? 100);
+  const reference = dhikr?.reference;
+  const whenSaid = dhikr?.benefit;
+
+  // Mirror iOS DailyDhikrView: Quran content → localized "قراءة <name>" or
+  // "Recite <name>" in bold; non-Quran → Arabic chunk (Arabic mode) or full
+  // English translation (English mode).
+  const quranTitle = detectQuranTitle(arabicSource);
+  const isQuran = quranTitle !== null;
+  let bodyText: string;
+  if (isQuran) {
+    bodyText = ar
+      ? (quranTitle!.startsWith('قراءة') ? quranTitle! : `قراءة ${quranTitle}`)
+      : quranTitleToEnglish(quranTitle!);
+  } else if (!ar && translation) {
+    // Strip parenthetical notes so the rendered font stays large.
+    const cleaned = cleanEnglishTranslation(translation) || translation;
+    const now = new Date();
+    const minute = now.getHours() * 60 + now.getMinutes();
+    bodyText = pickLongEnglishAzkarPage(cleaned, minute);
+  } else {
+    const chunks = splitAzkarChunks(arabicSource);
+    const now = new Date();
+    const minute = now.getHours() * 60 + now.getMinutes();
+    const chunkIdx = ((minute % chunks.length) + chunks.length) % chunks.length;
+    bodyText = chunks[chunkIdx] ?? chunks[0] ?? arabicSource;
+  }
+
+  // Rubik-Bold for Quran title AND English body; Rubik-Regular only for
+  // Arabic body chunks.
+  const bodyFont = isQuran || !ar ? 'Rubik-Bold' : 'Rubik-Regular';
+  const bodyFs = isQuran
+    ? (size === 'small' ? 14 : 19)
+    : ar
+      ? (size === 'small' ? 12 : 16)
+      : englishAzkarFontSize(bodyText, size);
+  const contentPadding = ar
+    ? { paddingHorizontal: 12, paddingVertical: 8 }
+    : { paddingHorizontal: 20, paddingVertical: 14 };
+
   return (
-    <GlassTile size={size} palette={p}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+    <GlassTile size={size} padding={ar ? undefined : 0} palette={p}>
+      <View style={{ flex: 1, alignItems: ar ? 'center' : 'stretch', justifyContent: 'center', ...contentPadding }}>
         <Text
-          numberOfLines={size === 'small' ? 2 : 3}
+          numberOfLines={ar ? 3 : 5}
           adjustsFontSizeToFit
-          minimumFontScale={0.5}
+          minimumFontScale={ar ? 0.85 : 0.68}
+          allowFontScaling={false}
           style={{
-            fontFamily: AZKAR_PREVIEW_FONT,
-            fontSize: size === 'small' ? 16 : 22,
+            fontFamily: bodyFont,
+            fontSize: bodyFs,
             color: p.text,
-            textAlign: 'center',
-            writingDirection: 'rtl',
-            lineHeight: lineH,
+            textAlign: ar ? 'center' : 'left',
+            writingDirection: ar ? 'rtl' : 'ltr',
+            lineHeight: Math.round(bodyFs * (ar ? 1.3 : 1.18)),
             includeFontPadding: false,
           }}
         >
-          سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ
+          {bodyText}
         </Text>
-        {!ar ? (
+        <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 12 : 14, color: p.muted, marginTop: 6, alignSelf: 'center' }}>
+          {`×${applyNumerals(count, numerals, ar)}`}
+        </Text>
+        {/* Arabic-only benefit + reference: hidden in English mode (no
+            English translation exists in azkar.json for these fields) so
+            the tile stays language-coherent and the translation body
+            gets the freed vertical space. */}
+        {ar && size !== 'small' && whenSaid ? (
           <Text
-            numberOfLines={2}
+            numberOfLines={1}
             style={{
               fontFamily: 'Rubik-Medium',
-              fontSize: size === 'small' ? 10 : 12,
+              fontSize: 9,
               color: p.muted,
               marginTop: 4,
               textAlign: 'center',
-              fontStyle: 'italic',
-              lineHeight: size === 'small' ? 14 : 16,
+              opacity: 0.85,
+              writingDirection: 'rtl',
             }}
           >
-            Glory be to Allah and praise Him
+            {whenSaid}
           </Text>
         ) : null}
-        <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 12, color: p.muted, marginTop: 6 }}>
-          {`${applyNumerals(100, numerals, ar)}×`}
-        </Text>
+        {ar && size !== 'small' && reference ? (
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: 'Rubik-Medium',
+              fontSize: 9,
+              color: p.muted,
+              marginTop: 2,
+              textAlign: 'center',
+              opacity: 0.7,
+            }}
+          >
+            {reference}
+          </Text>
+        ) : null}
       </View>
     </GlassTile>
   );

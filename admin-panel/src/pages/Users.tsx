@@ -45,6 +45,98 @@ const getCountryDisplay = (code: string): string => {
   return COUNTRY_NAMES[code.toUpperCase()] || code;
 };
 
+const TIMEZONE_COUNTRIES: Record<string, string> = {
+  'Africa/Cairo': 'EG',
+  'Asia/Riyadh': 'SA',
+  'Asia/Dubai': 'AE',
+  'Asia/Kuwait': 'KW',
+  'Asia/Qatar': 'QA',
+  'Asia/Bahrain': 'BH',
+  'Asia/Muscat': 'OM',
+  'Asia/Baghdad': 'IQ',
+  'Asia/Amman': 'JO',
+  'Asia/Gaza': 'PS',
+  'Asia/Hebron': 'PS',
+  'Asia/Beirut': 'LB',
+  'Asia/Damascus': 'SY',
+  'Asia/Aden': 'YE',
+  'Africa/Tripoli': 'LY',
+  'Africa/Tunis': 'TN',
+  'Africa/Algiers': 'DZ',
+  'Africa/Casablanca': 'MA',
+  'Africa/Khartoum': 'SD',
+  'Europe/London': 'GB',
+  'America/New_York': 'US',
+  'America/Los_Angeles': 'US',
+  'Europe/Paris': 'FR',
+  'Europe/Berlin': 'DE',
+  'Europe/Istanbul': 'TR',
+};
+
+const getTimezoneCountryCode = (timezone: unknown): string => {
+  return typeof timezone === 'string' ? TIMEZONE_COUNTRIES[timezone] || '' : '';
+};
+
+const hasPrayerLocation = (user: User): boolean => (
+  typeof user.locationLatitude === 'number' || typeof user.locationLongitude === 'number'
+);
+
+const getCountryResolution = (user: User): {
+  code: string;
+  conflict: boolean;
+  timezoneCode: string;
+  storedCode: string;
+  prayerCode: string;
+  prayerWins: boolean;
+} => {
+  const storedCode = (user.country || '').toUpperCase();
+  const timezoneCode = getTimezoneCountryCode(user.timezone).toUpperCase();
+  const prayerCode = (user.prayerCountryCode || '').toUpperCase();
+
+  // Prayer-GPS is the single source of truth once set: even an admin manual
+  // edit doesn't override it.
+  if (prayerCode) {
+    return {
+      code: prayerCode,
+      conflict: Boolean(storedCode && storedCode !== prayerCode),
+      timezoneCode,
+      storedCode,
+      prayerCode,
+      prayerWins: true,
+    };
+  }
+
+  // Legacy users who saved GPS before prayerCountryCode existed: treat the
+  // stored country as GPS-verified when prayer coordinates are present.
+  if (hasPrayerLocation(user) && user.countrySource === 'gps' && storedCode) {
+    return {
+      code: storedCode,
+      conflict: false,
+      timezoneCode,
+      storedCode,
+      prayerCode: storedCode,
+      prayerWins: true,
+    };
+  }
+
+  const conflict = Boolean(
+    timezoneCode &&
+    storedCode &&
+    timezoneCode !== storedCode &&
+    user.countrySource === 'gps' &&
+    !hasPrayerLocation(user)
+  );
+
+  return {
+    code: conflict ? timezoneCode : storedCode,
+    conflict,
+    timezoneCode,
+    storedCode,
+    prayerCode: '',
+    prayerWins: false,
+  };
+};
+
 // Helper function to format Firestore Timestamp or string dates
 const formatDate = (date: unknown): string => {
   if (!date) return '-';
@@ -89,6 +181,69 @@ const formatDate = (date: unknown): string => {
   return '-';
 };
 
+type ActivityFilter =
+  | 'all'
+  | 'today'
+  | 'last3'
+  | 'last7'
+  | 'last14'
+  | 'last30'
+  | 'inactive7'
+  | 'inactive30'
+  | 'never';
+
+// Activity buckets are mutually exclusive: each user appears in exactly one
+// "نشطون منذ X-Y" range, based on age = now - lastActive.
+// "غير نشطين منذ N+" and "لم يدخلوا أبداً" are wider cumulative views.
+const ACTIVITY_FILTER_OPTIONS: {
+  value: ActivityFilter;
+  label: string;
+  minDays?: number; // exclusive lower bound
+  maxDays?: number; // inclusive upper bound
+  mode: 'all' | 'bucket' | 'beyond' | 'never';
+}[] = [
+  { value: 'all', label: 'كل المستخدمين', mode: 'all' },
+  { value: 'today', label: 'نشطون اليوم', maxDays: 1, mode: 'bucket' },
+  { value: 'last3', label: 'نشطون منذ 1-3 أيام', minDays: 1, maxDays: 3, mode: 'bucket' },
+  { value: 'last7', label: 'نشطون منذ 3-7 أيام', minDays: 3, maxDays: 7, mode: 'bucket' },
+  { value: 'last14', label: 'نشطون منذ 7-14 يوم', minDays: 7, maxDays: 14, mode: 'bucket' },
+  { value: 'last30', label: 'نشطون منذ 14-30 يوم', minDays: 14, maxDays: 30, mode: 'bucket' },
+  { value: 'inactive7', label: 'غير نشطين منذ 7+ أيام', minDays: 7, mode: 'beyond' },
+  { value: 'inactive30', label: 'غير نشطين منذ 30+ يوم', minDays: 30, mode: 'beyond' },
+  { value: 'never', label: 'لم يدخلوا أبداً', mode: 'never' },
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const matchesActivityFilter = (user: User, filter: ActivityFilter): boolean => {
+  if (filter === 'all') return true;
+  const option = ACTIVITY_FILTER_OPTIONS.find(opt => opt.value === filter);
+  if (!option) return true;
+  const lastActiveMs = toMillis(user.lastActive as TimestampLike);
+  if (option.mode === 'never') return !lastActiveMs;
+  if (!lastActiveMs) return option.mode === 'beyond';
+  const ageMs = Date.now() - lastActiveMs;
+  if (option.mode === 'bucket') {
+    const minMs = (option.minDays || 0) * DAY_MS;
+    const maxMs = (option.maxDays || 0) * DAY_MS;
+    return ageMs > minMs && ageMs <= maxMs;
+  }
+  if (option.mode === 'beyond') {
+    const minMs = (option.minDays || 0) * DAY_MS;
+    return ageMs > minMs;
+  }
+  return true;
+};
+
+const isUserUninstalled = (user: User): boolean => (
+  user.appStatus === 'uninstalled' || user.pushTokenInvalid === true || Boolean(user.uninstalledDetectedAt)
+);
+
+const getEffectiveStatus = (user: User): 'active' | 'inactive' | 'banned' | 'uninstalled' => {
+  if (isUserUninstalled(user)) return 'uninstalled';
+  return user.status || 'active';
+};
+
 interface User {
   id: string;
   email: string;
@@ -97,6 +252,8 @@ interface User {
   country: string;
   countrySource?: 'gps' | 'device_locale' | 'admin' | '';
   countryName?: string;
+  prayerCountryCode?: string;
+  prayerCountryUpdatedAt?: unknown;
   locationCity?: string;
   locationLatitude?: number;
   locationLongitude?: number;
@@ -104,12 +261,26 @@ interface User {
   plan: UserPlan;
   planSource?: 'purchase' | 'admin' | 'manual' | 'none';
   status: 'active' | 'inactive' | 'banned';
+  appStatus?: 'installed' | 'uninstalled' | string;
+  appStatusUpdatedAt?: unknown;
+  uninstalledDetectedAt?: unknown;
+  uninstallDetectionSource?: string;
+  pushTokenInvalid?: boolean;
+  lastPushError?: string;
   adsEnabled: boolean;
   fcmToken?: string;
+  timezone?: string;
   registrationDate: unknown;
   lastActive: unknown;
   totalSpent: number;
   currency: string;
+}
+
+interface PrayerLocationDoc {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  updatedAt?: unknown;
 }
 
 interface PurchasePlanInfo {
@@ -195,15 +366,19 @@ export default function UsersPage() {
   const [deviceStats, setDeviceStats] = useState<ActiveDeviceStats>(EMPTY_DEVICE_STATS);
   const [deviceGroupMap, setDeviceGroupMap] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPlan, setFilterPlan] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterName, setFilterName] = useState('all');
+  const [filterActivity, setFilterActivity] = useState<ActivityFilter>('all');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);  const [deletingAll, setDeletingAll] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
 
   useEffect(() => {
@@ -211,11 +386,32 @@ export default function UsersPage() {
   }, []);
 
   const loadUsers = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       // SSOT: user counters match Dashboard/Analytics/Notifications.
       const { storeUsers, stats, groupMap } = await fetchActiveDevices(true);
       setDeviceStats(stats);
       setDeviceGroupMap(groupMap);
+
+      const prayerLocationByUserId = new Map<string, PrayerLocationDoc>();
+      try {
+        const prayerSettingsSnap = await getDocs(collection(db, 'userPrayerSettings'));
+        prayerSettingsSnap.forEach((settingsDoc) => {
+          const data = settingsDoc.data();
+          const latitude = typeof data.latitude === 'number' ? data.latitude : undefined;
+          const longitude = typeof data.longitude === 'number' ? data.longitude : undefined;
+          if (latitude === undefined && longitude === undefined) return;
+          prayerLocationByUserId.set(settingsDoc.id, {
+            latitude,
+            longitude,
+            city: typeof data.city === 'string' ? data.city : undefined,
+            updatedAt: data.updatedAt,
+          });
+        });
+      } catch (error) {
+        console.warn('Could not load user prayer locations:', error);
+      }
 
       const rawUsers: User[] = await Promise.all(storeUsers
         .map(async u => {
@@ -224,16 +420,25 @@ export default function UsersPage() {
             ? await getLatestPurchasePlan(u.id)
             : null;
           const resolvedPlan = purchasePlan || basePlan;
+          const prayerLocation = prayerLocationByUserId.get(u.id);
+          const locationCity = typeof u.locationCity === 'string' ? u.locationCity : '';
+          const locationLatitude = typeof u.locationLatitude === 'number' ? u.locationLatitude : undefined;
+          const locationLongitude = typeof u.locationLongitude === 'number' ? u.locationLongitude : undefined;
+          const locationUpdatedAt = u.locationUpdatedAt || null;
 
           return ({
-          ...u,
-          id: u.id,
-          name: (u.displayName || u.name || '') as string,
-          plan: resolvedPlan.plan,
-          planSource: resolvedPlan.source,
-          adsEnabled: (u as Partial<User>).adsEnabled ?? false,
-          totalSpent: (u as Partial<User>).totalSpent ?? 0,
-          currency: (u as Partial<User>).currency ?? 'USD',
+            ...u,
+            id: u.id,
+            name: (u.displayName || u.name || '') as string,
+            locationCity: locationCity || prayerLocation?.city || '',
+            locationLatitude: locationLatitude ?? prayerLocation?.latitude,
+            locationLongitude: locationLongitude ?? prayerLocation?.longitude,
+            locationUpdatedAt: locationUpdatedAt || prayerLocation?.updatedAt || null,
+            plan: resolvedPlan.plan,
+            planSource: resolvedPlan.source,
+            adsEnabled: (u as Partial<User>).adsEnabled ?? false,
+            totalSpent: (u as Partial<User>).totalSpent ?? 0,
+            currency: (u as Partial<User>).currency ?? 'USD',
           } as unknown as User);
         }));
 
@@ -243,6 +448,11 @@ export default function UsersPage() {
       setUsers(rawUsers);
     } catch (error) {
       console.error('Error loading users:', error);
+      const message = error instanceof Error ? error.message : 'تعذر تحميل بيانات المستخدمين';
+      setLoadError(message);
+      setUsers([]);
+      setDeviceStats(EMPTY_DEVICE_STATS);
+      setDeviceGroupMap(new Map());
     } finally {
       setLoading(false);
     }
@@ -261,10 +471,18 @@ export default function UsersPage() {
     const matchesPlan = filterPlan === 'all' || userPlan === filterPlan;
     // Same for status — missing status counts as 'active' since the app
     // doesn't write a status field for new users.
-    const userStatus = user.status || 'active';
+    const userStatus = getEffectiveStatus(user);
     const matchesStatus = filterStatus === 'all' || userStatus === filterStatus;
-    return matchesSearch && matchesPlan && matchesStatus;
+    const hasName = Boolean((user.name || '').trim());
+    const matchesName = filterName === 'all'
+      || (filterName === 'named' && hasName)
+      || (filterName === 'unnamed' && !hasName);
+    const matchesActivity = matchesActivityFilter(user, filterActivity);
+    return matchesSearch && matchesPlan && matchesStatus && matchesName && matchesActivity;
   });
+
+  const activityCount = (filter: ActivityFilter): number =>
+    users.reduce((acc, u) => acc + (matchesActivityFilter(u, filter) ? 1 : 0), 0);
 
   const stats = {
     total: deviceStats.storeRegistered,
@@ -274,6 +492,7 @@ export default function UsersPage() {
     unnamed: deviceStats.unnamedUsers,
     withTokens: deviceStats.withTokens,
     withoutTokens: deviceStats.withoutTokens,
+    uninstalled: users.filter(isUserUninstalled).length,
   };
   const planCounts = {
     free: users.filter(u => (u.plan || 'free') === 'free').length,
@@ -282,9 +501,10 @@ export default function UsersPage() {
     lifetime: users.filter(u => u.plan === 'lifetime').length,
   };
   const statusCounts = {
-    active: users.filter(u => (u.status || 'active') === 'active').length,
-    inactive: users.filter(u => u.status === 'inactive').length,
-    banned: users.filter(u => u.status === 'banned').length,
+    active: users.filter(u => getEffectiveStatus(u) === 'active').length,
+    inactive: users.filter(u => getEffectiveStatus(u) === 'inactive').length,
+    banned: users.filter(u => getEffectiveStatus(u) === 'banned').length,
+    uninstalled: users.filter(u => getEffectiveStatus(u) === 'uninstalled').length,
   };
 
   const handleEditUser = (user: User) => {
@@ -368,8 +588,9 @@ export default function UsersPage() {
       active: 'bg-green-500/20 text-green-400',
       inactive: 'bg-yellow-500/20 text-yellow-400',
       banned: 'bg-red-500/20 text-red-400',
+      uninstalled: 'bg-red-500/15 text-red-300 border border-red-500/25',
     };
-    const labels: Record<string, string> = { active: 'نشط', inactive: 'غير نشط', banned: 'محظور' };
+    const labels: Record<string, string> = { active: 'نشط', inactive: 'غير نشط', banned: 'محظور', uninstalled: 'حذف التطبيق' };
     return <span className={`px-3 py-1 rounded-full text-sm font-medium ${badges[status] || badges.active}`}>{labels[status] || 'نشط'}</span>;
   };
 
@@ -404,19 +625,33 @@ export default function UsersPage() {
   };
 
   const getCountrySourceLabel = (user: User): { label: string; className: string; title: string } => {
-    const gpsVerified = user.countrySource === 'gps' && Boolean(user.locationUpdatedAt || user.locationLatitude);
-    if (gpsVerified) {
+    const locationAvailable = hasPrayerLocation(user);
+    const countryResolution = getCountryResolution(user);
+    if (countryResolution.prayerWins) {
+      return {
+        label: 'موقع صلاة مؤكد',
+        className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
+        title: countryResolution.conflict
+          ? `كود الدولة من موقع الصلاة المحفوظ (${countryResolution.prayerCode}) يطغى على القيمة الأخرى (${countryResolution.storedCode}).`
+          : 'الكود مأخوذ من موقع الصلاة الذي أكده المستخدم، لذا هو مصدر الحقيقة.',
+      };
+    }
+    // For the legacy GPS-vs-timezone conflict (no saved coordinates), we
+    // already resolved silently to the timezone-derived code in
+    // getCountryResolution — fall through to the regular GPS badge so the
+    // admin doesn't see a "conflict" warning for something already fixed.
+    if (user.countrySource === 'gps') {
+      if (!locationAvailable) {
+        return {
+          label: 'GPS قديم',
+          className: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+          title: 'تم تحديد الدولة من GPS في إصدار قديم لم يكن يحفظ الإحداثيات في سجل المستخدم',
+        };
+      }
       return {
         label: 'GPS مؤكد',
         className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
         title: 'تم تحديد الدولة من موقع الصلاة/GPS الحقيقي',
-      };
-    }
-    if (user.countrySource === 'gps') {
-      return {
-        label: 'GPS قديم',
-        className: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
-        title: 'تم تحديدها بإصدار قديم بدون بيانات تحقق كافية، وستتحدث عند فتح الموقع مرة أخرى',
       };
     }
     if (user.countrySource === 'admin') {
@@ -424,6 +659,13 @@ export default function UsersPage() {
         label: 'تعديل يدوي',
         className: 'bg-blue-500/15 text-blue-300 border-blue-500/20',
         title: 'تم تعديل الدولة يدوياً من لوحة التحكم',
+      };
+    }
+    if (locationAvailable) {
+      return {
+        label: 'موقع صلاة',
+        className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
+        title: 'الإحداثيات محفوظة لمواقيت الصلاة، لكن كود الدولة المعروض ليس مؤكداً من GPS',
       };
     }
     if (user.country) {
@@ -462,11 +704,13 @@ export default function UsersPage() {
               حذف الكل ({users.length})
             </button>
           )}
-          <button onClick={loadUsers} aria-label="تحديث قائمة المستخدمين" title="تحديث" className="bg-accent-dark text-white px-4 py-2 rounded-lg hover:bg-accent-dark">تحديث</button>
+          <button onClick={loadUsers} disabled={loading} aria-label="تحديث قائمة المستخدمين" title="تحديث" className="bg-accent-dark text-white px-4 py-2 rounded-lg hover:bg-accent-dark disabled:opacity-50">
+            {loading ? 'جارٍ التحديث...' : 'تحديث'}
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
           <p className="text-slate-400 text-sm">مسجلون من المتاجر</p>
           <p className="text-2xl font-bold text-white">{stats.total}</p>
@@ -488,6 +732,10 @@ export default function UsersPage() {
           <p className="text-2xl font-bold text-slate-300">{stats.withoutTokens}</p>
         </div>
         <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
+          <p className="text-slate-400 text-sm">حذفوا التطبيق</p>
+          <p className="text-2xl font-bold text-red-300">{stats.uninstalled}</p>
+        </div>
+        <div className="bg-admin-surface rounded-xl p-4 border border-admin-border text-center">
           <p className="text-slate-400 text-sm">لديهم اسم</p>
           <p className="text-2xl font-bold text-purple-400">{stats.named}</p>
         </div>
@@ -498,7 +746,7 @@ export default function UsersPage() {
       </div>
 
       <div className="bg-admin-surface rounded-xl p-6 border border-admin-border mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <input type="text" placeholder="بحث بالاسم أو الإيميل أو الهاتف..."
             aria-label="بحث المستخدمين"
             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -517,11 +765,37 @@ export default function UsersPage() {
             <option value="active">نشط ({statusCounts.active})</option>
             <option value="inactive">غير نشط ({statusCounts.inactive})</option>
             <option value="banned">محظور ({statusCounts.banned})</option>
+            <option value="uninstalled">حذفوا التطبيق ({statusCounts.uninstalled})</option>
+          </select>
+          <select title="فلتر الاسم" aria-label="فلتر الاسم" value={filterName} onChange={e => setFilterName(e.target.value)}
+            className="px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg focus:ring-2 focus:ring-accent outline-none text-white">
+            <option value="all">كل الأسماء</option>
+            <option value="named">لديهم اسم فقط ({stats.named})</option>
+            <option value="unnamed">بدون اسم فقط ({stats.unnamed})</option>
+          </select>
+          <select
+            title="فلتر النشاط"
+            aria-label="فلتر النشاط"
+            value={filterActivity}
+            onChange={e => setFilterActivity(e.target.value as ActivityFilter)}
+            className="px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg focus:ring-2 focus:ring-accent outline-none text-white"
+          >
+            {ACTIVITY_FILTER_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label} ({activityCount(opt.value)})
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      {users.length === 0 ? (
+      {loadError ? (
+        <div className="bg-admin-surface rounded-xl border border-red-500/30 p-8 text-center">
+          <p className="text-red-300 text-lg font-semibold">فشل تحميل المستخدمين</p>
+          <p className="text-slate-400 text-sm mt-2">{loadError}</p>
+          <p className="text-slate-500 text-xs mt-3">افتح Console في المتصفح لو احتجت تفاصيل أكثر، أو جرّب تحديث الصفحة بعد تسجيل الدخول.</p>
+        </div>
+      ) : users.length === 0 ? (
         <div className="bg-admin-surface rounded-xl border border-admin-border p-12 text-center">
           <p className="text-slate-300 text-lg">لا يوجد مستخدمين مسجلين بعد</p>
           <p className="text-slate-500 text-sm mt-2">سيظهر المستخدمون هنا عند تسجيلهم في التطبيق</p>
@@ -555,6 +829,14 @@ export default function UsersPage() {
                           بدون توكن
                         </span>
                       )}
+                      {isUserUninstalled(user) && (
+                        <span
+                          title={user.lastPushError || 'تم رصد DeviceNotRegistered من Expo Push'}
+                          className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/20"
+                        >
+                          حذف التطبيق
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs font-mono text-accent-light">user_{(user as User & { displayNumber?: number }).displayNumber}</span>
@@ -570,16 +852,23 @@ export default function UsersPage() {
                   <td className="px-4 py-4 text-slate-300">
                     {(() => {
                       const source = getCountrySourceLabel(user);
-                      const gpsVerified = user.countrySource === 'gps' && Boolean(user.locationUpdatedAt || user.locationLatitude);
+                      const locationAvailable = hasPrayerLocation(user);
+                      const gpsVerified = user.countrySource === 'gps' && locationAvailable;
+                      const countryResolution = getCountryResolution(user);
                       return (
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span>{getCountryDisplay(user.country)}</span>
+                            <span>{getCountryDisplay(countryResolution.code)}</span>
                             <span title={source.title} className={`text-[11px] px-2 py-0.5 rounded-full border ${source.className}`}>
                               {source.label}
                             </span>
                           </div>
-                          {gpsVerified && user.locationCity && (
+                          {countryResolution.conflict && countryResolution.prayerWins && (
+                            <div className="text-xs text-emerald-300/80">
+                              متجاوز: {getCountryDisplay(countryResolution.storedCode)} ← {getCountryDisplay(countryResolution.prayerCode)} (موقع الصلاة)
+                            </div>
+                          )}
+                          {(gpsVerified || locationAvailable) && user.locationCity && (
                             <div className="text-xs text-slate-500">
                               {user.locationCity}{user.countryName ? `، ${user.countryName}` : ''}
                             </div>
@@ -589,7 +878,14 @@ export default function UsersPage() {
                     })()}
                   </td>
                   <td className="px-4 py-4">{getPlanBadge(user)}</td>
-                  <td className="px-4 py-4">{getStatusBadge(user.status || 'active')}</td>
+                  <td className="px-4 py-4">
+                    <div className="space-y-1">
+                      {getStatusBadge(getEffectiveStatus(user))}
+                      {isUserUninstalled(user) && (
+                        <p className="text-xs text-red-300/70">رُصد: {formatDate(user.uninstalledDetectedAt)}</p>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-4 text-sm text-slate-400">{formatDate(user.lastActive)}</td>
                   <td className="px-4 py-4">
                     <div className="flex gap-2">
@@ -648,6 +944,12 @@ export default function UsersPage() {
                       <option key={code} value={code}>{name} ({code})</option>
                     ))}
                   </select>
+                  {selectedUser.prayerCountryCode && (
+                    <p className="mt-2 text-xs text-emerald-300/80">
+                      مصدر الحقيقة الحالي هو موقع الصلاة المحفوظ ({getCountryDisplay(selectedUser.prayerCountryCode)}).
+                      التعديل اليدوي يبقى في حقل الدولة لكن الاستهداف يستخدم كود موقع الصلاة.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

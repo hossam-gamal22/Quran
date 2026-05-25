@@ -85,7 +85,7 @@ const Login: React.FC = () => {
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6">
-          Ruh Al-Muslim Admin Panel
+          Rooh Al-Muslim Admin Panel
         </p>
       </div>
     </div>

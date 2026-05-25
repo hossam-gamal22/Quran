@@ -1,9 +1,9 @@
 // lib/fonts.ts
-// Dynamic font family system — switches based on active language
-// Arabic → Rubik, Non-Arabic → Raleway
+// Dynamic font family system — Rubik is the app-wide default.
 
 import { getLanguage, isRTL } from '@/lib/i18n';
 import { Platform, TextStyle } from 'react-native';
+import { getFontSettingsSync } from '@/hooks/use-font-config';
 
 export type FontWeight = 'regular' | 'medium' | 'semibold' | 'bold';
 
@@ -15,16 +15,37 @@ const FONT_MAP = {
     bold: 'Rubik-Bold',
   },
   default: {
-    regular: 'Raleway-Regular',
-    medium: 'Raleway-Medium',
-    semibold: 'Raleway-SemiBold',
-    bold: 'Raleway-Bold',
+    regular: 'Rubik-Regular',
+    medium: 'Rubik-Medium',
+    semibold: 'Rubik-SemiBold',
+    bold: 'Rubik-Bold',
   },
 } as const;
 
 function getFontSet() {
   const lang = getLanguage();
-  return lang === 'ar' || lang === 'ur' ? FONT_MAP.ar : FONT_MAP.default;
+  const settings = getFontSettingsSync();
+  const isArabicLike = lang === 'ar' || lang === 'ur';
+
+  if (isArabicLike) {
+    if (settings.arabicFont === 'Amiri') {
+      return {
+        regular: 'Amiri',
+        medium: 'Amiri',
+        semibold: 'Amiri-Bold',
+        bold: 'Amiri-Bold',
+      };
+    }
+    return FONT_MAP.ar;
+  }
+
+  return FONT_MAP.default;
+}
+
+export function quranFontFamily(): string {
+  const settings = getFontSettingsSync();
+  if (settings.quranFont === 'Amiri') return 'Amiri';
+  return 'KFGQPCUthmanic';
 }
 
 /** Returns the appropriate Regular font family for current language */

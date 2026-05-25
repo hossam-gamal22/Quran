@@ -3,15 +3,17 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h, timeStringToDate } from './prayer-times';
+import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h, timeStringToDate, getPrayerNameAr, getPrayerNameEn } from './prayer-times';
 import { getOfflinePrayerTimesRange } from './prayer-week-cache';
 import type { CanonicalPrayerSnapshot } from './canonical-prayer-snapshot';
 import { getLocalizedHijriDate, HIJRI_MONTHS_EN } from './hijri-date';
 import { getAllAzkar, resolveTranslationValue } from '@/lib/azkar-api';
+import type { Language as AzkarLanguage } from '@/lib/azkar-api';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { t, getDateLocale, getLanguage, isRTL } from '@/lib/i18n';
 import { formatPrayerDurationCompact } from '@/lib/widget-format-duration';
 import { getTodayAyah, QuranAyah } from '@/lib/api/quran-cloud-api';
+import { detectQuranTitle, splitAzkarChunks, quranTitleToEnglish } from '@/lib/widget-azkar-helpers';
 
 // ========================================
 // الثوابت
@@ -138,17 +140,27 @@ export interface WidgetPrayerData {
   lastUpdated: string;
 }
 
+export interface WidgetZikrEntry {
+  id: string;
+  text: string;
+  translation?: string;
+  count: number;
+  timesLabel?: string;
+  category: string;
+  categoryName?: string;
+  benefit?: string;
+  /** Source (e.g. "رواه البخاري ٦٤٠٧"). Surfaced under "Daily Dhikr" widget. */
+  reference?: string;
+  /** True when the text is a Quranic surah recitation instruction — widget
+   *  renders the "قراءة سورة" card variant instead of the raw text. */
+  isSurahRecitation?: boolean;
+}
+
 export interface WidgetAzkarData {
-  randomZikr: {
-    id: string;
-    text: string;
-    translation?: string;
-    count: number;
-    timesLabel?: string;
-    category: string;
-    categoryName?: string;
-    benefit?: string;
-  };
+  randomZikr: WidgetZikrEntry;
+  /** Pre-cached pool the widget cycles through to avoid feeling static.
+   *  TimelineProvider picks by `(minuteOfDay) % rotation.length`. */
+  rotation?: WidgetZikrEntry[];
   morningCompleted: boolean;
   eveningCompleted: boolean;
   lastUpdated: string;
@@ -159,6 +171,7 @@ export interface VerseWidgetData {
   translation?: string;
   surahName: string;
   surahNameEn: string;
+  surahNumber?: number;
   ayahNumber: number;
   numberInSurah: number;
   date: string;
@@ -172,7 +185,13 @@ export interface DhikrWidgetData {
   timesLabel?: string;
   category: string;
   categoryName: string;
+  /** "When said" / virtue (zikr.benefit). */
   benefit?: string;
+  /** Source (zikr.reference, e.g. "رواه مسلم ٢٦٩٢"). */
+  reference?: string;
+  /** True for Quranic surah recitation entries. Widget renders the
+   *  "قراءة سورة الإخلاص والمعوذتين" card variant instead of raw text. */
+  isSurahRecitation?: boolean;
   date: string;
   lastUpdated: string;
 }
@@ -288,6 +307,46 @@ export interface SharedWidgetData {
    * widget in lock-step with the Hijri calendar shown inside the app.
    */
   hijriOffset?: number;
+  /**
+   * 365-ayah rolling verse pool the home-screen verse widget cycles
+   * through (one per day). On app open, consumed entries are replaced
+   * with fresh random ayat so the queue remains a full year long. See
+   * `lib/verse-pool.ts` for the source of truth + refresh rules.
+   */
+  versePool?: {
+    entries: Array<{
+      arabic: string;
+      surahName: string;
+      surahNumber: number;
+      ayahNumber: number;
+      /** English translation (Saheeh International). */
+      translation?: string;
+      /** Romanized surah name (e.g. "Az-Zukhruf"). */
+      englishSurahName?: string;
+      /** QCF page number + private glyphs baked into the Verse PNG snapshot. */
+      qcfPage?: number;
+      qcfGlyphs?: string[];
+    }>;
+    seedDayOfYear: number;
+    seedYear: number;
+    generatedAt?: string;
+  };
+  /**
+   * Pre-built morning + evening azkar pools used by the Android-side render
+   * pipeline. Each entry carries its Arabic text PLUS the same pre-split
+   * `displayChunks` and `quranTitle` that the iOS `BundledAzkar.swift`
+   * exposes, so the RN preview (and thus the baked Android PNG) renders the
+   * exact same chunk that iOS's SwiftUI view picks at the same minute.
+   *
+   * Pool composition mirrors the iOS bundle:
+   *   - morning = category "1" (23 entries — keeps shared azkar)
+   *   - evening = category "1b" MINUS any text identical to morning
+   *     (~11 unique أمسينا entries)
+   *
+   * See `lib/widget-azkar-helpers.ts` for the shared chunk / Quran helpers
+   * and `pickAzkarSlot()` for the minute-of-day rotation.
+   */
+  azkarPools?: import('@/lib/widget-azkar-helpers').WidgetAzkarPools;
   isPremium?: boolean;
   snapshotVersion?: number;
   snapshotUpdatedAt?: string;
@@ -373,20 +432,44 @@ export const preparePrayerWidgetData = async (
   canonicalSnapshot?: CanonicalPrayerSnapshot | null,
 ): Promise<WidgetPrayerData> => {
   const now = new Date();
-  // Apply the user's moon-sighting offset so the Hijri string the widget
-  // reads (`prayer.hijriDay` / `.hijriMonth` / `.hijriYear`) matches what the
-  // in-app Hijri tab shows. Native widget views also receive `hijriOffset`
-  // separately in SharedWidgetData for the Apple-Calendar fallback path.
-  let hijriOffsetValue = 0;
+  // Resolve TODAY's Hijri date through the same 4-layer service the rest
+  // of the app uses (admin Firestore override → AlAdhan API per country
+  // → news detection → tabular fallback, plus user's ±N day adjustment).
+  // Then map the result onto the legacy `prayer.hijriDay/Month/Year`
+  // shape so the standalone HijriDateWidget (which reads those fields
+  // directly) sees the admin-resolved value too — fixes the regression
+  // where the dedicated Hijri widget kept showing Apple's calc while
+  // every other widget reflected the override.
+  let hijri: { day: number; month: number; year: number; monthName: string } | null = null;
   try {
-    const { getHijriOffset } = require('./hijri-date');
-    const v = await getHijriOffset();
-    if (typeof v === 'number' && Number.isFinite(v)) hijriOffsetValue = v;
+    const { getHijriDate } = require('@/services/hijriCalendarService');
+    const resolved = await getHijriDate(now);
+    if (resolved && typeof resolved.day === 'number') {
+      hijri = {
+        day: resolved.day,
+        month: resolved.month,
+        year: resolved.year,
+        monthName: resolved.monthNameAr || resolved.monthName,
+      };
+    }
   } catch {}
-  const hijriRefDate = hijriOffsetValue
-    ? new Date(now.getTime() + hijriOffsetValue * 86400000)
-    : now;
-  const hijri = getLocalizedHijriDate(hijriRefDate);
+  if (!hijri) {
+    // Service unavailable → fall back to local tabular calc + manual offset
+    // (covers cold-launch path before Firestore loads).
+    try {
+      const { getHijriOffset } = require('./hijri-date');
+      await getHijriOffset();
+    } catch {}
+    const local = getLocalizedHijriDate(now);
+    if (local) {
+      hijri = {
+        day: local.day,
+        month: local.month,
+        year: local.year,
+        monthName: local.monthName,
+      };
+    }
+  }
   const updatedAt = now.toISOString();
   
   // الصلاة القادمة
@@ -398,12 +481,12 @@ export const preparePrayerWidgetData = async (
   
   // أسماء الصلوات
   const prayerNames: Record<string, { en: string; ar: string }> = {
-    fajr: { en: 'Fajr', ar: t('prayer.fajr') },
-    sunrise: { en: 'Sunrise', ar: t('prayer.sunrise') },
-    dhuhr: { en: 'Dhuhr', ar: t('prayer.dhuhr') },
-    asr: { en: 'Asr', ar: t('prayer.asr') },
-    maghrib: { en: 'Maghrib', ar: t('prayer.maghrib') },
-    isha: { en: 'Isha', ar: t('prayer.isha') },
+    fajr: { en: getPrayerNameEn('fajr', now), ar: getPrayerNameAr('fajr', now) },
+    sunrise: { en: getPrayerNameEn('sunrise', now), ar: getPrayerNameAr('sunrise', now) },
+    dhuhr: { en: getPrayerNameEn('dhuhr', now), ar: getPrayerNameAr('dhuhr', now) },
+    asr: { en: getPrayerNameEn('asr', now), ar: getPrayerNameAr('asr', now) },
+    maghrib: { en: getPrayerNameEn('maghrib', now), ar: getPrayerNameAr('maghrib', now) },
+    isha: { en: getPrayerNameEn('isha', now), ar: getPrayerNameAr('isha', now) },
   };
 
   // تحضير قائمة الصلوات
@@ -599,30 +682,138 @@ export const preparePrayerWidgetData = async (
 /**
  * تحضير بيانات الأذكار للويدجت
  */
+/**
+ * Detect a Quranic surah-recitation dhikr — e.g. "اقرأ سورة الإخلاص
+ * والمعوذتين". The dataset uses a couple of markers: the text starts with
+ * the verb قرأ/اقرأ, or it contains an explicit "سورة …" reference inside
+ * square brackets. When true, the widget renders the "قراءة سورة X" card
+ * variant with a recitation count (e.g. "3×") instead of trying to fit the
+ * full surah text inside the tile.
+ */
+function detectSurahRecitation(arabic: string): boolean {
+  const t = (arabic || '').trim();
+  if (!t) return false;
+  // Common opening verbs for "recite": اقرأ, قراءة, قرأ
+  if (/^(?:اقرأ|قراءة|قرأ|تلاوة)\b/.test(t)) return true;
+  // Bracketed surah marker, e.g. "[سورة الإخلاص]"
+  if (/\[\s*سورة\s/.test(t)) return true;
+  // Explicit phrasing inside the body
+  if (/(?:قراءة|تلاوة)\s+سورة/.test(t)) return true;
+  return false;
+}
+
+function buildZikrEntry(
+  zikr: ReturnType<typeof getAllAzkar>[number],
+  language: string,
+): WidgetZikrEntry {
+  const lang = (language || 'ar') as AzkarLanguage;
+  const isSurahRecitation = detectSurahRecitation(zikr.arabic);
+  const text = language === 'ar'
+    ? stripAzkarBrackets(zikr.arabic)
+    : (resolveTranslationValue(zikr.translations?.[lang]) || stripAzkarBrackets(zikr.arabic));
+  const translation = language !== 'ar'
+    ? resolveTranslationValue(zikr.translations?.en)
+    : undefined;
+  const benefitVal = zikr.benefit;
+  const benefit = typeof benefitVal === 'string'
+    ? benefitVal
+    : (benefitVal as any)?.[lang] || (benefitVal as any)?.['ar'] || undefined;
+  return {
+    id: String(zikr.id),
+    text,
+    translation,
+    count: zikr.count,
+    timesLabel: t('azkar.times'),
+    category: zikr.category,
+    categoryName: getDhikrCategoryName(zikr.category),
+    benefit,
+    reference: zikr.reference || undefined,
+    isSurahRecitation,
+  };
+}
+
+/**
+ * Build the morning + evening azkar pools published in `SharedWidgetData.azkarPools`.
+ *
+ * Mirrors the iOS-bundle filter/dedup/chunk logic from
+ * `scripts/generate-bundled-azkar.mjs` so the Android PNG bake (rendered
+ * from RN previews) shows the same chunk that iOS's SwiftUI widget picks
+ * at the same minute:
+ *   - morning  → category "1" (23 entries — keeps shared azkar)
+ *   - evening  → category "1b" MINUS any text identical to morning
+ *                (~11 unique أمسينا entries — guarantees the two widgets
+ *                never display the same zikr at the same time)
+ *   - chunks   → ≤140-char chunks split at natural punctuation
+ *   - quranTitle → "قراءة آية الكرسي" / "قراءة سور الإخلاص والفلق والناس" / …
+ *                  for Quran-only entries
+ *
+ * Total payload: ~18 KB serialized — fits comfortably inside the App
+ * Group / AsyncStorage write.
+ */
+export const prepareAzkarPools = (): import('@/lib/widget-azkar-helpers').WidgetAzkarPools => {
+  const all = getAllAzkar();
+  const morningRaw = all.filter((z) => z.category === '1');
+  const morningTexts = new Set(morningRaw.map((z) => z.arabic));
+  const eveningRaw = all.filter((z) => z.category === '1b' && !morningTexts.has(z.arabic));
+
+  const toEntry = (z: ReturnType<typeof getAllAzkar>[number]): import('@/lib/widget-azkar-helpers').WidgetZikrPoolEntry => {
+    const arabic = stripAzkarBrackets(z.arabic);
+    const quranTitle = detectQuranTitle(arabic);
+    const chunks = quranTitle
+      ? [quranTitle.startsWith('قراءة') ? quranTitle : `قراءة ${quranTitle}`]
+      : splitAzkarChunks(arabic);
+    const benefitVal = z.benefit;
+    const benefit = typeof benefitVal === 'string'
+      ? benefitVal
+      : (benefitVal as any)?.ar || '';
+    // English translation — azkar.json stores it as `translations.en` which
+    // is either a plain string or a { text, verified } object. Use the same
+    // resolver the in-app azkar screen uses so widget + screen text match.
+    const enRaw = z.translations?.en;
+    const translation = resolveTranslationValue(enRaw) || undefined;
+    const quranTitleEn = quranTitle ? quranTitleToEnglish(quranTitle) : undefined;
+    return {
+      id: Number(z.id) || 0,
+      arabic,
+      count: z.count,
+      reference: z.reference || '',
+      benefit,
+      displayChunks: chunks,
+      quranTitle,
+      translation,
+      quranTitleEn,
+    };
+  };
+
+  return {
+    morning: morningRaw.map(toEntry),
+    evening: eveningRaw.map(toEntry),
+  };
+};
+
 export const prepareAzkarWidgetData = async (
   language: string = 'ar',
   categories: string[] = ['1', '2', '3']
 ): Promise<WidgetAzkarData> => {
   const allAzkar = getAllAzkar();
-  // فلترة الأذكار حسب الفئات المختارة
-  const filteredAzkar = allAzkar.filter(zikr => 
-    categories.includes(zikr.category)
-  );
-  
-  // اختيار ذكر عشوائي
-  const randomIndex = Math.floor(Math.random() * filteredAzkar.length);
-  const randomZikr = filteredAzkar[randomIndex] || filteredAzkar[0];
-  
-  // جلب النص والترجمة
-  const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
-  const text = language === 'ar' ? stripAzkarBrackets(randomZikr.arabic) : (resolveTranslationValue(randomZikr.translations?.[lang]) || stripAzkarBrackets(randomZikr.arabic));
-  const translation = language !== 'ar' ? resolveTranslationValue(randomZikr.translations?.['en']) : undefined;
-  const benefit = typeof randomZikr.benefit === 'object' && randomZikr.benefit ? (randomZikr.benefit as Record<string, string>)[lang] : undefined;
+  const filteredAzkar = allAzkar.filter(zikr => categories.includes(zikr.category));
 
-  // حالة إكمال الأذكار (من التخزين)
+  // Build the cycling pool. Cap at 30 entries so the App Group payload
+  // stays small (each zikr is ~200 bytes serialized). 30 entries × 1
+  // minute per entry = ~30-minute rotation, after which it repeats.
+  const POOL_CAP = 30;
+  const pool = filteredAzkar.length > POOL_CAP
+    ? Array.from({ length: POOL_CAP }, (_, i) =>
+        filteredAzkar[Math.floor((i * filteredAzkar.length) / POOL_CAP)])
+    : filteredAzkar;
+  const rotation: WidgetZikrEntry[] = pool.map(z => buildZikrEntry(z, language));
+
+  // Random "primary" entry for the snapshot/placeholder path.
+  const randomIndex = Math.floor(Math.random() * (rotation.length || 1));
+  const randomZikr = rotation[randomIndex] ?? rotation[0] ?? buildZikrEntry(filteredAzkar[0] || allAzkar[0], language);
+
   let morningCompleted = false;
   let eveningCompleted = false;
-  
   try {
     const todayKey = new Date().toISOString().split('T')[0];
     const azkarStatus = await AsyncStorage.getItem(`azkar_status_${todayKey}`);
@@ -636,16 +827,8 @@ export const prepareAzkarWidgetData = async (
   }
 
   return {
-    randomZikr: {
-      id: String(randomZikr.id),
-      text,
-      translation,
-      count: randomZikr.count,
-      timesLabel: t('azkar.times'),
-      category: randomZikr.category,
-      categoryName: getDhikrCategoryName(randomZikr.category),
-      benefit,
-    },
+    randomZikr,
+    rotation,
     morningCompleted,
     eveningCompleted,
     lastUpdated: new Date().toISOString(),
@@ -716,7 +899,111 @@ export const prepareVerseWidgetData = async (
 ): Promise<VerseWidgetData> => {
   const todayDate = new Date().toISOString().split('T')[0]!;
 
-  // Try cached verse first
+  // PRIMARY SOURCE: same picker the in-app daily-ayah screen uses
+  // (`DAILY_AYAHS[dayOfYear % len]` + optional admin override). Was
+  // previously calling `getTodayAyah()` which hits AlQuran Cloud with a
+  // different selection algorithm — that's why the widget and the app
+  // showed *different* ayat for the same day even though both claimed to
+  // be "verse of the day".
+  try {
+    const { DAILY_AYAHS } = require('@/data/daily-ayahs');
+    const { getDailyAyahOverride } = require('@/lib/daily-content-override');
+    const { getSeasonalAyahForDate } = require('@/lib/seasonal-ayah');
+
+    let chosen: { arabic: string; ref: string; trans: string; surah: number; ayah: number } | null = null;
+
+    // Admin override takes precedence (mirrors app/daily-ayah.tsx).
+    try {
+      const ov = await getDailyAyahOverride();
+      if (ov?.data && typeof ov.data.text === 'string') {
+        chosen = {
+          arabic: ov.data.text,
+          ref: ov.data.surahName || '',
+          trans: '',
+          surah: Number(ov.data.surah) || 0,
+          ayah: Number(ov.data.ayah) || 0,
+        };
+      }
+    } catch {}
+
+    // Seasonal ayah comes before the generic rolling pool so widgets match
+    // the in-app "Verse of the Day" during Ramadan, Dhul Hijjah, Hajj, etc.
+    if (!chosen) {
+      try {
+        const seasonal = getSeasonalAyahForDate();
+        if (seasonal) chosen = seasonal;
+      } catch {}
+    }
+
+    if (!chosen) {
+      try {
+        const { ensureVersePool, daysSinceSeed } = require('@/lib/verse-pool');
+        const pool = await ensureVersePool();
+        if (pool?.entries?.length) {
+          const elapsed = Math.max(0, daysSinceSeed(pool));
+          const idx = ((elapsed % pool.entries.length) + pool.entries.length) % pool.entries.length;
+          const entry = pool.entries[idx];
+          if (entry) {
+            chosen = {
+              arabic: entry.arabic,
+              ref: `${entry.surahName} ${entry.ayahNumber}`,
+              trans: entry.translation || '',
+              surah: entry.surahNumber,
+              ayah: entry.ayahNumber,
+            };
+          }
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[Widget] verse-pool picker failed, falling back to DAILY_AYAHS:', e);
+      }
+    }
+
+    if (!chosen) {
+      const now = new Date();
+      const start = Date.UTC(now.getFullYear(), 0, 0);
+      const diff = now.getTime() - start;
+      const dayOfYear = Math.floor(diff / 86400000);
+      const idx = ((dayOfYear % DAILY_AYAHS.length) + DAILY_AYAHS.length) % DAILY_AYAHS.length;
+      chosen = DAILY_AYAHS[idx];
+    }
+
+    if (chosen) {
+      if (!chosen.trans && chosen.surah > 0 && chosen.ayah > 0) {
+        try {
+          const english = require('@/data/json/quran-english.json') as Record<
+            string,
+            Array<{ id: number; text: string }>
+          >;
+          chosen.trans = (english[String(chosen.surah)] ?? [])
+            .find((item) => item.id === chosen.ayah)?.text
+            ?.replace(/\s*﴾[\s\d٠-٩]+﴿\s*$/u, '')
+            .trim() || '';
+        } catch {}
+      }
+      const verseData: VerseWidgetData = {
+        arabic: chosen.arabic,
+        // Always publish English translation — widget decides whether to
+        // render it based on the picker language. The `showTranslation`
+        // setting must not gate the data payload; gating it leaves the
+        // widget silently showing Arabic in English mode.
+        translation: chosen.trans || undefined,
+        surahName: chosen.ref,           // already Arabic e.g. "البقرة ١٥٢"
+        surahNameEn: chosen.ref,         // English ref reuses same string until split
+        surahNumber: chosen.surah,
+        ayahNumber: chosen.ayah,
+        numberInSurah: chosen.ayah,
+        date: todayDate,
+        lastUpdated: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(`widget_verse_${todayDate}`, JSON.stringify(verseData));
+      return verseData;
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[Widget] DAILY_AYAHS picker failed, falling back to API:', e);
+  }
+
+  // FALLBACK: previous AlQuran Cloud API path (only used if the in-app
+  // dataset couldn't be loaded — covers extreme edge cases).
   try {
     const cached = await AsyncStorage.getItem(`widget_verse_${todayDate}`);
     if (cached) {
@@ -726,11 +1013,9 @@ export const prepareVerseWidgetData = async (
     console.warn('[Widget] Failed to parse cached verse, re-fetching:', e);
   }
 
-  // Fetch from API
   try {
     const ayah = await getTodayAyah();
     if (ayah) {
-      // Fetch English translation in parallel — best effort, never blocks
       let translation: string | undefined;
       if (options?.showTranslation !== false) {
         try {
@@ -744,12 +1029,12 @@ export const prepareVerseWidgetData = async (
         translation,
         surahName: ayah.surah.name,
         surahNameEn: ayah.surah.englishName,
+        surahNumber: ayah.surah.number,
         ayahNumber: ayah.number,
         numberInSurah: ayah.numberInSurah || ayah.number,
         date: todayDate,
         lastUpdated: new Date().toISOString(),
       };
-      // Cache for the day
       await AsyncStorage.setItem(`widget_verse_${todayDate}`, JSON.stringify(verseData));
       return verseData;
     }
@@ -778,9 +1063,13 @@ export const prepareDhikrWidgetData = async (
   options?: { showTranslation?: boolean; showBenefit?: boolean }
 ): Promise<DhikrWidgetData> => {
   const todayDate = new Date().toISOString().split('T')[0]!;
-  const allAzkar = getAllAzkar();
+  // Daily-dhikr pool MIRRORS BundledAzkar.daily on iOS: excludes categories
+  // '1' (morning) and '1b' (evening) so the daily-dhikr widget never
+  // duplicates content shown by the dedicated morning / evening widgets.
+  // Keeps everything else (sleep, after-prayer, after-wudu, food, travel…).
+  const dailyAzkar = getAllAzkar().filter((z) => z.category !== '1' && z.category !== '1b');
 
-  if (allAzkar.length === 0) {
+  if (dailyAzkar.length === 0) {
     return {
       arabic: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ',
       count: 3,
@@ -792,11 +1081,20 @@ export const prepareDhikrWidgetData = async (
     };
   }
 
-  const index = getDailyDhikrIndex(allAzkar.length);
-  const zikr = allAzkar[index]!;
+  const index = getDailyDhikrIndex(dailyAzkar.length);
+  const zikr = dailyAzkar[index]!;
 
   const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
-  const translation = (options?.showTranslation !== false && language !== 'ar') ? (resolveTranslationValue(zikr.translations?.[lang]) || resolveTranslationValue(zikr.translations?.['en'])) : undefined;
+  // ALWAYS publish the ENGLISH translation regardless of:
+  //   • the current widget language (the widget picks Arabic vs English at
+  //     render time, so the data must always carry English text)
+  //   • the `showTranslation` setting (that flag was the in-Arabic-mode
+  //     toggle for showing a bilingual layout; it should NOT gate whether
+  //     English mode receives content at all — that just leaves the widget
+  //     silently showing Arabic in English mode, which is what the user
+  //     keeps reporting)
+  // The widget itself decides what to render based on the picker language.
+  const translation = resolveTranslationValue(zikr.translations?.['en']) || undefined;
   const benefitVal = zikr.benefit;
   const benefit = (options?.showBenefit !== false) ? (typeof benefitVal === 'string'
     ? benefitVal
@@ -810,6 +1108,11 @@ export const prepareDhikrWidgetData = async (
     category: zikr.category,
     categoryName: getDhikrCategoryName(zikr.category),
     benefit,
+    // Source + recitation marker so the widget can render attribution
+    // ("رواه البخاري…") + switch to the "قراءة سورة …" card variant
+    // for Quranic recitation entries without re-fetching from JSON.
+    reference: zikr.reference || undefined,
+    isSurahRecitation: detectSurahRecitation(zikr.arabic),
     date: todayDate,
     lastUpdated: new Date().toISOString(),
   };

@@ -6,6 +6,21 @@ import { Audio } from 'expo-av';
 import { t } from '@/lib/i18n';
 import { audioCoordinator } from '@/lib/audio-coordinator';
 
+const AUDIO_LOAD_TIMEOUT_MS = 45000;
+
+function friendlyAudioError(): string {
+  return t('messages.networkError') || t('common.noAudioFile') || 'تعذر تشغيل الصوت. تحقق من الاتصال ثم حاول مرة أخرى.';
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error('audio-load-timeout')), timeoutMs);
+    }),
+  ]);
+}
+
 export interface AzkarAudioState {
   isPlaying: boolean;
   isLoading: boolean;
@@ -30,11 +45,12 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
     duration: 0,
     error: null,
   });
+  const [playbackRate, setPlaybackRateState] = useState(1);
 
   const soundRef = useRef<Audio.Sound | null>(null);
 
   // تحميل الملف الصوتي
-  const loadAudio = useCallback(async () => {
+  const loadAudio = useCallback(async (playAfterLoad = false) => {
     if (!audioUrl) {
       setState(prev => ({ ...prev, error: t('common.noAudioFile') }));
       return;
@@ -64,7 +80,15 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
         staysActiveInBackground: true,
       });
 
-      const { sound } = await Audio.Sound.createAsync({ uri: audioUrl });
+      const { sound } = await withTimeout(
+        Audio.Sound.createAsync(
+          { uri: audioUrl },
+          { rate: playbackRate, shouldCorrectPitch: true, shouldPlay: false },
+          undefined,
+          false,
+        ),
+        AUDIO_LOAD_TIMEOUT_MS,
+      );
       soundRef.current = sound;
 
       const status = await sound.getStatusAsync();
@@ -91,27 +115,26 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
           }
         });
 
-        if (autoPlay) {
+        if (autoPlay || playAfterLoad) {
           await sound.playAsync();
           setState(prev => ({ ...prev, isPlaying: true }));
         }
       }
     } catch (error) {
-      const errorMessage = String(error);
       setState(prev => ({
         ...prev,
-        error: errorMessage,
+        error: friendlyAudioError(),
         isLoading: false,
       }));
-      console.error('Error loading audio:', error);
+      console.log('Audio loading failed', error);
     }
-  }, [audioUrl, autoPlay, onPlaybackStatusUpdate]);
+  }, [audioUrl, autoPlay, onPlaybackStatusUpdate, playbackRate]);
 
   // تشغيل/إيقاف
   const togglePlayPause = useCallback(async () => {
     try {
       if (!soundRef.current) {
-        await loadAudio();
+        await loadAudio(true);
         return;
       }
 
@@ -121,7 +144,8 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
         await soundRef.current.playAsync();
       }
     } catch (error) {
-      console.error('Error toggling playback:', error);
+      setState(prev => ({ ...prev, error: friendlyAudioError(), isLoading: false }));
+      console.log('Audio playback failed', error);
     }
   }, [state.isPlaying, loadAudio]);
 
@@ -160,10 +184,21 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
     }
   }, []);
 
-  // تحميل الصوت عند تغيير URL
+  const setPlaybackRate = useCallback(async (rate: number) => {
+    setPlaybackRateState(rate);
+    try {
+      if (!soundRef.current) return;
+      const status = await soundRef.current.getStatusAsync();
+      if (status.isLoaded) await soundRef.current.setRateAsync(rate, true);
+    } catch (error) {
+      console.log('Audio speed change failed', error);
+    }
+  }, []);
+
+  // تحميل الصوت تلقائيًا فقط عند طلب autoplay. غير كده أول ضغطة تشغيل تجهز الصوت وتشغله مباشرة.
   useEffect(() => {
-    if (audioUrl) {
-      loadAudio();
+    if (audioUrl && autoPlay) {
+      loadAudio(true);
     }
 
     return () => {
@@ -173,7 +208,7 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
     // Only re-run when the URL changes — loadAudio recreates on every render
     // if onPlaybackStatusUpdate isn't memoised, so we intentionally omit it here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioUrl]);
+  }, [audioUrl, autoPlay]);
 
   // تنظيف عند إزالة المكون
   useEffect(() => {
@@ -194,12 +229,14 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
     ...state,
     formattedPosition: formatTime(state.currentPosition),
     formattedDuration: formatTime(state.duration),
+    playbackRate,
 
     // الدوال
     togglePlayPause,
     stop,
     reset,
     loadAudio,
+    setPlaybackRate,
 
     // الخاصيات
     isAudioAvailable: !!audioUrl,

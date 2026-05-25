@@ -52,6 +52,16 @@ const WIDGET_SWIFT_FILES = [
   'PrayerInputs.swift',
   'PrayerCalculator.swift',
   'PrayerDurationFormat.swift',
+  // 7-verse rotation bundled into the extension so the verse widget
+  // shows today's correct ayah even after a year offline / never opening
+  // the app. Mirrors data/daily-ayahs.ts. Used as final fallback when
+  // the 30-ayah verse pool hasn't been seeded yet (fresh install).
+  'BundledDailyAyahs.swift',
+  // GENERATED: all 288 azkar from data/json/azkar.json slimmed to Arabic
+  // + Arabic metadata only (~146 KB). DailyDhikrView + AzkarQuoteView
+  // read this directly so dhikr widgets are fully autonomous — they
+  // never need shared data from the app to function.
+  'BundledAzkar.swift',
 ];
 
 /**

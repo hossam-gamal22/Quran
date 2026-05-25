@@ -26,12 +26,31 @@ import {
 } from './snapshot';
 import type { SharedWidgetData } from '@/lib/widget-data';
 
+// 14 — Verse preview starts from a larger fit-to-width font and tighter side
+//       inset so short/medium ayat fill the space between ornaments.
+// 13 — Verse QCF ornaments/brackets get wider side inset from the ayah text.
+// 12 — Verse widget now takes the app's actual `sharedData.verse` first
+//       (including admin override), so tapping widget and app agree.
+// 11 — Verse fallback is now short, QCF brackets have more side breathing,
+//       and English translation is pulled closer to the Arabic line.
+// 10 — Verse widget now samples only very short ayat and enlarges Arabic /
+//       English text to match the approved black reference composition.
+// 9 — Verse text spacing tightened and verse pool now rejects long QCF ayat.
+//      Regenerate PNGs and data-driven snapshots on both home-widget platforms.
+// 8 — Verse QCF line gets more real width + hair-space glyph separation, so
+//      auto-fit no longer scales it back to the old visual size.
+// 7 — Verse of Day Arabic QCF line enlarged to match the approved gallery
+//      composition. Regenerate home-screen PNGs on iOS + Android.
+// 6 — Verse QCF snapshot layout now uses spaced glyphs + external brackets.
+//      Bump so old tightly-rendered verse PNGs regenerate on both platforms.
+// 5 — Verse of Day PNG snapshots now bake true QCF page glyphs/fonts. Bump
+//      forces old KFG/SwiftUI-era verse images to regenerate.
 // 4 — adds anchor manifest emission (preview wraps dynamic regions with
 //      `<AnchorReporter>`, snapshot pump attaches captured anchor rects to
 //      `SharedWidgetData.snapshotManifest[routeKey].anchors`). Bumping forces
 //      every cached PNG + manifest entry to regenerate so the new fields are
 //      populated even when the user's content signature hasn't changed.
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 14;
 
 export type DisplaySettingsLike = {
   widgetTheme?: string;

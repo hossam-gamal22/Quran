@@ -1,7 +1,7 @@
 // app/seerah.tsx
 // صفحة السيرة النبوية - روح المسلم
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  ActivityIndicator,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -23,15 +24,19 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
-import { exportAsPDF, showAdThenExport, PdfTemplate } from '@/lib/pdf-export';
-import { PdfTemplatePicker } from '@/components/ui/PdfTemplatePicker';
+import { showAdThenExport } from '@/lib/pdf-export';
+import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
+import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { t, getLanguage } from '@/lib/i18n';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useSeerahContent } from '@/lib/content-api';
+import { useAzkarAudio } from '@/hooks/use-azkar-audio';
+import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
@@ -43,6 +48,11 @@ import { Spacing } from '@/constants/theme';
 const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
+const AUDIO_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+
+function sectionSlug(titleEn: string): string {
+  return titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
 
 // ========================================
 // أنواع البيانات
@@ -218,6 +228,29 @@ interface SectionCardProps {
 function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors }: SectionCardProps) {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_s, colors.fs);
+  const slug = sectionSlug(section.titleEn);
+  const favoriteId = `seerah_${slug}`;
+  const [isFav, setIsFav] = useState(false);
+
+  useEffect(() => {
+    isFavorited(favoriteId, 'seerah').then(setIsFav);
+  }, [favoriteId]);
+
+  const handleToggleFav = useCallback(async (e: any) => {
+    e?.stopPropagation?.();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const nowSaved = await toggleFavorite({
+      id: favoriteId,
+      type: 'seerah',
+      title: getLanguage() === 'ar' ? section.title : section.titleEn,
+      subtitle: getLanguage() === 'ar' ? section.titleEn : section.title,
+      arabic: section.paragraphs[0] || section.title,
+      route: `/seerah?section=${slug}`,
+      meta: { chapter: index + 1 },
+    });
+    setIsFav(nowSaved);
+  }, [favoriteId, slug, section, index]);
+
   return (
     <View style={s.sectionOuter}>
       {/* Section header */}
@@ -244,6 +277,17 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
             </TranslatedText>
           )}
         </View>
+        <Pressable
+          onPress={handleToggleFav}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[s.sectionBadge, { backgroundColor: ACCENT_LIGHT }]}
+        >
+          <MaterialCommunityIcons
+            name={isFav ? 'heart' : 'heart-outline'}
+            size={20}
+            color={isFav ? '#ef4444' : colors.text}
+          />
+        </Pressable>
         <View style={[s.sectionBadge, { backgroundColor: ACCENT_LIGHT }]}>
           <MaterialCommunityIcons
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -280,7 +324,7 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
               source={section.videoUrl}
               title={section.videoTitle}
               colors={colors}
-              style={section.paragraphs.length ? s.videoSpacing : undefined}
+              style={section.paragraphs.length ? s.mediaSpacing : undefined}
               onBeforePlay={async () => {
                 await showInterstitial({ allowInSacredContext: false });
               }}
@@ -339,20 +383,152 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
 }
 
 // ========================================
+// مشغّل الصوت الموحّد للسيرة كاملة
+// ========================================
+
+interface SeerahAudioCardProps {
+  audioUrl: string;
+  audioTitle?: string;
+  colors: ReturnType<typeof useColors>;
+  isDarkMode: boolean;
+}
+
+function SeerahAudioCard({ audioUrl, audioTitle, colors, isDarkMode }: SeerahAudioCardProps) {
+  const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
+  const adShownRef = useRef(false);
+  const {
+    isPlaying,
+    isLoading,
+    error,
+    formattedPosition,
+    formattedDuration,
+    playbackRate,
+    setPlaybackRate,
+    togglePlayPause,
+  } = useAzkarAudio({ audioUrl });
+
+  const handlePress = useCallback(async () => {
+    if (isLoading) return;
+    if (!isPlaying && !adShownRef.current) {
+      adShownRef.current = true;
+      await showInterstitial({ allowInSacredContext: false, ignoreSmartSessionDelay: true }).catch(() => {});
+    }
+    await togglePlayPause();
+  }, [isLoading, isPlaying, togglePlayPause]);
+
+  const lang = getLanguage();
+  const displayTitle = audioTitle?.trim() || (lang === 'ar' ? 'استماع للسيرة النبوية كاملة' : 'Listen to the full Seerah');
+  return (
+    <View style={[s.seerahAudioOuter, isDarkMode ? { borderColor: 'rgba(255,255,255,0.08)' } : { borderColor: 'rgba(0,0,0,0.06)' }]}>
+      <BlurView
+        intensity={Platform.OS === 'ios' ? 25 : 10}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[s.audioCard, { backgroundColor: 'transparent' }]}>
+        <View style={[s.audioHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[s.audioIconWrap, { backgroundColor: ACCENT }]}>
+            <MaterialCommunityIcons name="headphones" size={22} color="#fff" />
+          </View>
+          <View style={s.audioTitleWrap}>
+            <Text style={[s.audioTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+              {displayTitle}
+            </Text>
+            <Text style={[s.audioSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {lang === 'ar' ? 'صوت واحد لكل السيرة' : 'Single audio for the whole Seerah'}
+            </Text>
+          </View>
+        </View>
+        <View style={s.audioControlsRow}>
+          <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedPosition}</Text>
+          <Pressable
+            onPress={handlePress}
+            disabled={isLoading}
+            style={[s.audioPlayButton, isLoading && s.audioPlayButtonDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel={isPlaying ? 'pause' : 'play'}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name={isPlaying ? 'pause' : 'play'} size={25} color="#fff" />
+            )}
+          </Pressable>
+          <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedDuration}</Text>
+        </View>
+        <View style={[s.audioSpeedRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <Text style={[s.audioSpeedLabel, { color: colors.textLight }]}>{lang === 'ar' ? 'السرعة' : 'Speed'}</Text>
+          {AUDIO_SPEEDS.map((speed) => {
+            const active = Math.abs(playbackRate - speed) < 0.01;
+            return (
+              <Pressable
+                key={speed}
+                onPress={() => setPlaybackRate(speed)}
+                style={[s.audioSpeedButton, active && s.audioSpeedButtonActive]}
+              >
+                <Text style={[s.audioSpeedButtonText, active && s.audioSpeedButtonTextActive]}>{speed}x</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {!!error && (
+          <Text style={[s.audioError, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {lang === 'ar' ? 'تعذر تشغيل الصوت. تحقق من الاتصال ثم حاول مرة أخرى.' : 'Audio could not be played. Check your connection and try again.'}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ========================================
 // المكون الرئيسي
 // ========================================
 
 export default function SeerahScreen() {
   const router = useRouter();
+  const { section: sectionParam } = useLocalSearchParams<{ section?: string }>();
   const { isDarkMode, t } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
   const s = useScaledStyles(_s, colors.fs);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionPositionsRef = useRef<Record<number, number>>({});
+  const timelineOffsetRef = useRef(0);
+  const handledSectionParamRef = useRef<string | null>(null);
 
   // CMS data with hardcoded fallback
-  const seerahSections = useSeerahContent(SEERAH_SECTIONS);
+  const { sections: seerahSections, audioUrl: seerahAudioUrl, audioTitle: seerahAudioTitle } = useSeerahContent(SEERAH_SECTIONS);
+
+  // Auto-open + scroll to a saved chapter when navigated via ?section=<slug>
+  useEffect(() => {
+    if (!sectionParam || handledSectionParamRef.current === sectionParam) return;
+    if (seerahSections.length === 0) return;
+    const targetIndex = seerahSections.findIndex(sec => sectionSlug(sec.titleEn) === sectionParam);
+    if (targetIndex < 0) return;
+    handledSectionParamRef.current = sectionParam;
+
+    setExpandedSections(prev => {
+      if (prev.has(targetIndex)) return prev;
+      const next = new Set(prev);
+      next.add(targetIndex);
+      return next;
+    });
+
+    const attemptScroll = (attempt: number) => {
+      const y = sectionPositionsRef.current[targetIndex];
+      if (y !== undefined && scrollRef.current) {
+        const absoluteY = timelineOffsetRef.current + y;
+        scrollRef.current.scrollTo({ y: Math.max(0, absoluteY - 16), animated: true });
+        return;
+      }
+      if (attempt < 8) setTimeout(() => attemptScroll(attempt + 1), 80);
+    };
+    setTimeout(() => attemptScroll(0), 120);
+  }, [sectionParam, seerahSections]);
 
   const toggleSection = useCallback((index: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -367,28 +543,31 @@ export default function SeerahScreen() {
     });
   }, []);
 
-  const handleExportPDF = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowTemplatePicker(true);
-  }, []);
-
-  const doExport = useCallback((template: PdfTemplate) => {
-    const html = seerahSections.map((sec, i) => {
-      const paragraphsHtml = sec.paragraphs.map(p => `<p>${p}</p>`).join('');
-      return `<div class="section">
-        <div class="section-title">${i + 1}. ${sec.title}</div>
-        ${paragraphsHtml}
-      </div>`;
-    }).join('');
-    return showAdThenExport(() => exportAsPDF(t('seerah.title'), html, template));
-  }, [seerahSections]);
+  const handleSharePdf = useCallback(async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await showAdThenExport(() => shareIslamicPdf({
+        title: t('seerah.title'),
+        subtitle: t('seerah.heroSubtitle'),
+        shortDescription: t('seerah.heroTitle'),
+        category: 'رُوح المسلم',
+        footerTitle: 'رُوح المسلم',
+        sections: seerahSections.map((sec, index) => ({
+          title: `${index + 1}. ${sec.title}`,
+          body: sec.paragraphs,
+        })),
+      }));
+    } catch (pdfError) {
+      setPdfErrorVisible(true);
+      console.log('Seerah PDF sharing failed', pdfError);
+    }
+  }, [seerahSections, t]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']} screenKey="seerah">
       {/* Header */}
       <UniversalHeader
         backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
-        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' } }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('seerah.title')}</Text>
@@ -429,21 +608,46 @@ export default function SeerahScreen() {
 
       {/* Content */}
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
       >
+        <ContentLanguageNotice />
         {/* Section count badge */}
-        <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
-          <Text style={[s.countText, { color: colors.text }]}>
-            {seerahSections.length} {t('seerah.chapters')}
-          </Text>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap' }}>
+          <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, flexShrink: 1 }]}>
+            <Text style={[s.countText, { color: colors.text }]}>
+              {seerahSections.length} {t('seerah.chapters')}
+            </Text>
+          </View>
+          <PdfShareButton onPress={handleSharePdf} />
         </View>
 
+        {/* Single audio for the whole Seerah (admin-managed) */}
+        {!!seerahAudioUrl?.trim() && (
+          <SeerahAudioCard
+            audioUrl={seerahAudioUrl}
+            audioTitle={seerahAudioTitle}
+            colors={colors}
+            isDarkMode={isDarkMode}
+          />
+        )}
+
         {/* Timeline with sections */}
-        <View style={s.timeline}>
+        <View
+          style={s.timeline}
+          onLayout={(e) => {
+            timelineOffsetRef.current = e.nativeEvent.layout.y;
+          }}
+        >
           {seerahSections.map((section, index) => (
-            <View key={index}>
+            <View
+              key={index}
+              onLayout={(e) => {
+                sectionPositionsRef.current[index] = e.nativeEvent.layout.y;
+              }}
+            >
               {/* Timeline connector line */}
               {index < seerahSections.length - 1 && (
                 <View
@@ -496,11 +700,13 @@ export default function SeerahScreen() {
         </View>
       </ScrollView>
       <BannerAdComponent screen="seerah" />
-      <PdfTemplatePicker
-        visible={showTemplatePicker}
-        onClose={() => setShowTemplatePicker(false)}
-        onSelect={doExport}
-        pageType="seerah"
+      <PdfShareErrorModal
+        visible={pdfErrorVisible}
+        onRetry={() => {
+          setPdfErrorVisible(false);
+          handleSharePdf();
+        }}
+        onClose={() => setPdfErrorVisible(false)}
       />
     </ScreenContainer>
   );
@@ -631,8 +837,113 @@ const _s = StyleSheet.create({
   glassContent: {
     padding: 18,
   },
-  videoSpacing: {
+  mediaSpacing: {
     marginBottom: 18,
+  },
+  audioCard: {
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: 'rgba(99, 102, 241, 0.16)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  seerahAudioOuter: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginVertical: Spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  audioHeaderRow: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: 12,
+  },
+  audioIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioTitleWrap: {
+    flex: 1,
+  },
+  audioTitle: {
+    fontFamily: fontBold(),
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  audioSubtitle: {
+    fontFamily: fontRegular(),
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 1,
+  },
+  audioControlsRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  audioTime: {
+    width: 54,
+    fontFamily: fontSemiBold(),
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  audioSpeedRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  audioSpeedLabel: {
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  audioSpeedButton: {
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  audioSpeedButtonActive: {
+    backgroundColor: '#6D5DF6',
+    borderColor: '#6D5DF6',
+  },
+  audioSpeedButtonText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  audioSpeedButtonTextActive: {
+    color: '#fff',
+  },
+  audioPlayButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6D5DF6',
+  },
+  audioPlayButtonDisabled: {
+    opacity: 0.65,
+  },
+  audioError: {
+    marginTop: 10,
+    color: '#ff5a5f',
+    fontFamily: fontSemiBold(),
+    fontSize: 13,
+    lineHeight: 20,
   },
 
   // Paragraph text

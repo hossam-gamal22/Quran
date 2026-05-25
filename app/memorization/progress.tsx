@@ -103,7 +103,7 @@ export default function ProgressScreen() {
 
           {/* 30-day heatmap */}
           <GlassCard style={styles.section}>
-            <Text style={styles.sectionTitle}>آخر 30 يومًا</Text>
+            <Text style={styles.sectionTitle}>{mt('last30Days')}</Text>
             <View style={styles.heatRow}>
               {activityDays.map((d, idx) => {
                 const isToday = idx === activityDays.length - 1;
@@ -129,7 +129,7 @@ export default function ProgressScreen() {
 
           {/* Per-surah progress */}
           <GlassCard style={styles.section}>
-            <Text style={styles.sectionTitle}>التقدّم لكل سورة</Text>
+            <Text style={styles.sectionTitle}>{mt('perSurah')}</Text>
             {surahRows.length === 0 ? (
               <Text style={styles.empty}>{mt('noProgressYet') || 'لا يوجد تقدّم بعد'}</Text>
             ) : (
@@ -205,8 +205,8 @@ function KpiCard({
 
 const kpiStyles = StyleSheet.create({
   card: { flex: 1, padding: 14, alignItems: 'center', gap: 4 },
-  value: { fontFamily: 'Cairo-Bold', fontSize: 22 },
-  label: { fontFamily: 'Cairo-Regular', fontSize: 12, textAlign: 'center' },
+  value: { fontFamily: 'Rubik-Bold', fontSize: 22 },
+  label: { fontFamily: 'Rubik-Regular', fontSize: 12, textAlign: 'center' },
 });
 
 const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
@@ -217,12 +217,12 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     section: { padding: 14, gap: 10 },
     sectionTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 15,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
-    empty: { color: colors.textLight, fontFamily: 'Cairo-Regular', fontSize: 13, textAlign: 'center' },
+    empty: { color: colors.textLight, fontFamily: 'Rubik-Regular', fontSize: 13, textAlign: 'center' },
     heatRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4 },
     heatCell: { width: 22, height: 22, borderRadius: 4 },
     heatCellToday: {
@@ -231,8 +231,8 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     surahRow: { gap: 6, paddingVertical: 6 },
     surahHeader: { flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' },
-    surahName: { color: colors.text, fontFamily: 'Cairo-SemiBold', fontSize: 13 },
-    surahCount: { color: colors.textLight, fontFamily: 'Cairo-Regular', fontSize: 12 },
+    surahName: { color: colors.text, fontFamily: 'Rubik-SemiBold', fontSize: 13 },
+    surahCount: { color: colors.textLight, fontFamily: 'Rubik-Regular', fontSize: 12 },
     barBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(127,127,127,0.2)', overflow: 'hidden' },
     barFill: { height: '100%', borderRadius: 4 },
     weakRow: {
@@ -246,10 +246,10 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     weakText: {
       flex: 1,
       color: colors.text,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: 'Rubik-SemiBold',
       fontSize: 13,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
-    weakFail: { color: '#b00020', fontFamily: 'Cairo-Bold', fontSize: 12 },
+    weakFail: { color: '#b00020', fontFamily: 'Rubik-Bold', fontSize: 12 },
   });

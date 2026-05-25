@@ -12,6 +12,8 @@ import { resolveNotificationSound } from './resolve-notification-sound';
 import { getReminderChannelId } from '../services/notifications/channels';
 import { getNotificationIconAttachment } from './notification-icons';
 import { updatePrayerStatus, getTodayDate, type PrayerName } from './worship-storage';
+import { getUserId } from './firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from './rewards-manager';
 
 export const DID_YOU_PRAY_CATEGORY = 'did_you_pray';
 export const DID_YOU_PRAY_ACTION_PRAYED = 'prayed';
@@ -75,6 +77,9 @@ export async function handleDidYouPrayResponse(
   if (action === DID_YOU_PRAY_ACTION_PRAYED) {
     try {
       await updatePrayerStatus(getTodayDate(), prayer, 'prayed');
+      getUserId()
+        .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+        .catch(() => {});
     } catch (e) {
       console.warn('[did-you-pray] Failed to log prayer:', e);
     }

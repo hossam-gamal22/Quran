@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { sendPremiumGrantNotification } from '../services/pushNotifications';
 
@@ -118,6 +118,46 @@ const DEFAULT_CONFIG: SubscriptionConfig = {
   },
 };
 
+const buildUsersLists = (
+  users: Array<{ id: string; data: () => Record<string, any> }>
+): { granted: AdminGrantEntry[]; usersList: UserOption[] } => {
+  const granted: AdminGrantEntry[] = [];
+  const usersList: UserOption[] = [];
+
+  users.forEach((userDoc) => {
+    const data = userDoc.data();
+    const userName = data.displayName || data.name || '';
+    const lastActive = formatLastActive(data.lastActive);
+    // Build full user list for the picker
+    if (!data.placeholder) {
+      usersList.push({
+        id: userDoc.id,
+        name: userName || userDoc.id,
+        platform: data.platform || 'unknown',
+        installSource: data.installSource || '',
+        lastActiveMs: lastActive.ms,
+        lastActiveLabel: lastActive.label,
+        hasPushToken: typeof data.fcmToken === 'string' && data.fcmToken.startsWith('ExponentPushToken'),
+        hasAdminPremium: !!data.adminPremium?.granted,
+      });
+    }
+    if (data.adminPremium?.granted) {
+      granted.push({
+        userId: userDoc.id,
+        userName: userName || userDoc.id,
+        granted: true,
+        plan: data.adminPremium.plan || 'yearly',
+        expiresAt: data.adminPremium.expiresAt || null,
+        reason: data.adminPremium.reason || '',
+        grantedAt: data.adminPremium.grantedAt || '',
+      });
+    }
+  });
+
+  usersList.sort((a, b) => b.lastActiveMs - a.lastActiveMs);
+  return { granted, usersList };
+};
+
 export default function Subscriptions() {
   const [config, setConfig] = useState<SubscriptionConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
@@ -135,8 +175,37 @@ export default function Subscriptions() {
 
 
   useEffect(() => {
-    loadConfig();
-    loadGrantedUsers();
+    const unsubscribeConfig = onSnapshot(
+      doc(db, 'config', 'subscription-settings'),
+      (snap) => {
+        if (snap.exists()) {
+          setConfig({ ...DEFAULT_CONFIG, ...snap.data() as SubscriptionConfig });
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error listening to subscription config:', error);
+        loadConfig();
+      }
+    );
+
+    const unsubscribeUsers = onSnapshot(
+      collection(db, 'users'),
+      (usersSnap) => {
+        const { granted, usersList } = buildUsersLists(usersSnap.docs);
+        setGrantedUsers(granted);
+        setAllUsers(usersList);
+      },
+      (error) => {
+        console.error('Error listening to granted users:', error);
+        loadGrantedUsers();
+      }
+    );
+
+    return () => {
+      unsubscribeConfig();
+      unsubscribeUsers();
+    };
   }, []);
 
   const loadConfig = async () => {
@@ -156,38 +225,7 @@ export default function Subscriptions() {
   const loadGrantedUsers = async () => {
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
-      const granted: AdminGrantEntry[] = [];
-      const usersList: UserOption[] = [];
-      usersSnap.forEach((userDoc) => {
-        const data = userDoc.data();
-        const userName = data.displayName || data.name || '';
-        const lastActive = formatLastActive(data.lastActive);
-        // Build full user list for the picker
-        if (!data.placeholder) {
-          usersList.push({
-            id: userDoc.id,
-            name: userName || userDoc.id,
-            platform: data.platform || 'unknown',
-            installSource: data.installSource || '',
-            lastActiveMs: lastActive.ms,
-            lastActiveLabel: lastActive.label,
-            hasPushToken: typeof data.fcmToken === 'string' && data.fcmToken.startsWith('ExponentPushToken'),
-            hasAdminPremium: !!data.adminPremium?.granted,
-          });
-        }
-        if (data.adminPremium?.granted) {
-          granted.push({
-            userId: userDoc.id,
-            userName: userName || userDoc.id,
-            granted: true,
-            plan: data.adminPremium.plan || 'yearly',
-            expiresAt: data.adminPremium.expiresAt || null,
-            reason: data.adminPremium.reason || '',
-            grantedAt: data.adminPremium.grantedAt || '',
-          });
-        }
-      });
-      usersList.sort((a, b) => b.lastActiveMs - a.lastActiveMs);
+      const { granted, usersList } = buildUsersLists(usersSnap.docs);
       setGrantedUsers(granted);
       setAllUsers(usersList);
     } catch (error) {
@@ -271,7 +309,6 @@ export default function Subscriptions() {
       setGrantUserId('');
       setGrantReason('');
       setGrantExpiry('');
-      loadGrantedUsers();
     } catch (error) {
       setMessage('❌ حدث خطأ أثناء منح الاشتراك');
       console.error(error);
@@ -287,7 +324,6 @@ export default function Subscriptions() {
         adminPremium: { granted: false },
       });
       setMessage(`✅ تم إلغاء اشتراك ${userId}`);
-      loadGrantedUsers();
     } catch (error) {
       setMessage('❌ حدث خطأ أثناء إلغاء الاشتراك');
       console.error(error);
@@ -334,7 +370,7 @@ export default function Subscriptions() {
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">إدارة الاشتراكات والعروض</h1>
+      <h1 className="text-2xl font-bold text-white mb-6">إدارة الاشتراكات والعروض</h1>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>

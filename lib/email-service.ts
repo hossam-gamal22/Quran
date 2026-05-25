@@ -4,7 +4,17 @@ import { collection, addDoc, doc, onSnapshot } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
 const RATE_LIMIT_KEY = '@qa_last_question_time';
+const FCM_TOKEN_CACHE_KEY = '@rooh_fcm_token';
 const RATE_LIMIT_MS = 0;
+
+async function readCachedFcmToken(): Promise<string> {
+  try {
+    const token = await AsyncStorage.getItem(FCM_TOKEN_CACHE_KEY);
+    return token && token.startsWith('ExponentPushToken') ? token : '';
+  } catch {
+    return '';
+  }
+}
 
 export interface QuestionSubmission {
   userName?: string;
@@ -29,6 +39,8 @@ export interface AutoAnswerResult {
   disclaimer?: string;
   sources: AutoAnswerSource[];
   status: 'answered' | 'no_results' | 'failed' | 'unconfigured' | 'disabled' | 'daily_limit';
+  isAdminCorrected?: boolean;
+  correctedAt?: string;
 }
 
 export async function checkRateLimit(): Promise<boolean> {
@@ -47,6 +59,8 @@ export async function checkRateLimit(): Promise<boolean> {
 }
 
 export async function submitQuestion(data: QuestionSubmission): Promise<string> {
+  const fcmToken = await readCachedFcmToken();
+
   // Save to Firestore (primary)
   const docRef = await addDoc(collection(db, 'userQuestions'), {
     userName: data.userName || '',
@@ -59,6 +73,7 @@ export async function submitQuestion(data: QuestionSubmission): Promise<string> 
     platform: Platform.OS,
     language: data.language,
     requestMode: data.requestMode || 'manual',
+    fcmToken: fcmToken || null,
   });
 
   // Save rate limit timestamp only when a cooldown is configured.
@@ -132,6 +147,8 @@ export function waitForAutoAnswer(
             disclaimer: data.autoAnswerDisclaimer ? String(data.autoAnswerDisclaimer) : undefined,
             sources: Array.isArray(data.autoAnswerSources) ? data.autoAnswerSources : [],
             status,
+            isAdminCorrected: data.adminCorrection === true,
+            correctedAt: data.adminCorrectedAt || data.adminAnsweredAt,
           });
           return;
         }
@@ -147,4 +164,32 @@ export function waitForAutoAnswer(
       () => finish(null)
     );
   });
+}
+
+export function subscribeToQuestionAnswer(
+  questionId: string,
+  onChange: (answer: AutoAnswerResult) => void,
+  onError?: (error: unknown) => void
+): () => void {
+  return onSnapshot(
+    doc(db, 'userQuestions', questionId),
+    (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data() as any;
+      const status = data.autoAnswerStatus;
+      if (status !== 'answered' || !data.autoAnswer) return;
+
+      onChange({
+        answer: String(data.autoAnswer || ''),
+        disclaimer: data.autoAnswerDisclaimer ? String(data.autoAnswerDisclaimer) : undefined,
+        sources: Array.isArray(data.autoAnswerSources) ? data.autoAnswerSources : [],
+        status: 'answered',
+        isAdminCorrected: data.adminCorrection === true,
+        correctedAt: data.adminCorrectedAt || data.adminAnsweredAt,
+      });
+    },
+    (error) => {
+      if (onError) onError(error);
+    }
+  );
 }

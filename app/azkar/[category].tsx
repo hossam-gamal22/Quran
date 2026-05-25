@@ -42,6 +42,7 @@ import {
   getCategoryName,
   getZikrTranslation,
   getZikrBenefit,
+  getDailyProgress,
   updateZikrProgress,
   addToFavorites,
   removeFromFavorites,
@@ -50,8 +51,8 @@ import {
   onAzkarChange,
   resolveCategoryId,
 } from '@/lib/azkar-api';
-import { fetchSelectedDuas, getDailySelectedDuas, duaToZikr } from '@/lib/duas-api';
-import { markAzkarCompleted, incrementAzkarZikrCount, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
+import { fetchSelectedDuas, getDailySelectedDuas, duaToZikr, subscribeToSelectedDuas } from '@/lib/duas-api';
+import { markAzkarCompleted, incrementAzkarZikrCount, getTodayDate, AzkarType } from '@/lib/worship-storage';
 import { trackAzkarRead } from '@/lib/firebase-analytics';
 import { getUserId } from '@/lib/firebase-user';
 import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
@@ -75,7 +76,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
-import { prefetchAzkarFiles, isAzkarCached, isCacheableAzkarAudio } from '@/lib/azkar-audio-cache';
+import { getAzkarAudioUri, prefetchAzkarFiles, isAzkarCached, isCacheableAzkarAudio } from '@/lib/azkar-audio-cache';
 import NetInfo from '@react-native-community/netinfo';
 import { hasQuranRefs } from '@/lib/azkar-quran-refs';
 import AzkarQcfVerse from '@/components/AzkarQcfVerse';
@@ -86,10 +87,13 @@ import { useQuran } from '@/contexts/QuranContext';
 import { getAyahAudioUrl } from '@/lib/quran-cache';
 import { expandQuranAudioMarker, getSurahArabicName } from '@/lib/azkar-quran-audio';
 import { expandAudioTracksForRepeat, getEffectiveZikrRepeatCount } from '@/lib/azkar-repeat';
+import { areAzkarCountsCompleted, getAzkarCompletionPercentage, getAzkarCompletionRatio } from '@/lib/azkar-progress';
 import { getAzkarDisplayParts } from '@/lib/azkar-display';
+import { shareAudio } from '@/lib/share-service';
+import { detectQuranTitle } from '@/lib/widget-azkar-helpers';
 
 // Map azkar category IDs → worship tracker keys
-const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>>> = {
+const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, AzkarType>> = {
   '1': 'morning',
   '1b': 'evening',
   '2': 'sleep',
@@ -116,6 +120,18 @@ interface CustomDhikr {
 const getCustomDhikrKey = (cat: string) => `@custom_dhikr_${cat}`;
 const AUDIO_REPEAT_DELAY_KEY = '@azkar_audio_repeat_delay_seconds';
 const DEFAULT_AUDIO_REPEAT_DELAY_SECONDS = 2;
+
+function buildZikrAudioShareName(zikr: Zikr): string {
+  const quranTitle = detectQuranTitle(zikr.arabic);
+  if (quranTitle) return quranTitle;
+  const displayText = getAzkarDisplayParts(zikr).text
+    .replace(/[ً-ٰٟۖ-ۭ]/g, '')
+    .replace(/[«»“”"'()[\]﴾﴿]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = displayText.split(' ').filter(Boolean).slice(0, 8).join(' ');
+  return words || `ذكر ${zikr.id}`;
+}
 
 const LISTEN_BACKGROUND_CATEGORY_MAP: Record<string, string> = {
   '1': 'morning',
@@ -183,7 +199,7 @@ export default function CategoryAzkarScreen() {
   const [azkar, setAzkar] = useState<Zikr[]>([]);
   const [categoryInfo, setCategoryInfo] = useState<AzkarCategory | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [counts, setCounts] = useState<Record<number, number>>({});
+  const [counts, setCounts] = useState<Record<number | string, number>>({});
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
   const language = (settings.language || 'ar') as Language;
   const isArabic = language === 'ar';
@@ -201,6 +217,7 @@ export default function CategoryAzkarScreen() {
   });
   const [audioRepeatDelaySeconds, setAudioRepeatDelaySeconds] = useState(DEFAULT_AUDIO_REPEAT_DELAY_SECONDS);
   const [categoryLocked, setCategoryLocked] = useState(false);
+  const [repeatSessionActive, setRepeatSessionActive] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState('general');
   const [loadError, setLoadError] = useState(false);
 
@@ -236,8 +253,11 @@ export default function CategoryAzkarScreen() {
 
   // Toast for loop-back
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [showIncompleteAlert, setShowIncompleteAlert] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const countsRef = useRef<Record<number, number>>({});
+  const incompleteAlertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countsRef = useRef<Record<number | string, number>>({});
   const visibleAzkarRef = useRef<Zikr[]>([]);
   const currentIndexRef = useRef(0);
 
@@ -257,6 +277,19 @@ export default function CategoryAzkarScreen() {
   useEffect(() => {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
+
+  useEffect(() => {
+    if (azkar.length === 0) return;
+    setCurrentIndex(prev => Math.min(Math.max(prev, 0), azkar.length - 1));
+  }, [azkar.length]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      if (incompleteAlertTimer.current) clearTimeout(incompleteAlertTimer.current);
+      if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(AUDIO_REPEAT_DELAY_KEY)
@@ -363,10 +396,19 @@ export default function CategoryAzkarScreen() {
       const initialCounts: Record<number, number> = {};
       const initialFavorites: Record<number, boolean> = {};
       try {
-        const favoriteIds = await getFavorites();
+        const [favoriteIds, dailyProgress] = await Promise.all([
+          getFavorites(),
+          getDailyProgress().catch(() => null),
+        ]);
         const favoriteSet = new Set(favoriteIds);
+        const savedCounts = new Map(
+          dailyProgress?.categories?.[resolvedCategory]?.azkarProgress.map(item => [item.zikrId, item.currentCount]) || [],
+        );
         for (const zikr of categoryAzkar) {
-          initialCounts[zikr.id] = countsRef.current[zikr.id] || 0;
+          const currentSessionCount = countsRef.current[zikr.id];
+          initialCounts[zikr.id] = typeof currentSessionCount === 'number'
+            ? currentSessionCount
+            : (savedCounts.get(zikr.id) || 0);
           initialFavorites[zikr.id] = favoriteSet.has(zikr.id);
         }
       } catch {
@@ -378,6 +420,7 @@ export default function CategoryAzkarScreen() {
       countsRef.current = initialCounts;
       setCounts(initialCounts);
       setFavorites(initialFavorites);
+      const alreadyCompletedToday = areAzkarCountsCompleted(visibleAzkar, initialCounts);
 
       // 4. التحقق من حالة القفل (صباح/مساء)
       if (isMorningOrEvening) {
@@ -387,17 +430,17 @@ export default function CategoryAzkarScreen() {
           if (lockData) {
             const { until } = JSON.parse(lockData);
             if (new Date().getTime() < until) {
-              setCategoryLocked(true);
+              setCategoryLocked(!repeatSessionActive);
             } else {
               await AsyncStorage.removeItem(lockKey);
-              setCategoryLocked(false);
+              setCategoryLocked(!repeatSessionActive && alreadyCompletedToday);
             }
           } else {
-            setCategoryLocked(false);
+            setCategoryLocked(!repeatSessionActive && alreadyCompletedToday);
           }
         } catch { /* lock check failed - ignore */ }
       } else {
-        setCategoryLocked(false);
+        setCategoryLocked(!repeatSessionActive && alreadyCompletedToday);
       }
 
       // 5. تشغيل الأنيميشن
@@ -419,6 +462,7 @@ export default function CategoryAzkarScreen() {
     lockCategoryKey,
     requestedCategory,
     resolvedCategory,
+    repeatSessionActive,
     selectedSubcategory,
   ]);
 
@@ -435,6 +479,13 @@ export default function CategoryAzkarScreen() {
     });
     return unsub;
   }, [loadData]);
+
+  useEffect(() => {
+    if (!isSunnahDuasRoute) return undefined;
+    return subscribeToSelectedDuas(() => {
+      loadData();
+    });
+  }, [isSunnahDuasRoute, loadData]);
 
   // ===================================
   // تحميل الأذكار المخصصة
@@ -526,10 +577,10 @@ export default function CategoryAzkarScreen() {
 
   const handleCategoryCompleted = useCallback(async () => {
     // تسجيل في تتبع العبادات
-    if (resolvedCategory) {
+    if (resolvedCategory && !repeatSessionActive) {
       const worshipKey = WORSHIP_AZKAR_MAP[resolvedCategory];
       if (worshipKey) {
-        await markAzkarCompleted(getTodayDate(), worshipKey);
+        await markAzkarCompleted(getTodayDate(), worshipKey, 'category');
       }
 
       // قفل أذكار الصباح والمساء حتى وقت التجديد
@@ -553,7 +604,6 @@ export default function CategoryAzkarScreen() {
         }
         const lockKey = `azkar_lock_${lockCategoryKey}`;
         await AsyncStorage.setItem(lockKey, JSON.stringify({ until: unlockTime.getTime() }));
-        setCategoryLocked(true);
       }
     }
 
@@ -561,30 +611,44 @@ export default function CategoryAzkarScreen() {
     showCelebration({
       type: 'adhkar_complete',
       title: t('azkar.completedSuccessfully', { name: categoryInfo ? getCategoryName(categoryInfo, language) : t('azkar.title') }),
-      subtitle: t('azkar.mayAllahAccept'),
+      subtitle: repeatSessionActive
+        ? (isArabic ? 'تمت القراءة مرة أخرى بدون إضافة نقاط جديدة' : 'Read again without adding new points')
+        : t('azkar.mayAllahAccept'),
       onDismiss: () => router.back(),
     });
-  }, [categoryInfo, isMorningOrEvening, language, lockCategoryKey, resolvedCategory, router, showCelebration]);
+  }, [categoryInfo, isArabic, isMorningOrEvening, language, lockCategoryKey, repeatSessionActive, resolvedCategory, router, showCelebration]);
 
   const getZikrRequiredCount = useCallback((zikr: Zikr) => {
     return getEffectiveZikrRepeatCount(zikr);
   }, []);
 
-  const checkAllCompleted = useCallback((updatedCounts: Record<number, number>) => {
-    return azkar.every(z => (updatedCounts[z.id] || 0) >= getZikrRequiredCount(z));
-  }, [azkar, getZikrRequiredCount]);
+  const checkAllCompleted = useCallback((updatedCounts: Record<number | string, number>) => {
+    return areAzkarCountsCompleted(azkar, updatedCounts);
+  }, [azkar]);
 
   const recordCompletedZikr = useCallback(async (zikr: Zikr) => {
     const today = getTodayDate();
-    await incrementAzkarZikrCount(today);
+    const zikrKey = `${resolvedCategory || 'azkar'}:${zikr.id}`;
+    const didRecord = await incrementAzkarZikrCount(today, zikrKey);
 
-    if (resolvedCategory) {
+    if (didRecord && resolvedCategory) {
       await trackAzkarRead(zikr.id, resolvedCategory, settings.language).catch(() => {});
     }
-    getUserId()
-      .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
-      .catch(() => {});
+    if (didRecord) {
+      getUserId()
+        .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+        .catch(() => {});
+    }
   }, [resolvedCategory, settings.language]);
+
+  const recordCompletedCustomDhikr = useCallback(async (item: CustomDhikr) => {
+    const didRecord = await incrementAzkarZikrCount(getTodayDate(), `custom:${item.id}`);
+    if (didRecord) {
+      getUserId()
+        .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+        .catch(() => {});
+    }
+  }, []);
 
   const completeAudioRepeat = useCallback((track: AudioTrack) => {
     if (categoryLocked || track.zikrId === undefined) return;
@@ -600,12 +664,14 @@ export default function CategoryAzkarScreen() {
     countsRef.current = updatedCounts;
     setCounts(updatedCounts);
 
-    if (resolvedCategory) {
+    if (resolvedCategory && !repeatSessionActive) {
       updateZikrProgress(resolvedCategory, zikr.id, newCount).catch(() => {});
     }
 
     if (newCount >= requiredCount) {
-      recordCompletedZikr(zikr).catch(() => {});
+      if (!repeatSessionActive) {
+        recordCompletedZikr(zikr).catch(() => {});
+      }
       if (checkAllCompleted(updatedCounts)) {
         setTimeout(() => handleCategoryCompleted(), 500);
       }
@@ -617,6 +683,7 @@ export default function CategoryAzkarScreen() {
     getZikrRequiredCount,
     handleCategoryCompleted,
     recordCompletedZikr,
+    repeatSessionActive,
     resolvedCategory,
   ]);
 
@@ -632,24 +699,45 @@ export default function CategoryAzkarScreen() {
     triggerFeedback('light');
   }, [triggerFeedback]);
 
+  const clearAutoAdvance = useCallback(() => {
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
+  }, []);
+
+  const scheduleAutoAdvance = useCallback((zikrId: number, indexAtCompletion: number) => {
+    clearAutoAdvance();
+    autoAdvanceTimer.current = setTimeout(() => {
+      const currentVisible = visibleAzkarRef.current;
+      const stillOnSameZikr =
+        currentIndexRef.current === indexAtCompletion &&
+        currentVisible[indexAtCompletion]?.id === zikrId;
+
+      if (!stillOnSameZikr || indexAtCompletion >= currentVisible.length - 1) return;
+
+      setCurrentIndex(indexAtCompletion + 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      autoAdvanceTimer.current = null;
+    }, 1000);
+  }, [clearAutoAdvance]);
+
   const handleCount = async (zikr: Zikr) => {
     if (categoryLocked) return;
     
     const requiredCount = getZikrRequiredCount(zikr);
-    const currentCount = counts[zikr.id] || 0;
+    const currentCount = countsRef.current[zikr.id] || 0;
     
     if (currentCount >= requiredCount) {
       // انتهى العداد - انتقل للذكر التالي
-      if (currentIndex < azkar.length - 1) {
-        goToNext();
-      }
+      goToNext();
       return;
     }
 
     const newCount = currentCount + 1;
     
     // تحديث العداد
-    const nextCounts = { ...counts, [zikr.id]: newCount };
+    const nextCounts = { ...countsRef.current, [zikr.id]: newCount };
     countsRef.current = nextCounts;
     setCounts(nextCounts);
     
@@ -675,13 +763,15 @@ export default function CategoryAzkarScreen() {
     ]).start();
 
     // تحديث التقدم في AsyncStorage
-    if (resolvedCategory) {
+    if (resolvedCategory && !repeatSessionActive) {
       await updateZikrProgress(resolvedCategory, zikr.id, newCount);
     }
 
     // إذا اكتمل العداد
     if (newCount >= requiredCount) {
-      await recordCompletedZikr(zikr);
+      if (!repeatSessionActive) {
+        await recordCompletedZikr(zikr);
+      }
 
       if (Platform.OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -693,40 +783,95 @@ export default function CategoryAzkarScreen() {
       if (checkAllCompleted(nextCounts)) {
         setTimeout(() => handleCategoryCompleted(), 500);
       } else {
-        // انتقال تلقائي بعد ثانية
-        setTimeout(() => {
-          if (currentIndex < azkar.length - 1) {
-            goToNext();
-          }
-        }, 1000);
+        // انتقال تلقائي بعد ثانية، لكن فقط لو المستخدم ما زال على نفس الذكر.
+        scheduleAutoAdvance(zikr.id, currentIndexRef.current);
       }
     }
   };
+
+  const handleListCount = useCallback(async (zikr: Zikr) => {
+    if (categoryLocked) return;
+
+    const requiredCount = getZikrRequiredCount(zikr);
+    const currentCount = countsRef.current[zikr.id] || 0;
+    if (currentCount >= requiredCount) return;
+
+    const newCount = currentCount + 1;
+    const nextCounts = { ...countsRef.current, [zikr.id]: newCount };
+    countsRef.current = nextCounts;
+    setCounts(nextCounts);
+    triggerFeedback('light');
+
+    if (resolvedCategory && !repeatSessionActive) {
+      await updateZikrProgress(resolvedCategory, zikr.id, newCount);
+    }
+
+    if (newCount >= requiredCount) {
+      if (!repeatSessionActive) {
+        await recordCompletedZikr(zikr);
+      }
+      triggerFeedback('success');
+
+      if (checkAllCompleted(nextCounts)) {
+        setTimeout(() => handleCategoryCompleted(), 500);
+      }
+    }
+  }, [
+    categoryLocked,
+    checkAllCompleted,
+    getZikrRequiredCount,
+    handleCategoryCompleted,
+    recordCompletedZikr,
+    repeatSessionActive,
+    resolvedCategory,
+    triggerFeedback,
+  ]);
+
+  const handleCustomDhikrCount = useCallback(async (item: CustomDhikr) => {
+    if (categoryLocked) return;
+
+    const currentCount = countsRef.current[item.id] || 0;
+    if (currentCount >= item.count) return;
+
+    const newCount = currentCount + 1;
+    const nextCounts = { ...countsRef.current, [item.id]: newCount };
+    countsRef.current = nextCounts;
+    setCounts(nextCounts);
+    triggerFeedback(newCount >= item.count ? 'success' : 'light');
+
+    if (newCount >= item.count) {
+      await recordCompletedCustomDhikr(item);
+    }
+  }, [categoryLocked, recordCompletedCustomDhikr, triggerFeedback]);
 
   // ===================================
   // التنقل
   // ===================================
 
   const goToNext = () => {
+    clearAutoAdvance();
     if (currentIndex < azkar.length - 1) {
       setCurrentIndex(prev => prev + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-
-      // تحديث أنيميشن التقدم
-      Animated.timing(progressAnim, {
-        toValue: (currentIndex + 2) / azkar.length,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
     } else {
+      if (!checkAllCompleted(countsRef.current)) {
+        triggerFeedback('medium');
+        setToastMsg(null);
+        setShowIncompleteAlert(true);
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        if (incompleteAlertTimer.current) clearTimeout(incompleteAlertTimer.current);
+        incompleteAlertTimer.current = setTimeout(() => setShowIncompleteAlert(false), 6000);
+        return;
+      }
+
+      if (!repeatSessionActive) {
+        triggerFeedback('medium');
+        setCategoryLocked(true);
+        return;
+      }
+
       // Loop back to start — بدأت من جديد
-      setCurrentIndex(0);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      Animated.timing(progressAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
+      startRepeatReadingSession();
       triggerFeedback('success');
       setToastMsg(t('azkar.startingOver'));
       if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -735,17 +880,53 @@ export default function CategoryAzkarScreen() {
   };
 
   const goToPrevious = () => {
+    clearAutoAdvance();
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-
-      Animated.timing(progressAnim, {
-        toValue: currentIndex / azkar.length,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
     }
   };
+
+  const goToFirstIncomplete = useCallback(() => {
+    clearAutoAdvance();
+    const firstIncompleteIndex = azkar.findIndex((zikr) => {
+      const required = getZikrRequiredCount(zikr);
+      return (countsRef.current[zikr.id] || 0) < required;
+    });
+
+    if (firstIncompleteIndex < 0) {
+      setShowIncompleteAlert(false);
+      return;
+    }
+
+    setViewMode('card');
+    setCurrentIndex(firstIncompleteIndex);
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    setShowIncompleteAlert(false);
+    if (incompleteAlertTimer.current) clearTimeout(incompleteAlertTimer.current);
+    triggerFeedback('light');
+  }, [azkar, clearAutoAdvance, getZikrRequiredCount, triggerFeedback]);
+
+  const startRepeatReadingSession = useCallback(() => {
+    clearAutoAdvance();
+    const resetVisibleCounts = azkar.reduce<Record<number | string, number>>(
+      (next, zikr) => {
+        next[zikr.id] = 0;
+        return next;
+      },
+      { ...countsRef.current },
+    );
+
+    countsRef.current = resetVisibleCounts;
+    setCounts(resetVisibleCounts);
+    setRepeatSessionActive(true);
+    setCategoryLocked(false);
+    setShowIncompleteAlert(false);
+    if (incompleteAlertTimer.current) clearTimeout(incompleteAlertTimer.current);
+    setCurrentIndex(0);
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    triggerFeedback('light');
+  }, [azkar, clearAutoAdvance, triggerFeedback]);
 
   // ===================================
   // المفضلة
@@ -772,12 +953,17 @@ export default function CategoryAzkarScreen() {
   const openShareOptions = (zikr: Zikr | CustomDhikr) => {
     setShareTargetZikr(zikr);
     triggerFeedback('light');
+    const hasShareableAudio =
+      !('createdAt' in zikr) &&
+      !!zikr.audio &&
+      !(zikr.audio.startsWith('quran:') && zikr.audio.split(':')[2]?.includes('-'));
     Alert.alert(
       t('common.share'),
       '',
       [
         { text: t('common.shareText'), onPress: () => shareAsText(zikr) },
         { text: t('common.shareImage'), onPress: () => setTimeout(() => brandedRef.current?.showSizePicker(), 50) },
+        ...(hasShareableAudio ? [{ text: t('common.shareAudio'), onPress: () => shareAsAudio(zikr as Zikr) }] : []),
         { text: t('common.cancel'), style: 'cancel' },
       ],
     );
@@ -802,6 +988,42 @@ export default function CategoryAzkarScreen() {
       await Share.share({ message: parts.join('\n\n') });
     } catch (error) {
       console.error('Error sharing:', error);
+    }
+  };
+
+  const shareAsAudio = async (zikr: Zikr) => {
+    try {
+      if (!zikr.audio) return;
+      if (zikr.audio.startsWith('quran:') && zikr.audio.split(':')[2]?.includes('-')) {
+        Alert.alert(t('common.error'), t('common.noAudioFile'));
+        return;
+      }
+
+      let audioUri = '';
+      let fileName = `${buildZikrAudioShareName(zikr)}.m4a`;
+      if (zikr.audio.startsWith('quran:')) {
+        const queueIdx = audioQueue.findIndex(q => q.zikr.id === zikr.id);
+        const startIndex = queueIdx >= 0 ? audioTrackStartByBaseIndex[queueIdx] : undefined;
+        const track = startIndex !== undefined ? audioTracks[startIndex] : undefined;
+        audioUri = track?.url || '';
+        fileName = `${buildZikrAudioShareName(zikr)}.mp3`;
+      } else {
+        audioUri = await getAzkarAudioUri(zikr.audio);
+      }
+
+      if (!audioUri) {
+        Alert.alert(t('common.error'), t('common.noAudioFile'));
+        return;
+      }
+
+      await shareAudio(
+        audioUri,
+        getAzkarDisplayParts(zikr).text || t('common.share'),
+        fileName,
+      );
+    } catch (error) {
+      console.error('Error sharing audio:', error);
+      Alert.alert(t('common.error'), t('common.shareError'));
     }
   };
 
@@ -1053,21 +1275,11 @@ export default function CategoryAzkarScreen() {
     setCurrentIndex(nextIndex);
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
 
-    const zikr = azkar[nextIndex];
-    const current = zikr ? countsRef.current[zikr.id] || 0 : 0;
-    const required = zikr ? getZikrRequiredCount(zikr) : 1;
-    Animated.timing(progressAnim, {
-      toValue: (nextIndex + Math.min(1, current / Math.max(1, required))) / Math.max(1, azkar.length),
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
   }, [
     azkar,
     currentAudioQueueItem,
     currentIndex,
-    getZikrRequiredCount,
     isGlobalAzkarPlaying,
-    progressAnim,
   ]);
 
   // Audio continues playing when leaving page — GlobalAudioBar handles it
@@ -1125,11 +1337,25 @@ export default function CategoryAzkarScreen() {
   // ===================================
 
   const resetCount = (zikrId: number) => {
+    countsRef.current = { ...countsRef.current, [zikrId]: 0 };
     setCounts(prev => ({ ...prev, [zikrId]: 0 }));
-    if (resolvedCategory) {
+    if (resolvedCategory && !repeatSessionActive) {
       updateZikrProgress(resolvedCategory, zikrId, 0);
     }
   };
+
+  const completionRatio = React.useMemo(
+    () => getAzkarCompletionRatio(azkar, counts),
+    [azkar, counts],
+  );
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: completionRatio,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [completionRatio, progressAnim]);
 
   // ===================================
   // الرندر
@@ -1163,13 +1389,23 @@ export default function CategoryAzkarScreen() {
     );
   }
 
-  const currentZikr = azkar[currentIndex];
+  const safeCurrentIndex = Math.min(Math.max(currentIndex, 0), azkar.length - 1);
+  const currentZikr = azkar[safeCurrentIndex];
+
+  if (!currentZikr) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ActivityIndicator size="large" color="#22C55E" />
+        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12 }}>{t('common.loading')}</Text>
+      </View>
+    );
+  }
+
   const currentCount = counts[currentZikr.id] || 0;
   const currentZikrRequiredCount = getZikrRequiredCount(currentZikr);
   const isCompleted = currentCount >= currentZikrRequiredCount;
-  const currentItemProgress = Math.min(1, currentCount / Math.max(1, currentZikrRequiredCount));
-  const progress = (currentIndex + currentItemProgress) / azkar.length;
-  const progressPercent = Math.round(progress * 100);
+  const progressPercent = getAzkarCompletionPercentage(azkar, counts);
 
   return (
     <>
@@ -1787,7 +2023,7 @@ export default function CategoryAzkarScreen() {
               </Animated.View>
 
               {/* Custom dhikr after main ones (scroll below current card if at end) */}
-              {currentIndex === azkar.length - 1 && customAzkar.length > 0 && (
+              {safeCurrentIndex === azkar.length - 1 && customAzkar.length > 0 && (
                 <View style={{ marginTop: 16 }}>
                   <Text style={[styles.customSectionTitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
                     {t('azkar.customAdhkar')}
@@ -1799,10 +2035,7 @@ export default function CategoryAzkarScreen() {
                       <TouchableOpacity
                         key={cd.id}
                         onPress={() => {
-                          if (cdDone) return;
-                          const next = cdCount + 1;
-                          setCounts(prev => ({ ...prev, [cd.id as any]: next }));
-                          triggerFeedback('light');
+                          handleCustomDhikrCount(cd).catch(() => {});
                         }}
                         onLongPress={() => deleteCustomDhikr(cd.id)}
                         activeOpacity={0.8}
@@ -1839,13 +2072,13 @@ export default function CategoryAzkarScreen() {
             <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)', flexDirection: isRTL ? 'row-reverse' : 'row', paddingBottom: Math.max(insets.bottom, 16) }]}>
               <TouchableOpacity
                 onPress={goToPrevious}
-                disabled={currentIndex === 0}
-                style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
+                disabled={safeCurrentIndex === 0}
+                style={[styles.navButton, safeCurrentIndex === 0 && styles.navButtonDisabled]}
               >
                 <MaterialCommunityIcons
                   name={isRTL ? 'chevron-right' : 'chevron-left'}
                   size={28}
-                  color={currentIndex === 0 ? '#9CA3AF' : categoryInfo.color}
+                  color={safeCurrentIndex === 0 ? '#9CA3AF' : categoryInfo.color}
                 />
               </TouchableOpacity>
 
@@ -1984,16 +2217,7 @@ export default function CategoryAzkarScreen() {
                         {/* Counter button */}
                         <TouchableOpacity
                           onPress={() => {
-                            if (categoryLocked || zDone) return;
-                            const next = zCount + 1;
-                            setCounts(prev => ({ ...prev, [zikr.id]: next }));
-                            triggerFeedback('light');
-                            if (next >= zRequiredCount) {
-                              triggerFeedback('success');
-                              const updated = { ...counts, [zikr.id]: next };
-                              if (checkAllCompleted(updated)) setTimeout(() => handleCategoryCompleted(), 500);
-                            }
-                            if (resolvedCategory) updateZikrProgress(resolvedCategory, zikr.id, next);
+                            handleListCount(zikr).catch(() => {});
                           }}
                           style={[styles.listCounterButton, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}
                           activeOpacity={0.8}
@@ -2024,10 +2248,7 @@ export default function CategoryAzkarScreen() {
                     <TouchableOpacity
                       key={cd.id}
                       onPress={() => {
-                        if (cdDone) return;
-                        const next = cdCount + 1;
-                        setCounts(prev => ({ ...prev, [cd.id as any]: next }));
-                        triggerFeedback('light');
+                        handleCustomDhikrCount(cd).catch(() => {});
                       }}
                       onLongPress={() => deleteCustomDhikr(cd.id)}
                       activeOpacity={0.8}
@@ -2074,26 +2295,88 @@ export default function CategoryAzkarScreen() {
         </View>
       )}
 
+      {showIncompleteAlert && (
+        <View style={styles.incompleteAlertContainer} pointerEvents="box-none">
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={goToFirstIncomplete}
+            style={[
+              styles.incompleteAlertBox,
+              {
+                backgroundColor: darkMode ? 'rgba(69, 45, 16, 0.96)' : 'rgba(255, 247, 237, 0.98)',
+                borderColor: categoryInfo.color,
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+              },
+            ]}
+          >
+            <View style={[styles.incompleteAlertIcon, { backgroundColor: categoryInfo.color }]}>
+              <MaterialCommunityIcons name="alert" size={18} color="#FFFFFF" />
+            </View>
+            <View style={styles.incompleteAlertContent}>
+              <Text
+                style={[
+                  styles.incompleteAlertTitle,
+                  {
+                    color: darkMode ? '#FFFFFF' : '#7C2D12',
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                  },
+                ]}
+              >
+                {isArabic ? 'لم تكتمل الأذكار بعد' : 'Adhkar are not complete yet'}
+              </Text>
+              <Text
+                style={[
+                  styles.incompleteAlertText,
+                  {
+                    color: darkMode ? '#FED7AA' : '#9A3412',
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                  },
+                ]}
+              >
+                {isArabic ? 'اضغط هنا للرجوع لأول ذكر غير مكتمل' : 'Tap to return to the first incomplete dhikr'}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name={isRTL ? 'chevron-left' : 'chevron-right'}
+              size={22}
+              color={darkMode ? '#FED7AA' : '#9A3412'}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* بوب أب القفل */}
       {categoryLocked && (
         <Modal visible={categoryLocked} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
-              <Text style={styles.modalEmoji}></Text>
+              <MaterialCommunityIcons name="check-decagram" size={46} color={categoryInfo?.color || '#10B981'} />
               <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                {t('azkar.alreadyCompleted')}
+                {isArabic ? 'قرأت أذكار اليوم' : 'Today\'s adhkar are done'}
               </Text>
               <Text style={[styles.modalSubtitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                {t('azkar.completedTodayMessage', { name: categoryInfo ? getCategoryName(categoryInfo, language) : t('azkar.title') })}
+                {isArabic
+                  ? 'يمكنك قراءتها مرة أخرى للذكر والطمأنينة، لكن القراءة الإضافية لن تُحسب في النقاط أو الترتيب.'
+                  : 'You can read them again for remembrance, but this extra reading will not count toward points or ranking.'}
               </Text>
               <Text style={[styles.modalDua, { color: categoryInfo?.color || '#10B981' }]}>
-                {t('azkar.willRenewOnTime')}
+                {isArabic ? 'هل تريد البدء من جديد؟' : 'Start again anyway?'}
               </Text>
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: categoryInfo?.color || '#10B981' }]}
+                onPress={startRepeatReadingSession}
+              >
+                <Text style={styles.modalButtonText}>{isArabic ? 'قراءة مرة أخرى' : 'Read again'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: darkMode ? '#374151' : '#E5E7EB', marginTop: 10 }]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.modalButtonText}>{t('common.ok')}</Text>
+                <Text style={[styles.modalButtonText, { color: darkMode ? '#F9FAFB' : '#374151' }]}>
+                  {isArabic ? 'رجوع' : 'Go back'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2639,5 +2922,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
+  },
+  incompleteAlertContainer: {
+    position: 'absolute',
+    bottom: 120,
+    left: 18,
+    right: 18,
+    zIndex: 1000,
+  },
+  incompleteAlertBox: {
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1.5,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  incompleteAlertIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  incompleteAlertContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  incompleteAlertTitle: {
+    fontSize: 15,
+    fontFamily: fontBold(),
+  },
+  incompleteAlertText: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fontSemiBold(),
   },
 });

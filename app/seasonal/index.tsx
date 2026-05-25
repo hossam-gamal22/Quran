@@ -29,10 +29,11 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getLanguage } from '@/lib/i18n';
 import TranslatedText from '@/components/ui/TranslatedText';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { UniversalHeader } from '@/components/ui';
 
 const getSeasonName = (season: { nameAr: string; nameEn: string }) => {
-  return getLanguage() === 'ar' ? season.nameAr : season.nameEn;
+  return getLanguage() === 'ar' ? season.nameAr : (season.nameEn || season.nameAr);
 };
 
 const { width } = Dimensions.get('window');
@@ -180,6 +181,8 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
+  const isArabic = getLanguage() === 'ar';
+  const displayName = isArabic ? day.nameAr : (day.nameEn || day.nameAr);
   return (
     <Animated.View entering={FadeIn.duration(500)}>
       <View style={styles.starAboveCardWrapper}>
@@ -190,21 +193,37 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
           style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
         >
           <View style={[styles.specialDayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <Text style={[styles.specialDayTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>
-              {t('seasonal.specialDay')}: {getLanguage() === 'ar' ? day.nameAr : day.nameEn}
-            </Text>
+            {isArabic || day.nameEn ? (
+              <Text style={[styles.specialDayTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>
+                {t('seasonal.specialDay')}: {displayName}
+              </Text>
+            ) : (
+              <Text style={[styles.specialDayTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>
+                {t('seasonal.specialDay')}: <TranslatedText from="ar" type="ui">{day.nameAr}</TranslatedText>
+              </Text>
+            )}
           </View>
-        <Text style={[styles.specialDayDesc, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>
-          {day.description}
-        </Text>
-        
+        {isArabic ? (
+          <Text style={[styles.specialDayDesc, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>
+            {day.description}
+          </Text>
+        ) : (
+          <TranslatedText from="ar" type="ui" style={[styles.specialDayDesc, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>
+            {day.description}
+          </TranslatedText>
+        )}
+
         {day.virtues.length > 0 && (
           <View style={styles.virtuesContainer}>
             <Text style={[styles.virtuesTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>{t('seasonal.ashura.virtues')}:</Text>
             {day.virtues.map((virtue, index) => (
               <View key={index} style={[styles.virtueItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="check-circle" size={16} color={seasonColor} />
-                <Text style={[styles.virtueText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{virtue}</Text>
+                {isArabic ? (
+                  <Text style={[styles.virtueText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{virtue}</Text>
+                ) : (
+                  <TranslatedText from="ar" type="ui" style={[styles.virtueText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{virtue}</TranslatedText>
+                )}
               </View>
             ))}
           </View>
@@ -216,7 +235,11 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
             {day.recommendedActions.map((action, index) => (
               <View key={index} style={[styles.actionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#0d8e62" />
-                <Text style={[styles.actionText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{action}</Text>
+                {isArabic ? (
+                  <Text style={[styles.actionText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{action}</Text>
+                ) : (
+                  <TranslatedText from="ar" type="ui" style={[styles.actionText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{action}</TranslatedText>
+                )}
               </View>
             ))}
           </View>
@@ -336,7 +359,19 @@ export default function SeasonalIndexScreen() {
 
   const navigateToSeason = (seasonType: SeasonType) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(`/seasonal/${seasonType}` as any);
+    const seasonRoutes: Partial<Record<SeasonType, string>> = {
+      ramadan: '/seasonal/ramadan',
+      hajj: '/seasonal/hajj',
+      dhul_hijjah: '/seasonal/hajj',
+      eid_adha: '/seasonal/hajj',
+      eid_fitr: '/seasonal/ramadan',
+      mawlid: '/seasonal/mawlid',
+      ashura: '/seasonal/ashura',
+      muharram: '/seasonal/ashura',
+      rajab: '/seasonal',
+      shaban: '/seasonal',
+    };
+    router.push((seasonRoutes[seasonType] || '/seasonal') as any);
   };
 
   const handleActiveSeasonPress = () => {
@@ -376,6 +411,7 @@ export default function SeasonalIndexScreen() {
           />
         }
       >
+        <ContentLanguageNotice style={{ marginHorizontal: 0 }} />
         {/* الموسم النشط */}
         {currentSeason ? (
           <>
@@ -436,9 +472,9 @@ export default function SeasonalIndexScreen() {
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#0d8e62" />
             <View style={styles.tipContent}>
               <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.hajj.tipTitle')}</Text>
-              <Text style={[styles.tipText, { color: colors.textLight }]}>
+              <TranslatedText from="ar" style={[styles.tipText, { color: colors.textLight }]}>
                 استغل المواسم الإسلامية في مضاعفة الأجر والتقرب إلى الله بالطاعات
-              </Text>
+              </TranslatedText>
             </View>
           </View>
         </Animated.View>
@@ -690,7 +726,6 @@ const _styles = StyleSheet.create({
     fontFamily: fontRegular(),
     flex: 1,
   },
-
   // بطاقة لا يوجد موسم
   noSeasonCard: {
     borderRadius: 20,

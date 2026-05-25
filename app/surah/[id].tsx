@@ -51,7 +51,7 @@ import { BlurView } from 'expo-blur';
 import ViewShot from 'react-native-view-shot';
 import Slider from '@react-native-community/slider';
 import { useQuran } from '@/contexts/QuranContext';
-import { hasPerAyahSync } from '@/lib/reciters-registry';
+import { hasPerAyahSync, RECITERS_BY_ID } from '@/lib/reciters-registry';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t as translate, getLanguage } from '@/lib/i18n';
 import { useQuranTracker } from '@/contexts/WorshipContext';
@@ -70,6 +70,7 @@ import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { fetchAppConfig, subscribeToAppConfig } from '@/lib/app-config-api';
+import { uiText } from '@/lib/ui-text';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
 function getTargetAyahBg(themeIndex: number): string {
@@ -84,7 +85,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { setLastRead, addBookmark, removeBookmark, getBookmarks } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
 import { isDownloaded, downloadSurah, deleteDownload } from '@/lib/audio-download-manager';
-import { notifyOfflineAudio } from '@/lib/audio-player';
+import { audioPlayer, notifyOfflineAudio } from '@/lib/audio-player';
 import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { playPageSound, EFFECT_SOUNDS } from '@/lib/sound-manager';
 import { shareImage } from '@/lib/share-service';
@@ -319,10 +320,8 @@ const MushafPage = React.memo(function MushafPage({
   );
   const [fontError, setFontError] = useState(false);
   // Safety fallback: only used for Android share-card capture (when the QCF
-  // font would otherwise render as invisible PUA glyphs in viewshot). The
-  // 604 QCF page fonts are bundled with the app and preloaded in background
-  // at startup (see app/_layout.tsx → preloadAllPagesInBackground), so for
-  // normal navigation the font is already in memory.
+  // font would otherwise render as invisible PUA glyphs in viewshot). QCF
+  // page fonts are bundled and loaded on demand for the visible page.
   const baseTextColor = getQuranTextColor('', themeIndex);
   // Determine if the theme's primary color is dark (i.e., designed for light backgrounds)
   const isBaseColorDark = (() => {
@@ -767,6 +766,8 @@ interface GlassHeaderProps {
   downloadState: 'idle' | 'downloading' | 'done';
   downloadProgress: number;
   autoScrollActive: boolean;
+  audioPlaying: boolean;
+  audioLoading: boolean;
   onTafsir: () => void;
   onPlay: () => void;
   onToggleAutoScroll: () => void;
@@ -778,7 +779,7 @@ interface GlassHeaderProps {
   onDownloadLongPress: () => void;
 }
 
-function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, showLockBadge, showDownloadButton, downloadState, downloadProgress, autoScrollActive, onTafsir, onPlay, onToggleAutoScroll, onBack, onToggleFavorite, onShare, onSettings, onDownload, onDownloadLongPress }: GlassHeaderProps) {
+function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, showLockBadge, showDownloadButton, downloadState, downloadProgress, autoScrollActive, audioPlaying, audioLoading, onTafsir, onPlay, onToggleAutoScroll, onBack, onToggleFavorite, onShare, onSettings, onDownload, onDownloadLongPress }: GlassHeaderProps) {
   return (
     <View style={gh.wrapper} collapsable={false}>
       <View style={gh.inner}>
@@ -791,9 +792,13 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
               color={tafsirActive ? goldenColor : (isLightBg ? '#555' : '#bbb')}
             />
           </TouchableOpacity>
-          <TouchableOpacity hitSlop={8} onPress={onPlay}>
+          <TouchableOpacity hitSlop={12} onPress={onPlay} style={gh.audioBtn}>
             <View>
-              <MaterialCommunityIcons name="play-circle-outline" size={24} color={goldenColor} />
+              {audioLoading ? (
+                <ActivityIndicator size="small" color={goldenColor} />
+              ) : (
+                <MaterialCommunityIcons name={audioPlaying ? 'pause-circle' : 'play-circle'} size={28} color={goldenColor} />
+              )}
               {showLockBadge && (
                 <View style={gh.lockBadge}>
                   <MaterialCommunityIcons name="lock" size={9} color="#000" />
@@ -852,7 +857,7 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
             {surahName}
           </Text>
           <Text style={[gh.juzLabel, { color: goldenColor }]} numberOfLines={1}>
-            الجزء {toArabicNumber(juz)}
+            {translate('quran.juz')} {toArabicNumber(juz)}
           </Text>
         </View>
 
@@ -877,6 +882,12 @@ const gh = StyleSheet.create({
     paddingHorizontal: 12,
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  audioBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   right: { paddingLeft: 4 },
   center: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 6 },
   pageInfo: { fontSize: 15, fontFamily: 'Rubik-Bold', lineHeight: 20, includeFontPadding: false, textAlign: 'right' },
@@ -1004,6 +1015,7 @@ export default function SurahScreen() {
   const [autoScrollMinimized, setAutoScrollMinimized] = useState(false);
   const [autoScrollStartPage, setAutoScrollStartPage] = useState(currentPage);
   const [autoScrollDraftSpeed, setAutoScrollDraftSpeed] = useState(0.5);
+  const [audioPressPending, setAudioPressPending] = useState(false);
   const [autoScrollDurationRange, setAutoScrollDurationRange] = useState({
     minSeconds: DEFAULT_AUTO_SCROLL_MIN_SECONDS,
     maxSeconds: DEFAULT_AUTO_SCROLL_MAX_SECONDS,
@@ -1321,6 +1333,15 @@ export default function SurahScreen() {
     return `${playbackState.currentSurah}:${playbackState.currentAyah}`;
   }, [playbackState.isPlaying, playbackState.isLoading, playbackState.currentSurah, playbackState.currentAyah]);
 
+  const isAudioOnCurrentPage = useMemo(() => {
+    if (playbackState.currentSurah === 0 || playbackState.currentAyah === 0) return false;
+    const verseData = getVerseQcfData(playbackState.currentSurah, playbackState.currentAyah);
+    return verseData?.page === currentPage;
+  }, [playbackState.currentSurah, playbackState.currentAyah, currentPage]);
+
+  const isCurrentPageAudioPlaying = isAudioOnCurrentPage && playbackState.isPlaying;
+  const isCurrentPageAudioLoading = (isAudioOnCurrentPage && playbackState.isLoading) || audioPressPending;
+
   // When the user deep-links to a specific ayah (e.g. from المحفوظات / آية اليوم
   // → `/surah/{n}?ayah={a}`), highlight that ayah on first render. The
   // existing fade/clear effect below removes it after ~5s.
@@ -1378,6 +1399,43 @@ export default function SurahScreen() {
   useEffect(() => {
     ensurePagesLoaded(currentPage, 3, forceLightText);
   }, [currentPage, forceLightText]);
+
+  // Warm the per-ayah audio cache for this page's first ayah in the background.
+  // The cache layer coalesces and skips already-cached files, so this is cheap
+  // to run on every page change — but it makes the first tap on play feel
+  // instant because expo-av is then loading a local file:// instead of a CDN.
+  // Guarded against `prefetchAyah` being missing (e.g. stale Metro bundle after
+  // a hot reload) so the screen never renders an error here.
+  useEffect(() => {
+    if (!currentReciter) return;
+    if (typeof audioPlayer.prefetchAyah !== 'function') return;
+    try {
+      const { surah, ayah } = getFirstAyahOnPage(currentPage);
+      audioPlayer.prefetchAyah(surah, ayah, currentReciter);
+    } catch {}
+  }, [currentPage, currentReciter]);
+
+  // When the settings sheet opens, prefetch the CURRENT ayah for every reciter
+  // visible in the picker. This is the moment the user is most likely to switch
+  // voices — by the time they tap a new reciter, the audio file is on disk and
+  // playback starts instantly. ~50–200 KB per reciter, ~10 reciters max, runs
+  // once per sheet open thanks to download coalescing.
+  useEffect(() => {
+    if (!showSettings) return;
+    if (typeof audioPlayer.prefetchAyah !== 'function') return;
+    try {
+      const state = audioPlayer.getState();
+      const surah = state.currentSurah > 0 ? state.currentSurah : getFirstAyahOnPage(currentPage).surah;
+      const ayah = state.currentSurah > 0 ? state.currentAyah : getFirstAyahOnPage(currentPage).ayah;
+      const mode = settings?.display?.quranReadingMode || 'tarteel';
+      const candidates = reciters.filter((r) =>
+        mode === 'tajweed' ? r.style === 'mujawwad' : hasPerAyahSync(r.identifier),
+      );
+      for (const r of candidates) {
+        audioPlayer.prefetchAyah(surah, ayah, r.identifier);
+      }
+    } catch {}
+  }, [showSettings, currentPage, reciters, settings?.display?.quranReadingMode]);
 
   // Surah names on current page — all surahs in page order (top to bottom)
   const surahsOnPage = useMemo(() => {
@@ -1515,7 +1573,13 @@ export default function SurahScreen() {
     // Need internet to download
     const net = await NetInfo.fetch().catch(() => null);
     if (net?.isConnected === false) {
-      Alert.alert('لا يوجد اتصال بالإنترنت', 'يحتاج تحميل السورة إلى اتصال بالإنترنت.');
+      Alert.alert(
+        uiText({ ar: 'لا يوجد اتصال بالإنترنت', en: 'No internet connection' }),
+        uiText({
+          ar: 'يحتاج تحميل السورة إلى اتصال بالإنترنت.',
+          en: 'Downloading the surah needs an internet connection.',
+        })
+      );
       return;
     }
 
@@ -1532,19 +1596,25 @@ export default function SurahScreen() {
     } catch (e: any) {
       setDownloadState('idle');
       setDownloadProgress(0);
-      Alert.alert('فشل التحميل', e?.message || 'تعذّر تحميل السورة. حاول مرة أخرى.');
+      Alert.alert(
+        translate('quran.downloadFailed'),
+        e?.message || uiText({ ar: 'تعذّر تحميل السورة. حاول مرة أخرى.', en: 'Could not download the surah. Please try again.' })
+      );
     }
   }, [isPremium, currentReciter, currentAudioSurah, downloadState]);
 
   const handleDeleteDownloadedSurah = useCallback(() => {
     if (!isPremium || !currentReciter || downloadState !== 'done') return;
     Alert.alert(
-      'حذف التحميل',
-      'هل تريد حذف الملف الصوتي المحمَّل لهذه السورة؟',
+      uiText({ ar: 'حذف التحميل', en: 'Delete download' }),
+      uiText({
+        ar: 'هل تريد حذف الملف الصوتي المحمَّل لهذه السورة؟',
+        en: 'Do you want to delete the downloaded audio file for this surah?',
+      }),
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: translate('common.cancel'), style: 'cancel' },
         {
-          text: 'حذف',
+          text: translate('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -1561,17 +1631,19 @@ export default function SurahScreen() {
 
   const handlePlayPage = useCallback(async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const { surah, ayah } = getFirstAyahOnPage(currentPage);
-    // Free user offline gate — proactively show upsell instead of silent failure
-    if (!isPremium) {
-      const net = await NetInfo.fetch().catch(() => null);
-      if (net?.isConnected === false) {
-        notifyOfflineAudio();
-        return;
-      }
+    if (isCurrentPageAudioLoading) return;
+    if (isAudioOnCurrentPage && playbackState.currentSurah > 0) {
+      await togglePlayPause();
+      return;
     }
-    playAyah(surah, ayah, true);
-  }, [currentPage, playAyah, isPremium]);
+    const { surah, ayah } = getFirstAyahOnPage(currentPage);
+    setAudioPressPending(true);
+    try {
+      await playAyah(surah, ayah, true, false);
+    } finally {
+      setAudioPressPending(false);
+    }
+  }, [currentPage, playAyah, isAudioOnCurrentPage, isCurrentPageAudioLoading, playbackState.currentSurah, togglePlayPause]);
 
   const handleAyahLongPress = useCallback((surah: number, ayah: number, page: number) => {
     setSelectedAyah({ surah, ayah, page });
@@ -1660,17 +1732,9 @@ export default function SurahScreen() {
 
   const handlePlayAyah = useCallback(async () => {
     if (!selectedAyah) return;
-    if (!isPremium) {
-      const net = await NetInfo.fetch().catch(() => null);
-      if (net?.isConnected === false) {
-        setShowAyahMenu(false);
-        notifyOfflineAudio();
-        return;
-      }
-    }
-    playAyah(selectedAyah.surah, selectedAyah.ayah, true);
     setShowAyahMenu(false);
-  }, [selectedAyah, playAyah, isPremium]);
+    await playAyah(selectedAyah.surah, selectedAyah.ayah, true, false);
+  }, [selectedAyah, playAyah]);
 
   // Auto-share: when navigated with ?autoShare=true, capture and share the page after font loads
   useEffect(() => {
@@ -2133,6 +2197,8 @@ export default function SurahScreen() {
               downloadState={downloadState}
               downloadProgress={downloadProgress}
               autoScrollActive={autoScrollActive}
+              audioPlaying={isCurrentPageAudioPlaying}
+              audioLoading={isCurrentPageAudioLoading}
               onTafsir={() => updateDisplay({ showTafsir: !showTafsirPanel } as any)}
               onPlay={handlePlayPage}
               onToggleAutoScroll={toggleAutoScroll}
@@ -2450,7 +2516,7 @@ export default function SurahScreen() {
               <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => { if (!tafsirLocked) setShowTafsir(false); }} />
               <View style={[s.sheetContainer, { height: '90%' }]}>
                 <BlurView intensity={Platform.OS === 'ios' ? 40 : 25} tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any} style={s.sheetBlur}>
-                  <View style={[s.sheetContent, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.85)' : '#212d39' }]}>
+                  <View style={[s.sheetContent, { backgroundColor: Platform.OS === 'android' ? (isLightBg ? '#FFFFFF' : '#212d39') : (isLightBg ? 'rgba(255,255,255,0.85)' : '#212d39') }]}>
                     <View style={s.sheetHandle}>
                       <View style={[s.sheetHandleBar, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }]} />
                     </View>
@@ -2519,7 +2585,7 @@ export default function SurahScreen() {
                   style={s.sheetBlur}
                 >
                   <View style={[s.sheetContent, {
-                    backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.97)' : '#0f1a14',
+                    backgroundColor: Platform.OS === 'android' ? (settingsIsLight ? '#FFFFFF' : '#0f1a14') : (settingsIsLight ? 'rgba(255,255,255,0.97)' : '#0f1a14'),
                     borderTopWidth: StyleSheet.hairlineWidth,
                     borderTopColor: settingsIsLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)',
                   }]}>
@@ -2703,23 +2769,48 @@ export default function SurahScreen() {
                                   isActive && { backgroundColor: settingsIsLight ? '#fff' : 'rgba(255,255,255,0.18)' },
                                 ]}
                                 onPress={() => {
-                                  if (mode === 'tajweed') {
-                                    // Intercept: ensure full Tajweed font set is downloaded first.
-                                    void (async () => {
-                                      const downloaded = await isAllTajweedDownloaded();
-                                      if (!downloaded) {
-                                        // iOS RN won't render a second <Modal> on top of an already-visible
-                                        // one, so close the settings sheet first, then open the download
-                                        // modal on the next tick. onComplete/onCancel reopens settings.
-                                        setShowSettings(false);
-                                        setTimeout(() => setShowTajweedDownload(true), Platform.OS === 'ios' ? 350 : 0);
-                                        return;
-                                      }
+                                  const previousMode = settings?.display?.quranReadingMode || 'tarteel';
+                                  if (previousMode === mode) return;
+                                  // Different mode = different reciter pool. If audio is playing
+                                  // and the current reciter doesn't fit the new pool, stop it and
+                                  // tell the user why — otherwise they'd see a frozen sticky player
+                                  // pointing at a reciter that's no longer in the picker.
+                                  const requiredStyle: 'mujawwad' | 'murattal' = mode === 'tajweed' ? 'mujawwad' : 'murattal';
+                                  const currentEntry = RECITERS_BY_ID[currentReciter];
+                                  const reciterFits = currentEntry?.style === requiredStyle
+                                    && (mode === 'tajweed' || hasPerAyahSync(currentReciter));
+                                  const playbackActive = playbackState.isPlaying || playbackState.isLoading;
+                                  const applyModeChange = () => {
+                                    if (mode === 'tajweed') {
+                                      void (async () => {
+                                        const downloaded = await isAllTajweedDownloaded();
+                                        if (!downloaded) {
+                                          setShowSettings(false);
+                                          setTimeout(() => setShowTajweedDownload(true), Platform.OS === 'ios' ? 350 : 0);
+                                          return;
+                                        }
+                                        updateDisplay({ quranReadingMode: mode });
+                                      })();
+                                    } else {
                                       updateDisplay({ quranReadingMode: mode });
-                                    })();
-                                  } else {
-                                    updateDisplay({ quranReadingMode: mode });
+                                    }
+                                  };
+                                  if (playbackActive && !reciterFits) {
+                                    audioPlayer.stop().catch(() => {});
+                                    Alert.alert(
+                                      uiText({ ar: 'تم إيقاف التشغيل', en: 'Playback stopped' }),
+                                      uiText({
+                                        ar: mode === 'tajweed'
+                                          ? 'قراء التجويد يختلفون عن قراء الترتيل. اختر قارئًا مجوّدًا من القائمة لمتابعة الاستماع.'
+                                          : 'قراء الترتيل يختلفون عن قراء التجويد. اختر قارئًا من قراء الترتيل لمتابعة الاستماع.',
+                                        en: mode === 'tajweed'
+                                          ? 'Mujawwad reciters differ from Tarteel reciters. Pick a Mujawwad reciter to keep listening.'
+                                          : 'Tarteel reciters differ from Mujawwad reciters. Pick a Tarteel reciter to keep listening.',
+                                      }),
+                                      [{ text: uiText({ ar: 'حسناً', en: 'OK' }) }],
+                                    );
                                   }
+                                  applyModeChange();
                                   if (Platform.OS !== 'web') Haptics.selectionAsync();
                                 }}
                               >
@@ -2830,21 +2921,29 @@ export default function SurahScreen() {
                           style={{
                             color: settingsIsLight ? '#666' : '#aaa',
                             fontSize: 11,
-                            fontFamily: 'Cairo-Regular',
+                            fontFamily: 'Rubik-Regular',
                             textAlign: 'center',
                             marginBottom: 8,
                             paddingHorizontal: 8,
                           }}
                         >
-                          {isArabicLang
-                            ? 'هؤلاء القراء يدعمون تحديد الآية أثناء التلاوة. لمزيد من القراء انتقل إلى تبويب "استماع".'
-                            : 'These reciters support per-ayah highlighting. For more reciters, see the Listen tab.'}
+                          {(settings?.display?.quranReadingMode || 'tarteel') === 'tajweed'
+                            ? (isArabicLang
+                              ? 'قراء التجويد. للقراء بتحديد الآية، اختر وضع الترتيل.'
+                              : 'Mujawwad reciters. For per-ayah highlighting, switch to Tarteel mode.')
+                            : (isArabicLang
+                              ? 'هؤلاء القراء يدعمون تحديد الآية أثناء التلاوة. لمزيد من القراء انتقل إلى تبويب "استماع".'
+                              : 'These reciters support per-ayah highlighting. For more reciters, see the Listen tab.')}
                         </Text>
-                        {/* Note: Mushaf playback requires per-ayah sync, so only 🟢 reciters
-                            are listed here. Continuous-only (🟡) reciters appear in the
-                            Listen tab (recitations) where they work fully. */}
+                        {/* Tarteel mode → per-ayah-capable reciters (highlight follows audio).
+                            Tajweed mode → mujawwad reciters (continuous-only is fine here, the
+                            listener is studying tajweed rules, not racing through verses). */}
                         <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                          {reciters.filter(r => hasPerAyahSync(r.identifier)).map(r => {
+                          {reciters.filter(r => {
+                            const mode = settings?.display?.quranReadingMode || 'tarteel';
+                            if (mode === 'tajweed') return r.style === 'mujawwad';
+                            return hasPerAyahSync(r.identifier);
+                          }).map(r => {
                             const isActive = currentReciter === r.identifier;
                             const isLoadingThis = isActive && playbackState.isLoading;
                             return (
@@ -2868,8 +2967,8 @@ export default function SurahScreen() {
                                 <View style={{ flex: 1 }}>
                                   <Text style={[stg.reciterName, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{isArabicLang ? (r.name || r.englishName) : (r.englishName || r.name)}</Text>
                                   {isLoadingThis && (
-                                    <Text style={{ color: settingsIsLight ? '#888' : '#aaa', fontSize: 11, marginTop: 2, fontFamily: 'Cairo-Regular', textAlign: isRTL ? 'right' : 'left' }}>
-                                      {isArabicLang ? 'جارٍ التحميل من الإنترنت…' : 'Streaming over network…'}
+                                    <Text style={{ color: settingsIsLight ? '#888' : '#aaa', fontSize: 11, marginTop: 2, fontFamily: 'Rubik-Regular', textAlign: isRTL ? 'right' : 'left' }}>
+                                      {uiText({ ar: 'جارٍ التحميل من الإنترنت...', en: 'Streaming over network...' })}
                                     </Text>
                                   )}
                                 </View>

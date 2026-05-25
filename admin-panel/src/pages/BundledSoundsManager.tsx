@@ -57,7 +57,6 @@ interface SoundConfig {
 
 const DEFAULT_BUNDLED_SOUNDS: BundledSound[] = [
   // إشعارات
-  { id: 'general_reminder', displayName: 'تذكير عام', category: 'notification', assetPath: './assets/sounds/general_reminder.mp3', enabled: true, order: 1 },
   { id: 'salawat', displayName: 'صلاة على النبي', category: 'notification', assetPath: './assets/sounds/salawat.mp3', enabled: true, order: 2 },
   { id: 'istighfar', displayName: 'استغفار', category: 'notification', assetPath: './assets/sounds/istighfar.mp3', enabled: true, order: 3 },
   { id: 'tasbih', displayName: 'تسبيح', category: 'notification', assetPath: './assets/sounds/tasbih.mp3', enabled: true, order: 4 },
@@ -65,22 +64,29 @@ const DEFAULT_BUNDLED_SOUNDS: BundledSound[] = [
   { id: 'alhamdulillah', displayName: 'الحمد لله', category: 'notification', assetPath: './assets/sounds/alhamdulillah.mp3', enabled: true, order: 6 },
   { id: 'morning_adhkar', displayName: 'أذكار الصباح', category: 'notification', assetPath: './assets/sounds/morning_adhkar.mp3', enabled: true, order: 7 },
   { id: 'evening_adhkar', displayName: 'أذكار المساء', category: 'notification', assetPath: './assets/sounds/evening_adhkar.mp3', enabled: true, order: 8 },
+  { id: 'notif_after_prayer', displayName: 'بعد الصلاة', category: 'notification', assetPath: './assets/sounds/notif_after_prayer.mp3', enabled: true, order: 9 },
+  { id: 'complete', displayName: 'complete', category: 'notification', assetPath: './assets/sounds/notif_daily_summary.mp3', enabled: true, order: 10 },
+  { id: 'notif_kahf', displayName: 'تذكير سورة الكهف', category: 'notification', assetPath: './assets/sounds/notif_kahf.mp3', enabled: true, order: 11 },
+  { id: 'notif_khatma', displayName: 'تذكير الختمة', category: 'notification', assetPath: './assets/sounds/notif_khatma.mp3', enabled: true, order: 12 },
+  { id: 'notif_sleep', displayName: 'أذكار النوم', category: 'notification', assetPath: './assets/sounds/notif_sleep.mp3', enabled: true, order: 13 },
+  { id: 'notif_verse', displayName: 'آية يومية', category: 'notification', assetPath: './assets/sounds/notif_verse.mp3', enabled: true, order: 14 },
+  { id: 'notif_wakeup', displayName: 'أذكار الاستيقاظ', category: 'notification', assetPath: './assets/sounds/notif_wakeup.mp3', enabled: true, order: 15 },
   // أذان
-  { id: 'makkah', displayName: 'أذان مكة المكرمة', category: 'adhan', assetPath: './assets/sounds/makkah.mp3', enabled: true, order: 10 },
-  { id: 'madinah', displayName: 'أذان المدينة المنورة', category: 'adhan', assetPath: './assets/sounds/madinah.mp3', enabled: true, order: 11 },
-  { id: 'alaqsa', displayName: 'أذان المسجد الأقصى', category: 'adhan', assetPath: './assets/sounds/alaqsa.mp3', enabled: true, order: 12 },
-  { id: 'mishary', displayName: 'مشاري العفاسي', category: 'adhan', assetPath: './assets/sounds/mishary.mp3', enabled: true, order: 13 },
-  { id: 'abdulbasit', displayName: 'عبد الباسط عبد الصمد', category: 'adhan', assetPath: './assets/sounds/abdulbasit.mp3', enabled: true, order: 14 },
-  { id: 'sudais', displayName: 'عبد الرحمن السديس', category: 'adhan', assetPath: './assets/sounds/sudais.mp3', enabled: true, order: 15 },
-  { id: 'egypt', displayName: 'أذان مصر', category: 'adhan', assetPath: './assets/sounds/egypt.mp3', enabled: true, order: 16 },
-  { id: 'dosari', displayName: 'ياسر الدوسري', category: 'adhan', assetPath: './assets/sounds/dosari.mp3', enabled: true, order: 17 },
-  { id: 'ajman', displayName: 'أذان عجمان', category: 'adhan', assetPath: './assets/sounds/ajman.mp3', enabled: true, order: 18 },
-  { id: 'ali_mulla', displayName: 'علي الملا', category: 'adhan', assetPath: './assets/sounds/ali_mulla.mp3', enabled: true, order: 19 },
-  { id: 'naqshbandi', displayName: 'النقشبندي', category: 'adhan', assetPath: './assets/sounds/naqshbandi.mp3', enabled: true, order: 20 },
-  { id: 'sharif', displayName: 'محمد شريف', category: 'adhan', assetPath: './assets/sounds/sharif.mp3', enabled: true, order: 21 },
-  { id: 'mansoor_zahrani', displayName: 'منصور الزهراني', category: 'adhan', assetPath: './assets/sounds/mansoor_zahrani.mp3', enabled: true, order: 22 },
-  { id: 'haramain', displayName: 'الحرمين', category: 'adhan', assetPath: './assets/sounds/haramain.mp3', enabled: true, order: 23 },
-  { id: 'silent', displayName: 'صامت', category: 'adhan', assetPath: './assets/sounds/silent.mp3', enabled: true, order: 24 },
+  { id: 'makkah', displayName: 'أذان مكة المكرمة', category: 'adhan', assetPath: './assets/sounds/makkah.mp3', enabled: true, order: 100 },
+  { id: 'madinah', displayName: 'أذان المدينة المنورة', category: 'adhan', assetPath: './assets/sounds/madinah.mp3', enabled: true, order: 101 },
+  { id: 'alaqsa', displayName: 'أذان المسجد الأقصى', category: 'adhan', assetPath: './assets/sounds/alaqsa.mp3', enabled: true, order: 102 },
+  { id: 'mishary', displayName: 'مشاري العفاسي', category: 'adhan', assetPath: './assets/sounds/mishary.mp3', enabled: true, order: 103 },
+  { id: 'abdulbasit', displayName: 'عبد الباسط عبد الصمد', category: 'adhan', assetPath: './assets/sounds/abdulbasit.mp3', enabled: true, order: 104 },
+  { id: 'sudais', displayName: 'عبد الرحمن السديس', category: 'adhan', assetPath: './assets/sounds/sudais.mp3', enabled: true, order: 105 },
+  { id: 'egypt', displayName: 'أذان مصر', category: 'adhan', assetPath: './assets/sounds/egypt.mp3', enabled: true, order: 106 },
+  { id: 'dosari', displayName: 'ياسر الدوسري', category: 'adhan', assetPath: './assets/sounds/dosari.mp3', enabled: true, order: 107 },
+  { id: 'ajman', displayName: 'أذان عجمان', category: 'adhan', assetPath: './assets/sounds/ajman.mp3', enabled: true, order: 108 },
+  { id: 'ali_mulla', displayName: 'علي الملا', category: 'adhan', assetPath: './assets/sounds/ali_mulla.mp3', enabled: true, order: 109 },
+  { id: 'naqshbandi', displayName: 'النقشبندي', category: 'adhan', assetPath: './assets/sounds/naqshbandi.mp3', enabled: true, order: 110 },
+  { id: 'sharif', displayName: 'محمد شريف', category: 'adhan', assetPath: './assets/sounds/sharif.mp3', enabled: true, order: 111 },
+  { id: 'mansoor_zahrani', displayName: 'منصور الزهراني', category: 'adhan', assetPath: './assets/sounds/mansoor_zahrani.mp3', enabled: true, order: 112 },
+  { id: 'haramain', displayName: 'الحرمين', category: 'adhan', assetPath: './assets/sounds/haramain.mp3', enabled: true, order: 113 },
+  { id: 'silent', displayName: 'صامت', category: 'adhan', assetPath: './assets/sounds/silent.mp3', enabled: true, order: 114 },
 ];
 
 const FIRESTORE_CONFIG_DOC = 'appConfig/soundSettings';
@@ -88,6 +94,26 @@ const FIRESTORE_UPLOADED_COLLECTION = 'uploadedSounds';
 
 type CategoryFilter = 'all' | 'notification' | 'adhan';
 type ActiveTab = 'bundled' | 'pending' | 'instructions';
+
+function mergeBundledSoundDefaults(existingSounds: BundledSound[] = []): BundledSound[] {
+  const defaultIds = new Set(DEFAULT_BUNDLED_SOUNDS.map(sound => sound.id));
+  const normalizedExistingSounds = existingSounds.map(sound =>
+    sound.id === 'notif_daily_summary'
+      ? { ...sound, id: 'complete', displayName: sound.displayName === 'الملخص اليومي' ? 'complete' : sound.displayName }
+      : sound
+  );
+  const existingById = new Map(normalizedExistingSounds.map(sound => [sound.id, sound]));
+  const mergedDefaults = DEFAULT_BUNDLED_SOUNDS.map(defaultSound => ({
+    ...defaultSound,
+    ...existingById.get(defaultSound.id),
+    assetPath: defaultSound.assetPath,
+    category: defaultSound.category,
+    order: existingById.get(defaultSound.id)?.order ?? defaultSound.order,
+  }));
+  const customSounds = normalizedExistingSounds.filter(sound => !defaultIds.has(sound.id));
+
+  return [...mergedDefaults, ...customSounds].sort((a, b) => a.order - b.order);
+}
 
 // ==================== Component ====================
 
@@ -124,11 +150,23 @@ export default function BundledSoundsManager() {
       ]);
 
       if (configSnap.exists() && configSnap.data()?.bundledSounds?.length) {
-        setConfig(configSnap.data() as SoundConfig);
+        const existingConfig = configSnap.data() as SoundConfig;
+        const repairedConfig: SoundConfig = {
+          ...existingConfig,
+          bundledSounds: mergeBundledSoundDefaults(existingConfig.bundledSounds),
+          updatedAt: existingConfig.updatedAt || new Date().toISOString(),
+          version: existingConfig.version || 1,
+        };
+
+        if (repairedConfig.bundledSounds.length !== existingConfig.bundledSounds.length) {
+          await setDoc(doc(db, FIRESTORE_CONFIG_DOC), repairedConfig, { merge: true });
+        }
+
+        setConfig(repairedConfig);
       } else {
         // Initialize/repair with defaults (doc may exist without bundledSounds)
         const defaultConfig: SoundConfig = {
-          bundledSounds: DEFAULT_BUNDLED_SOUNDS,
+          bundledSounds: mergeBundledSoundDefaults(),
           updatedAt: new Date().toISOString(),
           version: 1,
         };

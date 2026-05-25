@@ -34,7 +34,7 @@ const DEFAULT_CONFIG: ShareModalConfig = {
     'كل من شارك هذا التطبيق كان له مثل أجر من انتفع به — اجعله صدقة جارية تعود عليك وعلى من تحب',
   shareMessageAr: 'حمّل تطبيق روح المسلم — صلوات، أذكار، قرآن وأوقات الصلاة',
   shareUrlFallback: 'https://roohmuslim.app',
-  shareUrlIos: 'https://apps.apple.com/app/rooh-muslim/id123456789',
+  shareUrlIos: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
   shareUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
 };
 

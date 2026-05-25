@@ -20,18 +20,20 @@ import type { CelebrationType } from '@/contexts/CelebrationContext';
 
 const { width } = Dimensions.get('window');
 
+const CELEBRATION_ANIMATION_SOURCE = require('@/assets/animations/adhkar-complete.json');
+
 const ANIMATION_SOURCES: Record<CelebrationType, any> = {
-  adhkar_complete: require('@/assets/animations/adhkar-complete.json'),
-  rank_up: require('@/assets/animations/rank-up.json'),
-  monthly_winner: require('@/assets/animations/monthly-winner.json'),
-  quran_pages: require('@/assets/animations/adhkar-complete.json'),
-  khatma_wird: require('@/assets/animations/adhkar-complete.json'),
+  adhkar_complete: CELEBRATION_ANIMATION_SOURCE,
+  rank_up: CELEBRATION_ANIMATION_SOURCE,
+  monthly_winner: CELEBRATION_ANIMATION_SOURCE,
+  quran_pages: CELEBRATION_ANIMATION_SOURCE,
+  khatma_wird: CELEBRATION_ANIMATION_SOURCE,
 };
 
 const ANIMATION_SIZES: Record<CelebrationType, number> = {
   adhkar_complete: 200,
   rank_up: 200,
-  monthly_winner: 180,
+  monthly_winner: 200,
   quran_pages: 200,
   khatma_wird: 200,
 };
@@ -81,6 +83,7 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
   const cardContent = (
     <View style={{ alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24, backgroundColor: cardBg }}>
       <LottieView
+        key={`${type}-${visible ? 'visible' : 'hidden'}`}
         ref={lottieRef}
         source={ANIMATION_SOURCES[type]}
         autoPlay

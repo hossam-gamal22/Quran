@@ -29,6 +29,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/hooks/use-auth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,7 +41,7 @@ import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { fetchQAContent, subscribeToQAContent, filterVisibleContent } from '@/lib/qa-content-api';
-import { submitQuestion, waitForAutoAnswer, type AutoAnswerResult } from '@/lib/email-service';
+import { submitQuestion, waitForAutoAnswer, subscribeToQuestionAnswer, type AutoAnswerResult } from '@/lib/email-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ========================================
@@ -82,13 +83,16 @@ interface ChatMessage {
   sources?: AutoAnswerResult['sources'];
   status?: AutoAnswerResult['status'];
   relatedQuestion?: string;
+  questionId?: string;
+  isAdminCorrected?: boolean;
+  correctedAt?: string;
 }
 
-const INITIAL_CHAT_MESSAGE: ChatMessage = {
+const getInitialChatMessage = (): ChatMessage => ({
   id: 'intro',
   role: 'assistant',
-  text: 'السلام عليكم، اكتب سؤالك بأسلوبك الطبيعي. سأبحث في المصادر الموثوقة وأعرض لك أقرب إجابة مع الروابط.',
-};
+  text: t('questionAnswer.aiAssistantIntro'),
+});
 const CHAT_HISTORY_KEY = '@qa_assistant_chat_history';
 const CHAT_CONVERSATIONS_KEY = '@qa_assistant_conversations';
 const QA_ASSISTANT_COMPLETIONS_AD_KEY = '@qa_assistant_completions_for_ad';
@@ -107,10 +111,12 @@ function formatConversationDate(isoDate: string): string {
   try {
     const date = new Date(isoDate);
     const diff = Math.floor((Date.now() - date.getTime()) / 86400000);
-    if (diff === 0) return 'اليوم';
-    if (diff === 1) return 'أمس';
-    if (diff < 7) return `منذ ${diff} أيام`;
-    return date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
+    if (diff === 0) return t('questionAnswer.dateToday');
+    if (diff === 1) return t('questionAnswer.dateYesterday');
+    if (diff < 7) return t('questionAnswer.daysAgo', { count: diff });
+    const lang = getLanguage();
+    const locale = lang === 'ar' ? 'ar-EG' : lang;
+    return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   } catch {
     return '';
   }
@@ -122,6 +128,29 @@ function getSourceHost(url: string): string {
   } catch {
     return url;
   }
+}
+
+function containsArabic(text?: string): boolean {
+  return /[\u0600-\u06FF]/.test(text || '');
+}
+
+function TranslatedTextIfNeeded({
+  text,
+  style,
+  numberOfLines,
+}: {
+  text: string;
+  style: TextStyle | TextStyle[];
+  numberOfLines?: number;
+}) {
+  const translated = useAutoTranslate(containsArabic(text) ? text : '', 'ar', 'section');
+  const language = getLanguage();
+  const displayText = language !== 'ar' && containsArabic(text) && translated ? translated : text;
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {displayText}
+    </Text>
+  );
 }
 
 async function maybeShowQaCompletionAd(): Promise<void> {
@@ -164,7 +193,7 @@ export default function QuestionAnswerScreen() {
   const [showAssistantModal, setShowAssistantModal] = useState(false);
   const [chatQuestion, setChatQuestion] = useState('');
   const [isAssistantThinking, setIsAssistantThinking] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([INITIAL_CHAT_MESSAGE]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => [getInitialChatMessage()]);
   const [isChatHistoryLoaded, setIsChatHistoryLoaded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [savedConversations, setSavedConversations] = useState<SavedConversation[]>([]);
@@ -206,6 +235,44 @@ export default function QuestionAnswerScreen() {
     const trimmed = chatMessages.slice(-60);
     AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(trimmed)).catch(() => undefined);
   }, [chatMessages, isChatHistoryLoaded]);
+
+  useEffect(() => {
+    const questionIds = Array.from(new Set(
+      chatMessages
+        .filter((message) => message.role === 'assistant' && message.questionId)
+        .map((message) => message.questionId as string)
+    ));
+
+    if (questionIds.length === 0) return;
+
+    const unsubscribers = questionIds.map((questionId) => subscribeToQuestionAnswer(questionId, (answer) => {
+      setChatMessages((prev) => prev.map((message) => {
+        if (message.role !== 'assistant' || message.questionId !== questionId) return message;
+        const currentSources = JSON.stringify(message.sources || []);
+        const nextSources = JSON.stringify(answer.sources || []);
+        if (
+          message.text === answer.answer &&
+          message.isAdminCorrected === answer.isAdminCorrected &&
+          currentSources === nextSources
+        ) {
+          return message;
+        }
+
+        return {
+          ...message,
+          text: answer.answer,
+          sources: answer.sources,
+          status: answer.status,
+          isAdminCorrected: answer.isAdminCorrected,
+          correctedAt: answer.correctedAt,
+        };
+      }));
+    }));
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [chatMessages]);
 
   // Load saved conversations on mount
   useEffect(() => {
@@ -251,7 +318,7 @@ export default function QuestionAnswerScreen() {
   }, []);
 
   const clearChatHistory = useCallback(() => {
-    setChatMessages([INITIAL_CHAT_MESSAGE]);
+    setChatMessages([getInitialChatMessage()]);
     AsyncStorage.removeItem(CHAT_HISTORY_KEY).catch(() => undefined);
   }, []);
 
@@ -259,7 +326,7 @@ export default function QuestionAnswerScreen() {
     saveCurrentConversation(chatMessages);
     setChatQuestion('');
     setChatMessages([{
-      ...INITIAL_CHAT_MESSAGE,
+      ...getInitialChatMessage(),
       id: `intro-${Date.now()}`,
     }]);
     AsyncStorage.removeItem(CHAT_HISTORY_KEY).catch(() => undefined);
@@ -368,8 +435,7 @@ export default function QuestionAnswerScreen() {
       });
 
       const result = await waitForAutoAnswer(questionId, 28000);
-      const fallbackText =
-        'لم أتمكن من تجهيز رد فوري موثوق الآن. يمكنك إرسال السؤال لنا، وسنراجعه ونرد عليك بمصادر موثوقة خلال 48 ساعة إن شاء الله.';
+      const fallbackText = t('questionAnswer.aiAssistantFallbackAnswer');
 
       setChatMessages(prev => [
         ...prev,
@@ -380,6 +446,9 @@ export default function QuestionAnswerScreen() {
           sources: result?.sources || [],
           status: result?.status,
           relatedQuestion: text,
+          questionId,
+          isAdminCorrected: result?.isAdminCorrected,
+          correctedAt: result?.correctedAt,
         },
       ]);
       maybeShowQaCompletionAd();
@@ -389,7 +458,7 @@ export default function QuestionAnswerScreen() {
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          text: 'حدث خطأ أثناء البحث. يمكنك إرسال السؤال لنا، وسنراجعه ونرد عليك بمصادر موثوقة خلال 48 ساعة إن شاء الله.',
+          text: t('questionAnswer.aiAssistantErrorAnswer'),
           sources: [],
           status: 'failed',
           relatedQuestion: text,
@@ -418,7 +487,7 @@ export default function QuestionAnswerScreen() {
   const handleSubmitQuestion = useCallback(async () => {
     if (!questionText.trim()) return;
     if (!userEmail.trim() || !isValidEmail(userEmail)) {
-      Alert.alert(t('common.error'), 'البريد الإلكتروني مطلوب للرد على سؤالك');
+      Alert.alert(t('common.error'), t('questionAnswer.emailRequired'));
       return;
     }
 
@@ -441,10 +510,10 @@ export default function QuestionAnswerScreen() {
       setUserEmail('');
       Alert.alert(
         t('questionAnswer.questionSent'),
-        'تم إرسال سؤالك. سنراجعه ونرد عليك بمصادر موثوقة خلال 48 ساعة إن شاء الله.'
+        t('questionAnswer.questionSentDetailed')
       );
     } catch (e) {
-      Alert.alert(t('common.error'), t('questionAnswer.submitError') || 'حدث خطأ أثناء إرسال السؤال. حاول مرة أخرى.');
+      Alert.alert(t('common.error'), t('questionAnswer.submitError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -696,10 +765,10 @@ export default function QuestionAnswerScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.assistantEntryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-            اسأل المساعد الذكي
+            {t('questionAnswer.aiAssistantCardTitle')}
           </Text>
           <Text style={[styles.assistantEntrySub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
-            رد فوري بالمصادر، وإن لم نجد إجابة نرسل سؤالك للمراجعة خلال 48 ساعة.
+            {t('questionAnswer.aiAssistantCardDesc')}
           </Text>
         </View>
         <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={colors.textLight} />
@@ -804,15 +873,15 @@ export default function QuestionAnswerScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.chatTitle, { color: isDarkMode ? '#fff' : '#1a1a1a', textAlign: isRTL ? 'right' : 'left' }]}>
-                  المساعد الذكي
+                  {t('questionAnswer.aiAssistantTitle')}
                 </Text>
                 <Text style={[styles.chatSubtitle, { textAlign: isRTL ? 'right' : 'left' }]}>
-                  ردود فورية من أفضل المصادر الإسلامية
+                  {t('questionAnswer.aiAssistantSubtitle')}
                 </Text>
               </View>
               <TouchableOpacity onPress={startNewChat} style={styles.chatNewBtn}>
                 <MaterialCommunityIcons name="message-plus-outline" size={18} color="#fff" />
-                <Text style={styles.chatNewText}>جديد</Text>
+                <Text style={styles.chatNewText}>{t('questionAnswer.aiAssistantNewChat')}</Text>
               </TouchableOpacity>
               {savedConversations.length > 0 && (
                 <TouchableOpacity
@@ -843,7 +912,7 @@ export default function QuestionAnswerScreen() {
                 {savedConversations.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingTop: 40 }}>
                     <MaterialCommunityIcons name="history" size={48} color="#888" />
-                    <Text style={[styles.chatSubtitle, { marginTop: 12, fontSize: 14 }]}>لا توجد محادثات محفوظة</Text>
+                    <Text style={[styles.chatSubtitle, { marginTop: 12, fontSize: 14 }]}>{t('questionAnswer.aiAssistantNoHistory')}</Text>
                   </View>
                 ) : (
                   savedConversations.map((conv) => (
@@ -863,7 +932,7 @@ export default function QuestionAnswerScreen() {
                           {conv.preview}
                         </Text>
                         <Text style={[styles.historyCount, { textAlign: isRTL ? 'right' : 'left' }]}>
-                          {conv.messages.filter((m) => m.role === 'user').length} سؤال
+                          {t('questionAnswer.aiAssistantQuestionsCount', { count: conv.messages.filter((m) => m.role === 'user').length })}
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -899,22 +968,43 @@ export default function QuestionAnswerScreen() {
                       },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.chatBubbleText,
-                        {
-                          color: isUserMessage ? '#fff' : (isDarkMode ? '#fff' : '#1a1a1a'),
-                          textAlign: isRTL ? 'right' : 'left',
-                          writingDirection: isRTL ? 'rtl' : 'ltr',
-                        },
-                      ]}
-                    >
-                      {message.text}
-                    </Text>
+                    {isUserMessage ? (
+                      <Text
+                        style={[
+                          styles.chatBubbleText,
+                          {
+                            color: '#fff',
+                            textAlign: isRTL ? 'right' : 'left',
+                            writingDirection: isRTL ? 'rtl' : 'ltr',
+                          },
+                        ]}
+                      >
+                        {message.text}
+                      </Text>
+                    ) : (
+                      <TranslatedTextIfNeeded
+                        text={message.text}
+                        style={[
+                          styles.chatBubbleText,
+                          {
+                            color: isDarkMode ? '#fff' : '#1a1a1a',
+                            textAlign: isRTL ? 'right' : 'left',
+                            writingDirection: isRTL ? 'rtl' : 'ltr',
+                          },
+                        ]}
+                      />
+                    )}
 
-                    {(message.sources?.length || 0) > 0 && (
+	                    {message.isAdminCorrected && (
+	                      <View style={styles.correctionBadge}>
+	                        <MaterialCommunityIcons name="check-decagram" size={14} color={ACCENT} />
+	                        <Text style={styles.correctionBadgeText}>{t('questionAnswer.aiAssistantAdminCorrected')}</Text>
+	                      </View>
+	                    )}
+
+	                    {(message.sources?.length || 0) > 0 && (
                       <View style={styles.chatSources}>
-                        <Text style={[styles.sourcesLabel, { textAlign: isRTL ? 'right' : 'left' }]}>المصادر:</Text>
+                        <Text style={[styles.sourcesLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{t('questionAnswer.aiAssistantSources')}</Text>
                         {message.sources?.map((source, index) => (
                           <TouchableOpacity
                             key={`${source.url}-${index}`}
@@ -924,13 +1014,17 @@ export default function QuestionAnswerScreen() {
                             <Text style={[styles.chatSourceDomain, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                               {getSourceHost(source.url)}
                             </Text>
-                            <Text style={[styles.chatSourceText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
-                              {index + 1}. {source.title}
-                            </Text>
+                            <TranslatedTextIfNeeded
+                              text={`${index + 1}. ${source.title}`}
+                              style={[styles.chatSourceText, { textAlign: isRTL ? 'right' : 'left' }]}
+                              numberOfLines={2}
+                            />
                             {!!source.snippet && (
-                              <Text style={[styles.chatSourceSnippet, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={3}>
-                                {source.snippet}
-                              </Text>
+                              <TranslatedTextIfNeeded
+                                text={source.snippet}
+                                style={[styles.chatSourceSnippet, { textAlign: isRTL ? 'right' : 'left' }]}
+                                numberOfLines={3}
+                              />
                             )}
                           </TouchableOpacity>
                         ))}
@@ -944,13 +1038,13 @@ export default function QuestionAnswerScreen() {
                           disabled={isAssistantThinking}
                           style={[styles.retrySearchBtn, isAssistantThinking && styles.submitBtnDisabled]}
                         >
-                          <Text style={styles.retrySearchText}>إعادة البحث</Text>
+                          <Text style={styles.retrySearchText}>{t('questionAnswer.aiAssistantRetry')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => openManualQuestion(message.relatedQuestion || getLastUserQuestion())}
                           style={styles.manualFallbackBtn}
                         >
-                          <Text style={styles.manualFallbackText}>إرسال للإدارة خلال 48 ساعة</Text>
+                          <Text style={styles.manualFallbackText}>{t('questionAnswer.aiAssistantManualFallback')}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -960,7 +1054,7 @@ export default function QuestionAnswerScreen() {
               {isAssistantThinking && (
                 <View style={[styles.chatBubble, styles.assistantBubble, { backgroundColor: isDarkMode ? '#243044' : '#f4f7f5', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
                   <ActivityIndicator size="small" color={ACCENT} />
-                  <Text style={[styles.chatSubtitle, { marginTop: 8 }]}>جاري البحث في المصادر...</Text>
+                  <Text style={[styles.chatSubtitle, { marginTop: 8 }]}>{t('questionAnswer.aiAssistantThinking')}</Text>
                 </View>
               )}
             </ScrollView>
@@ -972,7 +1066,7 @@ export default function QuestionAnswerScreen() {
                   <TextInput
                     value={chatQuestion}
                     onChangeText={(val) => setChatQuestion(val.slice(0, MAX_QUESTION_LENGTH))}
-                    placeholder="اكتب سؤالك هنا..."
+                    placeholder={t('questionAnswer.aiAssistantInputPlaceholder')}
                     placeholderTextColor="#888"
                     multiline
                     style={[styles.chatInput, { color: isDarkMode ? '#fff' : '#1a1a1a', textAlign: isRTL ? 'right' : 'left' }]}
@@ -989,7 +1083,7 @@ export default function QuestionAnswerScreen() {
                   onPress={() => openManualQuestion(chatQuestion || getLastUserQuestion())}
                   style={{ paddingTop: 10 }}
                 >
-                  <Text style={styles.cancelText}>أو أرسل السؤال لنا للرد خلال 48 ساعة بمصادر موثوقة</Text>
+                  <Text style={styles.cancelText}>{t('questionAnswer.aiAssistantManualLink')}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -1229,6 +1323,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 4,
+  },
+  correctionBadge: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(13,142,98,0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(13,142,98,0.35)',
+  },
+  correctionBadgeText: {
+    color: ACCENT,
+    fontSize: 12,
+    fontWeight: '700',
   },
   chatFallbackActions: {
     marginTop: 12,

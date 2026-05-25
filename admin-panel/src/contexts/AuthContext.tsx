@@ -2,12 +2,17 @@ import React, { useState, useEffect, ReactNode } from 'react';
 import { AuthContext } from './auth-context';
 
 const SESSION_KEY = 'rooh_admin_session';
-const VERIFY_URL = '/api/verify-admin';
+const USE_DIRECT_NETLIFY_FUNCTIONS =
+  import.meta.env.PROD ||
+  (import.meta.env.VITE_NETLIFY_FUNCTIONS_DIRECT as string | undefined) === 'true';
+const VERIFY_URL = USE_DIRECT_NETLIFY_FUNCTIONS
+  ? '/.netlify/functions/verify-admin'
+  : '/api/verify-admin';
 const LOCAL_DEV_SESSION_PREFIX = 'local-dev-session:';
 
 function isLocalDevAuthEnabled(): boolean {
   return Boolean(
-    import.meta.env.DEV &&
+    (import.meta.env.DEV || USE_DIRECT_NETLIFY_FUNCTIONS) &&
     typeof window !== 'undefined' &&
     ['127.0.0.1', 'localhost'].includes(window.location.hostname)
   );
@@ -113,6 +118,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     if (result.status === 401) {
       throw new Error('wrong-password');
+    }
+    if (
+      result.status === 500 &&
+      result.data?.error === 'not-configured' &&
+      isLocalDevAuthEnabled() &&
+      await verifyLocalDevPassword(passwordHash)
+    ) {
+      localStorage.setItem(SESSION_KEY, issueLocalDevSession());
+      setAuthenticated(true);
+      return;
     }
     if (result.status === 500 && result.data?.error === 'not-configured') {
       throw new Error('not-configured');

@@ -11,6 +11,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
   Platform,
   Image,
   ImageBackground,
@@ -37,6 +38,9 @@ import { useQuran } from '@/contexts/QuranContext';
 import { Spacing } from '@/constants/theme';
 import { QURAN_THEMES, getSafeThemeIndex, isThemeLight, getGoldenColor } from '@/constants/quran-themes';
 import { useAppIdentity } from '@/hooks/use-app-identity';
+import { getAyahAudioUrl } from '@/lib/quran-cache';
+import { getGlobalAyahNumber } from '@/lib/azkar-quran-audio';
+import { shareAudio } from '@/lib/share-service';
 
 const surahOrnament = require('@/assets/images/quran/surah-ornament.png');
 
@@ -50,7 +54,7 @@ export default function AyatKursiScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { playAyah, playbackState, togglePlayPause } = useQuran();
+  const { playAyah, playbackState, togglePlayPause, currentReciter } = useQuran();
   const shareViewShotRef = useRef<ViewShot>(null);
   const { logoSource: appIcon } = useAppIdentity();
 
@@ -90,7 +94,7 @@ export default function AyatKursiScreen() {
       .catch(() => setLoading(false));
   }, [qcfPage, isDarkMode]);
 
-  const handleShare = async () => {
+  const handleShareImage = async () => {
     try {
       if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (!shareViewShotRef.current) return;
@@ -110,6 +114,35 @@ export default function AyatKursiScreen() {
     } catch (e) {
       console.warn('Error sharing Ayat Al-Kursi:', e);
     }
+  };
+
+  const handleShareAudio = async () => {
+    try {
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const globalAyah = getGlobalAyahNumber(SURAH_NUM, AYAH_NUM);
+      if (!globalAyah) {
+        Alert.alert(t('common.error'), t('common.noAudioFile'));
+        return;
+      }
+      const audioUrl = getAyahAudioUrl(currentReciter, globalAyah, SURAH_NUM, AYAH_NUM);
+      const title = isRTL ? 'آية الكرسي' : 'Ayat Al-Kursi';
+      await shareAudio(audioUrl, title, `${title}.mp3`);
+    } catch (e) {
+      console.warn('Error sharing Ayat Al-Kursi audio:', e);
+      Alert.alert(t('common.error'), t('common.shareError'));
+    }
+  };
+
+  const handleShare = () => {
+    Alert.alert(
+      t('common.share'),
+      '',
+      [
+        { text: t('common.shareImage'), onPress: handleShareImage },
+        { text: t('common.shareAudio'), onPress: handleShareAudio },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
   };
 
   const handlePlay = () => {

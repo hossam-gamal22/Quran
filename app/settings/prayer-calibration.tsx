@@ -25,6 +25,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t } from '@/lib/i18n';
+import { getPrayerTranslationKey } from '@/lib/prayer-times';
 
 type PrayerKey = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 
@@ -34,7 +35,7 @@ function getPrayerLabel(key: PrayerKey, translate: typeof t): string {
   const map: Record<PrayerKey, string> = {
     fajr: translate('prayer.fajr'),
     sunrise: translate('prayer.sunrise'),
-    dhuhr: translate('prayer.dhuhr'),
+    dhuhr: translate(getPrayerTranslationKey('dhuhr')),
     asr: translate('prayer.asr'),
     maghrib: translate('prayer.maghrib'),
     isha: translate('prayer.isha'),

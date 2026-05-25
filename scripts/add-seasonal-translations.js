@@ -209,7 +209,7 @@ const translations = {
       title: 'موسم الحج',
       headerSubtitle: 'أيام الحج المباركة',
       headerSubtitleWithDay: 'اليوم',
-      dhulHijjah: 'ذو الحجة',
+      dhulHijjah: 'ذي الحجة',
       tenDaysTitle: 'العشر الأوائل من ذي الحجة',
       tenDaysSubtitle: 'أفضل أيام العام',
       ritualsSection: 'أيام الحج ومناسكه',

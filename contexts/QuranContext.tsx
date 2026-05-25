@@ -32,7 +32,7 @@ interface QuranContextType {
   
   // الصوت
   playbackState: PlaybackState;
-  playAyah: (surahNumber: number, ayahNumber: number, continuous?: boolean) => Promise<void>;
+  playAyah: (surahNumber: number, ayahNumber: number, continuous?: boolean, playFullSurah?: boolean) => Promise<void>;
   togglePlayPause: () => Promise<void>;
   stopPlayback: () => Promise<void>;
   playNext: () => Promise<void>;
@@ -100,8 +100,13 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const playAyah = useCallback(async (surahNumber: number, ayahNumber: number, continuous = false) => {
-    await audioPlayer.playAyah(surahNumber, ayahNumber, currentReciter, continuous);
+  const playAyah = useCallback(async (
+    surahNumber: number,
+    ayahNumber: number,
+    continuous = false,
+    playFullSurah = continuous,
+  ) => {
+    await audioPlayer.playAyah(surahNumber, ayahNumber, currentReciter, continuous, false, playFullSurah);
   }, [currentReciter]);
 
   const togglePlayPause = useCallback(async () => {
@@ -128,10 +133,20 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
     const safe = RECITERS_BY_ID[identifier] ? identifier : migrateReciterId(identifier);
     setCurrentReciter(safe);
     AsyncStorage.setItem(RECITER_STORAGE_KEY, safe).catch(() => {});
-    // If audio is currently playing, restart with the new reciter
+    // If audio is currently playing, hand the current ayah to the new reciter
+    // immediately. Force per-ayah mode: a single-ayah mp3 is tiny and starts
+    // playing in well under a second, vs. a full-surah file (5–30 MB) that
+    // would otherwise re-download from scratch when the listener is just
+    // trying to swap voices. Continuous play stays on, so the rest of the
+    // surah keeps streaming verse-by-verse with the existing prefetcher.
     const state = audioPlayer.getState();
-    if (state.isPlaying && state.currentSurah > 0) {
-      audioPlayer.playAyah(state.currentSurah, state.currentAyah, safe, true);
+    if ((state.isPlaying || state.isLoading) && state.currentSurah > 0) {
+      // Kick off the new reciter's current-ayah download immediately so the
+      // file is on disk by the time playAyah reaches expo-av createAsync.
+      if (typeof audioPlayer.prefetchAyah === 'function') {
+        audioPlayer.prefetchAyah(state.currentSurah, state.currentAyah, safe);
+      }
+      audioPlayer.playAyah(state.currentSurah, state.currentAyah, safe, true, false, false);
     }
   }, []);
 

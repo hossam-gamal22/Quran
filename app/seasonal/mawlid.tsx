@@ -27,6 +27,8 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
 // theme constants removed — using useColors() hook instead
 import TranslatedText from '@/components/ui/TranslatedText';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
+import { useSeasonalCMS } from '@/lib/content-api';
 
 // ========================================
 // الثوابت
@@ -80,6 +82,48 @@ const SALAWAT = [
     arabic: 'السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ',
     virtue: 'من التشهد في الصلاة',
   },
+  {
+    id: 'blessed',
+    title: 'صلاة وسلام وبركة',
+    arabic: 'اللَّهُمَّ صَلِّ وَسَلِّمْ وَبَارِكْ عَلَى نَبِيِّنَا مُحَمَّدٍ، وَعَلَى آلِهِ وَصَحْبِهِ أَجْمَعِينَ',
+    virtue: 'صيغة جامعة للصلاة والسلام والبركة',
+  },
+  {
+    id: 'abundant',
+    title: 'صلاة بعدد خلق الله',
+    arabic: 'اللَّهُمَّ صَلِّ عَلَى سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ عَدَدَ خَلْقِكَ، وَرِضَا نَفْسِكَ، وَزِنَةَ عَرْشِكَ، وَمِدَادَ كَلِمَاتِكَ',
+    virtue: 'من أعظم صيغ الصلاة على النبي ﷺ',
+  },
+  {
+    id: 'comprehensive',
+    title: 'الصلاة جامعة',
+    arabic: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، فِي الْأَوَّلِينَ وَفِي الْآخِرِينَ، وَفِي الْمَلَإِ الْأَعْلَى إِلَى يَوْمِ الدِّينِ',
+    virtue: 'صيغة تجمع الزمان والمكان',
+  },
+  {
+    id: 'as_you_love',
+    title: 'صلاة كما يحب ويرضى',
+    arabic: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ كَمَا تُحِبُّ وَتَرْضَى لَهُ',
+    virtue: 'تفويض كيفية الصلاة لله تعالى',
+  },
+  {
+    id: 'intercession',
+    title: 'طلب الشفاعة',
+    arabic: 'اللَّهُمَّ ارْزُقْنِي شَفَاعَةَ نَبِيِّنَا مُحَمَّدٍ ﷺ يَوْمَ الْقِيَامَةِ',
+    virtue: 'دعاء بنيل شفاعة النبي ﷺ',
+  },
+  {
+    id: 'salvation',
+    title: 'صلاة النجاة',
+    arabic: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ صَلَاةً تُنْجِينَا بِهَا مِنْ جَمِيعِ الْأَهْوَالِ وَالْآفَاتِ، وَتَقْضِي لَنَا بِهَا جَمِيعَ الْحَاجَاتِ',
+    virtue: 'صيغة جامعة لطلب الفرج والنجاة',
+  },
+  {
+    id: 'brief',
+    title: 'صيغة موجزة',
+    arabic: 'صَلَّى اللَّهُ عَلَيْهِ وَعَلَى آلِهِ وَسَلَّمَ',
+    virtue: 'صيغة سهلة للإكثار من الصلاة على النبي ﷺ',
+  },
 ];
 
 const RECOMMENDED_ACTIONS = [
@@ -88,6 +132,30 @@ const RECOMMENDED_ACTIONS = [
   { id: 'sunnah', icon: 'star', title: 'اتباع سنته ﷺ', color: '#c07b10' },
   { id: 'akhlaq', icon: 'account-heart', title: 'التخلق بأخلاقه ﷺ', color: '#0d8e62' },
 ];
+
+type MawlidSalawat = {
+  id: string;
+  title: string;
+  titleKey?: string;
+  arabic: string;
+  virtue: string;
+  translation?: string;
+};
+
+type MawlidAction = {
+  id: string;
+  icon: string;
+  title: string;
+  labelKey?: string;
+  color: string;
+};
+
+type CMSMawlidAction = {
+  id: string;
+  icon: string;
+  labelKey: string;
+  color: string;
+};
 
 // ========================================
 // مكونات فرعية
@@ -161,7 +229,7 @@ const QualityCard: React.FC<QualityCardProps> = ({ quality, index, isDarkMode })
 };
 
 interface SalawatCardProps {
-  salawat: typeof SALAWAT[0];
+  salawat: MawlidSalawat;
   onShare: () => void;
   isDarkMode: boolean;
   index: number;
@@ -247,7 +315,7 @@ export default function MawlidScreen() {
     { icon: 'arm-flex', title: t('seasonal.mawlid.qualityBravery'), description: t('seasonal.mawlid.qualityBraveryDesc') },
   ], [t]);
 
-  const salawatList = useMemo(() => [
+  const localSalawatList = useMemo<MawlidSalawat[]>(() => [
     {
       id: 'ibrahimiyah',
       title: t('seasonal.mawlid.salawatIbrahimiyah'),
@@ -268,12 +336,43 @@ export default function MawlidScreen() {
     },
   ], [t]);
 
-  const recommendedActions = useMemo(() => [
+  const localRecommendedActions = useMemo<MawlidAction[]>(() => [
     { id: 'salawat', icon: 'heart', title: t('seasonal.mawlid.actionSalawat'), color: '#e91e63' },
     { id: 'seerah', icon: 'book-open-variant', title: t('seasonal.mawlid.actionSeerah'), color: '#3a7ca5' },
     { id: 'sunnah', icon: 'star', title: t('seasonal.mawlid.actionSunnah'), color: '#c07b10' },
     { id: 'akhlaq', icon: 'account-heart', title: t('seasonal.mawlid.actionAkhlaq'), color: '#0d8e62' },
   ], [t]);
+
+  const { duas: rawSalawatList, checklist: rawRecommendedActions } = useSeasonalCMS<MawlidSalawat, CMSMawlidAction>(
+    'mawlid',
+    localSalawatList,
+    localRecommendedActions.map((action) => ({
+      id: action.id,
+      icon: action.icon,
+      labelKey: action.title,
+      color: action.color,
+    }))
+  );
+
+  const salawatList = useMemo<MawlidSalawat[]>(() => (
+    rawSalawatList
+      .filter((salawat) => salawat.arabic)
+      .map((salawat, index) => ({
+        id: salawat.id || `cms-mawlid-salawat-${index}`,
+        title: salawat.title || salawat.titleKey || '',
+        arabic: salawat.arabic,
+        virtue: salawat.virtue || salawat.translation || '',
+      }))
+  ), [rawSalawatList]);
+
+  const recommendedActions = useMemo<MawlidAction[]>(() => (
+    rawRecommendedActions.map((action, index) => ({
+      id: action.id || `cms-mawlid-action-${index}`,
+      icon: action.icon || 'check',
+      title: action.labelKey || '',
+      color: action.color || '#0d8e62',
+    }))
+  ), [rawRecommendedActions]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -286,10 +385,10 @@ export default function MawlidScreen() {
     setSalawatCount((prev) => prev + 1);
   };
 
-  const handleShareSalawat = async (salawat: typeof SALAWAT[0]) => {
+  const handleShareSalawat = async (salawat: MawlidSalawat) => {
     try {
       await Share.share({
-        message: `${salawat.title}\n\n${salawat.arabic}\n\n${salawat.virtue}`,
+        message: [salawat.title, salawat.arabic, salawat.virtue].filter(Boolean).join('\n\n'),
         title: salawat.title,
       });
     } catch (error) {
@@ -333,6 +432,7 @@ export default function MawlidScreen() {
           />
         }
       >
+        <ContentLanguageNotice style={{ marginHorizontal: 0 }} />
         {/* بطاقة النبي ﷺ */}
         <Animated.View entering={FadeIn.duration(500)}>
           <View
@@ -726,7 +826,6 @@ const _styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontRegular(),
   },
-
   // الأعمال
   actionsCard: {
     borderRadius: 16,

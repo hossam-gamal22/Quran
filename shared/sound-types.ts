@@ -64,7 +64,6 @@ export interface SoundConfig {
  */
 export const DEFAULT_BUNDLED_SOUNDS: BundledSound[] = [
   // إشعارات
-  { id: 'general_reminder', displayName: 'تذكير عام', category: 'notification', assetPath: './assets/sounds/general_reminder.mp3', enabled: true, order: 1 },
   { id: 'salawat', displayName: 'صلاة على النبي', category: 'notification', assetPath: './assets/sounds/salawat.mp3', enabled: true, order: 2 },
   { id: 'istighfar', displayName: 'استغفار', category: 'notification', assetPath: './assets/sounds/istighfar.mp3', enabled: true, order: 3 },
   { id: 'tasbih', displayName: 'تسبيح', category: 'notification', assetPath: './assets/sounds/tasbih.mp3', enabled: true, order: 4 },

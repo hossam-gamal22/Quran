@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   CreditCard,
@@ -104,6 +104,74 @@ function isStoreSource(source: string): boolean {
   return source === 'play_store' || source === 'app_store';
 }
 
+type UserDocData = Record<string, any>;
+type PurchaseDocEntry = {
+  id: string;
+  userId: string;
+  data: Record<string, any>;
+};
+
+function buildPurchaseRecords(
+  usersById: Record<string, UserDocData>,
+  purchaseDocs: PurchaseDocEntry[]
+): PurchaseRecord[] {
+  const allPurchases: PurchaseRecord[] = [];
+
+  purchaseDocs.forEach((purchaseDoc) => {
+    const userData = usersById[purchaseDoc.userId] || {};
+    const data = purchaseDoc.data;
+    const userName = (userData.displayName || userData.name || '') as string;
+    const userInstallSource = (userData.installSource || '') as string;
+    const hasPushToken =
+      typeof userData.fcmToken === 'string' &&
+      userData.fcmToken.startsWith('ExponentPushToken');
+    const nameFromPurchase = (data.userDisplayName || '') as string;
+    const displayName = nameFromPurchase || userName;
+    const platform = data.platform || data.userPlatform || userData.platform || 'unknown';
+    const orderId = data.orderId || data.transactionId || data.purchaseId || null;
+    const purchaseToken = data.purchaseToken || data.purchaseTokenAndroid || null;
+    const installSource = data.userInstallSource || userInstallSource;
+    const warnings: string[] = [];
+    if (userData.placeholder) warnings.push('مستخدم placeholder');
+    if (!displayName) warnings.push('بدون اسم');
+    if (!isStoreSource(installSource)) warnings.push('مصدره ليس متجر رسمي');
+    if (!hasPushToken) warnings.push('بدون push token');
+    if (!orderId && !purchaseToken) warnings.push('لا يوجد رقم طلب أو purchase token');
+
+    allPurchases.push({
+      id: `${purchaseDoc.userId}_${purchaseDoc.id}`,
+      userId: purchaseDoc.userId,
+      userName: displayName || purchaseDoc.userId.slice(0, 8),
+      productId: data.productId || '',
+      plan: data.plan || '',
+      orderId,
+      transactionId: data.transactionId || null,
+      purchaseToken,
+      platform,
+      store: data.store || (platform === 'ios' ? 'app_store' : platform === 'android' ? 'play_store' : 'unknown'),
+      purchasedAt: toDate(data.purchasedAt) || toDate(data.transactionDate),
+      expiresAt: data.expiresAt || null,
+      userInstallSource: installSource || '',
+      userCountry: data.userCountry || userData.country || '',
+      userLanguage: data.userLanguage || userData.language || '',
+      userLastActive: toDate(userData.lastActive),
+      hasName: !!displayName,
+      hasPushToken,
+      isStoreUser: isStoreSource(installSource),
+      isPlaceholder: !!userData.placeholder,
+      linkWarnings: warnings,
+    });
+  });
+
+  allPurchases.sort((a, b) => {
+    const aTime = a.purchasedAt?.getTime() ?? 0;
+    const bTime = b.purchasedAt?.getTime() ?? 0;
+    return bTime - aTime;
+  });
+
+  return allPurchases;
+}
+
 // ==================== Component ====================
 
 export default function PurchaseHistory() {
@@ -122,76 +190,21 @@ export default function PurchaseHistory() {
   const loadPurchases = async () => {
     setLoading(true);
     try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const allPurchases: PurchaseRecord[] = [];
-
-      await Promise.allSettled(
-        usersSnap.docs.map(async (userDoc) => {
-          const userData = userDoc.data();
-          const userName = (userData.displayName || userData.name || '') as string;
-          const userInstallSource = (userData.installSource || '') as string;
-          const hasPushToken =
-            typeof userData.fcmToken === 'string' &&
-            userData.fcmToken.startsWith('ExponentPushToken');
-
-          try {
-            const purchasesSnap = await getDocs(
-              collection(db, 'users', userDoc.id, 'purchases')
-            );
-
-            purchasesSnap.forEach((purchaseDoc) => {
-              const data = purchaseDoc.data();
-              const nameFromPurchase = (data.userDisplayName || '') as string;
-              const displayName = nameFromPurchase || userName;
-              const platform = data.platform || data.userPlatform || userData.platform || 'unknown';
-              const orderId = data.orderId || data.transactionId || data.purchaseId || null;
-              const purchaseToken = data.purchaseToken || data.purchaseTokenAndroid || null;
-              const installSource = data.userInstallSource || userInstallSource;
-              const warnings: string[] = [];
-              if (userData.placeholder) warnings.push('مستخدم placeholder');
-              if (!displayName) warnings.push('بدون اسم');
-              if (!isStoreSource(installSource)) warnings.push('مصدره ليس متجر رسمي');
-              if (!hasPushToken) warnings.push('بدون push token');
-              if (!orderId && !purchaseToken) warnings.push('لا يوجد رقم طلب أو purchase token');
-
-              allPurchases.push({
-                id: `${userDoc.id}_${purchaseDoc.id}`,
-                userId: userDoc.id,
-                userName: displayName || userDoc.id.slice(0, 8),
-                productId: data.productId || '',
-                plan: data.plan || '',
-                orderId,
-                transactionId: data.transactionId || null,
-                purchaseToken,
-                platform,
-                store: data.store || (platform === 'ios' ? 'app_store' : platform === 'android' ? 'play_store' : 'unknown'),
-                purchasedAt: toDate(data.purchasedAt) || toDate(data.transactionDate),
-                expiresAt: data.expiresAt || null,
-                userInstallSource: installSource || '',
-                userCountry: data.userCountry || userData.country || '',
-                userLanguage: data.userLanguage || userData.language || '',
-                userLastActive: toDate(userData.lastActive),
-                hasName: !!displayName,
-                hasPushToken,
-                isStoreUser: isStoreSource(installSource),
-                isPlaceholder: !!userData.placeholder,
-                linkWarnings: warnings,
-              });
-            });
-          } catch {
-            // Skip users with no purchases subcollection
-          }
-        })
-      );
-
-      // Sort by purchase date (newest first)
-      allPurchases.sort((a, b) => {
-        const aTime = a.purchasedAt?.getTime() ?? 0;
-        const bTime = b.purchasedAt?.getTime() ?? 0;
-        return bTime - aTime;
+      const [usersSnap, purchasesSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(collectionGroup(db, 'purchases')),
+      ]);
+      const usersById: Record<string, UserDocData> = {};
+      usersSnap.forEach((userDoc) => {
+        usersById[userDoc.id] = userDoc.data();
       });
+      const purchaseDocs: PurchaseDocEntry[] = purchasesSnap.docs.map((purchaseDoc) => ({
+        id: purchaseDoc.id,
+        userId: purchaseDoc.ref.parent.parent?.id || '',
+        data: purchaseDoc.data(),
+      })).filter((purchaseDoc) => !!purchaseDoc.userId);
 
-      setPurchases(allPurchases);
+      setPurchases(buildPurchaseRecords(usersById, purchaseDocs));
     } catch (error) {
       console.error('Error loading purchases:', error);
     } finally {
@@ -200,7 +213,56 @@ export default function PurchaseHistory() {
   };
 
   useEffect(() => {
-    loadPurchases();
+    setLoading(true);
+    let usersReady = false;
+    let purchasesReady = false;
+    let liveUsersById: Record<string, UserDocData> = {};
+    let livePurchaseDocs: PurchaseDocEntry[] = [];
+
+    const applyLiveData = () => {
+      if (!usersReady || !purchasesReady) return;
+      setPurchases(buildPurchaseRecords(liveUsersById, livePurchaseDocs));
+      setLoading(false);
+    };
+
+    const unsubscribeUsers = onSnapshot(
+      collection(db, 'users'),
+      (usersSnap) => {
+        const nextUsers: Record<string, UserDocData> = {};
+        usersSnap.forEach((userDoc) => {
+          nextUsers[userDoc.id] = userDoc.data();
+        });
+        liveUsersById = nextUsers;
+        usersReady = true;
+        applyLiveData();
+      },
+      (error) => {
+        console.error('Error listening to purchase users:', error);
+        loadPurchases();
+      }
+    );
+
+    const unsubscribePurchases = onSnapshot(
+      collectionGroup(db, 'purchases'),
+      (purchasesSnap) => {
+        livePurchaseDocs = purchasesSnap.docs.map((purchaseDoc) => ({
+          id: purchaseDoc.id,
+          userId: purchaseDoc.ref.parent.parent?.id || '',
+          data: purchaseDoc.data(),
+        })).filter((purchaseDoc) => !!purchaseDoc.userId);
+        purchasesReady = true;
+        applyLiveData();
+      },
+      (error) => {
+        console.error('Error listening to purchases:', error);
+        loadPurchases();
+      }
+    );
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribePurchases();
+    };
   }, []);
 
   // ==================== Filtering & Sorting ====================

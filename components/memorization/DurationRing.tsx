@@ -140,16 +140,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   topLabel: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     marginBottom: 2,
   },
   value: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
   bottomLabel: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     marginTop: 2,
   },
 });

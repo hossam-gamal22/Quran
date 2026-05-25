@@ -12,6 +12,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Modal,
   Platform,
   Image,
   ImageBackground,
@@ -38,6 +40,8 @@ import { useQuran } from '@/contexts/QuranContext';
 import { Spacing } from '@/constants/theme';
 import { QURAN_THEMES, getSafeThemeIndex, isThemeLight, getGoldenColor } from '@/constants/quran-themes';
 import { useAppIdentity } from '@/hooks/use-app-identity';
+import { getSurahAudioUrl } from '@/lib/quran-cache';
+import { shareAudioWithOptions } from '@/lib/share-service';
 
 // Assets for surah banner and basmala
 const surahOrnament = require('@/assets/images/quran/surah-ornament.png');
@@ -222,9 +226,10 @@ export default function SurahReadingScreen({
   const isRTL = useIsRTL();
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { playAyah, playbackState, togglePlayPause, stopPlayback } = useQuran();
+  const { playAyah, playbackState, togglePlayPause, stopPlayback, currentReciter } = useQuran();
   const shareViewShotRef = useRef<ViewShot>(null);
   const { logoSource: appIcon } = useAppIdentity();
+  const [sharingAudio, setSharingAudio] = useState(false);
 
   // Use the same Quran theme as the Mushaf reader for share capture
   const themeIndex = getSafeThemeIndex(settings?.display?.quranThemeIndex ?? 0);
@@ -276,7 +281,7 @@ export default function SurahReadingScreen({
     };
   }, []);
 
-  const handleShare = useCallback(async () => {
+  const handleShareImage = useCallback(async () => {
     try {
       if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (!shareViewShotRef.current || !currentPage) return;
@@ -297,6 +302,35 @@ export default function SurahReadingScreen({
       console.warn('Error sharing surah page:', e);
     }
   }, [currentPage, isDarkMode]);
+
+  const handleShareAudio = useCallback(async () => {
+    setSharingAudio(true);
+    try {
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const title = t(titleKey) || getSurahName(surahNumber);
+      const audioUrl = getSurahAudioUrl(currentReciter, surahNumber);
+      await shareAudioWithOptions(audioUrl, title, `${title}.mp3`, {
+        onPrepared: () => setSharingAudio(false),
+      });
+    } catch (e) {
+      console.warn('Error sharing surah audio:', e);
+      Alert.alert(t('common.error'), t('common.shareError'));
+    } finally {
+      setSharingAudio(false);
+    }
+  }, [currentReciter, surahNumber, t, titleKey]);
+
+  const handleShare = useCallback(() => {
+    Alert.alert(
+      t('common.share'),
+      '',
+      [
+        { text: t('common.shareImage'), onPress: handleShareImage },
+        { text: t('common.shareAudio'), onPress: handleShareAudio },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
+  }, [handleShareAudio, handleShareImage, t]);
 
   const handlePlay = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -442,6 +476,40 @@ export default function SurahReadingScreen({
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
       lineHeight: 24,
+    },
+    sharingModalBackdrop: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    sharingModalCard: {
+      width: '100%',
+      maxWidth: 320,
+      alignItems: 'center',
+      gap: 14,
+      paddingVertical: 24,
+      paddingHorizontal: 20,
+      borderRadius: 18,
+      backgroundColor: isDarkMode ? '#172323' : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+    },
+    sharingModalTitle: {
+      fontSize: 16,
+      fontFamily: fontBold(),
+      color: colors.text,
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    sharingModalSubtitle: {
+      fontSize: 13,
+      fontFamily: fontRegular(),
+      color: colors.textLight || colors.muted,
+      textAlign: 'center',
+      lineHeight: 21,
+      writingDirection: isRTL ? 'rtl' : 'ltr',
     },
   });
   const styles = useScaledStyles(_styles, colors.fs);
@@ -643,6 +711,21 @@ export default function SurahReadingScreen({
           {extraContent}
         </ScrollView>
       </ScreenContainer>
+      <Modal transparent visible={sharingAudio} animationType="fade" statusBarTranslucent>
+        <View style={styles.sharingModalBackdrop}>
+          <View style={styles.sharingModalCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.sharingModalTitle}>
+              {isRTL ? 'جاري تجهيز الصوت' : 'Preparing audio'}
+            </Text>
+            <Text style={styles.sharingModalSubtitle}>
+              {isRTL
+                ? 'قد يستغرق تحميل السورة بضع لحظات قبل فتح المشاركة.'
+                : 'Downloading the surah may take a few moments before sharing opens.'}
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </BackgroundWrapper>
   );
 }

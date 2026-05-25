@@ -396,7 +396,7 @@ export default function TafsirSearchScreen() {
             <TouchableOpacity
               style={[s.searchBtn, { backgroundColor: '#0d8e62', paddingHorizontal: 14 }]}
               onPress={() => { setSurahFilter(''); setShowSurahPicker(true); }}
-              accessibilityLabel={'اختر سورة'}
+              accessibilityLabel={t('tafsirSearch.chooseSurah')}
             >
               <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#fff" />
             </TouchableOpacity>

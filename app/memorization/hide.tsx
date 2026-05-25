@@ -139,7 +139,7 @@ export default function HideScreen() {
                   <Text
                     style={{
                       color: active ? '#fff' : colors.text,
-                      fontFamily: 'Cairo-SemiBold',
+                      fontFamily: 'Rubik-SemiBold',
                       fontSize: 12,
                     }}
                   >
@@ -250,13 +250,13 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     emptyText: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 14,
       textAlign: 'center',
     },
     position: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -317,7 +317,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     hint: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 11,
       textAlign: 'center',
     },
@@ -332,7 +332,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       borderWidth: 1.5,
       borderColor: colors.primary,
     },
-    revealText: { fontFamily: 'Cairo-Bold', fontSize: 13 },
+    revealText: { fontFamily: 'Rubik-Bold', fontSize: 13 },
     markRow: { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 },
     markFail: {
       flex: 1,
@@ -354,7 +354,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       paddingVertical: 12,
       borderRadius: 12,
     },
-    markText: { fontFamily: 'Cairo-Bold', fontSize: 13 },
+    markText: { fontFamily: 'Rubik-Bold', fontSize: 13 },
     navRow: { flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 },
     navBtn: {
       flexDirection: isRTL ? 'row-reverse' : 'row',
@@ -363,5 +363,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       paddingVertical: 8,
       paddingHorizontal: 12,
     },
-    navText: { color: colors.text, fontFamily: 'Cairo-SemiBold', fontSize: 13 },
+    navText: { color: colors.text, fontFamily: 'Rubik-SemiBold', fontSize: 13 },
   });

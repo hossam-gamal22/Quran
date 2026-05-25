@@ -138,30 +138,19 @@ function ScrollableChipTabs({
   const contentWidthRef = useRef(0);
   const chipLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
 
-  const anchorToStart = useCallback(() => {
-    const vp = viewportWidthRef.current;
-    const cw = contentWidthRef.current;
-    if (!vp || !cw) return;
-    if (isRTL) {
-      // First tab is rendered last visually (row-reverse) — its layout x is at the
-      // far right of content. Scroll so the right edge of content is visible.
-      const x = Math.max(0, cw - vp);
-      scrollRef.current?.scrollTo({ x, animated: false });
-    } else {
-      scrollRef.current?.scrollTo({ x: 0, animated: false });
-    }
-  }, [isRTL]);
-
   const scrollSelectedIntoView = useCallback(
-    (key: string) => {
+    (key: string, animated: boolean = true) => {
       const layout = chipLayoutsRef.current[key];
       const vp = viewportWidthRef.current;
-      if (!layout || !vp) return;
+      const cw = contentWidthRef.current;
+      if (!layout || !vp || !cw) return;
       // Center the chip within the viewport when possible.
       const target = Math.max(0, layout.x + layout.width / 2 - vp / 2);
-      const cw = contentWidthRef.current;
       const maxX = Math.max(0, cw - vp);
-      scrollRef.current?.scrollTo({ x: Math.min(target, maxX), animated: true });
+      const x = Math.min(target, maxX);
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ x, animated });
+      });
     },
     []
   );
@@ -178,12 +167,14 @@ function ScrollableChipTabs({
       showsHorizontalScrollIndicator={false}
       onLayout={(e: LayoutChangeEvent) => {
         viewportWidthRef.current = e.nativeEvent.layout.width;
-        anchorToStart();
+        // Keep current selection visible whenever the viewport changes (e.g., rotation).
+        scrollSelectedIntoView(selected, false);
       }}
       onContentSizeChange={(w) => {
         contentWidthRef.current = w;
-        // Re-anchor whenever content size changes (font load, locale switch, tab list change).
-        anchorToStart();
+        // Re-anchor on content size change (font load, locale switch, tab list change)
+        // around the currently selected tab so the user's choice stays visible.
+        scrollSelectedIntoView(selected, false);
       }}
       contentContainerStyle={[
         chipStyles.row,
@@ -205,6 +196,9 @@ function ScrollableChipTabs({
             onLayout={(e: LayoutChangeEvent) => {
               const { x, width } = e.nativeEvent.layout;
               chipLayoutsRef.current[tab.key] = { x, width };
+              if (tab.key === selected) {
+                scrollSelectedIntoView(tab.key, false);
+              }
             }}
             onPress={() => {
               if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

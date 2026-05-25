@@ -88,6 +88,7 @@ const SCREEN_LABELS: Record<string, string> = {
   worship: 'متتبع العبادات',
   seerah: 'السيرة النبوية',
   companions: 'قصص الصحابة',
+  religious_stories: 'قصص دينية',
   hajj_umrah: 'الحج والعمرة',
   daily_ayah: 'آية اليوم',
   hadith: 'أحاديث',
@@ -135,6 +136,7 @@ const DEFAULT_SETTINGS: AdsSettings = {
     worship: false,
     seerah: true,
     companions: true,
+    religious_stories: true,
     hajj_umrah: true,
     daily_ayah: true,
     hadith: true,
@@ -342,7 +344,7 @@ export default function Ads() {
   return (
     <>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">إعدادات الإعلانات</h1>
+        <h1 className="text-2xl font-bold text-white">إعدادات الإعلانات</h1>
         {message && (
           <div className={`px-4 py-2 rounded-lg ${message.includes('بنجاح') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {message}

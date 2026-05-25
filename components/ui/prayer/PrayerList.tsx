@@ -26,6 +26,7 @@ import {
   PrayerName,
   formatPrayerTime,
   getPrayerIcon,
+  getPrayerTranslationKey,
   isPrayerPassed,
   getNextPrayer,
 } from '@/lib/prayer-times';
@@ -200,7 +201,7 @@ const PrayerItem: React.FC<PrayerItemProps> = React.memo(({
   const themeColors = useColors();
   const styles = useScaledStyles(_styles, themeColors.fs);
   const scale = useSharedValue(1);
-  const prayerNameLocalized = t(`prayer.${name}`);
+  const prayerNameLocalized = t(getPrayerTranslationKey(name));
   const icon = getPrayerIcon(name);
   const colors = prayerColors[name];
   const accentColor = isDarkMode ? colors.dark : colors.light;

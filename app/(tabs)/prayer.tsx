@@ -48,6 +48,7 @@ import {
   formatPrayerTime,
   getNextPrayer,
   getTimeRemaining,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
 import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
@@ -234,7 +235,7 @@ export default function PrayerScreen() {
     const next = prayerTimes ? getNextPrayer(prayerTimes) : null;
     const remaining = prayerTimes ? getTimeRemaining(prayerTimes) : null;
     const name = next?.name ?? 'fajr';
-    const label = t(`prayer.${name}`);
+    const label = t(getPrayerTranslationKey(name));
     const countdown = remaining
       ? `${pad(remaining.hours)}:${pad(remaining.minutes)}:${pad(remaining.seconds)}`
       : '--:--:--';
@@ -525,8 +526,8 @@ export default function PrayerScreen() {
 
       await saveLocation(locationData);
       // Location now available — reschedule prayer notifications that depend on it
-      import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
-        rescheduleAllFromStorage().catch(() => {});
+      import('@/lib/notifications-manager').then(({ forceRescheduleAllFromStorage }) => {
+        forceRescheduleAllFromStorage().catch(() => {});
       }).catch(() => {});
       return (await getStoredLocation()) || locationData;
     } catch (err) {
@@ -551,7 +552,7 @@ export default function PrayerScreen() {
 
       const prayerNames: { key: keyof PrayerTimes; name: string }[] = [
         { key: 'fajr', name: t('prayer.fajr') },
-        { key: 'dhuhr', name: t('prayer.dhuhr') },
+        { key: 'dhuhr', name: t(getPrayerTranslationKey('dhuhr')) },
         { key: 'asr', name: t('prayer.asr') },
         { key: 'maghrib', name: t('prayer.maghrib') },
         { key: 'isha', name: t('prayer.isha') },
@@ -724,8 +725,8 @@ export default function PrayerScreen() {
                 currentLoc = { ...stored, city, country };
                 await saveLocation(currentLoc);
                 // Location updated — reschedule prayer notifications
-                import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
-                  rescheduleAllFromStorage().catch(() => {});
+                import('@/lib/notifications-manager').then(({ forceRescheduleAllFromStorage }) => {
+                  forceRescheduleAllFromStorage().catch(() => {});
                 }).catch(() => {});
               }
 
@@ -974,6 +975,8 @@ export default function PrayerScreen() {
     try {
       const { updateSharedData } = require('@/lib/widget-data');
       const locationLabel = location?.city ? `${location.city}${location.country ? ', ' + location.country : ''}` : '';
+      const today = getTodayDateString();
+      cachePrayerTimes(today, adjusted, settings.prayer.calculationMethod, settings.prayer.asrJuristic).catch(() => {});
       if (location) {
         const snapshot = buildCanonicalPrayerSnapshot({
           times: adjusted,
@@ -1175,8 +1178,8 @@ export default function PrayerScreen() {
             </Animated.View>
           )}
 
-          {/* Location permission banner — يظهر فقط لو الموقع معطّل أو غير محدد */}
-          <PermissionBanner onlyKeys={['location']} />
+          {/* Prayer-related permission banners */}
+          <PermissionBanner onlyKeys={['location', 'backgroundRefresh']} />
 
           {/* Makkah fallback location banner */}
           {usingMakkahFallback && !error && dataSource !== 'extrapolated' && (
@@ -1597,7 +1600,7 @@ export default function PrayerScreen() {
             <TouchableOpacity activeOpacity={1} style={[styles.statusModalSheet, { backgroundColor: colors.modalSurface }]} onPress={() => {}}>
               <View style={[styles.statusModalHandle, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)' }]} />
               <Text style={[styles.statusModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {statusModal.prayer ? t(`prayer.${statusModal.prayer}`) : ''}
+                {statusModal.prayer ? t(getPrayerTranslationKey(statusModal.prayer)) : ''}
               </Text>
               {PRAYER_STATUS_OPTIONS.map(opt => {
                 const selected = statusModal.current === opt.value;

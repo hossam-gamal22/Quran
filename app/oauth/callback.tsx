@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { t } from "@/lib/i18n";
+import { uiText } from "@/lib/ui-text";
 
 export default function OAuthCallback() {
   const router = useRouter();
@@ -298,24 +299,24 @@ export default function OAuthCallback() {
           <>
             <ActivityIndicator size="large" />
             <Text className="mt-4 text-base leading-6 text-center text-foreground">
-              Completing authentication...
+              {uiText({ ar: 'جارٍ إكمال تسجيل الدخول...', en: 'Completing authentication...' })}
             </Text>
           </>
         )}
         {status === "success" && (
           <>
             <Text className="text-base leading-6 text-center text-foreground">
-              Authentication successful!
+              {uiText({ ar: 'تم تسجيل الدخول بنجاح!', en: 'Authentication successful!' })}
             </Text>
             <Text className="text-base leading-6 text-center text-foreground">
-              Redirecting...
+              {uiText({ ar: 'جارٍ التحويل...', en: 'Redirecting...' })}
             </Text>
           </>
         )}
         {status === "error" && (
           <>
             <Text className="mb-2 text-xl font-bold leading-7 text-error">
-              Authentication failed
+              {uiText({ ar: 'فشل تسجيل الدخول', en: 'Authentication failed' })}
             </Text>
             <Text className="text-base leading-6 text-center text-foreground">
               {errorMessage}

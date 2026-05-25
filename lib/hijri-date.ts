@@ -12,6 +12,78 @@ export interface HijriDate {
   weekdayAr: string;
 }
 
+const HIJRI_OFFSET_STORAGE_KEY = '@hijri_date_offset';
+const HIJRI_USER_ADJUSTMENT_STORAGE_KEY = '@hijri_user_adjustment';
+
+let cachedHijriOffset = 0;
+let hijriOffsetLoaded = false;
+let hijriOffsetLoadPromise: Promise<number> | null = null;
+const hijriOffsetListeners = new Set<(offset: number) => void>();
+
+function normalizeHijriOffset(offset: unknown): number {
+  const n = typeof offset === 'number' ? offset : parseInt(String(offset ?? '0'), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function getCachedHijriOffset(): number {
+  return cachedHijriOffset;
+}
+
+export function setCachedHijriOffset(offset: number): void {
+  const next = normalizeHijriOffset(offset);
+  const changed = !hijriOffsetLoaded || cachedHijriOffset !== next;
+  cachedHijriOffset = next;
+  hijriOffsetLoaded = true;
+  if (changed) {
+    hijriOffsetListeners.forEach((listener) => {
+      try { listener(cachedHijriOffset); } catch {}
+    });
+  }
+}
+
+export function subscribeToHijriOffsetChanges(listener: (offset: number) => void): () => void {
+  hijriOffsetListeners.add(listener);
+  return () => {
+    hijriOffsetListeners.delete(listener);
+  };
+}
+
+function applyCachedHijriOffset(date: Date): Date {
+  const offset = getCachedHijriOffset();
+  if (offset === 0) return date;
+  const adjusted = new Date(date);
+  adjusted.setDate(adjusted.getDate() + offset);
+  return adjusted;
+}
+
+export async function hydrateHijriOffset(): Promise<number> {
+  if (hijriOffsetLoaded) return cachedHijriOffset;
+  if (hijriOffsetLoadPromise) return hijriOffsetLoadPromise;
+
+  hijriOffsetLoadPromise = (async () => {
+    try {
+      const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+      const userAdjustment = await AsyncStorage.getItem(HIJRI_USER_ADJUSTMENT_STORAGE_KEY);
+      const legacyOffset = await AsyncStorage.getItem(HIJRI_OFFSET_STORAGE_KEY);
+      const value = userAdjustment ?? legacyOffset ?? '0';
+      setCachedHijriOffset(normalizeHijriOffset(value));
+
+      // Keep the legacy display key and the resolver key aligned after app updates.
+      await Promise.allSettled([
+        AsyncStorage.setItem(HIJRI_USER_ADJUSTMENT_STORAGE_KEY, String(cachedHijriOffset)),
+        AsyncStorage.setItem(HIJRI_OFFSET_STORAGE_KEY, String(cachedHijriOffset)),
+      ]);
+    } catch {
+      setCachedHijriOffset(0);
+    } finally {
+      hijriOffsetLoadPromise = null;
+    }
+    return cachedHijriOffset;
+  })();
+
+  return hijriOffsetLoadPromise;
+}
+
 /**
  * Get localized date names using translations system (12 languages)
  */
@@ -42,7 +114,7 @@ function localizeNumber(n: number, _locale?: string): string {
  * Get localized Hijri date (uses current app language)
  */
 export function getLocalizedHijriDate(date: Date = new Date()): HijriDate {
-  const hijri = gregorianToHijri(date);
+  const hijri = gregorianToHijri(applyCachedHijriOffset(date));
   const names = getLocalizedDateNames();
   return {
     ...hijri,
@@ -99,7 +171,7 @@ export const HIJRI_MONTHS_AR = [
   'رمضان',
   'شوال',
   'ذو القعدة',
-  'ذو الحجة',
+  'ذي الحجة',
 ];
 
 export const HIJRI_MONTHS_EN = [
@@ -412,14 +484,14 @@ export function gregorianToHijri(date: Date = new Date()): HijriDate {
  * دالة مساعدة - نفس gregorianToHijri
  */
 export function getHijriDate(date: Date = new Date()): HijriDate {
-  return gregorianToHijri(date);
+  return gregorianToHijri(applyCachedHijriOffset(date));
 }
 
 /**
  * دالة مساعدة - نفس gregorianToHijri (alias آخر)
  */
 export function getHijriDateObject(date: Date = new Date()): HijriDate {
-  return gregorianToHijri(date);
+  return gregorianToHijri(applyCachedHijriOffset(date));
 }
 
 /**
@@ -480,7 +552,7 @@ export function getFullDate(date: Date = new Date()): {
     gregorian: string;
   };
 } {
-  const hijri = gregorianToHijri(date);
+  const hijri = getHijriDate(date);
   const weekdayIndex = date.getDay();
   const names = getLocalizedDateNames();
   const locale = getDateLocale();
@@ -514,7 +586,7 @@ export function getFullDate(date: Date = new Date()): {
  * الحصول على مناسبات اليوم (including Ayyam al-Bidh)
  */
 export function getTodayEvents(date: Date = new Date()): IslamicEventDetails[] {
-  const hijri = gregorianToHijri(date);
+  const hijri = getHijriDate(date);
   const events: IslamicEventDetails[] = ISLAMIC_EVENTS.filter(event => {
     if (event.hijriMonth !== hijri.month) return false;
     if (event.hijriDayEnd) {
@@ -540,7 +612,8 @@ export function getUpcomingEvents(count: number = 5): Array<IslamicEvent & {
   daysUntil: number;
 }> {
   const today = new Date();
-  const hijriToday = gregorianToHijri(today);
+  const hijriToday = getHijriDate(today);
+  const offset = getCachedHijriOffset();
   const events: Array<IslamicEvent & { hijriDate: string; gregorianDate: string; daysUntil: number }> = [];
   const names = getLocalizedDateNames();
 
@@ -550,6 +623,9 @@ export function getUpcomingEvents(count: number = 5): Array<IslamicEvent & {
     
     for (const event of ISLAMIC_EVENTS) {
       const gregorianDate = hijriToGregorian(year, event.hijriMonth, event.hijriDay);
+      if (offset !== 0) {
+        gregorianDate.setDate(gregorianDate.getDate() - offset);
+      }
       const daysUntil = Math.ceil((gregorianDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
       if (daysUntil > 0 && daysUntil <= 365) {
@@ -574,7 +650,7 @@ export function getUpcomingEvents(count: number = 5): Array<IslamicEvent & {
  */
 export function getHijriMonthDays(year: number, month: number): number {
   // الأشهر الفردية 30 يوم والزوجية 29 يوم
-  // ماعدا ذو الحجة في السنة الكبيسة 30 يوم
+  // ماعدا ذي الحجة في السنة الكبيسة 30 يوم
   if (month % 2 === 1) return 30;
   if (month === 12 && isHijriLeapYear(year)) return 30;
   return 29;
@@ -605,10 +681,14 @@ export function getHijriMonthCalendar(hijriYear: number, hijriMonth: number): Ar
   
   const daysInMonth = getHijriMonthDays(hijriYear, hijriMonth);
   const today = new Date();
-  const todayHijri = gregorianToHijri(today);
+  const todayHijri = getHijriDate(today);
+  const offset = getCachedHijriOffset();
   
   for (let day = 1; day <= daysInMonth; day++) {
     const gregorianDate = hijriToGregorian(hijriYear, hijriMonth, day);
+    if (offset !== 0) {
+      gregorianDate.setDate(gregorianDate.getDate() - offset);
+    }
     const isToday = 
       todayHijri.year === hijriYear && 
       todayHijri.month === hijriMonth && 
@@ -642,28 +722,24 @@ export function getHijriMonthCalendar(hijriYear: number, hijriMonth: number): Ar
 // Hijri Offset System
 // ============================================
 
-const HIJRI_OFFSET_STORAGE_KEY = '@hijri_date_offset';
-
 /**
  * Get the stored Hijri offset (±1-2 days for moon sighting differences)
  */
 export async function getHijriOffset(): Promise<number> {
-  try {
-    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
-    const val = await AsyncStorage.getItem(HIJRI_OFFSET_STORAGE_KEY);
-    return val ? parseInt(val, 10) || 0 : 0;
-  } catch {
-    return 0;
-  }
+  return hydrateHijriOffset();
 }
 
 /**
  * Save the Hijri offset
  */
 export async function setHijriOffset(offset: number): Promise<void> {
+  setCachedHijriOffset(offset);
   try {
     const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
-    await AsyncStorage.setItem(HIJRI_OFFSET_STORAGE_KEY, String(offset));
+    await Promise.allSettled([
+      AsyncStorage.setItem(HIJRI_OFFSET_STORAGE_KEY, String(cachedHijriOffset)),
+      AsyncStorage.setItem(HIJRI_USER_ADJUSTMENT_STORAGE_KEY, String(cachedHijriOffset)),
+    ]);
   } catch {}
 }
 

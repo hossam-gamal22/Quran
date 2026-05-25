@@ -43,6 +43,10 @@ export interface SpecialDay {
   description: string;
   virtues: string[];
   recommendedActions: string[];
+  reference?: string;
+  sourceUrl?: string;
+  grade?: string;
+  note?: string;
 }
 
 export interface SeasonalContent {
@@ -174,9 +178,12 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
         day: 9,
         nameAr: 'يوم عرفة',
         nameEn: 'Day of Arafah',
-        description: 'أعظم أيام السنة',
-        virtues: ['يكفر سنتين', 'أكثر يوم يعتق الله فيه من النار'],
+        description: 'الوقوف بعرفة ركن الحج الأكبر',
+        virtues: ['الحج عرفة', 'صيامه لغير الحاج يكفر سنة ماضية وسنة قادمة بإذن الله'],
         recommendedActions: ['صيام عرفة لغير الحاج', 'الإكثار من الدعاء', 'التلبية'],
+        reference: 'جامع الترمذي 889، صحيح مسلم 1162a',
+        sourceUrl: 'https://sunnah.com/tirmidhi:889',
+        grade: 'صحيح - دار السلام',
       },
       {
         day: 10,
@@ -202,9 +209,11 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
         day: 9,
         nameAr: 'يوم عرفة',
         nameEn: 'Day of Arafah',
-        description: 'أفضل يوم طلعت فيه الشمس',
+        description: 'يوم الدعاء وصيامه لغير الحاج مرغب فيه',
         virtues: ['صيامه يكفر سنة ماضية وسنة قادمة'],
         recommendedActions: ['الصيام', 'الدعاء', 'الذكر'],
+        reference: 'صحيح مسلم 1162a',
+        sourceUrl: 'https://sunnah.com/muslim:1162a',
       },
     ],
   },
@@ -225,6 +234,8 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
         description: 'اليوم التاسع من محرم',
         virtues: ['صيامه مستحب مع عاشوراء'],
         recommendedActions: ['الصيام'],
+        reference: 'صحيح مسلم 1134a',
+        sourceUrl: 'https://sunnah.com/muslim:1134a',
       },
       {
         day: 10,
@@ -232,7 +243,9 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
         nameEn: 'Ashura',
         description: 'نجّى الله موسى وقومه',
         virtues: ['صيامه يكفر سنة ماضية'],
-        recommendedActions: ['الصيام', 'التوسعة على العيال'],
+        recommendedActions: ['الصيام', 'الدعاء', 'الاستغفار'],
+        reference: 'صحيح مسلم 1162a، صحيح البخاري 2004',
+        sourceUrl: 'https://sunnah.com/muslim:1162a',
       },
     ],
   },
@@ -240,7 +253,7 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
     type: 'mawlid',
     nameAr: 'ذكرى المولد النبوي',
     nameEn: 'Prophet\'s Birthday',
-    description: 'ذكرى مولد خير البشر ﷺ',
+    description: 'تذكير بالسيرة والصلاة على النبي ﷺ من غير تخصيص عبادة ثابتة لهذا اليوم',
     startDate: { month: 3, day: 12 },
     endDate: { month: 3, day: 12 },
     color: '#2E8B57',
@@ -290,19 +303,22 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
     type: 'shaban',
     nameAr: 'شهر شعبان',
     nameEn: 'Shaban',
-    description: 'شهر ترفع فيه الأعمال',
+    description: 'شهر كان النبي ﷺ يكثر فيه من الصيام',
     startDate: { month: 8, day: 1 },
     endDate: { month: 8, day: 30 },
     color: '#9370DB',
     icon: 'calendar-month',
     specialDays: [
       {
-        day: 15,
-        nameAr: 'ليلة النصف من شعبان',
-        nameEn: 'Mid-Shaban Night',
-        description: 'ليلة يطلع الله فيها على خلقه',
-        virtues: ['ليلة مباركة'],
-        recommendedActions: ['قيام الليل', 'الدعاء', 'الاستغفار'],
+        day: 1,
+        nameAr: 'بداية شعبان',
+        nameEn: 'Beginning of Shaban',
+        description: 'فرصة للاستعداد لرمضان بالصيام لمن استطاع واعتاد',
+        virtues: ['كان النبي ﷺ أكثر صيامه في شهر بعد رمضان في شعبان'],
+        recommendedActions: ['الصيام لمن استطاع', 'قراءة القرآن', 'التوبة'],
+        reference: 'صحيح البخاري 1969',
+        sourceUrl: 'https://sunnah.com/bukhari:1969',
+        note: 'لا يخصص المحتوى ليلة النصف بعبادة بعينها.',
       },
     ],
   },
@@ -469,7 +485,12 @@ export const getUpcomingSeason = (hijriDate?: SeasonDate): SeasonInfo & { daysUn
 export const getCurrentSpecialDay = (season: SeasonInfo | null): SpecialDay | null => {
   if (!season || !season.specialDays) return null;
 
-  return season.specialDays.find(day => day.day === season.currentDay) || null;
+  const absoluteHijriDay = season.startDate.day + season.currentDay - 1;
+  return (
+    season.specialDays.find(day => day.day === season.currentDay) ||
+    season.specialDays.find(day => day.day === absoluteHijriDay) ||
+    null
+  );
 };
 
 /**
@@ -540,10 +561,12 @@ let SEASONAL_GREETINGS: Record<SeasonType, string[]> = {
     'كل عام وأنتم بخير',
   ],
   rajab: [
-    'اللهم بارك لنا في رجب وشعبان وبلغنا رمضان',
+    'رجب من الأشهر الحرم',
+    'شهر حرام فاعظموا فيه الطاعة',
   ],
   shaban: [
-    'اللهم بارك لنا في شعبان وبلغنا رمضان',
+    'اللهم بلغنا رمضان',
+    'شعبان شهر الاستعداد',
   ],
   none: [''],
 };

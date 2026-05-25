@@ -49,6 +49,8 @@ export interface DailyFastingRecord {
 export interface DailyQuranRecord {
   date: string;
   pagesRead: number;
+  khatmaCompletions?: number;
+  khatmaCompletionIds?: string[];
   versesRead?: number;
   surahsCompleted?: number[];
   khatmaProgress?: number;
@@ -67,7 +69,11 @@ export interface DailyAzkarRecord {
   wakeup: boolean;
   afterPrayer: boolean;
   zikrCount?: number;
+  completedZikrIds?: string[];
+  typeCompletionSources?: Partial<Record<AzkarType, 'manual' | 'category'>>;
 }
+
+export type AzkarType = 'morning' | 'evening' | 'sleep' | 'wakeup' | 'afterPrayer';
 
 // إحصائيات الصلاة
 export interface PrayerStats {
@@ -571,6 +577,59 @@ export const addQuranPages = async (date: string, pages: number): Promise<void> 
   }
 };
 
+/**
+ * تسجيل ختمة مكتملة مرة واحدة لكل دورة/معرّف داخل اليوم.
+ */
+export const recordKhatmaCompletion = async (
+  date: string,
+  completionId?: string
+): Promise<boolean> => {
+  try {
+    let record = await getQuranRecord(date);
+
+    if (!record) {
+      record = { date, pagesRead: 0 };
+    }
+
+    const ids = Array.isArray(record.khatmaCompletionIds)
+      ? [...record.khatmaCompletionIds]
+      : [];
+
+    if (completionId) {
+      if (ids.includes(completionId)) return false;
+      ids.push(completionId);
+      record.khatmaCompletionIds = ids;
+      record.khatmaCompletions = Math.max(Number(record.khatmaCompletions) || 0, ids.length);
+    } else {
+      record.khatmaCompletions = (Number(record.khatmaCompletions) || ids.length || 0) + 1;
+    }
+
+    await saveQuranRecord(record);
+    return true;
+  } catch (error) {
+    console.error('Error recording khatma completion:', error);
+    return false;
+  }
+};
+
+export const removeKhatmaCompletion = async (
+  date: string,
+  completionId: string
+): Promise<boolean> => {
+  try {
+    const record = await getQuranRecord(date);
+    if (!record?.khatmaCompletionIds?.includes(completionId)) return false;
+
+    record.khatmaCompletionIds = record.khatmaCompletionIds.filter(id => id !== completionId);
+    record.khatmaCompletions = Math.max(0, (Number(record.khatmaCompletions) || 0) - 1);
+    await saveQuranRecord(record);
+    return true;
+  } catch (error) {
+    console.error('Error removing khatma completion:', error);
+    return false;
+  }
+};
+
 // ========================================
 // دوال سجلات الأذكار
 // ========================================
@@ -620,7 +679,7 @@ export const saveAzkarRecord = async (record: DailyAzkarRecord): Promise<void> =
  */
 export const toggleAzkar = async (
   date: string,
-  type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>
+  type: AzkarType
 ): Promise<boolean> => {
   try {
     let record = await getAzkarRecord(date);
@@ -638,6 +697,12 @@ export const toggleAzkar = async (
     }
     
     record[type] = !record[type];
+    record.typeCompletionSources = { ...(record.typeCompletionSources || {}) };
+    if (record[type]) {
+      record.typeCompletionSources[type] = 'manual';
+    } else {
+      delete record.typeCompletionSources[type];
+    }
     await saveAzkarRecord(record);
     return record[type];
   } catch (error) {
@@ -651,7 +716,8 @@ export const toggleAzkar = async (
  */
 export const markAzkarCompleted = async (
   date: string,
-  type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>
+  type: AzkarType,
+  source: 'manual' | 'category' = 'manual'
 ): Promise<void> => {
   try {
     let record = await getAzkarRecord(date);
@@ -668,6 +734,16 @@ export const markAzkarCompleted = async (
     }
     if (!record[type]) {
       record[type] = true;
+      record.typeCompletionSources = {
+        ...(record.typeCompletionSources || {}),
+        [type]: source,
+      };
+      await saveAzkarRecord(record);
+    } else if (!record.typeCompletionSources?.[type]) {
+      record.typeCompletionSources = {
+        ...(record.typeCompletionSources || {}),
+        [type]: source,
+      };
       await saveAzkarRecord(record);
     }
   } catch (error) {
@@ -678,7 +754,10 @@ export const markAzkarCompleted = async (
 /**
  * زيادة عداد الأذكار المقروءة (ذكر واحد مكتمل = +1)
  */
-export const incrementAzkarZikrCount = async (date: string): Promise<void> => {
+export const incrementAzkarZikrCount = async (
+  date: string,
+  zikrKey?: string
+): Promise<boolean> => {
   try {
     let record = await getAzkarRecord(date);
     if (!record) {
@@ -692,10 +771,41 @@ export const incrementAzkarZikrCount = async (date: string): Promise<void> => {
         zikrCount: 0,
       };
     }
+    if (zikrKey) {
+      const completedZikrIds = Array.isArray(record.completedZikrIds)
+        ? [...record.completedZikrIds]
+        : [];
+      if (completedZikrIds.includes(zikrKey)) return false;
+      completedZikrIds.push(zikrKey);
+      record.completedZikrIds = completedZikrIds;
+    }
     record.zikrCount = (record.zikrCount || 0) + 1;
     await saveAzkarRecord(record);
+    return true;
   } catch (error) {
     console.error('Error incrementing azkar zikr count:', error);
+    return false;
+  }
+};
+
+/**
+ * إلغاء ذكر مكتمل تم تسجيله بمفتاح يومي محدد.
+ */
+export const removeAzkarZikrCompletion = async (
+  date: string,
+  zikrKey: string
+): Promise<boolean> => {
+  try {
+    const record = await getAzkarRecord(date);
+    if (!record?.completedZikrIds?.includes(zikrKey)) return false;
+
+    record.completedZikrIds = record.completedZikrIds.filter(id => id !== zikrKey);
+    record.zikrCount = Math.max(0, (Number(record.zikrCount) || 0) - 1);
+    await saveAzkarRecord(record);
+    return true;
+  } catch (error) {
+    console.error('Error removing azkar zikr completion:', error);
+    return false;
   }
 };
 
@@ -987,6 +1097,8 @@ export default {
   getAllQuranRecords,
   saveQuranRecord,
   addQuranPages,
+  recordKhatmaCompletion,
+  removeKhatmaCompletion,
   
   // الأذكار
   getAzkarRecord,
@@ -995,6 +1107,7 @@ export default {
   toggleAzkar,
   markAzkarCompleted,
   incrementAzkarZikrCount,
+  removeAzkarZikrCompletion,
   
   // الإحصائيات
   calculatePrayerStats,
@@ -1020,6 +1133,7 @@ export default {
 export interface MonthlyActivityStats {
   prayers: number;
   quranPages: number;
+  khatmas: number;
   azkar: number;
   tasbih: number;
   fasting: number;
@@ -1035,7 +1149,7 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
   const m = month ?? (now.getMonth() + 1);
   const monthPrefix = `${y}-${String(m).padStart(2, '0')}`;
 
-  const stats: MonthlyActivityStats = { prayers: 0, quranPages: 0, azkar: 0, tasbih: 0, fasting: 0 };
+  const stats: MonthlyActivityStats = { prayers: 0, quranPages: 0, khatmas: 0, azkar: 0, tasbih: 0, fasting: 0 };
 
   // 1. Prayers — count individual prayer events (prayed or late)
   try {
@@ -1054,6 +1168,11 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
     for (const [date, record] of Object.entries(quranRecords)) {
       if (date.startsWith(monthPrefix) && record && typeof record === 'object') {
         stats.quranPages += (record as any).pagesRead || 0;
+        const khatmaIds = Array.isArray((record as any).khatmaCompletionIds)
+          ? (record as any).khatmaCompletionIds.length
+          : 0;
+        const khatmaCompletions = Number((record as any).khatmaCompletions) || 0;
+        stats.khatmas += Math.max(khatmaCompletions, khatmaIds);
       }
     }
   } catch {}
@@ -1098,20 +1217,25 @@ export async function getMonthlyActivityStats(year?: number, month?: number): Pr
     }
   } catch {}
 
-  // 5. Azkar — prefer per-zikr completions, fall back to manual checklist marks
+	  // 5. Azkar — new records can distinguish manual checklist marks from
+	  // auto category completion. Old records cannot, so use the larger value
+	  // to avoid losing legitimate same-day activity without double-counting.
   try {
     const azkarRecords = await getAllAzkarRecords();
     for (const [date, record] of Object.entries(azkarRecords)) {
       if (date.startsWith(monthPrefix) && record && typeof record === 'object') {
-        const completedTypes = [
-          record.morning,
-          record.evening,
-          record.sleep,
-          record.wakeup,
-          record.afterPrayer,
-        ].filter(Boolean).length;
+        const typeKeys: AzkarType[] = ['morning', 'evening', 'sleep', 'wakeup', 'afterPrayer'];
+        const completedTypes = typeKeys.filter(type => record[type]).length;
         const zikrCount = Number((record as any).zikrCount) || 0;
-        stats.azkar += zikrCount > 0 ? zikrCount : completedTypes;
+        const hasSourceData = !!record.typeCompletionSources;
+        if (hasSourceData) {
+          const manualTypes = typeKeys.filter(type => (
+            record[type] && record.typeCompletionSources?.[type] !== 'category'
+          )).length;
+          stats.azkar += zikrCount + manualTypes;
+	        } else {
+	          stats.azkar += Math.max(zikrCount, completedTypes);
+	        }
       }
     }
   } catch {}

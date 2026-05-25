@@ -104,8 +104,8 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
   // NOTE: Android channels are managed exclusively by services/notifications/channels.ts
   // Do NOT create channels here — initializeAllNotificationChannels() handles them with
-  // the user's selected sound. Creating a channel here would override it with
-  // the wrong sound (general_reminder) since Android channels are immutable once created.
+  // the user's selected sound. Creating a channel here would override it with the wrong
+  // sound since Android channels are immutable once created.
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   if (existingStatus === 'granted') return true;
@@ -165,15 +165,69 @@ function applyTimingAdjustments(
   return result;
 }
 
-// عدد الأيام المجدولة مسبقاً — 4 days (default).
-// Kept at 4 (not 7) to limit seasonal prayer-time drift: over 7 days a prayer
-// can shift ~13 min, causing the stale d6/d7 slot to fire before the app
-// reschedules with the correct time, resulting in a duplicate notification.
-// 4 days caps drift to ~5-6 min, and the background task reliably refreshes
-// within that window.
-// iOS budget allocator may override this via notifSettings.iosScheduleDays.
+// عدد الأيام المجدولة مسبقاً.
+// Android has no 64-notification cap, so keep a longer local adhan window.
+// iOS budget allocator overrides this via notifSettings.iosScheduleDays.
 // App reschedules on every foreground resume via ensurePrayerNotificationsExist().
-const DEFAULT_PRAYER_SCHEDULE_DAYS = 4;
+const DEFAULT_PRAYER_SCHEDULE_DAYS = Platform.OS === 'android' ? 7 : 4;
+const CRITICAL_PRAYER_NOTIFICATION_WINDOW_MS = 5 * 60 * 1000;
+const MIN_SAFE_PRAYER_RESCHEDULE_LEAD_MS = 3 * 60 * 1000;
+
+type DayScheduleData = { date: Date; timings: Record<string, string>; isOffline: boolean };
+
+function dateTagFor(day: Date): string {
+  return `${day.getFullYear()}${String(day.getMonth() + 1).padStart(2, '0')}${String(day.getDate()).padStart(2, '0')}`;
+}
+
+function resolveFreshPrayerTriggerMs(
+  identifier: string,
+  scheduleDays: DayScheduleData[],
+  advanceMinutes: number,
+): number | null {
+  const idPartsOld = identifier.match(/^prayer_([a-z]+)(?:_d(\d+))?$/);
+  const idPartsDate = identifier.match(/^prayer_([a-z]+)_(\d{8})$/);
+
+  if (idPartsOld) {
+    const pKey = idPartsOld[1] as PrayerKey;
+    const dayIdx = idPartsOld[2] ? parseInt(idPartsOld[2], 10) : 0;
+    const dayData = scheduleDays[dayIdx];
+    const apiKey = PRAYER_KEY_TO_API[pKey];
+    if (!dayData || !apiKey) return null;
+    const timeStr = dayData.timings[apiKey];
+    return timeStr ? prayerTimeToDateForDay(timeStr, dayData.date, advanceMinutes).getTime() : null;
+  }
+
+  if (idPartsDate) {
+    const pKey = idPartsDate[1] as PrayerKey;
+    const targetTag = idPartsDate[2];
+    const dayData = scheduleDays.find(d => dateTagFor(d.date) === targetTag);
+    const apiKey = PRAYER_KEY_TO_API[pKey];
+    if (!dayData || !apiKey) return null;
+    const timeStr = dayData.timings[apiKey];
+    return timeStr ? prayerTimeToDateForDay(timeStr, dayData.date, advanceMinutes).getTime() : null;
+  }
+
+  return null;
+}
+
+function resolveCanonicalPrayerIdentifier(
+  identifier: string,
+  scheduleDays: DayScheduleData[],
+): string | null {
+  const idPartsOld = identifier.match(/^prayer_([a-z]+)(?:_d(\d+))?$/);
+  const idPartsDate = identifier.match(/^prayer_([a-z]+)_(\d{8})$/);
+
+  if (idPartsDate) return identifier;
+
+  if (idPartsOld) {
+    const pKey = idPartsOld[1] as PrayerKey;
+    const dayIdx = idPartsOld[2] ? parseInt(idPartsOld[2], 10) : 0;
+    const dayData = scheduleDays[dayIdx];
+    return dayData ? `prayer_${pKey}_${dateTagFor(dayData.date)}` : null;
+  }
+
+  return null;
+}
 
 async function schedulePrayerVisualFirstNotification(args: {
   identifier: string;
@@ -284,7 +338,6 @@ export async function schedulePrayerNotifications(
     const currentYear = today.getFullYear();
 
     // ─── Data Source: try API first, then offline fallback ────────────
-    type DayScheduleData = { date: Date; timings: Record<string, string>; isOffline: boolean };
     let scheduleDays: DayScheduleData[] = [];
     let usedOfflineFallback = false;
 
@@ -317,8 +370,10 @@ export async function schedulePrayerNotifications(
           Maghrib: dayData.timings.Maghrib,
           Isha: dayData.timings.Isha,
         };
-        // Apply user per-prayer adjustments so notifications match displayed times
-        const timings = applyTimingAdjustments(rawTimings, prayerAdjustments);
+        // Offline range returns effective app times already (cached/week/local
+        // calculation paths apply adjustments at source), so do not apply the
+        // same offsets a second time here.
+        const timings = rawTimings;
         // Phase 1.F: validate — تجنب جدولة أوقات مستحيلة (خلل API)
         const v = validatePrayerTimings(timings);
         if (!v.valid) {
@@ -346,8 +401,10 @@ export async function schedulePrayerNotifications(
           Maghrib: entry.times.maghrib,
           Isha: entry.times.isha,
         };
-        // Apply user per-prayer adjustments so notifications match displayed times
-        const timings = applyTimingAdjustments(rawTimings, prayerAdjustments);
+        // Offline range returns effective app times already (cached/week/local
+        // calculation paths apply adjustments at source), so do not apply the
+        // same offsets a second time here.
+        const timings = rawTimings;
         // Phase 1.F: validate offline timings too
         const v = validatePrayerTimings(timings);
         if (!v.valid) {
@@ -367,31 +424,26 @@ export async function schedulePrayerNotifications(
     // We defer cancellation until AFTER fetching succeeds so that a network
     // failure never wipes existing scheduled notifications (the "one-shot" bug).
     //
-    // RACE-CONDITION GUARD (Fix B): Skip cancellation for IMMINENT prayer
-    // notifications (firing within the next 15 minutes). Reason: the API fetch
-    // above can take several seconds. If we cancel an imminent prayer (e.g. Maghrib
-    // 3 min away) and then the freshly-recomputed triggerDate ends up in the past
-    // by the time we reach the scheduling loop, the loop's `triggerDate <= now`
-    // guard will SKIP it — leaving the user with no notification at all.
-    // The scheduling loop already does `continue` when triggerDate is past, so
-    // preserved imminent notifications won't be overwritten by `scheduleNotificationAsync`.
-    const IMMINENT_WINDOW_MS = 15 * 60 * 1000;
+    // Race-condition guard: if a prayer notification is already about to fire
+    // and the freshly computed replacement is also too close to schedule safely,
+    // keep the existing request. This makes "user opened the app one minute
+    // before adhan while location is refreshing" prefer a slightly stale adhan
+    // notification over silence.
     const cancelCheckNow = Date.now();
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const protectedPrayerNotificationIds = new Set<string>();
+    let protectedNativePrayerAlarmCount = 0;
     let preservedImminentCount = 0;
     for (const n of scheduled) {
       const isPrayerNotif = n.identifier.startsWith('prayer_') || n.identifier.startsWith('did_you_pray_');
       if (!isPrayerNotif) continue;
+      const isPrayerTimeNotif = n.identifier.startsWith('prayer_');
 
-      // Old-format identifiers (prayer_dhuhr, prayer_dhuhr_d2, etc.) are always
-      // cancelled unconditionally — they are superseded by date-based identifiers
-      // (prayer_dhuhr_20260514). Preserving them as "imminent" caused a double-
-      // notification bug: the old format fired alongside the new one at prayer time.
+      // Old-format identifiers (prayer_dhuhr, prayer_dhuhr_d2, etc.) are
+      // normally cancelled because they are superseded by date-based identifiers
+      // (prayer_dhuhr_20260514). The critical-imminent guard below may still
+      // keep one if cancelling it could leave the user with no adhan.
       const isOldFormat = /^prayer_[a-z]+(?:_d\d+)?$/.test(n.identifier);
-      if (isOldFormat) {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
-        continue;
-      }
 
       // Extract trigger date if this is a DATE trigger (expo-notifications shape)
       const trig: any = n.trigger;
@@ -401,58 +453,28 @@ export async function schedulePrayerNotifications(
         : trig && typeof trig === 'object' && typeof trig.date === 'number' ? trig.date
         : null;
 
-      if (triggerMs !== null) {
+      if (isPrayerTimeNotif && triggerMs !== null) {
         const msUntilFire = triggerMs - cancelCheckNow;
-        if (msUntilFire > 0 && msUntilFire <= IMMINENT_WINDOW_MS) {
-          // Check if freshly-calculated time differs by more than 10 min.
-          // If it does, the stored notification is stale (prayer time shifted
-          // seasonally) — cancel it so the correct time fires instead.
-          // This prevents the "double adhan" bug where an old d6/d7 slot fires
-          // at the wrong time, then the app reschedules the correct notification.
-          const DRIFT_TOLERANCE_MS = 5 * 60 * 1000;
-          let freshTriggerMs: number | null = null;
-          // Support both old dayOffset IDs (prayer_maghrib, prayer_maghrib_d3)
-          // and new date-based IDs (prayer_maghrib_20260513).
-          const idPartsOld = n.identifier.match(/^prayer_([a-z]+)(?:_d(\d+))?$/);
-          const idPartsDate = n.identifier.match(/^prayer_([a-z]+)_(\d{8})$/);
-          if (idPartsOld) {
-            const pKey = idPartsOld[1] as PrayerKey;
-            const dayIdx = idPartsOld[2] ? parseInt(idPartsOld[2], 10) : 0;
-            const dayData = scheduleDays[dayIdx];
-            if (dayData && PRAYER_KEY_TO_API[pKey]) {
-              const apiKey = PRAYER_KEY_TO_API[pKey];
-              const timeStr = dayData.timings[apiKey];
-              if (timeStr) {
-                freshTriggerMs = prayerTimeToDateForDay(timeStr, dayData.date, notifSettings.advanceMinutes).getTime();
-              }
-            }
-          } else if (idPartsDate) {
-            const pKey = idPartsDate[1] as PrayerKey;
-            const dateTag = idPartsDate[2]; // e.g. "20260513"
-            const dayData = scheduleDays.find(d => {
-              const t = d.date;
-              return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}` === dateTag;
-            });
-            if (dayData && PRAYER_KEY_TO_API[pKey]) {
-              const apiKey = PRAYER_KEY_TO_API[pKey];
-              const timeStr = dayData.timings[apiKey];
-              if (timeStr) {
-                freshTriggerMs = prayerTimeToDateForDay(timeStr, dayData.date, notifSettings.advanceMinutes).getTime();
-              }
-            }
-          }
-          if (freshTriggerMs !== null && Math.abs(freshTriggerMs - triggerMs) > DRIFT_TOLERANCE_MS) {
-            console.log(`[prayer-notif] 🔄 CANCEL drifted imminent ${n.identifier} (stored=${new Date(triggerMs).toISOString()}, fresh=${new Date(freshTriggerMs).toISOString()}, drift=${Math.round((freshTriggerMs - triggerMs) / 60000)}min)`);
+        if (msUntilFire > 0 && msUntilFire <= CRITICAL_PRAYER_NOTIFICATION_WINDOW_MS) {
+          const freshTriggerMs = resolveFreshPrayerTriggerMs(n.identifier, scheduleDays, notifSettings.advanceMinutes);
+          const freshHasSafeLead = freshTriggerMs !== null
+            && freshTriggerMs > cancelCheckNow + MIN_SAFE_PRAYER_RESCHEDULE_LEAD_MS;
+
+          if (freshHasSafeLead) {
+            console.log(`[prayer-notif] 🔄 CANCEL imminent ${n.identifier}; fresh trigger has safe lead (${Math.round((freshTriggerMs - cancelCheckNow) / 1000)}s)`);
           } else {
-            // Previously: preserved imminent notifications (fires in < 15min) to avoid
-            // a gap. But this caused a double-notification bug when useFullAdhan changed
-            // while a notification was imminent: drift=0 → preserved with OLD content,
-            // then scheduleNotificationAsync was called with same identifier → iOS
-            // sometimes kept BOTH. Fix: always cancel and reschedule unconditionally;
-            // scheduleNotificationAsync with same identifier replaces correctly.
-            console.log(`[prayer-notif] 🔄 CANCEL imminent (will reschedule) ${n.identifier} (fires in ${Math.round(msUntilFire / 1000)}s)`);
+            protectedPrayerNotificationIds.add(n.identifier);
+            const canonicalId = resolveCanonicalPrayerIdentifier(n.identifier, scheduleDays);
+            if (canonicalId) protectedPrayerNotificationIds.add(canonicalId);
+            protectedNativePrayerAlarmCount++;
+            preservedImminentCount++;
+            console.log(`[prayer-notif] 🛡️ KEEP critical imminent ${n.identifier} (canonical=${canonicalId || 'unknown'}; fires in ${Math.round(msUntilFire / 1000)}s; fresh=${freshTriggerMs ? new Date(freshTriggerMs).toISOString() : 'unknown'})`);
+            continue;
           }
         }
+      }
+      if (isOldFormat) {
+        console.log(`[prayer-notif] 🔄 CANCEL old-format prayer notification ${n.identifier}`);
       }
       await Notifications.cancelScheduledNotificationAsync(n.identifier);
     }
@@ -518,22 +540,35 @@ export async function schedulePrayerNotifications(
     console.log('[FullAdhan] selected sound file:', soundValue);
     console.log('[FullAdhan] permission status:', 'schedulePrayerNotifications reached after permission gate');
 
-    // Cancel any previously-scheduled native AlarmManager triggers for the
-    // foreground service. Safe to call even when the toggle is off — clears stale alarms.
+    const protectedFullAdhanAlarmCount =
+      Platform.OS === 'android' &&
+      shouldUseFullAdhan &&
+      notifSettings.advanceMinutes <= 0
+        ? protectedNativePrayerAlarmCount
+        : 0;
+
+    // Cancel previously-scheduled native AlarmManager triggers for the foreground
+    // service. If an adhan is critically close, keep its earliest request code(s)
+    // and clear only the later native alarms so the near prayer still plays.
     if (Platform.OS === 'android') {
       try {
         const FullAdhanModule = (NativeModules as any)?.FullAdhanModule;
-        if (FullAdhanModule?.cancelAllFullAdhan) {
+        if (protectedFullAdhanAlarmCount > 0 && FullAdhanModule?.cancelFullAdhanFrom) {
+          await FullAdhanModule.cancelFullAdhanFrom(protectedFullAdhanAlarmCount);
+          console.log(`[FullAdhan] Preserved ${protectedFullAdhanAlarmCount} imminent native alarm(s), cancelled later alarms`);
+        } else if (protectedFullAdhanAlarmCount === 0 && FullAdhanModule?.cancelAllFullAdhan) {
           await FullAdhanModule.cancelAllFullAdhan();
+        } else if (protectedFullAdhanAlarmCount > 0) {
+          console.warn('[FullAdhan] cancelFullAdhanFrom unavailable; keeping native alarms this pass to protect imminent adhan');
         }
       } catch (e) {
-        console.warn('[prayer-notif] FullAdhanModule.cancelAllFullAdhan failed:', e);
+        console.warn('[prayer-notif] FullAdhanModule native alarm cleanup failed:', e);
       }
     }
 
     // Counter for AlarmManager request codes — keeps each scheduled prayer
     // its own PendingIntent so cancel/replace works correctly.
-    let fullAdhanRequestCode = 0;
+    let fullAdhanRequestCode = protectedFullAdhanAlarmCount;
 
     const scheduledIds: string[] = [];
     // Refresh `now` AFTER the API fetch + cancellation completes.
@@ -552,8 +587,14 @@ export async function schedulePrayerNotifications(
         const timeStr = timings[apiKey];
         if (!timeStr) continue;
 
+        // Use date-based identifiers so a notification scheduled days ago for
+        // "today" shares the same id as one freshly scheduled for today.
+        const dateStr = dateTagFor(targetDate);
+        const identifier = `prayer_${prayerKey}_${dateStr}`;
+        const primaryNotificationProtected = protectedPrayerNotificationIds.has(identifier);
+
         const triggerDate = prayerTimeToDateForDay(timeStr, targetDate, notifSettings.advanceMinutes);
-        if (triggerDate <= now) {
+        if (triggerDate <= now && !primaryNotificationProtected) {
           console.log(`[prayer-notif] SKIP ${prayerKey} d+${dayOffset} — past (${triggerDate.toISOString()} <= ${now.toISOString()})`);
           continue;
         }
@@ -562,12 +603,12 @@ export async function schedulePrayerNotifications(
         const prayerName = (prayerKey === 'dhuhr' && isFriday) ? t('prayer.jumuah') : t(`prayer.${prayerKey}`);
         const notifTitle = getPrayerNotifTitle(prayerKey, lang, isFriday);
         const cleanTime = timeStr.replace(/\s*\([^)]*\)\s*/, '').trim();
-        // Use date-based identifiers so a notification scheduled days ago for
-        // "today" shares the same id as one freshly scheduled for today.
-        const dateStr = `${targetDate.getFullYear()}${String(targetDate.getMonth() + 1).padStart(2, '0')}${String(targetDate.getDate()).padStart(2, '0')}`;
-        const identifier = `prayer_${prayerKey}_${dateStr}`;
 
-        try {
+        if (primaryNotificationProtected) {
+          scheduledIds.push(identifier);
+          console.log(`[prayer-notif] 🛡️ SKIP replacing protected imminent ${identifier}; existing OS notification remains armed`);
+        } else {
+          try {
           // Advance reminder uses a gentle notification sound, not the full adhan.
           // The actual adhan notification (advanceMinutes=0) uses the adhan channel.
           const isAdvanceReminder = notifSettings.advanceMinutes > 0;
@@ -668,8 +709,9 @@ export async function schedulePrayerNotifications(
               console.warn(`[prayer-notif] FullAdhanModule.scheduleFullAdhan failed for ${prayerKey} d+${dayOffset}:`, e);
             }
           }
-        } catch (e) {
-          console.error(`[prayer-notif] ❌ FAILED to schedule ${prayerKey} d+${dayOffset}:`, e);
+          } catch (e) {
+            console.error(`[prayer-notif] ❌ FAILED to schedule ${prayerKey} d+${dayOffset}:`, e);
+          }
         }
 
         // ─── Schedule "هل صليت؟" reminder after the actual prayer time ───

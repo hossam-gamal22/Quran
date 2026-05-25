@@ -68,8 +68,8 @@ function IOSTabsLayout() {
         backgroundColor={tabBarBg}
         disableIndicator={false}
         labelStyle={{
-          default: { fontSize: 12, fontFamily: 'Cairo-Medium', color: inactiveColor },
-          selected: { fontSize: 12, fontFamily: 'Cairo-SemiBold', color: activeColor },
+          default: { fontSize: 12, fontFamily: 'Rubik-Medium', color: inactiveColor },
+          selected: { fontSize: 12, fontFamily: 'Rubik-SemiBold', color: activeColor },
         }}
       >
         {orderedTabs.map((tab) => (
@@ -197,7 +197,7 @@ const AndroidTabButton = React.forwardRef<
             androidStyles.tabLabel,
             {
               color,
-              fontFamily: isFocused ? 'Cairo-SemiBold' : 'Cairo-Medium',
+              fontFamily: isFocused ? 'Rubik-SemiBold' : 'Rubik-Medium',
             },
           ]}
           numberOfLines={1}

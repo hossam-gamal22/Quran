@@ -151,6 +151,7 @@ const ROUTE_OPTIONS = [
   { value: '/ruqya', label: 'الرقية الشرعية' },
   { value: '/seerah', label: 'السيرة النبوية' },
   { value: '/companions', label: 'قصص الصحابة' },
+  { value: '/religious-stories', label: 'قصص دينية' },
   { value: '/radio', label: 'إذاعة القرآن' },
   { value: '/all-favorites', label: 'المحفوظات' },
   { value: '/subscription', label: 'الاشتراك' },

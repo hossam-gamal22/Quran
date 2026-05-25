@@ -2,9 +2,9 @@
 // إدارة التسبيحات المسبقة
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, Trash2, Edit2, X, Copy, Download, Wand2, RefreshCw } from 'lucide-react';
+import { Plus, Save, Trash2, Edit2, X, Copy, Download, Wand2, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { getDefaultTasbihPresets } from '../data/adhkar-defaults';
 
 function isGeneratedPlaceholderTranslation(value: string | undefined): boolean {
@@ -28,6 +28,46 @@ interface TasbihPreset {
 const EMPTY_PRESET: Omit<TasbihPreset, 'id'> = {
   text: '', transliteration: '', target: 33, virtue: '', reference: '', source: 'hadith_sahih', grade: '', order: 0,
 };
+
+const YUNUS_DUA_PRESET_ID = 'tasbih_default_6';
+const YUNUS_DUA_TEXT = 'لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ';
+const YUNUS_DUA_TRANSLITERATION = 'La ilaha illa anta subhanaka inni kuntu minaz-zalimin';
+const YUNUS_DUA_VIRTUE = 'دعوة ذي النون عليه السلام؛ قال النبي ﷺ: «فإنه لم يدعُ بها رجل مسلم في شيء قط إلا استجاب الله له». ولم يثبت لها عدد مخصوص';
+const YUNUS_DUA_REFERENCE = 'الأنبياء: 87، وسنن الترمذي 3505';
+const DEPRECATED_SUBHAN_WABIHAMDIH_TEXT = 'سبحان الله وبحمده';
+
+function sortPresets(items: TasbihPreset[]): TasbihPreset[] {
+  return [...items].sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+function stripArabicTashkeel(text: string): string {
+  return text.replace(/[\u064B-\u065F\u0670]/g, '');
+}
+
+function normalizeArabicText(text: string): string {
+  return stripArabicTashkeel(text).replace(/\s+/g, ' ').trim();
+}
+
+function isDeprecatedSubhanWabihamdihPreset(preset: TasbihPreset): boolean {
+  return preset.id === YUNUS_DUA_PRESET_ID
+    || String((preset as unknown as Record<string, unknown>).id) === '6'
+    || normalizeArabicText(preset.text) === DEPRECATED_SUBHAN_WABIHAMDIH_TEXT;
+}
+
+function normalizeDeprecatedTasbihPreset(preset: TasbihPreset): TasbihPreset {
+  if (!isDeprecatedSubhanWabihamdihPreset(preset)) return preset;
+
+  return {
+    ...preset,
+    text: YUNUS_DUA_TEXT,
+    transliteration: YUNUS_DUA_TRANSLITERATION,
+    target: 1,
+    source: 'quran',
+    virtue: YUNUS_DUA_VIRTUE,
+    reference: YUNUS_DUA_REFERENCE,
+    grade: '',
+  };
+}
 
 function getMobilePresetId(docId: string, order = 0): number {
   const trailingNumber = docId.match(/(\d+)$/)?.[1];
@@ -56,27 +96,43 @@ const TasbihPresetsManager: React.FC = () => {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, 'tasbihPresets'));
-      const items = snap.docs.map(d => ({ ...d.data(), id: d.id } as TasbihPreset));
-      items.sort((a, b) => (a.order || 0) - (b.order || 0));
-      setPresets(items);
+      const items = snap.docs.map(d => normalizeDeprecatedTasbihPreset({ ...d.data(), id: d.id } as TasbihPreset));
+      setPresets(sortPresets(items));
     } catch { /* empty */ }
     setIsLoading(false);
   };
 
-  useEffect(() => { loadPresets(); }, []);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'tasbihPresets'),
+      (snap) => {
+        const items = snap.docs.map(d => normalizeDeprecatedTasbihPreset({ ...d.data(), id: d.id } as TasbihPreset));
+        setPresets(sortPresets(items));
+        setIsLoading(false);
+      },
+      () => {
+        setIsLoading(false);
+      },
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   const handleSave = async (preset: TasbihPreset) => {
-    if (isGeneratedPlaceholderTranslation(preset.virtue) || isGeneratedPlaceholderTranslation(preset.reference)) {
+    const normalizedPreset = normalizeDeprecatedTasbihPreset(preset);
+    if (isGeneratedPlaceholderTranslation(normalizedPreset.virtue) || isGeneratedPlaceholderTranslation(normalizedPreset.reference)) {
       alert('قيمة "الفضل" أو "المرجع" placeholder تلقائي وليست ترجمة حقيقية. راجع النص قبل الحفظ.');
       return;
     }
     try {
-      const id = preset.id || `tasbih_${Date.now()}`;
-      await setDoc(doc(db, 'tasbihPresets', id), serializePresetForFirestore(preset, id));
+      const id = normalizedPreset.id || `tasbih_${Date.now()}`;
+      const nextOrder = Math.max(0, Math.min(presets.length, Number.isFinite(normalizedPreset.order) ? normalizedPreset.order : presets.length));
+      const nextPresets = presets.filter(p => p.id !== id);
+      nextPresets.splice(nextOrder, 0, { ...normalizedPreset, id, order: nextOrder });
+      await persistPresetOrder(nextPresets);
       setSaveMsg('✅ تم الحفظ');
       setIsModalOpen(false);
       setEditingPreset(null);
-      loadPresets();
     } catch (e) {
       const msg = `❌ فشل الحفظ: ${(e as Error).message}`;
       setSaveMsg(msg);
@@ -89,6 +145,7 @@ const TasbihPresetsManager: React.FC = () => {
   ), 0);
 
   const [cleaningCorrupted, setCleaningCorrupted] = useState(false);
+  const [syncingYunusDua, setSyncingYunusDua] = useState(false);
 
   const handleCleanCorrupted = async () => {
     if (cleaningCorrupted) return;
@@ -120,7 +177,6 @@ const TasbihPresetsManager: React.FC = () => {
         await setDoc(doc(db, 'tasbihPresets', p.id), serializePresetForFirestore(next, p.id));
         fixed += 1;
       }
-      await loadPresets();
       setSaveMsg(`✅ تم إصلاح ${fixed} تسبيح`);
     } catch (e) {
       const msg = `❌ فشل التنظيف: ${(e as Error).message}`;
@@ -131,13 +187,86 @@ const TasbihPresetsManager: React.FC = () => {
     }
   };
 
+  const handleSyncYunusDuaPreset = async () => {
+    if (syncingYunusDua) return;
+    setSyncingYunusDua(true);
+    try {
+      const defaultPreset = getDefaultTasbihPresets().find(p => p.id === YUNUS_DUA_PRESET_ID);
+      if (!defaultPreset) throw new Error('Default Yunus dua preset not found');
+
+      const candidates = presets.filter(isDeprecatedSubhanWabihamdihPreset);
+      const docsToUpdate = candidates.length > 0 ? candidates : [{ ...(defaultPreset as TasbihPreset), id: YUNUS_DUA_PRESET_ID }];
+
+      for (const preset of docsToUpdate) {
+        const normalized = normalizeDeprecatedTasbihPreset({
+          ...(defaultPreset as TasbihPreset),
+          ...preset,
+          id: preset.id || YUNUS_DUA_PRESET_ID,
+          order: Number.isFinite(preset.order) ? preset.order : defaultPreset.order,
+        });
+        await setDoc(doc(db, 'tasbihPresets', normalized.id), serializePresetForFirestore(normalized, normalized.id));
+      }
+
+      await loadPresets();
+      setSaveMsg(`✅ تم تحديث دعاء ذي النون في الأدمن (${docsToUpdate.length})`);
+    } catch (e) {
+      const msg = `❌ فشل تحديث دعاء ذي النون: ${(e as Error).message}`;
+      setSaveMsg(msg);
+      alert(msg);
+    } finally {
+      setSyncingYunusDua(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('هل تريد حذف هذا التسبيح؟')) return;
     try {
       await deleteDoc(doc(db, 'tasbihPresets', id));
-      loadPresets();
     } catch (e) {
       alert(`فشل الحذف: ${(e as Error).message}`);
+    }
+  };
+
+  const persistPresetOrder = async (nextPresets: TasbihPreset[]) => {
+    const ordered = nextPresets.map((preset, index) => ({ ...preset, order: index }));
+    setPresets(ordered);
+
+    const batch = writeBatch(db);
+    ordered.forEach((preset) => {
+      batch.set(doc(db, 'tasbihPresets', preset.id), serializePresetForFirestore(preset, preset.id));
+    });
+    await batch.commit();
+    setSaveMsg('✅ تم تحديث الترتيب');
+  };
+
+  const movePreset = async (id: string, direction: -1 | 1) => {
+    const currentIndex = presets.findIndex(p => p.id === id);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= presets.length) return;
+
+    const nextPresets = [...presets];
+    const [moved] = nextPresets.splice(currentIndex, 1);
+    nextPresets.splice(targetIndex, 0, moved);
+
+    try {
+      await persistPresetOrder(nextPresets);
+    } catch (e) {
+      alert(`فشل تحديث الترتيب: ${(e as Error).message}`);
+      loadPresets();
+    }
+  };
+
+  const handleOrderSave = async (preset: TasbihPreset, rawOrder: number) => {
+    const nextOrder = Math.max(0, Math.min(presets.length - 1, Number.isFinite(rawOrder) ? rawOrder : 0));
+    const others = presets.filter(p => p.id !== preset.id);
+    const nextPresets = [...others];
+    nextPresets.splice(nextOrder, 0, { ...preset, order: nextOrder });
+
+    try {
+      await persistPresetOrder(nextPresets);
+    } catch (e) {
+      alert(`فشل تحديث الترتيب: ${(e as Error).message}`);
+      loadPresets();
     }
   };
 
@@ -167,6 +296,14 @@ const TasbihPresetsManager: React.FC = () => {
             تنظيف {corruptedCount} قيمة فاسدة
           </button>
         )}
+        <button
+          onClick={handleSyncYunusDuaPreset}
+          disabled={syncingYunusDua}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-xl hover:bg-emerald-800 transition-colors disabled:opacity-50"
+        >
+          {syncingYunusDua ? <RefreshCw size={18} className="animate-spin" /> : <Wand2 size={18} />}
+          تحديث دعاء ذي النون
+        </button>
         <button
           className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
           onClick={async () => {
@@ -242,8 +379,47 @@ const TasbihPresetsManager: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {presets.map(p => (
+          {presets.map((p, index) => (
             <div key={p.id} className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50 flex items-center gap-4">
+              <div className="flex flex-col items-center gap-1">
+                <button
+                  onClick={() => movePreset(p.id, -1)}
+                  disabled={index === 0}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-admin-surface-light hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                  title="رفع للأعلى"
+                  aria-label="رفع للأعلى"
+                >
+                  <ArrowUp size={16} />
+                </button>
+                <button
+                  onClick={() => movePreset(p.id, 1)}
+                  disabled={index === presets.length - 1}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-admin-surface-light hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                  title="تنزيل للأسفل"
+                  aria-label="تنزيل للأسفل"
+                >
+                  <ArrowDown size={16} />
+                </button>
+              </div>
+              <div className="w-14 shrink-0 text-center">
+                <input
+                  key={`${p.id}-${p.order ?? index}`}
+                  type="number"
+                  min={1}
+                  max={presets.length}
+                  defaultValue={(p.order ?? index) + 1}
+                  onBlur={e => handleOrderSave(p, Number(e.target.value) - 1)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="w-full bg-admin-surface text-center text-white rounded-lg px-2 py-1.5 border border-admin-border"
+                  title="الترتيب"
+                  aria-label="الترتيب"
+                />
+                <span className="text-[11px] text-slate-500">المركز</span>
+              </div>
               <div className="flex-1">
                 <p className="text-white font-bold text-lg" dir="rtl">{p.text}</p>
                 {p.transliteration && <p className="text-slate-400 text-sm">{p.transliteration}</p>}
@@ -283,6 +459,12 @@ const TasbihPresetsManager: React.FC = () => {
                   <label className="text-slate-300 text-sm block mb-1">العدد المستهدف</label>
                   <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingPreset.target} onChange={e => setEditingPreset({ ...editingPreset, target: Number(e.target.value) })} aria-label="العدد المستهدف" />
                 </div>
+                <div>
+                  <label className="text-slate-300 text-sm block mb-1">الترتيب</label>
+                  <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={(editingPreset.order ?? 0) + 1} onChange={e => setEditingPreset({ ...editingPreset, order: Math.max(0, Number(e.target.value) - 1) })} aria-label="الترتيب" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">المصدر</label>
                   <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingPreset.source || 'hadith_sahih'} onChange={e => setEditingPreset({ ...editingPreset, source: e.target.value as TasbihPreset['source'] })} aria-label="المصدر">

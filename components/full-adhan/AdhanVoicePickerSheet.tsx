@@ -6,6 +6,7 @@
 import React from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: 'rgba(20,32,28,0.85)',
+    backgroundColor: Platform.OS === 'android' ? '#14201c' : 'rgba(20,32,28,0.85)',
     overflow: 'hidden',
   },
   handle: {
@@ -139,14 +140,14 @@ const styles = StyleSheet.create({
   title: {
     color: '#ffffff',
     fontSize: 20,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: 'Rubik-SemiBold',
     textAlign: 'center',
     marginBottom: 4,
   },
   subtitle: {
     color: 'rgba(255,255,255,0.65)',
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: '#ffffff',
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: 'Rubik-Medium',
     flex: 1,
   },
 });

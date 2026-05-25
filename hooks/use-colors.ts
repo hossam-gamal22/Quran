@@ -29,12 +29,38 @@ const DarkColorsExtended = {
   cardGlass: DarkColors.cardGlass,
 };
 
+function parseLocalDate(value?: string): number | null {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day).getTime();
+}
+
+function getActiveSeasonalThemeColors(seasonalThemes?: any[]) {
+  if (!Array.isArray(seasonalThemes)) return undefined;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const activeTheme = seasonalThemes.find(theme => {
+    if (!theme?.isActive) return false;
+    const start = parseLocalDate(theme.startDate);
+    const end = parseLocalDate(theme.endDate);
+    return start !== null && end !== null && today >= start && today <= end;
+  });
+
+  return activeTheme?.colors;
+}
+
 export function useColors() {
   const { isDarkMode, settings } = useSettings();
   const { themeConfig } = useThemeConfig();
 
-  // Merge: hardcoded defaults → admin Firestore overrides
-  const adminOverrides = isDarkMode ? themeConfig?.dark : themeConfig?.light;
+  // Merge: hardcoded defaults → admin Firestore overrides → active seasonal overrides
+  const baseAdminOverrides = isDarkMode ? themeConfig?.dark : themeConfig?.light;
+  const seasonalOverrides = getActiveSeasonalThemeColors(themeConfig?.seasonalThemes);
+  const adminOverrides = seasonalOverrides
+    ? { ...(baseAdminOverrides || {}), ...seasonalOverrides }
+    : baseAdminOverrides;
   const baseColors = isDarkMode ? DarkColorsExtended : LightColors;
   // Sanitize admin overrides: an admin can accidentally publish an unusable
   // brand color (e.g. primary = "#FFFFFF" in light mode, primary = "#d6d6d6"
@@ -113,6 +139,9 @@ export function useColors() {
   const card = (hasBgOverride && Platform.OS === 'android') ? 'transparent' : cardSolid;
   // Elevation value: 0 on Android when card is transparent (avoids shadow artifacts)
   const cardElevation = (hasBgOverride && Platform.OS === 'android') ? 0 : undefined;
+  const modalSurface = hasBgOverride
+    ? (bgTextColor === 'white' ? '#0f1a14' : '#FFFFFF')
+    : (isDarkMode ? '#0f1a14' : '#FFFFFF');
 
   // Icon color override: adapt for bg-override mode
   const icon = hasBgOverride
@@ -191,8 +220,8 @@ export function useColors() {
     card,
     /** Semi-transparent card bg for components that NEED a visible background (headers, search bars, modals) */
     cardSolid,
-    /** Guaranteed FULLY OPAQUE surface for modals/bottom sheets — never affected by app background overrides */
-    modalSurface: colors.card,
+    /** Guaranteed FULLY OPAQUE surface for modals/bottom sheets. */
+    modalSurface,
     /** Elevation override: 0 on Android when bg override is active, undefined otherwise */
     cardElevation: cardElevation as number | undefined,
     icon,

@@ -71,7 +71,7 @@ export const DAILY_ROUTES: AppRoute[] = [
   { path: '/daily-dhikr', label: 'ذكر اليوم', category: 'daily' },
   { path: '/daily-summary', label: 'الملخص اليومي', category: 'daily' },
   { path: '/hadith-of-day', label: 'حديث اليوم', category: 'daily' },
-  { path: '/quote-of-day', label: 'اقتباس اليوم', category: 'daily' },
+  { path: '/quote-of-day', label: 'حكمة اليوم', category: 'daily' },
   { path: '/story-of-day', label: 'قصة اليوم', category: 'daily' },
   { path: '/quran-dua-daily', label: 'دعاء قرآني يومي', category: 'daily' },
   { path: '/sunnah-dua-daily', label: 'دعاء من السنة يومي', category: 'daily' },
@@ -100,6 +100,7 @@ export const HAJJ_ROUTES: AppRoute[] = [
 export const STORIES_ROUTES: AppRoute[] = [
   { path: '/seerah', label: 'السيرة النبوية', category: 'stories' },
   { path: '/companions', label: 'قصص الصحابة', category: 'stories' },
+  { path: '/religious-stories', label: 'قصص دينية', category: 'stories' },
 ];
 
 // ==================== الحفظ ====================

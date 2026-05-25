@@ -5,10 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:netlify": "VITE_NETLIFY_FUNCTIONS_DIRECT=true pnpm run build && netlify dev --dir dist --functions netlify/functions --port 8888 --no-open",
+    "dev:netlify:vite": "VITE_USE_NETLIFY_API=true vite --host 127.0.0.1",
     "build": "vite build",
+    "build:netlify": "vite build",
     "deploy": "vite build && npx firebase-tools deploy --only hosting:rooh-almuslim --project rooh-almuslim",
+    "deploy:netlify": "netlify deploy --build",
+    "deploy:netlify:prod": "netlify deploy --build --prod",
+    "local-service:install": "bash scripts/local-netlify-service.sh install",
+    "local-service:start": "bash scripts/local-netlify-service.sh start",
+    "local-service:stop": "bash scripts/local-netlify-service.sh stop",
+    "local-service:restart": "bash scripts/local-netlify-service.sh restart",
+    "local-service:status": "bash scripts/local-netlify-service.sh status",
+    "local-service:uninstall": "bash scripts/local-netlify-service.sh uninstall",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:netlify": "pnpm run dev:netlify"
   },
   "dependencies": {
     "firebase": "^12.10.0",

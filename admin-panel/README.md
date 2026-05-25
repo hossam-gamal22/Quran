@@ -1,73 +1,116 @@
-# React + TypeScript + Vite
+# Rooh Admin Panel
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+لوحة إدارة React/Vite مع Netlify Functions. نفس المشروع يشتغل بثلاث طرق:
 
-Currently, two official plugins are available:
+- Vite dev سريع للتطوير اليومي.
+- Netlify dev محلي production-like، يشغل `/api/*` functions محليا.
+- Netlify deploy للإنتاج من نفس `netlify.toml`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Local Setup
 
-## React Compiler
+انسخ ملف البيئة:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+أضف القيم السرية في `.env`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+ADMIN_PASSWORD_HASH=...
+ADMIN_SESSION_SECRET=at-least-32-random-chars
+EXPO_ACCESS_TOKEN=...
+ADMIN_PANEL_ORIGINS=http://localhost:8888,http://127.0.0.1:8888
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+توليد `ADMIN_PASSWORD_HASH`:
+
+```bash
+node -e "crypto.subtle.digest('SHA-256', new TextEncoder().encode('YOUR_PASSWORD')).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))"
+```
+
+## Run Locally
+
+تطوير سريع بدون Netlify functions:
+
+```bash
+pnpm run dev
+```
+
+تشغيل محلي production-like بنفس مسارات Netlify:
+
+```bash
+pnpm run dev:netlify
+```
+
+افتح:
+
+```text
+http://localhost:8888
+```
+
+في الوضع ده:
+
+- يتم عمل `vite build` ثم خدمة `dist` محليا.
+- `/.netlify/functions/verify-admin` يشتغل محليا من `netlify/functions/verify-admin.ts`.
+- `/.netlify/functions/expo-push` يشتغل محليا من `netlify/functions/expo-push.ts`.
+- الإنتاج يقدر يستخدم `/api/verify-admin` و`/api/expo-push` عبر redirects.
+- صفحات React Router ترجع لـ `index.html` عبر redirects.
+
+## Persistent Local Service
+
+على macOS تقدر تشغل اللوحة كخدمة `launchd` تبدأ تلقائيا وتفضل شغالة:
+
+```bash
+pnpm run local-service:install
+```
+
+أوامر الإدارة:
+
+```bash
+pnpm run local-service:status
+pnpm run local-service:restart
+pnpm run local-service:stop
+pnpm run local-service:uninstall
+```
+
+الخدمة تستخدم نفس `pnpm run dev:netlify` ونفس الرابط:
+
+```text
+http://localhost:8888
+```
+
+اللوج المحلي:
+
+```text
+admin-panel/.local-logs/netlify-dev.log
+```
+
+## Build And Deploy
+
+اختبار build:
+
+```bash
+pnpm run build
+```
+
+Deploy preview على Netlify:
+
+```bash
+pnpm run deploy:netlify
+```
+
+Deploy production:
+
+```bash
+pnpm run deploy:netlify:prod
+```
+
+لو هتربطه من Netlify UI، خلي الإعدادات:
+
+```text
+Base directory: admin-panel
+Build command: pnpm install --no-frozen-lockfile && pnpm run build
+Publish directory: admin-panel/dist
+Functions directory: admin-panel/netlify/functions
 ```

@@ -138,11 +138,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   value: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     fontSize: 18,
   },
   label: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
     fontSize: 12,
     marginTop: 2,
   },

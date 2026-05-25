@@ -22,6 +22,7 @@ import {
   getTimeRemaining,
   formatPrayerTime,
   getPrayerIcon,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { t } from '@/lib/i18n';
 
@@ -106,7 +107,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   const minuteAngle = (minutes + seconds / 60) * 6; // 360/60 = 6 degrees per minute
   const secondAngle = seconds * 6;
 
-  const prayerName = t(`prayer.${nextPrayer.name}`);
+  const prayerName = t(getPrayerTranslationKey(nextPrayer.name));
   const prayerIcon = getPrayerIcon(nextPrayer.name);
   const pad = (n: number) => String(n).padStart(2, '0');
 

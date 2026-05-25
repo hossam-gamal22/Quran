@@ -92,6 +92,27 @@ export interface PrayerNotifications {
 
 export type PrayerName = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 
+export const isFridayDate = (date: Date = new Date()): boolean => date.getDay() === 5;
+
+export const getPrayerTranslationKey = (prayer: PrayerName, date: Date = new Date()): string => {
+  if (prayer === 'dhuhr' && isFridayDate(date)) {
+    return 'prayer.jumuah';
+  }
+  return `prayer.${prayer}`;
+};
+
+export const getPrayerNameEn = (prayer: PrayerName, date: Date = new Date()): string => {
+  const names: Record<PrayerName, string> = {
+    fajr: 'Fajr',
+    sunrise: 'Sunrise',
+    dhuhr: isFridayDate(date) ? 'Jumuah' : 'Dhuhr',
+    asr: 'Asr',
+    maghrib: 'Maghrib',
+    isha: 'Isha',
+  };
+  return names[prayer];
+};
+
 export type CalculationMethod = 
   | 0  // Shia Ithna-Ashari
   | 1  // University of Islamic Sciences, Karachi
@@ -639,6 +660,19 @@ export const getCachedPrayerTimes = async (date: string, method?: number, school
   }
 };
 
+export const clearPrayerTimeCaches = async (): Promise<void> => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const toRemove = keys.filter((key) => key.startsWith(`${STORAGE_KEYS.PRAYER_TIMES}_`));
+    if (toRemove.length > 0) {
+      await AsyncStorage.multiRemove(toRemove);
+      console.log(`🧹 [prayer-times] Cleared ${toRemove.length} prayer time cache keys`);
+    }
+  } catch (error) {
+    console.error('Error clearing prayer time caches:', error);
+  }
+};
+
 // ========================================
 // دوال مساعدة
 // ========================================
@@ -646,11 +680,11 @@ export const getCachedPrayerTimes = async (date: string, method?: number, school
 /**
  * الحصول على اسم الصلاة بالعربية
  */
-export const getPrayerNameAr = (prayer: PrayerName): string => {
+export const getPrayerNameAr = (prayer: PrayerName, date: Date = new Date()): string => {
   const names: Record<PrayerName, string> = {
     fajr: 'الفجر',
     sunrise: 'الشروق',
-    dhuhr: 'الظهر',
+    dhuhr: isFridayDate(date) ? 'صلاة الجمعة' : 'الظهر',
     asr: 'العصر',
     maghrib: 'المغرب',
     isha: 'العشاء',
@@ -722,6 +756,10 @@ export default {
   getStoredLocation,
   cachePrayerTimes,
   getCachedPrayerTimes,
+  clearPrayerTimeCaches,
+  isFridayDate,
+  getPrayerTranslationKey,
+  getPrayerNameEn,
   getPrayerNameAr,
   getPrayerIcon,
   isInLastThird,

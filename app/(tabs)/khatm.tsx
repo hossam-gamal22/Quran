@@ -27,6 +27,8 @@ import { BlurView } from 'expo-blur';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getUserId } from '@/lib/firebase-user';
+import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -88,9 +90,15 @@ export default function KhatmScreen() {
 
     if (isCompleted) {
       await unmarkSurahComplete(stats.currentKhatm.id, surahNum, ayahCount);
+      getUserId()
+        .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+        .catch(() => {});
     } else {
       const updated = await markSurahComplete(stats.currentKhatm.id, surahNum, ayahCount);
       if (updated?.isCompleted) {
+        getUserId()
+          .then(userId => (userId ? syncMonthlyEngagementFromLocalWorship(userId) : null))
+          .catch(() => {});
         // Celebration!
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showCelebration({
@@ -175,7 +183,7 @@ export default function KhatmScreen() {
     deleteBtn: { padding: 6 },
     // Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
-    modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Math.max(insets.bottom, 16) + 16 },
+    modalSheet: { backgroundColor: colors.modalSurface, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Math.max(insets.bottom, 16) + 16 },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
     modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 16 },
     input: {

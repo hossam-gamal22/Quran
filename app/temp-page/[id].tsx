@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 24,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: 'Rubik-Regular',
   },
   ctaContainer: {
     alignItems: 'center',
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: '#fff',
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Rubik-Bold',
     textAlign: 'center',
   },
 });

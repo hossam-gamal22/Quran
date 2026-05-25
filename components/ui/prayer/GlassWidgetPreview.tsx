@@ -9,6 +9,7 @@ import {
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
@@ -50,7 +51,7 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   }, [prayerTimes]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
-  const prayerName = nextPrayer ? t(`prayer.${nextPrayer.name}`) : t('prayer.fajr');
+  const prayerName = nextPrayer ? t(getPrayerTranslationKey(nextPrayer.name)) : t('prayer.fajr');
 
   const countdownStr = timeRemaining
     ? `${pad(timeRemaining.hours)}:${pad(timeRemaining.minutes)}:${pad(timeRemaining.seconds)}`

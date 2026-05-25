@@ -2,7 +2,7 @@
 // هوك للتحقق إذا ميزة محجوزة للبريميوم
 
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { isFeaturePremium, DEFAULT_FEATURE_GATING } from '@/lib/feature-gating';
+import { isFeaturePremium } from '@/lib/feature-gating';
 import type { PremiumFeatureKey, FeatureGatingConfig } from '@/types/premium';
 
 /**
@@ -12,8 +12,8 @@ export function usePremiumFeature(
   key: PremiumFeatureKey,
   config?: FeatureGatingConfig
 ) {
-  const { isPremium } = useSubscription();
-  const locked = isFeaturePremium(key, config ?? DEFAULT_FEATURE_GATING) && !isPremium;
+  const { isPremium, isFeatureLocked } = useSubscription();
+  const locked = config ? isFeaturePremium(key, config) && !isPremium : isFeatureLocked(key);
 
   return { isLocked: locked, isPremium };
 }

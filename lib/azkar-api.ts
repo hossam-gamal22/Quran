@@ -10,6 +10,7 @@ import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { translateBenefit } from '@/lib/benefit-translations';
 import { getEffectiveZikrRepeatCount } from '@/lib/azkar-repeat';
+import { dedupeAzkarByDisplayedText, removeLowerCountGlobalDuplicateAzkar } from '@/lib/azkar-dedupe';
 
 // ===================================================
 // الأنواع (Types)
@@ -375,7 +376,13 @@ export const subscribeToCustomCategoriesFromFirestore = (): (() => void) => {
  */
 export const getAzkarByCategory = (category: AzkarCategoryType): Zikr[] => {
   const resolvedCategory = resolveCategoryId(category);
-  return sortAzkarItems(getAllAzkar().filter((zikr) => zikr.category === resolvedCategory));
+  const allAzkar = getAllAzkar();
+  return sortAzkarItems(dedupeAzkarByDisplayedText(
+    removeLowerCountGlobalDuplicateAzkar(
+      allAzkar.filter((zikr) => zikr.category === resolvedCategory),
+      allAzkar,
+    ),
+  ));
 };
 
 /**
@@ -410,7 +417,20 @@ export const resolveTranslationValue = (val: unknown): string | undefined => {
 export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
   const t = zikr.translations || zikr.translation;
   // Fallback chain: requested lang → en → ar
-  return resolveTranslationValue(t?.[language]) || resolveTranslationValue(t?.en) || resolveTranslationValue(t?.[DEFAULT_LANGUAGE]) || zikr.arabic;
+  const resolved = resolveTranslationValue(t?.[language]) || resolveTranslationValue(t?.en) || resolveTranslationValue(t?.[DEFAULT_LANGUAGE]) || zikr.arabic;
+  // For non-Arabic languages, strip count-mention parens like "(four times)" /
+  // "(× 10)" and the outer paren wrap — the count badge in the UI already
+  // shows the repetition, so inline restating is redundant noise. Arabic
+  // body comes straight from azkar.json with its own formatting conventions
+  // that the screen layout expects, so leave Arabic untouched.
+  if (language === 'ar') return resolved;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { stripAzkarTranslationNoise } = require('@/lib/widget-azkar-helpers');
+    return stripAzkarTranslationNoise(resolved) || resolved;
+  } catch {
+    return resolved;
+  }
 };
 
 /**

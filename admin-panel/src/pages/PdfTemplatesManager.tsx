@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db, storage } from '../firebase';
-import { doc, setDoc, collection, getDocs, addDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, addDoc, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   FileText,
@@ -159,7 +159,33 @@ export default function PdfTemplatesManager() {
   const themeFileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   /* ─── Load data ─── */
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const unsubs = [
+      onSnapshot(collection(db, FIRESTORE_TEMPLATES), (snap) => {
+        setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as CustomTemplate)));
+        setIsLoading(false);
+      }, (err) => {
+        console.error('Error loading PDF templates:', err);
+        setIsLoading(false);
+      }),
+      onSnapshot(collection(db, FIRESTORE_UPLOADS), (snap) => {
+        setUploads(snap.docs.map(d => ({ id: d.id, ...d.data() } as UploadedPdf)));
+        setIsLoading(false);
+      }, (err) => {
+        console.error('Error loading PDF uploads:', err);
+        setIsLoading(false);
+      }),
+      onSnapshot(doc(db, FIRESTORE_THEME_PDFS, THEME_PDFS_DOC), (snap) => {
+        setThemePdfAssignments(snap.exists() ? (snap.data().assignments || {}) : {});
+        setIsLoading(false);
+      }, (err) => {
+        console.error('Error loading theme PDF assignments:', err);
+        setIsLoading(false);
+      }),
+    ];
+
+    return () => unsubs.forEach(unsub => unsub());
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -559,6 +585,27 @@ export default function PdfTemplatesManager() {
         )}
       </div>
 
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-admin-border bg-admin-surface/60 p-4">
+          <h3 className="text-white font-semibold mb-2">أين تظهر للمستخدم؟</h3>
+          <p className="text-sm text-slate-400 leading-7">
+            تظهر في نافذة اختيار قالب PDF عند الضغط على تصدير PDF في صفحات الحج، العمرة، السيرة النبوية، وقصص الصحابة.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-admin-border bg-admin-surface/60 p-4">
+          <h3 className="text-white font-semibold mb-2">ما الذي يتحدث فعليا؟</h3>
+          <p className="text-sm text-slate-400 leading-7">
+            قوالب الألوان النشطة وملفات PDF المرفوعة تُقرأ من Firestore عند فتح نافذة التصدير. لوحة الإدارة نفسها تعرض التغييرات لحظيا.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <h3 className="text-amber-100 font-semibold mb-2">تنبيه مهم</h3>
+          <p className="text-sm text-amber-100/80 leading-7">
+            ربط PDF بأنماط القرآن غير مستخدم في التطبيق حاليا لأن شاشة القرآن لا تفتح نافذة تصدير PDF. استخدم “ملفات PDF مرفوعة” للصفحات المدعومة فقط.
+          </p>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 bg-admin-surface rounded-xl p-1 w-fit">
         <button
@@ -583,7 +630,7 @@ export default function PdfTemplatesManager() {
             activeTab === 'themepdfs' ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Link2 className="w-4 h-4" /> ربط PDF بالأنماط ({Object.keys(themePdfAssignments).length}/{THEME_NAMES.length})
+          <Link2 className="w-4 h-4" /> ربط PDF بالأنماط - غير مستخدم حاليا ({Object.keys(themePdfAssignments).length}/{THEME_NAMES.length})
         </button>
       </div>
 
@@ -893,15 +940,20 @@ export default function PdfTemplatesManager() {
       {activeTab === 'themepdfs' && (
         <div className="space-y-4">
           {/* Info */}
-          <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border">
-            <div className="flex items-center gap-2 text-slate-300 mb-2">
-              <Link2 className="w-4 h-4 text-accent-light" />
-              <span className="text-sm font-medium">ربط ملفات PDF بأنماط القرآن</span>
-            </div>
-            <p className="text-xs text-slate-400">
-              اختر نمط القراءة ثم ارفع ملف PDF مخصص له. عند اختيار المستخدم لهذا النمط، سيتم عرض ملف PDF المرتبط به. عند استبدال PDF، يتم حذف الملف القديم تلقائياً.
-            </p>
-          </div>
+	          <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border">
+	            <div className="flex items-center gap-2 text-slate-300 mb-2">
+	              <Link2 className="w-4 h-4 text-accent-light" />
+	              <span className="text-sm font-medium">ربط ملفات PDF بأنماط القرآن</span>
+	            </div>
+	            <div className="space-y-2 text-xs text-slate-400 leading-6">
+	              <p>
+	                هذا الإعداد محفوظ في Firestore، لكنه غير مستهلك حاليا في واجهة المستخدم لأن شاشة القرآن لا تحتوي تدفق تصدير PDF مرتبط بأنماط القراءة.
+	              </p>
+	              <p className="text-amber-300">
+	                لا تعتبر أي ملفات هنا ظاهرة للمستخدمين الآن. التصدير الفعلي المستخدم حاليا هو قوالب الألوان وملفات PDF المرفوعة حسب الصفحة واللغة.
+	              </p>
+	            </div>
+	          </div>
 
           {/* Theme grid */}
           <div className="grid gap-3">

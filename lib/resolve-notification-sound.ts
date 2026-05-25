@@ -30,9 +30,9 @@ const ALL_SOUND_FILES: Record<string, string> = {
  *   comes from the channel, but we set content.sound as well for completeness
  * - Returns false for truly silent notifications
  *
- * Resolution: custom installed (Firebase) → bundled sound → general_reminder fallback.
- * NEVER returns 'default' in production builds — always a real bundled filename.
- * In Expo Go, returns 'default' because custom sounds aren't bundled.
+ * Resolution: missing/'default' → system default sound; otherwise
+ * custom installed (Firebase) → bundled sound → system default fallback.
+ * Returning 'default' lets iOS/Android play the phone's normal notification tone.
  */
 // SDK 54: Constants.appOwnership is deprecated and may be null inside Expo Go;
 // fall back to the modern executionEnvironment === 'storeClient' signal.
@@ -48,27 +48,25 @@ export function resolveNotificationSound(soundType?: string, soundEnabled?: bool
   // Expo Go: custom sounds aren't bundled — use system sound so something plays
   if (isExpoGo) return 'default';
 
-  // Determine the key to look up
-  // 'default' or missing soundType → 'makkah' for adhan-like contexts,
-  // but we resolve to 'general_reminder' for non-adhan contexts here.
-  // The caller (prayer-notifications.ts) already forces 'makkah' before calling us,
-  // so this fallback mainly catches edge cases from other callers.
-  const key = (!soundType || soundType === 'default') ? 'general_reminder' : soundType;
+  // Missing or explicit 'default' → use the phone's system notification sound.
+  // Adhan callers (prayer-notifications.ts) force 'makkah' before calling us,
+  // so this only affects reminder/general-style notifications.
+  if (!soundType || soundType === 'default') return 'default';
 
   // 1. Check installed custom sounds (downloaded from Firebase)
-  const customSoundValue = getNotificationSoundValueSync(key);
+  const customSoundValue = getNotificationSoundValueSync(soundType);
   if (customSoundValue) {
-    console.log(`[resolve-notification-sound] Using custom installed sound for ${key}: ${customSoundValue}`);
+    console.log(`[resolve-notification-sound] Using custom installed sound for ${soundType}: ${customSoundValue}`);
     return customSoundValue;
   }
 
   // 2. Look up in the authoritative sound maps from channels.ts
-  const file = ALL_SOUND_FILES[key];
+  const file = ALL_SOUND_FILES[soundType];
   if (file) {
     return resolveSoundFile(file);
   }
 
-  // 3. Unknown sound type — fall back to a real bundled file, never 'default'
-  console.warn(`[resolve-notification-sound] Sound type '${key}' not found, falling back to general_reminder`);
-  return resolveSoundFile(NOTIFICATION_SOUND_FILES['general_reminder']);
+  // 3. Unknown sound type — fall back to the system default sound
+  console.warn(`[resolve-notification-sound] Sound type '${soundType}' not found, falling back to system default`);
+  return 'default';
 }

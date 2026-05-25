@@ -28,7 +28,7 @@ import {
   BorderRadius,
   FONT_SIZES,
 } from '../../constants/theme';
-import { playPageSound, EFFECT_SOUNDS } from '@/lib/sound-manager';
+import { playPageSound, NOTIFICATION_SOUNDS } from '@/lib/sound-manager';
 
 export default function WirdScreen() {
   const router = useRouter();
@@ -87,7 +87,7 @@ export default function WirdScreen() {
           onPress: async () => {
             setIsCompleting(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            playPageSound('khatmaComplete', EFFECT_SOUNDS.success).catch(() => {});
+            playPageSound('khatmaComplete', NOTIFICATION_SOUNDS.complete).catch(() => {});
             
             const success = await completeTodayWird();
             

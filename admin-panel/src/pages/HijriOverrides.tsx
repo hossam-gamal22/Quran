@@ -1,10 +1,11 @@
 // admin-panel/src/pages/HijriOverrides.tsx
 // إدارة تعديلات التاريخ الهجري حسب الدولة
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { Plus, Trash2, Edit2, Check, X, Globe, Calendar, ExternalLink, Shield, ShieldCheck } from 'lucide-react';
+import { collection, doc, setDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { Plus, Trash2, Edit2, Check, X, Globe, Calendar, ExternalLink, Shield, ShieldCheck, Minus, Save, RefreshCw } from 'lucide-react';
+import { sendHijriOverrideSyncNotification } from '../services/pushNotifications';
 
 // ============================================
 // Types
@@ -25,6 +26,25 @@ interface HijriOverride {
   isVerified: boolean;
 }
 
+interface CurrentHijriDate {
+  day: number;
+  month: number;
+  year: number;
+  monthLength: 29 | 30;
+  source: 'admin' | 'calculated';
+  override?: HijriOverride;
+}
+
+interface CountryDraft {
+  day: number;
+  month: number;
+  year: number;
+  monthLength: 29 | 30;
+  source: string;
+  sourceUrl: string;
+  isVerified: boolean;
+}
+
 // ============================================
 // Constants
 // ============================================
@@ -41,7 +61,7 @@ const HIJRI_MONTHS = [
   { num: 9, ar: 'رمضان', en: 'Ramadan' },
   { num: 10, ar: 'شوال', en: 'Shawwal' },
   { num: 11, ar: 'ذو القعدة', en: 'Dhul Qadah' },
-  { num: 12, ar: 'ذو الحجة', en: 'Dhul Hijjah' },
+  { num: 12, ar: 'ذي الحجة', en: 'Dhul Hijjah' },
 ];
 
 const COUNTRIES = [
@@ -81,10 +101,113 @@ const COUNTRIES = [
 ];
 
 const PRESETS = [
-  { label: 'بداية رمضان', month: 9, desc: 'Ramadan starts' },
-  { label: 'عيد الفطر', month: 10, desc: 'Eid Al-Fitr (Shawwal)' },
-  { label: 'عيد الأضحى', month: 12, desc: 'Eid Al-Adha (Dhul Hijjah)' },
+  { label: 'بداية رمضان', month: 9, eventDay: 1, desc: 'Ramadan starts' },
+  { label: 'عيد الفطر', month: 10, eventDay: 1, desc: 'Eid Al-Fitr (Shawwal)' },
+  { label: 'عيد الأضحى', month: 12, eventDay: 10, desc: 'Eid Al-Adha (Dhul Hijjah)' },
 ];
+
+const DEFAULT_SOURCE = 'تعديل لوحة التحكم';
+const MS_PER_DAY = 86400000;
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+const toIsoDate = (date: Date) =>
+  `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+
+const getTodayUtc = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+};
+
+const getHijriMonthDays = (year: number, month: number): 29 | 30 => {
+  if (month % 2 === 1) return 30;
+  if (month !== 12) return 29;
+  return ((11 * year + 14) % 30) < 11 ? 30 : 29;
+};
+
+const gregorianToHijri = (date: Date = new Date()) => {
+  const g = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const gd = date.getDate();
+  const a = Math.floor((14 - m) / 12);
+  const y = g + 4800 - a;
+  const mo = m + 12 * a - 3;
+  const julianDay =
+    gd +
+    Math.floor((153 * mo + 2) / 5) +
+    365 * y +
+    Math.floor(y / 4) -
+    Math.floor(y / 100) +
+    Math.floor(y / 400) -
+    32045;
+
+  const l = julianDay - 1948440 + 10632;
+  const n = Math.floor((l - 1) / 10631);
+  const l2 = l - 10631 * n + 354;
+  const j =
+    Math.floor((10985 - l2) / 5316) * Math.floor((50 * l2) / 17719) +
+    Math.floor(l2 / 5670) * Math.floor((43 * l2) / 15238);
+  const l3 =
+    l2 -
+    Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) -
+    Math.floor(j / 16) * Math.floor((15238 * j) / 43) +
+    29;
+
+  let year = 30 * n + j - 30;
+  let month = Math.floor((24 * (l3 - 1)) / 709);
+  let day = l3 - Math.floor((709 * month) / 24);
+  const maxDays = getHijriMonthDays(year, month);
+  if (day > maxDays) {
+    day -= maxDays;
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return { day, month, year, monthLength: getHijriMonthDays(year, month) };
+};
+
+const getAdjacentHijriMonthKeys = (year: number, month: number) => {
+  const previous = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+  const current = { year, month };
+  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+  return [previous, current, next];
+};
+
+const parseIsoDate = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const deriveMonthStartFromToday = (todayHijriDay: number) => {
+  const start = getTodayUtc();
+  start.setUTCDate(start.getUTCDate() - (todayHijriDay - 1));
+  return toIsoDate(start);
+};
+
+const deriveMonthStartFromEvent = (eventGregorianDate: string, eventHijriDay: number) => {
+  const date = parseIsoDate(eventGregorianDate);
+  if (!date) return '';
+  date.setUTCDate(date.getUTCDate() - (eventHijriDay - 1));
+  return toIsoDate(date);
+};
+
+const isTodayInsideOverride = (override: HijriOverride) => {
+  const startDate = parseIsoDate(override.hijriStartGregorian);
+  if (!startDate) return false;
+  const diffDays = Math.floor((getTodayUtc().getTime() - startDate.getTime()) / MS_PER_DAY);
+  return diffDays >= 0 && diffDays < override.monthLength;
+};
+
+const getOverrideHijriDay = (override: HijriOverride) => {
+  const startDate = parseIsoDate(override.hijriStartGregorian);
+  if (!startDate) return null;
+  const diffDays = Math.floor((getTodayUtc().getTime() - startDate.getTime()) / MS_PER_DAY) + 1;
+  if (diffDays < 1 || diffDays > override.monthLength) return null;
+  return diffDays;
+};
 
 // ============================================
 // Component
@@ -97,6 +220,27 @@ const HijriOverrides: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [savingCountry, setSavingCountry] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, CountryDraft>>({});
+
+  const pushHijriSync = async (payload: {
+    countryCode: string;
+    countryName: string;
+    hijriYear: number;
+    hijriMonth: number;
+    monthLength: 29 | 30;
+    hijriStartGregorian: string;
+    source: string;
+    sourceUrl?: string;
+    isVerified: boolean;
+    deleted?: boolean;
+  }) => {
+    try {
+      await sendHijriOverrideSyncNotification(payload);
+    } catch (error) {
+      console.warn('Hijri push sync failed:', error);
+    }
+  };
 
   // Form state
   const [form, setForm] = useState({
@@ -117,25 +261,38 @@ const HijriOverrides: React.FC = () => {
   const fetchOverrides = async () => {
     setLoading(true);
     try {
-      const snapshot = await getDocs(collection(db, 'hijri_overrides'));
-      const data: HijriOverride[] = [];
-      snapshot.forEach(docSnap => {
-        data.push({ id: docSnap.id, ...docSnap.data() } as HijriOverride);
-      });
-      // Sort by year desc, then month desc, then country
+      // Kept for manual refresh paths; realtime data is wired in the effect below.
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching overrides:', err);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'hijri_overrides'),
+      snapshot => {
+        const data: HijriOverride[] = [];
+        snapshot.forEach(docSnap => {
+          data.push({ id: docSnap.id, ...docSnap.data() } as HijriOverride);
+        });
       data.sort((a, b) => {
         if (a.hijriYear !== b.hijriYear) return b.hijriYear - a.hijriYear;
         if (a.hijriMonth !== b.hijriMonth) return b.hijriMonth - a.hijriMonth;
         return a.countryCode.localeCompare(b.countryCode);
       });
       setOverrides(data);
-    } catch (err) {
-      console.error('Error fetching overrides:', err);
-    }
-    setLoading(false);
-  };
+        setLoading(false);
+      },
+      err => {
+        console.error('Error subscribing to overrides:', err);
+        setLoading(false);
+      }
+    );
 
-  useEffect(() => { fetchOverrides(); }, []);
+    return unsubscribe;
+  }, []);
 
   // ============================================
   // Save override
@@ -160,6 +317,17 @@ const HijriOverrides: React.FC = () => {
         updatedBy: 'admin',
         isVerified: form.isVerified,
       });
+      await pushHijriSync({
+        countryCode: form.countryCode,
+        countryName: country?.en || form.countryCode,
+        hijriYear: form.hijriYear,
+        hijriMonth: form.hijriMonth,
+        monthLength: form.monthLength,
+        hijriStartGregorian: form.hijriStartGregorian,
+        source: form.source,
+        sourceUrl: form.sourceUrl || '',
+        isVerified: form.isVerified,
+      });
       setShowForm(false);
       setEditingId(null);
       resetForm();
@@ -176,7 +344,22 @@ const HijriOverrides: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      const existing = overrides.find(override => override.id === id);
       await deleteDoc(doc(db, 'hijri_overrides', id));
+      if (existing) {
+        await pushHijriSync({
+          countryCode: existing.countryCode,
+          countryName: existing.countryName,
+          hijriYear: existing.hijriYear,
+          hijriMonth: existing.hijriMonth,
+          monthLength: existing.monthLength,
+          hijriStartGregorian: existing.hijriStartGregorian,
+          source: existing.source,
+          sourceUrl: existing.sourceUrl || '',
+          isVerified: existing.isVerified,
+          deleted: true,
+        });
+      }
       setDeleteConfirmId(null);
       await fetchOverrides();
     } catch (err) {
@@ -216,8 +399,149 @@ const HijriOverrides: React.FC = () => {
     });
   };
 
-  const applyPreset = (preset: typeof PRESETS[0]) => {
-    setForm(prev => ({ ...prev, hijriMonth: preset.month }));
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    countryCode: 'SA',
+    hijriYear: 1447,
+    hijriMonth: 9,
+    eventHijriDay: 1,
+    eventGregorianDate: toIsoDate(getTodayUtc()),
+    monthLength: 30 as 29 | 30,
+    source: '',
+    sourceUrl: '',
+    isVerified: true,
+    title: 'تاريخ المناسبة',
+  });
+
+  const openEventPreset = (preset: typeof PRESETS[0]) => {
+    const inferredYear = approximateToday.year;
+    setEventForm(prev => ({
+      ...prev,
+      hijriYear: inferredYear,
+      hijriMonth: preset.month,
+      eventHijriDay: preset.eventDay,
+      eventGregorianDate: toIsoDate(getTodayUtc()),
+      monthLength: getHijriMonthDays(inferredYear, preset.month),
+      source: prev.source || DEFAULT_SOURCE,
+      title: preset.label,
+    }));
+    setShowEventForm(true);
+  };
+
+  const approximateToday = useMemo(() => gregorianToHijri(new Date()), []);
+  const activeMonthKeys = useMemo(
+    () => getAdjacentHijriMonthKeys(approximateToday.year, approximateToday.month),
+    [approximateToday.year, approximateToday.month]
+  );
+
+  const currentCountryRows = useMemo(() => {
+    return COUNTRIES.map(country => {
+      const activeOverride = overrides.find(override =>
+        override.countryCode === country.code &&
+        override.isVerified &&
+        activeMonthKeys.some(key => key.year === override.hijriYear && key.month === override.hijriMonth) &&
+        isTodayInsideOverride(override)
+      );
+      const overrideDay = activeOverride ? getOverrideHijriDay(activeOverride) : null;
+      const current: CurrentHijriDate = activeOverride && overrideDay
+        ? {
+            day: overrideDay,
+            month: activeOverride.hijriMonth,
+            year: activeOverride.hijriYear,
+            monthLength: activeOverride.monthLength,
+            source: 'admin',
+            override: activeOverride,
+          }
+        : {
+            day: approximateToday.day,
+            month: approximateToday.month,
+            year: approximateToday.year,
+            monthLength: approximateToday.monthLength,
+            source: 'calculated',
+          };
+
+      return { country, current };
+    });
+  }, [activeMonthKeys, approximateToday, overrides]);
+
+  const getDraftForCountry = (countryCode: string, current: CurrentHijriDate): CountryDraft =>
+    drafts[countryCode] || {
+      day: current.day,
+      month: current.month,
+      year: current.year,
+      monthLength: current.monthLength,
+      source: current.override?.source || DEFAULT_SOURCE,
+      sourceUrl: current.override?.sourceUrl || '',
+      isVerified: true,
+    };
+
+  const updateDraft = (countryCode: string, current: CurrentHijriDate, patch: Partial<CountryDraft>) => {
+    setDrafts(prev => ({
+      ...prev,
+      [countryCode]: {
+        ...getDraftForCountry(countryCode, current),
+        ...patch,
+      },
+    }));
+  };
+
+  const saveCountryDate = async (
+    countryCode: string,
+    countryName: string,
+    current: CurrentHijriDate,
+    overrideDraft?: Partial<CountryDraft>,
+  ) => {
+    const draft = { ...getDraftForCountry(countryCode, current), ...overrideDraft };
+    const safeDay = Math.max(1, Math.min(draft.monthLength, draft.day));
+    const docId = `${countryCode}_${draft.year}_${draft.month}`;
+
+    setSavingCountry(countryCode);
+    try {
+      await setDoc(doc(db, 'hijri_overrides', docId), {
+        countryCode,
+        countryName,
+        hijriYear: draft.year,
+        hijriMonth: draft.month,
+        monthLength: draft.monthLength,
+        hijriStartGregorian: deriveMonthStartFromToday(safeDay),
+        source: draft.source || DEFAULT_SOURCE,
+        sourceUrl: draft.sourceUrl || '',
+        announcedAt: Timestamp.now(),
+        updatedBy: 'admin',
+        isVerified: draft.isVerified,
+      });
+      await pushHijriSync({
+        countryCode,
+        countryName,
+        hijriYear: draft.year,
+        hijriMonth: draft.month,
+        monthLength: draft.monthLength,
+        hijriStartGregorian: deriveMonthStartFromToday(safeDay),
+        source: draft.source || DEFAULT_SOURCE,
+        sourceUrl: draft.sourceUrl || '',
+        isVerified: draft.isVerified,
+      });
+      setDrafts(prev => {
+        const next = { ...prev };
+        delete next[countryCode];
+        return next;
+      });
+    } catch (err) {
+      console.error('Error saving country date:', err);
+    } finally {
+      setSavingCountry(null);
+    }
+  };
+
+  const quickAdjustCountry = async (
+    countryCode: string,
+    countryName: string,
+    current: CurrentHijriDate,
+    delta: number,
+  ) => {
+    const draft = getDraftForCountry(countryCode, current);
+    const nextDay = Math.max(1, Math.min(draft.monthLength, draft.day + delta));
+    await saveCountryDate(countryCode, countryName, current, { ...draft, day: nextDay });
   };
 
   // ============================================
@@ -273,10 +597,65 @@ const HijriOverrides: React.FC = () => {
         updatedBy: 'admin',
         isVerified: todayForm.isVerified,
       });
+      await pushHijriSync({
+        countryCode: todayForm.countryCode,
+        countryName: country?.en || todayForm.countryCode,
+        hijriYear: todayForm.hijriYear,
+        hijriMonth: todayForm.hijriMonth,
+        monthLength: todayForm.monthLength,
+        hijriStartGregorian,
+        source: todayForm.source,
+        sourceUrl: todayForm.sourceUrl || '',
+        isVerified: todayForm.isVerified,
+      });
       setShowTodayForm(false);
       await fetchOverrides();
     } catch (err) {
       console.error('Error saving today override:', err);
+    }
+    setSaving(false);
+  };
+
+  const handleSaveEvent = async () => {
+    if (!eventForm.eventGregorianDate || !eventForm.source) return;
+    const hijriStartGregorian = deriveMonthStartFromEvent(
+      eventForm.eventGregorianDate,
+      eventForm.eventHijriDay
+    );
+    if (!hijriStartGregorian) return;
+
+    setSaving(true);
+    try {
+      const country = COUNTRIES.find(c => c.code === eventForm.countryCode);
+      const docId = `${eventForm.countryCode}_${eventForm.hijriYear}_${eventForm.hijriMonth}`;
+      await setDoc(doc(db, 'hijri_overrides', docId), {
+        countryCode: eventForm.countryCode,
+        countryName: country?.en || eventForm.countryCode,
+        hijriYear: eventForm.hijriYear,
+        hijriMonth: eventForm.hijriMonth,
+        monthLength: eventForm.monthLength,
+        hijriStartGregorian,
+        source: eventForm.source,
+        sourceUrl: eventForm.sourceUrl || '',
+        announcedAt: Timestamp.now(),
+        updatedBy: 'admin',
+        isVerified: eventForm.isVerified,
+      });
+      await pushHijriSync({
+        countryCode: eventForm.countryCode,
+        countryName: country?.en || eventForm.countryCode,
+        hijriYear: eventForm.hijriYear,
+        hijriMonth: eventForm.hijriMonth,
+        monthLength: eventForm.monthLength,
+        hijriStartGregorian,
+        source: eventForm.source,
+        sourceUrl: eventForm.sourceUrl || '',
+        isVerified: eventForm.isVerified,
+      });
+      setShowEventForm(false);
+      await fetchOverrides();
+    } catch (err) {
+      console.error('Error saving event override:', err);
     }
     setSaving(false);
   };
@@ -290,6 +669,50 @@ const HijriOverrides: React.FC = () => {
     const c = COUNTRIES.find(co => co.code === code);
     return c ? c.name : code;
   };
+
+  const parseIsoDate = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(Date.UTC(year, month - 1, day));
+  };
+
+  const getCurrentHijriDay = (override: HijriOverride) => {
+    const startDate = parseIsoDate(override.hijriStartGregorian);
+    if (!startDate) return null;
+
+    const today = getTodayUtc();
+    const diffDays = Math.floor((today.getTime() - startDate.getTime()) / 86400000) + 1;
+    if (diffDays >= 1 && diffDays <= override.monthLength) {
+      return diffDays;
+    }
+    return null;
+  };
+
+  const getCurrentDayLabel = (override: HijriOverride) => {
+    const startDate = parseIsoDate(override.hijriStartGregorian);
+    if (!startDate) return 'غير صالح';
+
+    const today = getTodayUtc();
+    const endDate = new Date(startDate.getTime() + (override.monthLength - 1) * 86400000);
+    const currentDay = getCurrentHijriDay(override);
+
+    if (currentDay !== null) {
+      return `${currentDay}`;
+    }
+    if (today < startDate) {
+      return 'لم يبدأ';
+    }
+    if (today > endDate) {
+      return 'انتهى';
+    }
+    return 'غير متوفر';
+  };
+
+  const eventMonthStartGregorian = deriveMonthStartFromEvent(
+    eventForm.eventGregorianDate,
+    eventForm.eventHijriDay
+  );
+  const selectedEventMonth = HIJRI_MONTHS[eventForm.hijriMonth - 1];
 
   // ============================================
   // Render
@@ -327,17 +750,189 @@ const HijriOverrides: React.FC = () => {
         {PRESETS.map(preset => (
           <button
             key={preset.month}
-            onClick={() => {
-              applyPreset(preset);
-              setEditingId(null);
-              setShowForm(true);
-            }}
+            onClick={() => openEventPreset(preset)}
             className="px-4 py-2 bg-admin-surface hover:bg-admin-surface-light text-slate-300 rounded-lg border border-admin-border transition-colors text-sm"
           >
             <Calendar className="w-4 h-4 inline ml-2" />
             {preset.label}
           </button>
         ))}
+      </div>
+
+      {/* Current country dates */}
+      <div className="bg-admin-surface/50 rounded-2xl border border-admin-border/50 overflow-hidden" dir="rtl">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-admin-border/50">
+          <div>
+            <h2 className="text-lg font-bold text-white">تاريخ اليوم حسب الدولة</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              عدّل اليوم الهجري لكل دولة. الحفظ يكتب مباشرة في Firestore ويصل لمستخدمي الدولة فوراً.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300">
+              {overrides.filter(override => override.isVerified && isTodayInsideOverride(override)).length} تعديل نشط
+            </span>
+            <button
+              onClick={() => setDrafts({})}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              إعادة القيم
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-admin-surface text-slate-400 border-b border-admin-border">
+                <th className="text-right px-4 py-3">الدولة</th>
+                <th className="text-center px-4 py-3">المعروض حالياً</th>
+                <th className="text-center px-4 py-3">اليوم</th>
+                <th className="text-center px-4 py-3">الشهر</th>
+                <th className="text-center px-4 py-3">السنة</th>
+                <th className="text-center px-4 py-3">طول الشهر</th>
+                <th className="text-right px-4 py-3">المصدر</th>
+                <th className="text-center px-4 py-3">نشر فوري</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentCountryRows.map(({ country, current }) => {
+                const draft = getDraftForCountry(country.code, current);
+                const isDirty =
+                  draft.day !== current.day ||
+                  draft.month !== current.month ||
+                  draft.year !== current.year ||
+                  draft.monthLength !== current.monthLength ||
+                  draft.source !== (current.override?.source || DEFAULT_SOURCE);
+
+                return (
+                  <tr key={country.code} className="border-b border-admin-border/50 hover:bg-admin-surface/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-white">{country.name}</div>
+                      <div className="text-xs text-slate-500" dir="ltr">{country.code} · {country.en}</div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="font-bold text-white">
+                        {current.day} {HIJRI_MONTHS[current.month - 1]?.ar} {current.year} هـ
+                      </div>
+                      <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-xs ${
+                        current.source === 'admin'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : 'bg-slate-700/70 text-slate-300'
+                      }`}>
+                        {current.source === 'admin' ? 'من الأدمن' : 'حساب تلقائي'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => quickAdjustCountry(country.code, country.en, current, -1)}
+                          disabled={savingCountry === country.code || draft.day <= 1}
+                          className="p-2 rounded-lg bg-admin-surface-light hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors"
+                          title="إنقاص يوم ونشر فوراً"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={draft.monthLength}
+                          value={draft.day}
+                          onChange={e => updateDraft(country.code, current, { day: Math.max(1, Math.min(draft.monthLength, parseInt(e.target.value) || 1)) })}
+                          className="w-16 bg-admin-surface-light text-white rounded-lg px-2 py-2 border border-admin-border text-center"
+                          aria-label={`اليوم الهجري ${country.name}`}
+                        />
+                        <button
+                          onClick={() => quickAdjustCountry(country.code, country.en, current, 1)}
+                          disabled={savingCountry === country.code || draft.day >= draft.monthLength}
+                          className="p-2 rounded-lg bg-admin-surface-light hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors"
+                          title="زيادة يوم ونشر فوراً"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={draft.month}
+                        onChange={e => {
+                          const month = parseInt(e.target.value);
+                          updateDraft(country.code, current, {
+                            month,
+                            monthLength: getHijriMonthDays(draft.year, month),
+                          });
+                        }}
+                        className="bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border"
+                        aria-label={`الشهر الهجري ${country.name}`}
+                      >
+                        {HIJRI_MONTHS.map(month => (
+                          <option key={month.num} value={month.num}>{month.ar}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        value={draft.year}
+                        onChange={e => {
+                          const year = parseInt(e.target.value) || approximateToday.year;
+                          updateDraft(country.code, current, {
+                            year,
+                            monthLength: getHijriMonthDays(year, draft.month),
+                          });
+                        }}
+                        className="w-24 bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border text-center"
+                        aria-label={`السنة الهجرية ${country.name}`}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center gap-2">
+                        {[29, 30].map(length => (
+                          <button
+                            key={length}
+                            onClick={() => updateDraft(country.code, current, { monthLength: length as 29 | 30, day: Math.min(draft.day, length) })}
+                            className={`px-3 py-2 rounded-lg border text-xs transition-colors ${
+                              draft.monthLength === length
+                                ? 'bg-accent border-accent text-white'
+                                : 'bg-admin-surface-light border-admin-border text-slate-300'
+                            }`}
+                          >
+                            {length}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 min-w-56">
+                      <input
+                        type="text"
+                        value={draft.source}
+                        onChange={e => updateDraft(country.code, current, { source: e.target.value })}
+                        className="w-full bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border text-right"
+                        placeholder={DEFAULT_SOURCE}
+                        aria-label={`مصدر تعديل ${country.name}`}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => saveCountryDate(country.code, country.en, current)}
+                        disabled={savingCountry === country.code || !draft.source}
+                        className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                          isDirty
+                            ? 'bg-accent hover:bg-accent-dark text-white'
+                            : 'bg-admin-surface-light hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        <Save className="w-4 h-4" />
+                        {savingCountry === country.code ? 'نشر...' : 'نشر'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Quick "today's Hijri date" modal */}
@@ -460,7 +1055,7 @@ const HijriOverrides: React.FC = () => {
                   }`}
                   aria-label="حالة التوثيق"
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${todayForm.isVerified ? 'translate-x-1' : 'translate-x-6'}`} />
+                  <span className={`absolute left-0.5 top-0.5 inline-block h-4 w-4 rounded-full bg-white transition-transform ${todayForm.isVerified ? 'translate-x-5' : 'translate-x-0'}`} />
                 </button>
               </div>
             </div>
@@ -475,6 +1070,189 @@ const HijriOverrides: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowTodayForm(false)}
+                className="px-4 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event date modal for Ramadan/Eid shortcuts */}
+      {showEventForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-admin-surface rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">نشر {eventForm.title}</h2>
+              <button onClick={() => setShowEventForm(false)} className="text-slate-400 hover:text-white" aria-label="إغلاق">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-400 mb-4">
+              اختر يوم المناسبة فقط، وسيتم حساب باقي أيام الشهر تلقائياً من هذا اليوم.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">الدولة</label>
+                <select
+                  value={eventForm.countryCode}
+                  onChange={e => setEventForm(prev => ({ ...prev, countryCode: e.target.value }))}
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="اختر الدولة"
+                >
+                  {COUNTRIES.map(c => (
+                    <option key={c.code} value={c.code}>{c.name} ({c.en})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">تاريخ {eventForm.title} (ميلادي)</label>
+                <input
+                  type="date"
+                  value={eventForm.eventGregorianDate}
+                  onChange={e => setEventForm(prev => ({ ...prev, eventGregorianDate: e.target.value }))}
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label={`تاريخ ${eventForm.title}`}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">اليوم الهجري</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={eventForm.monthLength}
+                    value={eventForm.eventHijriDay}
+                    onChange={e => setEventForm(prev => ({ ...prev, eventHijriDay: Math.max(1, Math.min(prev.monthLength, parseInt(e.target.value) || 1)) }))}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border text-center"
+                    aria-label="اليوم الهجري للمناسبة"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">الشهر</label>
+                  <select
+                    value={eventForm.hijriMonth}
+                    onChange={e => {
+                      const month = parseInt(e.target.value);
+                      setEventForm(prev => ({
+                        ...prev,
+                        hijriMonth: month,
+                        monthLength: getHijriMonthDays(prev.hijriYear, month),
+                        eventHijriDay: Math.min(prev.eventHijriDay, getHijriMonthDays(prev.hijriYear, month)),
+                      }));
+                    }}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                    aria-label="الشهر الهجري"
+                  >
+                    {HIJRI_MONTHS.map(m => (
+                      <option key={m.num} value={m.num}>{m.ar}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">السنة</label>
+                  <input
+                    type="number"
+                    value={eventForm.hijriYear}
+                    onChange={e => {
+                      const year = parseInt(e.target.value) || approximateToday.year;
+                      setEventForm(prev => ({
+                        ...prev,
+                        hijriYear: year,
+                        monthLength: getHijriMonthDays(year, prev.hijriMonth),
+                        eventHijriDay: Math.min(prev.eventHijriDay, getHijriMonthDays(year, prev.hijriMonth)),
+                      }));
+                    }}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border text-center"
+                    aria-label="السنة الهجرية"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-admin-border bg-admin-surface-light/60 p-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-slate-400">سيُحفظ داخلياً كبداية شهر {selectedEventMonth?.ar}</span>
+                  <span className="font-semibold text-white" dir="ltr">{eventMonthStartGregorian || 'غير صالح'}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">نهاية الشهر</label>
+                <div className="flex gap-2">
+                  {[29, 30].map(len => (
+                    <button
+                      key={len}
+                      onClick={() => setEventForm(prev => ({
+                        ...prev,
+                        monthLength: len as 29 | 30,
+                        eventHijriDay: Math.min(prev.eventHijriDay, len),
+                      }))}
+                      className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+                        eventForm.monthLength === len
+                          ? 'bg-accent text-white border-accent'
+                          : 'bg-admin-surface-light text-slate-300 border-admin-border'
+                      }`}
+                    >
+                      {len} يوم
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">المصدر الرسمي</label>
+                <input
+                  type="text"
+                  value={eventForm.source}
+                  onChange={e => setEventForm(prev => ({ ...prev, source: e.target.value }))}
+                  placeholder="مثال: دار الإفتاء المصرية"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="المصدر الرسمي"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">رابط المصدر (اختياري)</label>
+                <input
+                  type="url"
+                  value={eventForm.sourceUrl}
+                  onChange={e => setEventForm(prev => ({ ...prev, sourceUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="رابط المصدر"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-slate-300">موثق رسمياً</span>
+                <button
+                  onClick={() => setEventForm(prev => ({ ...prev, isVerified: !prev.isVerified }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    eventForm.isVerified ? 'bg-accent' : 'bg-admin-surface-light'
+                  }`}
+                  aria-label="حالة التوثيق"
+                >
+                  <span className={`absolute left-0.5 top-0.5 inline-block h-4 w-4 rounded-full bg-white transition-transform ${eventForm.isVerified ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                disabled={saving || !eventForm.eventGregorianDate || !eventForm.source || !eventMonthStartGregorian}
+                onClick={handleSaveEvent}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dark disabled:opacity-50 text-white rounded-xl transition-colors"
+              >
+                <Check className="w-4 h-4" />
+                {saving ? 'جاري الحفظ...' : 'نشر'}
+              </button>
+              <button
+                onClick={() => setShowEventForm(false)}
                 className="px-4 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
               >
                 إلغاء
@@ -602,10 +1380,10 @@ const HijriOverrides: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, isVerified: !prev.isVerified }))}
-                  className={`w-12 h-6 rounded-full transition-colors ${form.isVerified ? 'bg-accent' : 'bg-admin-surface-light'}`}
+                  className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${form.isVerified ? 'bg-accent' : 'bg-admin-surface-light'}`}
                   aria-label={form.isVerified ? 'موثق رسمياً' : 'غير موثق'}
                 >
-                  <div className={`w-5 h-5 rounded-full bg-white transition-transform ${form.isVerified ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  <div className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${form.isVerified ? 'translate-x-6' : 'translate-x-0'}`} />
                 </button>
                 <span className="text-sm text-slate-300">
                   {form.isVerified ? 'موثق رسمياً' : 'غير موثق'}
@@ -653,6 +1431,7 @@ const HijriOverrides: React.FC = () => {
                   <th className="text-right px-4 py-3">الشهر</th>
                   <th className="text-right px-4 py-3">السنة</th>
                   <th className="text-center px-4 py-3">الأيام</th>
+                  <th className="text-center px-4 py-3">اليوم الحالي</th>
                   <th className="text-right px-4 py-3">البداية</th>
                   <th className="text-right px-4 py-3">المصدر</th>
                   <th className="text-center px-4 py-3">الحالة</th>
@@ -674,6 +1453,17 @@ const HijriOverrides: React.FC = () => {
                       }`}>
                         {ov.monthLength} يوم
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-white font-semibold">
+                      {getCurrentHijriDay(ov) !== null ? (
+                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs">
+                          {getCurrentHijriDay(ov)}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-slate-700/70 text-slate-300 text-xs">
+                          {getCurrentDayLabel(ov)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-300" dir="ltr">{ov.hijriStartGregorian}</td>
                     <td className="px-4 py-3">

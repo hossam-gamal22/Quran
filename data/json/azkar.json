@@ -363,26 +363,26 @@
     "id": 7,
     "category": "1",
     "arabic": "اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا ، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ.",
-    "transliteration": "(Allahumma bika asbahna wabika amsayna, wabika nahya ,wabika namootu wa-ilaykan-nushoor.)[In the evening:] (Allahumma bika amsayna, wabika asbahna, wabika nahya wabika namootu wa-ilaykal-maseer.)",
+    "transliteration": "(Allahumma bika asbahna wabika amsayna, wabika nahya ,wabika namootu wa-ilaykan-nushoor.)",
     "translations": {
       "ar": {
         "text": "((اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا ، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ)).",
         "verified": true
       },
       "en": {
-        "text": "(O Allah, by your leave we have reached the morning and by Your leave we have reached the evening, by Your leave we live and die and unto You is our resurrection.)[In the evening:](O Allah, by Your leave we have reached the evening and by Your leave we have reached the morning, by Your leave we live and die and unto You is our return.)",
+        "text": "(O Allah, by your leave we have reached the morning and by Your leave we have reached the evening, by Your leave we live and die and unto You is our resurrection.)",
         "verified": true
       },
       "de": {
-        "text": "(O Allah, durch deine Erlaubnis haben wir den Morgen erreicht und durch deine Erlaubnis haben wir den Abend erreicht, durch deine Erlaubnis leben und sterben wir und zu dir ist unsere Auferstehung.)[Am Abend:](O Allah, durch deine Erlaubnis haben wir den Abend erreicht und durch deine Erlaubnis haben wir den Morgen erreicht, durch deine Erlaubnis leben und sterben wir und zu dir ist unsere Rückkehr.)",
+        "text": "(O Allah, durch deine Erlaubnis haben wir den Morgen erreicht und durch deine Erlaubnis haben wir den Abend erreicht, durch deine Erlaubnis leben und sterben wir und zu dir ist unsere Auferstehung.)",
         "verified": false
       },
       "es": {
-        "text": "(Oh Allah, con Tu permiso hemos llegado a la mañana y con Tu permiso hemos llegado a la tarde, con Tu permiso vivimos y morimos y a Ti es nuestra resurrección). [Por la tarde:] (Oh Allah, con Tu permiso hemos llegado a la tarde y con Tu permiso hemos llegado a la mañana, con Tu permiso vivimos y morimos y a Ti es nuestro regreso.)",
+        "text": "(Oh Allah, con Tu permiso hemos llegado a la mañana y con Tu permiso hemos llegado a la tarde, con Tu permiso vivimos y morimos y a Ti es nuestra resurrección).",
         "verified": false
       },
       "tr": {
-        "text": "(Allah'ım, senin izninle sabaha ulaştık, Senin izninle akşama ulaştık, Senin izninle yaşar ve ölürüz ve dönüşümüz Sanadır.)[Akşam:](Allah'ım, Senin izninle akşama ulaştık, Senin izninle sabahladık, Senin izninle yaşar ve ölürüz ve dönüşümüz sanadır.)",
+        "text": "(Allah'ım, senin izninle sabaha ulaştık, Senin izninle akşama ulaştık, Senin izninle yaşar ve ölürüz ve dönüşümüz Sanadır.)",
         "verified": false
       },
       "ur": {
@@ -394,15 +394,15 @@
         "verified": false
       },
       "bn": {
-        "text": "(হে আল্লাহ, তোমার হুকুমে আমরা সকালে উপনীত হয়েছি এবং তোমার হুকুমে আমরা সন্ধ্যায় উপনীত হয়েছি, তোমারই অনুমতিতে আমরা বেঁচে আছি এবং মৃত্যুবরণ করেছি এবং তোমার কাছেই আমাদের পুনরুত্থান।) [সন্ধ্যায়:] (হে আল্লাহ, তোমার অনুমতিতে আমরা সন্ধ্যায় উপনীত হয়েছি এবং তোমার অনুমতিতে আমরা প্রভাতে উপনীত হয়েছি, তোমার নির্দেশে আমরা বেঁচে আছি এবং মরেছি এবং তোমার কাছেই আমাদের প্রত্যাবর্তন।)",
+        "text": "(হে আল্লাহ, তোমার হুকুমে আমরা সকালে উপনীত হয়েছি এবং তোমার হুকুমে আমরা সন্ধ্যায় উপনীত হয়েছি, তোমারই অনুমতিতে আমরা বেঁচে আছি এবং মৃত্যুবরণ করেছি এবং তোমার কাছেই আমাদের পুনরুত্থান।)",
         "verified": false
       },
       "ru": {
-        "text": "(О Аллах, с Твоего соизволения мы достигли утра, с Твоего соизволения мы достигли вечера, с Твоего соизволения мы живем и умираем, и к Тебе - наше воскресение.) [Вечером:] (О Аллах, с Твоего соизволения мы достигли вечера и с Твоего соизволения мы достигли утра, с Твоего соизволения мы живем и умираем, и к Тебе - наше возвращение.)",
+        "text": "(О Аллах, с Твоего соизволения мы достигли утра, с Твоего соизволения мы достигли вечера, с Твоего соизволения мы живем и умираем, и к Тебе - наше воскресение.)",
         "verified": false
       },
       "fr": {
-        "text": "(Ô Allah, par ta permission nous avons atteint le matin et par Ta permission nous avons atteint le soir, par Ta permission nous vivons et mourons et c'est à Toi qu'est notre résurrection.) [Le soir :] (O Allah, par Ta permission nous avons atteint le soir et par Ta permission nous avons atteint le matin, par Ta permission nous vivons et mourons et vers Toi est notre retour.)",
+        "text": "(Ô Allah, par ta permission nous avons atteint le matin et par Ta permission nous avons atteint le soir, par Ta permission nous vivons et mourons et c'est à Toi qu'est notre résurrection.)",
         "verified": false
       },
       "id": {
@@ -410,7 +410,7 @@
         "verified": false
       },
       "ms": {
-        "text": "(Ya Allah, dengan izin-Mu kami sampai ke waktu pagi dan dengan izin-Mu kami sampai ke petang, dengan izin-Mu kami hidup dan mati dan kepada-Mu kami dibangkitkan.) [Pada waktu petang:] (Ya Allah, dengan izin-Mu kami sampai waktu petang dan dengan izin-Mu kami sampai waktu pagi, dengan izin-Mu kami hidup dan mati dan kepada-Mu kami kembali.)",
+        "text": "(Ya Allah, dengan izin-Mu kami sampai ke waktu pagi dan dengan izin-Mu kami sampai ke petang, dengan izin-Mu kami hidup dan mati dan kepada-Mu kami dibangkitkan.)",
         "verified": false
       }
     },
@@ -423,7 +423,7 @@
     "id": 8,
     "category": "1b",
     "arabic": "اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ الْمَصِيرُ.",
-    "transliteration": "(Allahumma bika asbahna wabika amsayna, wabika nahya ,wabika namootu wa-ilaykan-nushoor.)[In the evening:] (Allahumma bika amsayna, wabika asbahna, wabika nahya wabika namootu wa-ilaykal-maseer.)",
+    "transliteration": "(Allahumma bika amsayna, wabika asbahna, wabika nahya wabika namootu wa-ilaykal-maseer.)",
     "translations": {
       "ar": {
         "text": "اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ الْمَصِيرُ.",
@@ -434,15 +434,15 @@
         "verified": true
       },
       "de": {
-        "text": "(O Allah, durch deine Erlaubnis haben wir den Morgen erreicht und durch deine Erlaubnis haben wir den Abend erreicht, durch deine Erlaubnis leben und sterben wir und zu dir ist unsere Auferstehung.)[Am Abend:](O Allah, durch deine Erlaubnis haben wir den Abend erreicht und durch deine Erlaubnis haben wir den Morgen erreicht, durch deine Erlaubnis leben und sterben wir und zu dir ist unsere Rückkehr.)",
+        "text": "(O Allah, durch deine Erlaubnis haben wir den Abend erreicht und durch deine Erlaubnis haben wir den Morgen erreicht, durch deine Erlaubnis leben und sterben wir und zu dir ist unsere Rückkehr.)",
         "verified": false
       },
       "es": {
-        "text": "(Oh Allah, con Tu permiso hemos llegado a la mañana y con Tu permiso hemos llegado a la tarde, con Tu permiso vivimos y morimos y a Ti es nuestra resurrección). [Por la tarde:] (Oh Allah, con Tu permiso hemos llegado a la tarde y con Tu permiso hemos llegado a la mañana, con Tu permiso vivimos y morimos y a Ti es nuestro regreso.)",
+        "text": "(Oh Allah, con Tu permiso hemos llegado a la tarde y con Tu permiso hemos llegado a la mañana, con Tu permiso vivimos y morimos y a Ti es nuestro regreso.)",
         "verified": false
       },
       "tr": {
-        "text": "(Allah'ım, senin izninle sabaha ulaştık, Senin izninle akşama ulaştık, Senin izninle yaşar ve ölürüz ve dönüşümüz Sanadır.)[Akşam:](Allah'ım, Senin izninle akşama ulaştık, Senin izninle sabahladık, Senin izninle yaşar ve ölürüz ve dönüşümüz sanadır.)",
+        "text": "(Allah'ım, Senin izninle akşama ulaştık, Senin izninle sabahladık, Senin izninle yaşar ve ölürüz ve dönüşümüz sanadır.)",
         "verified": false
       },
       "ur": {
@@ -454,15 +454,15 @@
         "verified": false
       },
       "bn": {
-        "text": "(হে আল্লাহ, তোমার হুকুমে আমরা সকালে উপনীত হয়েছি এবং তোমার হুকুমে আমরা সন্ধ্যায় উপনীত হয়েছি, তোমারই অনুমতিতে আমরা বেঁচে আছি এবং মৃত্যুবরণ করেছি এবং তোমার কাছেই আমাদের পুনরুত্থান।) [সন্ধ্যায়:] (হে আল্লাহ, তোমার অনুমতিতে আমরা সন্ধ্যায় উপনীত হয়েছি এবং তোমার অনুমতিতে আমরা প্রভাতে উপনীত হয়েছি, তোমার নির্দেশে আমরা বেঁচে আছি এবং মরেছি এবং তোমার কাছেই আমাদের প্রত্যাবর্তন।)",
+        "text": "(হে আল্লাহ, তোমার অনুমতিতে আমরা সন্ধ্যায় উপনীত হয়েছি এবং তোমার অনুমতিতে আমরা প্রভাতে উপনীত হয়েছি, তোমার নির্দেশে আমরা বেঁচে আছি এবং মরেছি এবং তোমার কাছেই আমাদের প্রত্যাবর্তন।)",
         "verified": false
       },
       "ru": {
-        "text": "(О Аллах, с Твоего соизволения мы достигли утра, с Твоего соизволения мы достигли вечера, с Твоего соизволения мы живем и умираем, и к Тебе - наше воскресение.) [Вечером:] (О Аллах, с Твоего соизволения мы достигли вечера и с Твоего соизволения мы достигли утра, с Твоего соизволения мы живем и умираем, и к Тебе - наше возвращение.)",
+        "text": "(О Аллах, с Твоего соизволения мы достигли вечера и с Твоего соизволения мы достигли утра, с Твоего соизволения мы живем и умираем, и к Тебе - наше возвращение.)",
         "verified": false
       },
       "fr": {
-        "text": "(Ô Allah, par ta permission nous avons atteint le matin et par Ta permission nous avons atteint le soir, par Ta permission nous vivons et mourons et c'est à Toi qu'est notre résurrection.) [Le soir :] (O Allah, par Ta permission nous avons atteint le soir et par Ta permission nous avons atteint le matin, par Ta permission nous vivons et mourons et vers Toi est notre retour.)",
+        "text": "(O Allah, par Ta permission nous avons atteint le soir et par Ta permission nous avons atteint le matin, par Ta permission nous vivons et mourons et vers Toi est notre retour.)",
         "verified": false
       },
       "id": {
@@ -470,7 +470,7 @@
         "verified": false
       },
       "ms": {
-        "text": "(Ya Allah, dengan izin-Mu kami sampai ke waktu pagi dan dengan izin-Mu kami sampai ke petang, dengan izin-Mu kami hidup dan mati dan kepada-Mu kami dibangkitkan.) [Pada waktu petang:] (Ya Allah, dengan izin-Mu kami sampai waktu petang dan dengan izin-Mu kami sampai waktu pagi, dengan izin-Mu kami hidup dan mati dan kepada-Mu kami kembali.)",
+        "text": "(Ya Allah, dengan izin-Mu kami sampai waktu petang dan dengan izin-Mu kami sampai waktu pagi, dengan izin-Mu kami hidup dan mati dan kepada-Mu kami kembali.)",
         "verified": false
       }
     },
@@ -1683,54 +1683,54 @@
     "id": 29,
     "category": "1",
     "arabic": "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ رَبِّ الْعَالَمِينَ، اللَّهُـمَّ إِنِّي أَسْأَلُكَ خَيْرَ هَذَا الْيَوْمِ:فَتْحَهُ، وَنَصْرَهُ، وَنورَهُ، وَبَرَكَتَهُ، وَهُدَاهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِيهِ وَشَرِّ مَا بَعْدَهُ.",
-    "transliteration": "(Asbahna wa-asbahal-mulku lillahi rabbil-AAalameen, allahumma innee as-aluka khayra hathal-yawm, fat-hahu, wanasrahu, wanoorahu, wabarakatahu, wahudahu, wa-aAAoothu bika min sharri ma feehi, washarri ma baAAdah.)[For the evening, the supplication is read as follows: ](Amsayna wa-amsal-mulku lillahi rabbil-AAalameen, allahumma innee as-aluka khayra hathihil-laylah, fat-haha, wanasraha, wanooraha, wabarakataha, wahudaha, wa-aAAoothu bika min sharri ma feeha washarri ma baAAdaha.)",
+    "transliteration": "(Asbahna wa-asbahal-mulku lillahi rabbil-AAalameen, allahumma innee as-aluka khayra hathal-yawm, fat-hahu, wanasrahu, wanoorahu, wabarakatahu, wahudahu, wa-aAAoothu bika min sharri ma feehi, washarri ma baAAdah.)",
     "translations": {
       "ar": {
         "text": "((أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ رَبِّ الْعَالَمِينَ، اللَّهُـمَّ إِنِّي أَسْأَلُكَ خَيْرَ هَذَا الْيَوْمِ:فَتْحَهُ، وَنَصْرَهُ، وَنورَهُ، وَبَرَكَتَهُ، وَهُدَاهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِيهِ وَشَرِّ مَا بَعْدَهُ)).",
         "verified": true
       },
       "en": {
-        "text": "(We have reached the morning and at this very time all sovereignty belongs to Allah, Lord of the worlds. O Allah, I ask You for the good of this day, its triumphs and its victories, its light and its blessings and its guidance, and I take refuge in You from the evil of this day and the evil that follows it.)[For the evening, the supplication is read as follows:](We have reached the evening and at this very time all sovereignty belongs to Allah, Lord of the worlds. O Allah, I ask You for the good of tonight, its triumphs and its victories, its light and its blessings and its guidance, and I take refuge in You from the evil of tonight and the evil that follows it.)",
+        "text": "(We have reached the morning and at this very time all sovereignty belongs to Allah, Lord of the worlds. O Allah, I ask You for the good of this day, its triumphs and its victories, its light and its blessings and its guidance, and I take refuge in You from the evil of this day and the evil that follows it.)",
         "verified": true
       },
       "de": {
-        "text": "(Wir haben den Morgen erreicht und zu diesem Zeitpunkt gehört alle Souveränität Allah, dem Herrn der Welten. O Allah, ich bitte Dich um das Gute dieses Tages, seine Triumphe und Siege, sein Licht und seine Segnungen und seine Führung, und ich nehme Zuflucht bei Dir vor dem Bösen dieses Tages und dem Bösen, das darauf folgt.)[Für den Abend lautet das Flehen wie folgt:](Wir haben den Abend erreicht und zu diesem Zeitpunkt gehört alle Souveränität Allah, dem Herrn der Welten. O Allah, ich bitte Dich um das Gute dieser Nacht, ihre Triumphe und Siege, ihr Licht und ihre Segnungen und ihre Führung, und ich nehme Zuflucht bei Dir vor dem Bösen dieser Nacht und dem Bösen, das darauf folgt.)",
+        "text": "(Wir haben den Morgen erreicht und zu diesem Zeitpunkt gehört alle Souveränität Allah, dem Herrn der Welten. O Allah, ich bitte Dich um das Gute dieses Tages, seine Triumphe und Siege, sein Licht und seine Segnungen und seine Führung, und ich nehme Zuflucht bei Dir vor dem Bösen dieses Tages und dem Bösen, das darauf folgt.)",
         "verified": false
       },
       "es": {
-        "text": "(Hemos llegado a la mañana y en este mismo momento toda la soberanía pertenece a Allah, Señor de los mundos. Oh Allah, te pido por el bien de este día, sus triunfos y sus victorias, su luz y sus bendiciones y su guía, y me refugio en Ti del mal de este día y del mal que le sigue). Te pido por el bien de esta noche, sus triunfos y sus victorias, su luz y sus bendiciones y su guía, y me refugio en Ti del mal de esta noche y del mal que le sigue).",
+        "text": "(Hemos llegado a la mañana y en este mismo momento toda la soberanía pertenece a Allah, Señor de los mundos. Oh Allah, te pido por el bien de este día, sus triunfos y sus victorias, su luz y sus bendiciones y su guía, y me refugio en Ti del mal de este día y del mal que le sigue)",
         "verified": false
       },
       "tr": {
-        "text": "(Sabaha ulaştık ve bu saatte bütün egemenlik alemlerin Rabbi olan Allah'ındır. Allah'ım, Senden bu günün hayrını, zaferini, zaferini, nurunu, bereketini ve hidayetini isterim, bu günün şerrinden ve ondan sonra gelecek olan şerden Sana sığınırım.)[Akşam için dua şöyle okunur:](Akşama ulaştık ve bu saatte bütün egemenlik âlemlerin Rabbi olan Allah'ındır. Allah'ım, ben Senden bu gecenin hayrını, fethini, zaferini, nurunu, bereketini ve hidayetini isterim, bu gecenin şerrinden ve ondan sonra gelen şerrinden sana sığınırım.)",
+        "text": "(Sabaha ulaştık ve bu saatte bütün egemenlik alemlerin Rabbi olan Allah'ındır. Allah'ım, Senden bu günün hayrını, zaferini, zaferini, nurunu, bereketini ve hidayetini isterim, bu günün şerrinden ve ondan sonra gelecek olan şerden Sana sığınırım.)",
         "verified": false
       },
       "ur": {
-        "text": "(ہم صبح کو پہنچ چکے ہیں اور اس وقت تمام بادشاہت اللہ رب العالمین کی ہے، اے اللہ میں تجھ سے آج کے دن کی بھلائی، اس کی فتح و نصرت، اس کی روشنی اور اس کی برکتوں اور اس کی ہدایت کا سوال کرتا ہوں، اور میں اس دن کے شر اور اس کے بعد آنے والے شر سے تیری پناہ میں آتا ہوں۔) بادشاہی اللہ ہی کے لیے ہے جو تمام جہانوں کا رب ہے، میں تجھ سے آج کی رات کی بھلائی، اس کی فتح و نصرت، اس کی روشنی اور اس کی برکات اور اس کی ہدایت کا سوال کرتا ہوں، اور میں آج کی رات کے شر اور اس کے بعد آنے والے شر سے تیری پناہ میں آتا ہوں۔)",
+        "text": "(ہم صبح کو پہنچ چکے ہیں اور اس وقت تمام بادشاہت اللہ رب العالمین کی ہے، اے اللہ میں تجھ سے آج کے دن کی بھلائی، اس کی فتح و نصرت، اس کی روشنی اور اس کی برکتوں اور اس کی ہدایت کا سوال کرتا ہوں، اور میں اس دن کے شر اور اس کے بعد آنے والے شر سے تیری پناہ میں آتا ہوں۔)",
         "verified": false
       },
       "hi": {
-        "text": "(हम सुबह पहुंच गए हैं और इस समय सारी संप्रभुता दुनिया के भगवान, अल्लाह की है। हे अल्लाह, मैं आपसे इस दिन की भलाई, इसकी जीत और इसकी जीत, इसकी रोशनी और इसके आशीर्वाद और इसके मार्गदर्शन के लिए प्रार्थना करता हूं, और मैं इस दिन की बुराई और इसके बाद आने वाली बुराई से आपकी शरण लेता हूं।) आज की रात की भलाई के लिए, इसकी विजयों और विजयों के लिए, इसके प्रकाश और इसके आशीर्वाद और इसके मार्गदर्शन के लिए, और मैं आज रात की बुराई और उसके बाद आने वाली बुराई से आपकी शरण लेता हूं।)",
+        "text": "(हम सुबह पहुंच गए हैं और इस समय सारी संप्रभुता दुनिया के भगवान, अल्लाह की है। हे अल्लाह, मैं आपसे इस दिन की भलाई, इसकी जीत और इसकी जीत, इसकी रोशनी और इसके आशीर्वाद और इसके मार्गदर्शन के लिए प्रार्थना करता हूं, और मैं इस दिन की बुराई और इसके बाद आने वाली बुराई से आपकी शरण लेता हूं।)",
         "verified": false
       },
       "bn": {
-        "text": "(আমরা প্রভাতে উপনীত হয়েছি এবং এই সময়েই সমস্ত সার্বভৌমত্ব বিশ্বজগতের প্রতিপালক আল্লাহর জন্য। হে আল্লাহ, আমি আপনার কাছে এই দিনের মঙ্গল, এর বিজয় এবং এর বিজয়, এর আলো এবং এর বরকত এবং এর দিকনির্দেশনা চাই এবং আমি এই দিনের অনিষ্ট এবং এর পরবর্তী অনিষ্ট থেকে আপনার কাছে আশ্রয় নিচ্ছি।) [সন্ধ্যার জন্য, দুআটি পাঠ করা হয়েছে যেভাবে আমরা সন্ধ্যায় পৌঁছেছি। সার্বভৌমত্ব আল্লাহর জন্য, হে আল্লাহ, আমি আপনার কাছে আজকের রাতের কল্যাণ, এর বিজয় ও বিজয়, এর আলো এবং এর বরকত এবং এর পথপ্রদর্শন এবং আজকের রাতের অনিষ্ট থেকে আপনার কাছে আশ্রয় প্রার্থনা করছি।)",
+        "text": "(আমরা প্রভাতে উপনীত হয়েছি এবং এই সময়েই সমস্ত সার্বভৌমত্ব বিশ্বজগতের প্রতিপালক আল্লাহর জন্য। হে আল্লাহ, আমি আপনার কাছে এই দিনের মঙ্গল, এর বিজয় এবং এর বিজয়, এর আলো এবং এর বরকত এবং এর দিকনির্দেশনা চাই এবং আমি এই দিনের অনিষ্ট এবং এর পরবর্তী অনিষ্ট থেকে আপনার কাছে আশ্রয় নিচ্ছি।)",
         "verified": false
       },
       "ru": {
-        "text": "(Мы достигли утра, и в это самое время вся власть принадлежит Аллаху, Господу миров. О Аллах, я прошу Тебя о благе этого дня, его триумфах и его победах, его свете и его благословениях и его руководстве, и я прибегаю к Тебе от зла этого дня и зла, которое последует за ним.) [Для вечера мольба читается следующим образом:] (Мы достигли вечера и в это самое время вся власть принадлежит Аллаху, Господу миров. О Аллах, Я прошу Тебя о благе этой ночи, ее триумфах и победах, ее свете, ее благословениях и ее руководстве, и я прибегаю к Тебе от зла этой ночи и зла, которое последует за ней.)",
+        "text": "(Мы достигли утра, и в это самое время вся власть принадлежит Аллаху, Господу миров. О Аллах, я прошу Тебя о благе этого дня, его триумфах и его победах, его свете и его благословениях и его руководстве, и я прибегаю к Тебе от зла этого дня и зла, которое последует за ним.)",
         "verified": false
       },
       "fr": {
-        "text": "(Nous avons atteint le matin et à ce moment précis toute souveraineté appartient à Allah, Seigneur des mondes. Ô Allah, je Te demande le bien de ce jour, ses triomphes et ses victoires, sa lumière et ses bénédictions et sa direction, et je me réfugie auprès de Toi contre le mal de ce jour et le mal qui le suit.) le bien de cette nuit, ses triomphes et ses victoires, sa lumière et ses bénédictions et sa direction, et je me réfugie en Toi contre le mal de cette nuit et le mal qui la suit.)",
+        "text": "(Nous avons atteint le matin et à ce moment précis toute souveraineté appartient à Allah, Seigneur des mondes. Ô Allah, je Te demande le bien de ce jour, ses triomphes et ses victoires, sa lumière et ses bénédictions et sa direction, et je me réfugie auprès de Toi contre le mal de ce jour et le mal qui le suit.)",
         "verified": false
       },
       "id": {
-        "text": "(Kita telah tiba di pagi hari dan saat ini semua kekuasaan ada di tangan Allah SWT, Tuhan semesta alam. Ya Allah, aku memohon kepada-Mu kebaikan hari ini, kemenangan-kemenangannya dan kemenangan-kemenangannya, cahayanya, keberkahannya, dan petunjuknya, dan aku berlindung kepada-Mu dari keburukan hari ini dan keburukan yang mengikutinya.) Engkau atas kebaikan malam ini, kemenangan-kemenangannya dan kejayaannya, cahayanya, keberkahannya, dan petunjuknya, dan aku berlindung kepada-Mu dari keburukan malam ini dan keburukan yang mengikutinya.)",
+        "text": "(Kita telah tiba di pagi hari dan saat ini semua kekuasaan ada di tangan Allah SWT, Tuhan semesta alam. Ya Allah, aku memohon kepada-Mu kebaikan hari ini, kemenangan-kemenangannya dan kemenangan-kemenangannya, cahayanya, keberkahannya, dan petunjuknya, dan aku berlindung kepada-Mu dari keburukan hari ini dan keburukan yang mengikutinya.)",
         "verified": false
       },
       "ms": {
-        "text": "(Kami telah tiba di waktu pagi dan pada waktu ini semua kerajaan adalah milik Allah, Tuhan sekalian alam. Ya Allah, aku memohon kepada-Mu kebaikan hari ini, kejayaannya dan kemenangannya, cahayanya dan keberkatannya dan petunjuknya, dan aku berlindung kepada-Mu dari kejelekan hari ini dan kejelekan sesudahnya.)[Sehingga pada waktu petang, doa itu telah kami sampaikan pada waktu petang seperti ini. kepunyaan Allah, Tuhan sekalian alam, Ya Allah, aku memohon kepada-Mu kebaikan malam ini, kemenangannya dan kemenangannya, cahayanya dan keberkatannya dan petunjuknya, dan aku berlindung kepada-Mu dari kejahatan malam ini dan kejahatan yang mengikutinya.)",
+        "text": "(Kami telah tiba di waktu pagi dan pada waktu ini semua kerajaan adalah milik Allah, Tuhan sekalian alam. Ya Allah, aku memohon kepada-Mu kebaikan hari ini, kejayaannya dan kemenangannya, cahayanya dan keberkatannya dan petunjuknya, dan aku berlindung kepada-Mu dari kejelekan hari ini dan kejelekan sesudahnya.)",
         "verified": false
       }
     },
@@ -1743,54 +1743,54 @@
     "id": 30,
     "category": "1b",
     "arabic": "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ رَبِّ الْعَالَمِينَ، اللَّهُـمَّ إِنِّي أَسْأَلُكَ خَيْرَ هَذِهِ اللَّيْلَةِ:فَتْحَهُ، وَنَصْرَهُ، وَنورَهُ، وَبَرَكَتَهُ، وَهُدَاهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِيهِ وَشَرِّ مَا بَعْدَهُ.",
-    "transliteration": "(Asbahna wa-asbahal-mulku lillahi rabbil-AAalameen, allahumma innee as-aluka khayra hathal-yawm, fat-hahu, wanasrahu, wanoorahu, wabarakatahu, wahudahu, wa-aAAoothu bika min sharri ma feehi, washarri ma baAAdah.)[For the evening, the supplication is read as follows: ](Amsayna wa-amsal-mulku lillahi rabbil-AAalameen, allahumma innee as-aluka khayra hathihil-laylah, fat-haha, wanasraha, wanooraha, wabarakataha, wahudaha, wa-aAAoothu bika min sharri ma feeha washarri ma baAAdaha.)",
+    "transliteration": "(Amsayna wa-amsal-mulku lillahi rabbil-AAalameen, allahumma innee as-aluka khayra hathihil-laylah, fat-haha, wanasraha, wanooraha, wabarakataha, wahudaha, wa-aAAoothu bika min sharri ma feeha washarri ma baAAdaha.)",
     "translations": {
       "ar": {
         "text": "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ رَبِّ الْعَالَمِينَ، اللَّهُـمَّ إِنِّي أَسْأَلُكَ خَيْرَ هَذِهِ اللَّيْلَةِ:فَتْحَهُ، وَنَصْرَهُ، وَنورَهُ، وَبَرَكَتَهُ، وَهُدَاهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِيهِ وَشَرِّ مَا بَعْدَهُ.",
         "verified": true
       },
       "en": {
-        "text": "(We have reached the evening and at this very time all sovereignty belongs to Allah, Lord of the worlds. O Allah, I ask You for the good of this night, its triumphs and its victories, its light and its blessings and its guidance, and I take refuge in You from the evil of this night and the evil that follows it.)[For the evening, the supplication is read as follows:](We have reached the evening and at this very time all sovereignty belongs to Allah, Lord of the worlds. O Allah, I ask You for the good of tonight, its triumphs and its victories, its light and its blessings and its guidance, and I take refuge in You from the evil of tonight and the evil that follows it.)",
+        "text": "(We have reached the evening and at this very time all sovereignty belongs to Allah, Lord of the worlds. O Allah, I ask You for the good of tonight, its triumphs and its victories, its light and its blessings and its guidance, and I take refuge in You from the evil of tonight and the evil that follows it.)",
         "verified": true
       },
       "de": {
-        "text": "(Wir haben den Morgen erreicht und zu diesem Zeitpunkt gehört alle Souveränität Allah, dem Herrn der Welten. O Allah, ich bitte Dich um das Gute dieses Tages, seine Triumphe und Siege, sein Licht und seine Segnungen und seine Führung, und ich nehme Zuflucht bei Dir vor dem Bösen dieses Tages und dem Bösen, das darauf folgt.)[Für den Abend lautet das Flehen wie folgt:](Wir haben den Abend erreicht und zu diesem Zeitpunkt gehört alle Souveränität Allah, dem Herrn der Welten. O Allah, ich bitte Dich um das Gute dieser Nacht, ihre Triumphe und Siege, ihr Licht und ihre Segnungen und ihre Führung, und ich nehme Zuflucht bei Dir vor dem Bösen dieser Nacht und dem Bösen, das darauf folgt.)",
+        "text": "(Wir haben den Abend erreicht und zu diesem Zeitpunkt gehört alle Souveränität Allah, dem Herrn der Welten. O Allah, ich bitte Dich um das Gute dieser Nacht, ihre Triumphe und Siege, ihr Licht und ihre Segnungen und ihre Führung, und ich nehme Zuflucht bei Dir vor dem Bösen dieser Nacht und dem Bösen, das darauf folgt.)",
         "verified": false
       },
       "es": {
-        "text": "(Hemos llegado a la mañana y en este mismo momento toda la soberanía pertenece a Allah, Señor de los mundos. Oh Allah, te pido por el bien de este día, sus triunfos y sus victorias, su luz y sus bendiciones y su guía, y me refugio en Ti del mal de este día y del mal que le sigue). Te pido por el bien de esta noche, sus triunfos y sus victorias, su luz y sus bendiciones y su guía, y me refugio en Ti del mal de esta noche y del mal que le sigue).",
+        "text": "(Hemos llegado a la tarde y en este mismo momento toda la soberanía pertenece a Allah, Señor de los mundos. Oh Allah, te pido por el bien de esta noche, sus triunfos y sus victorias, su luz y sus bendiciones y su guía, y me refugio en Ti del mal de esta noche y del mal que le sigue)",
         "verified": false
       },
       "tr": {
-        "text": "(Sabaha ulaştık ve bu saatte bütün egemenlik alemlerin Rabbi olan Allah'ındır. Allah'ım, Senden bu günün hayrını, zaferini, zaferini, nurunu, bereketini ve hidayetini isterim, bu günün şerrinden ve ondan sonra gelecek olan şerden Sana sığınırım.)[Akşam için dua şöyle okunur:](Akşama ulaştık ve bu saatte bütün egemenlik âlemlerin Rabbi olan Allah'ındır. Allah'ım, ben Senden bu gecenin hayrını, fethini, zaferini, nurunu, bereketini ve hidayetini isterim, bu gecenin şerrinden ve ondan sonra gelen şerrinden sana sığınırım.)",
+        "text": "(Akşama ulaştık ve bu saatte bütün egemenlik âlemlerin Rabbi olan Allah'ındır. Allah'ım, ben Senden bu gecenin hayrını, fethini, zaferini, nurunu, bereketini ve hidayetini isterim, bu gecenin şerrinden ve ondan sonra gelen şerrinden sana sığınırım.)",
         "verified": false
       },
       "ur": {
-        "text": "(ہم صبح کو پہنچ چکے ہیں اور اس وقت تمام بادشاہت اللہ رب العالمین کی ہے، اے اللہ میں تجھ سے آج کے دن کی بھلائی، اس کی فتح و نصرت، اس کی روشنی اور اس کی برکتوں اور اس کی ہدایت کا سوال کرتا ہوں، اور میں اس دن کے شر اور اس کے بعد آنے والے شر سے تیری پناہ میں آتا ہوں۔) بادشاہی اللہ ہی کے لیے ہے جو تمام جہانوں کا رب ہے، میں تجھ سے آج کی رات کی بھلائی، اس کی فتح و نصرت، اس کی روشنی اور اس کی برکات اور اس کی ہدایت کا سوال کرتا ہوں، اور میں آج کی رات کے شر اور اس کے بعد آنے والے شر سے تیری پناہ میں آتا ہوں۔)",
+        "text": "(ہم شام کو پہنچ چکے ہیں اور اس وقت تمام بادشاہت اللہ رب العالمین کی ہے، اے اللہ میں تجھ سے آج کی رات کی بھلائی، اس کی فتح و نصرت، اس کی روشنی اور اس کی برکتوں اور اس کی ہدایت کا سوال کرتا ہوں، اور میں اس رات کے شر اور اس کے بعد آنے والے شر سے تیری پناہ میں آتا ہوں۔)",
         "verified": false
       },
       "hi": {
-        "text": "(हम सुबह पहुंच गए हैं और इस समय सारी संप्रभुता दुनिया के भगवान, अल्लाह की है। हे अल्लाह, मैं आपसे इस दिन की भलाई, इसकी जीत और इसकी जीत, इसकी रोशनी और इसके आशीर्वाद और इसके मार्गदर्शन के लिए प्रार्थना करता हूं, और मैं इस दिन की बुराई और इसके बाद आने वाली बुराई से आपकी शरण लेता हूं।) आज की रात की भलाई के लिए, इसकी विजयों और विजयों के लिए, इसके प्रकाश और इसके आशीर्वाद और इसके मार्गदर्शन के लिए, और मैं आज रात की बुराई और उसके बाद आने वाली बुराई से आपकी शरण लेता हूं।)",
+        "text": "(हम शाम पहुंच गए हैं और इस समय सारी संप्रभुता दुनिया के भगवान, अल्लाह की है। हे अल्लाह, मैं आपसे इस रात की भलाई, इसकी जीत और इसकी जीत, इसकी रोशनी और इसके आशीर्वाद और इसके मार्गदर्शन के लिए प्रार्थना करता हूं, और मैं इस रात की बुराई और इसके बाद आने वाली बुराई से आपकी शरण लेता हूं।)",
         "verified": false
       },
       "bn": {
-        "text": "(আমরা প্রভাতে উপনীত হয়েছি এবং এই সময়েই সমস্ত সার্বভৌমত্ব বিশ্বজগতের প্রতিপালক আল্লাহর জন্য। হে আল্লাহ, আমি আপনার কাছে এই দিনের মঙ্গল, এর বিজয় এবং এর বিজয়, এর আলো এবং এর বরকত এবং এর দিকনির্দেশনা চাই এবং আমি এই দিনের অনিষ্ট এবং এর পরবর্তী অনিষ্ট থেকে আপনার কাছে আশ্রয় নিচ্ছি।) [সন্ধ্যার জন্য, দুআটি পাঠ করা হয়েছে যেভাবে আমরা সন্ধ্যায় পৌঁছেছি। সার্বভৌমত্ব আল্লাহর জন্য, হে আল্লাহ, আমি আপনার কাছে আজকের রাতের কল্যাণ, এর বিজয় ও বিজয়, এর আলো এবং এর বরকত এবং এর পথপ্রদর্শন এবং আজকের রাতের অনিষ্ট থেকে আপনার কাছে আশ্রয় প্রার্থনা করছি।)",
+        "text": "(আমরা সন্ধ্যায় উপনীত হয়েছি এবং এই সময়েই সমস্ত সার্বভৌমত্ব বিশ্বজগতের প্রতিপালক আল্লাহর জন্য। হে আল্লাহ, আমি আপনার কাছে এই রাতের মঙ্গল, এর বিজয় এবং এর বিজয়, এর আলো এবং এর বরকত এবং এর দিকনির্দেশনা চাই এবং আমি এই রাতের অনিষ্ট এবং এর পরবর্তী অনিষ্ট থেকে আপনার কাছে আশ্রয় নিচ্ছি।)",
         "verified": false
       },
       "ru": {
-        "text": "(Мы достигли утра, и в это самое время вся власть принадлежит Аллаху, Господу миров. О Аллах, я прошу Тебя о благе этого дня, его триумфах и его победах, его свете и его благословениях и его руководстве, и я прибегаю к Тебе от зла этого дня и зла, которое последует за ним.) [Для вечера мольба читается следующим образом:] (Мы достигли вечера и в это самое время вся власть принадлежит Аллаху, Господу миров. О Аллах, Я прошу Тебя о благе этой ночи, ее триумфах и победах, ее свете, ее благословениях и ее руководстве, и я прибегаю к Тебе от зла этой ночи и зла, которое последует за ней.)",
+        "text": "(Мы достигли вечера и в это самое время вся власть принадлежит Аллаху, Господу миров. О Аллах, Я прошу Тебя о благе этой ночи, ее триумфах и победах, ее свете, ее благословениях и ее руководстве, и я прибегаю к Тебе от зла этой ночи и зла, которое последует за ней.)",
         "verified": false
       },
       "fr": {
-        "text": "(Nous avons atteint le matin et à ce moment précis toute souveraineté appartient à Allah, Seigneur des mondes. Ô Allah, je Te demande le bien de ce jour, ses triomphes et ses victoires, sa lumière et ses bénédictions et sa direction, et je me réfugie auprès de Toi contre le mal de ce jour et le mal qui le suit.) le bien de cette nuit, ses triomphes et ses victoires, sa lumière et ses bénédictions et sa direction, et je me réfugie en Toi contre le mal de cette nuit et le mal qui la suit.)",
+        "text": "(Nous avons atteint le soir et à ce moment précis toute souveraineté appartient à Allah, Seigneur des mondes. Ô Allah, je Te demande le bien de cette nuit, ses triomphes et ses victoires, sa lumière et ses bénédictions et sa direction, et je me réfugie auprès de Toi contre le mal de cette nuit et le mal qui la suit.)",
         "verified": false
       },
       "id": {
-        "text": "(Kita telah tiba di pagi hari dan saat ini semua kekuasaan ada di tangan Allah SWT, Tuhan semesta alam. Ya Allah, aku memohon kepada-Mu kebaikan hari ini, kemenangan-kemenangannya dan kemenangan-kemenangannya, cahayanya, keberkahannya, dan petunjuknya, dan aku berlindung kepada-Mu dari keburukan hari ini dan keburukan yang mengikutinya.) Engkau atas kebaikan malam ini, kemenangan-kemenangannya dan kejayaannya, cahayanya, keberkahannya, dan petunjuknya, dan aku berlindung kepada-Mu dari keburukan malam ini dan keburukan yang mengikutinya.)",
+        "text": "(Kita telah tiba di sore hari dan saat ini semua kekuasaan ada di tangan Allah SWT, Tuhan semesta alam. Ya Allah, aku memohon kepada-Mu kebaikan malam ini, kemenangan-kemenangannya dan kemenangan-kemenangannya, cahayanya, keberkahannya, dan petunjuknya, dan aku berlindung kepada-Mu dari keburukan malam ini dan keburukan yang mengikutinya.)",
         "verified": false
       },
       "ms": {
-        "text": "(Kami telah tiba di waktu pagi dan pada waktu ini semua kerajaan adalah milik Allah, Tuhan sekalian alam. Ya Allah, aku memohon kepada-Mu kebaikan hari ini, kejayaannya dan kemenangannya, cahayanya dan keberkatannya dan petunjuknya, dan aku berlindung kepada-Mu dari kejelekan hari ini dan kejelekan sesudahnya.)[Sehingga pada waktu petang, doa itu telah kami sampaikan pada waktu petang seperti ini. kepunyaan Allah, Tuhan sekalian alam, Ya Allah, aku memohon kepada-Mu kebaikan malam ini, kemenangannya dan kemenangannya, cahayanya dan keberkatannya dan petunjuknya, dan aku berlindung kepada-Mu dari kejahatan malam ini dan kejahatan yang mengikutinya.)",
+        "text": "(Kami telah tiba di waktu petang dan pada waktu ini semua kerajaan adalah milik Allah, Tuhan sekalian alam. Ya Allah, aku memohon kepada-Mu kebaikan malam ini, kejayaannya dan kemenangannya, cahayanya dan keberkatannya dan petunjuknya, dan aku berlindung kepada-Mu dari kejelekan malam ini dan kejelekan sesudahnya.)",
         "verified": false
       }
     },
@@ -2038,126 +2038,6 @@
     "reference": "",
     "benefit": "غُفرت خطاياه وإن كانت مثل زبد البحر",
     "audio": "91.m4a"
-  },
-  {
-    "id": 35,
-    "category": "1",
-    "arabic": "لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ (عشرَ مرَّات) ، أَوْ (مرَّةً واحدةً عندَ الكَسَلِ).",
-    "transliteration": "(La ilaha illal-lah, wahdahu la shareeka lah, lahul-mulku walahul-hamd, wahuwa AAala kulli shay-in qadeer.  [ten times or once if lazy])",
-    "translations": {
-      "ar": {
-        "text": "((لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ)) (عشرَ مرَّات) ، أَوْ (مرَّةً واحدةً عندَ الكَسَلِ).",
-        "verified": true
-      },
-      "en": {
-        "text": "(None has the right to be worshipped except Allah, alone, without partner, to Him belongs all sovereignty and praise, and He is over all things omnipotent.)( [ten times or once if lazy])",
-        "verified": true
-      },
-      "id": {
-        "text": "Tiada Tuhan yang berhak disembah selain Allah, Yang Maha Esa, Tiada sekutu bagi-Nya. Bagi-Nya kerajaan dan pujian. Dia-lah Yang Maha Kuasa atas segala sesuatu",
-        "verified": true
-      },
-      "ms": {
-        "text": "Tiada Tuhan yang berhak disembah melainkan Allah Yang Esa tiada sekutu bagiNya, bagiNya kerajaan dan bagiNya kepujian, dan Dia berkuasa ke atas setiap sesuatu",
-        "verified": true
-      },
-      "de": {
-        "text": "(Niemand hat das Recht, angebetet zu werden, außer Allah, allein und ohne Partner. Ihm gehört alle Herrschaft und Lobpreis, und Er ist über alle Dinge allmächtig.) ([zehnmal oder einmal, wenn man faul ist])",
-        "verified": false
-      },
-      "es": {
-        "text": "(Nadie tiene derecho a ser adorado excepto Allah, solo, sin pareja, a Él pertenece toda soberanía y alabanza, y Él es omnipotente sobre todas las cosas.)( [diez veces o una vez si es perezoso])",
-        "verified": false
-      },
-      "tr": {
-        "text": "(Yalnız ve ortağı olmayan Allah'tan başka ilah yoktur, mülk ve hamd O'nundur ve O, her şeye kadirdir.)( [On defa veya tembel ise bir defa])",
-        "verified": false
-      },
-      "ur": {
-        "text": "(اللہ کے سوا کسی کی عبادت کا حق نہیں، وہ اکیلا ہے، اس کا کوئی شریک نہیں ہے، اسی کی بادشاہی اور تعریف ہے، اور وہ ہر چیز پر قادر ہے۔)",
-        "verified": false
-      },
-      "hi": {
-        "text": "(अल्लाह के अलावा किसी को भी पूजा करने का अधिकार नहीं है, अकेले, बिना किसी साथी के, सारी संप्रभुता और प्रशंसा उसी की है, और वह सभी चीजों पर सर्वशक्तिमान है।) (आलसी होने पर दस बार या एक बार)",
-        "verified": false
-      },
-      "bn": {
-        "text": "(আল্লাহ ব্যতীত অন্য কারো উপাসনা করার অধিকার নেই, একা, অংশীদার ছাড়া, সমস্ত সার্বভৌমত্ব ও প্রশংসা তাঁরই, এবং তিনি সর্বশক্তিমান।) ( [দশবার বা একবার অলস হলে])",
-        "verified": false
-      },
-      "ru": {
-        "text": "(Никто не имеет права на поклонение, кроме Аллаха, Единого, без сотоварища, Ему принадлежит вся власть и хвала, и Он над всем всемогущ.) ([десять раз или один раз, если ленив])",
-        "verified": false
-      },
-      "fr": {
-        "text": "(Nul n'a le droit d'être adoré sauf Allah, seul, sans associé, à Lui appartiennent toute la souveraineté et la louange, et Il est sur toutes choses tout-puissant.)( [dix fois ou une fois si paresseux])",
-        "verified": false
-      }
-    },
-    "count": 10,
-    "reference": "",
-    "benefit": "من قالها عشر مرات كان كمن أعتق أربعة أنفس من ولد إسماعيل",
-    "audio": "92.m4a"
-  },
-  {
-    "id": 36,
-    "category": "1b",
-    "arabic": "لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ (عشرَ مرَّات) ، أَوْ (مرَّةً واحدةً عندَ الكَسَلِ).",
-    "transliteration": "(La ilaha illal-lah, wahdahu la shareeka lah, lahul-mulku walahul-hamd, wahuwa AAala kulli shay-in qadeer.  [ten times or once if lazy])",
-    "translations": {
-      "ar": {
-        "text": "لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ (عشرَ مرَّات) ، أَوْ (مرَّةً واحدةً عندَ الكَسَلِ).",
-        "verified": true
-      },
-      "en": {
-        "text": "(None has the right to be worshipped except Allah, alone, without partner, to Him belongs all sovereignty and praise, and He is over all things omnipotent.)( [ten times or once if lazy])",
-        "verified": true
-      },
-      "id": {
-        "text": "Tiada Tuhan yang berhak disembah selain Allah, Yang Maha Esa, Tiada sekutu bagi-Nya. Bagi-Nya kerajaan dan pujian. Dia-lah Yang Maha Kuasa atas segala sesuatu",
-        "verified": true
-      },
-      "ms": {
-        "text": "Tiada Tuhan yang berhak disembah melainkan Allah Yang Esa tiada sekutu bagiNya, bagiNya kerajaan dan bagiNya kepujian, dan Dia berkuasa ke atas setiap sesuatu",
-        "verified": true
-      },
-      "de": {
-        "text": "(Niemand hat das Recht, angebetet zu werden, außer Allah, allein und ohne Partner. Ihm gehört alle Herrschaft und Lobpreis, und Er ist über alle Dinge allmächtig.) ([zehnmal oder einmal, wenn man faul ist])",
-        "verified": false
-      },
-      "es": {
-        "text": "(Nadie tiene derecho a ser adorado excepto Allah, solo, sin pareja, a Él pertenece toda soberanía y alabanza, y Él es omnipotente sobre todas las cosas.)( [diez veces o una vez si es perezoso])",
-        "verified": false
-      },
-      "tr": {
-        "text": "(Yalnız ve ortağı olmayan Allah'tan başka ilah yoktur, mülk ve hamd O'nundur ve O, her şeye kadirdir.)( [On defa veya tembel ise bir defa])",
-        "verified": false
-      },
-      "ur": {
-        "text": "(اللہ کے سوا کسی کی عبادت کا حق نہیں، وہ اکیلا ہے، اس کا کوئی شریک نہیں ہے، اسی کی بادشاہی اور تعریف ہے، اور وہ ہر چیز پر قادر ہے۔)",
-        "verified": false
-      },
-      "hi": {
-        "text": "(अल्लाह के अलावा किसी को भी पूजा करने का अधिकार नहीं है, अकेले, बिना किसी साथी के, सारी संप्रभुता और प्रशंसा उसी की है, और वह सभी चीजों पर सर्वशक्तिमान है।) (आलसी होने पर दस बार या एक बार)",
-        "verified": false
-      },
-      "bn": {
-        "text": "(আল্লাহ ব্যতীত অন্য কারো উপাসনা করার অধিকার নেই, একা, অংশীদার ছাড়া, সমস্ত সার্বভৌমত্ব ও প্রশংসা তাঁরই, এবং তিনি সর্বশক্তিমান।) ( [দশবার বা একবার অলস হলে])",
-        "verified": false
-      },
-      "ru": {
-        "text": "(Никто не имеет права на поклонение, кроме Аллаха, Единого, без сотоварища, Ему принадлежит вся власть и хвала, и Он над всем всемогущ.) ([десять раз или один раз, если ленив])",
-        "verified": false
-      },
-      "fr": {
-        "text": "(Nul n'a le droit d'être adoré sauf Allah, seul, sans associé, à Lui appartiennent toute la souveraineté et la louange, et Il est sur toutes choses tout-puissant.)( [dix fois ou une fois si paresseux])",
-        "verified": false
-      }
-    },
-    "count": 10,
-    "reference": "",
-    "benefit": "من قالها عشر مرات كان كمن أعتق أربعة أنفس من ولد إسماعيل",
-    "audio": "92.m4a"
   },
   {
     "id": 37,
@@ -14086,66 +13966,6 @@
     "reference": "",
     "benefit": "شكر نعمة المطر",
     "audio": "215.m4a"
-  },
-  {
-    "id": 236,
-    "category": "104",
-    "arabic": "أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ.",
-    "transliteration": "A'ūdhu bi-kalimāti Llāhi-t-tāmmāti min sharri mā khalaq.",
-    "translations": {
-      "ar": {
-        "text": "((أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ)).",
-        "verified": true
-      },
-      "en": {
-        "text": "(I take refuge in Allah’s perfect words from the evil that He has created.)",
-        "verified": true
-      },
-      "fr": {
-        "text": "« Je cherche protection auprès des paroles parfaites d'Allah contre le mal de ce qu'Il a créé. »",
-        "verified": true
-      },
-      "id": {
-        "text": "Aku berlindung dengan kalimat-kalimat Allah yang sempurna, dari kejahatan makhluk-Nya",
-        "verified": true
-      },
-      "ms": {
-        "text": "Aku berlindung dengan kalimat Allah yang sempurna dari kejahatan semua makhluk",
-        "verified": true
-      },
-      "de": {
-        "text": "(Ich nehme Zuflucht bei Allahs vollkommenen Worten vor dem Bösen, das Er geschaffen hat.)",
-        "verified": false
-      },
-      "es": {
-        "text": "(Me refugio en las perfectas palabras de Allah contra el mal que Él ha creado).",
-        "verified": false
-      },
-      "tr": {
-        "text": "(Yarattığı kötülüklerden Allah'ın mükemmel sözlerine sığınırım.)",
-        "verified": false
-      },
-      "ur": {
-        "text": "(میں پناہ لیتا ہوں اللہ کے کامل کلمات کی اس شر سے جو اس نے پیدا کی ہے۔)",
-        "verified": false
-      },
-      "hi": {
-        "text": "(मैं उस बुराई से जो उसने पैदा की है, अल्लाह के उत्तम शब्दों की शरण लेता हूँ।)",
-        "verified": false
-      },
-      "bn": {
-        "text": "(আমি আল্লাহর নিখুঁত বাণীর আশ্রয় নিচ্ছি তিনি যা সৃষ্টি করেছেন তা থেকে।)",
-        "verified": false
-      },
-      "ru": {
-        "text": "(Я прибегаю к совершенным словам Аллаха от зла, которое Он создал.)",
-        "verified": false
-      }
-    },
-    "count": 1,
-    "reference": "",
-    "benefit": "من نزل منزلاً ثم قال هذا لم يضره شيء حتى يرتحل من منزله ذلك",
-    "audio": "216.m4a"
   },
   {
     "id": 237,

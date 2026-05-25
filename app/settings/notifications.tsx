@@ -37,6 +37,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { Colors, DarkColors } from '@/constants/theme';
 import { t } from '@/lib/i18n';
+import { getPrayerTranslationKey } from '@/lib/prayer-times';
 import {
   ADHAN_SOUNDS as ADHAN_SOUND_FILES,
   NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES,
@@ -55,6 +56,7 @@ import { checkAllPermissions, openBatteryOptimizationSettings } from '@/lib/perm
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
+import { uiText } from '@/lib/ui-text';
 
 // ========================================
 // الثوابت
@@ -67,7 +69,6 @@ const NOTIFICATION_SOUNDS: { id: NotificationSoundType; nameKey: string; icon: s
   { id: 'subhanallah', nameKey: 'notificationSounds.subhanallah', icon: 'volume-high' },
   { id: 'alhamdulillah', nameKey: 'notificationSounds.alhamdulillah', icon: 'volume-high' },
   { id: 'istighfar', nameKey: 'notificationSounds.astaghfirullah', icon: 'volume-high' },
-  { id: 'general_reminder', nameKey: 'notificationSounds.reminderTone', icon: 'volume-high' },
   { id: 'silent', nameKey: 'notificationSounds.silent', icon: 'bell-off' },
 ];
 
@@ -79,7 +80,6 @@ const REMINDER_SOUNDS: { id: ReminderSoundType; nameKey: string }[] = [
   { id: 'subhanallah', nameKey: 'notificationSounds.subhanallah' },
   { id: 'alhamdulillah', nameKey: 'notificationSounds.alhamdulillah' },
   { id: 'istighfar', nameKey: 'notificationSounds.astaghfirullah' },
-  { id: 'general_reminder', nameKey: 'notificationSounds.reminderTone' },
   { id: 'silent', nameKey: 'notificationSounds.silent' },
 ];
 
@@ -134,7 +134,7 @@ const DID_YOU_PRAY_SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 const PRAYER_NAMES = [
   { key: 'fajr', name: t('prayer.fajr'), icon: 'weather-sunset-up' },
   { key: 'sunrise', name: t('prayer.sunrise'), icon: 'white-balance-sunny' },
-  { key: 'dhuhr', name: t('prayer.dhuhr'), icon: 'weather-sunny' },
+  { key: 'dhuhr', name: t(getPrayerTranslationKey('dhuhr')), icon: 'weather-sunny' },
   { key: 'asr', name: t('prayer.asr'), icon: 'weather-sunny-alert' },
   { key: 'maghrib', name: t('prayer.maghrib'), icon: 'weather-sunset-down' },
   { key: 'isha', name: t('prayer.isha'), icon: 'weather-night' },
@@ -727,11 +727,11 @@ export default function NotificationsScreen() {
       case 'salawat': return settings.notifications.salawatSoundType ?? 'salawat';
       case 'tasbih': return settings.notifications.tasbihSoundType ?? 'tasbih';
       case 'istighfar': return settings.notifications.istighfarSoundType ?? 'istighfar';
-      case 'azkar': return settings.notifications.azkarSoundType ?? 'general_reminder';
+      case 'azkar': return settings.notifications.azkarSoundType ?? 'default';
       case 'dailyVerse': return settings.notifications.dailyVerseSoundType ?? 'default';
       case 'customReminder': return settings.notifications.customReminderSoundType ?? 'default';
-      case 'quranReading': return settings.notifications.quranReminderSoundType ?? 'general_reminder';
-      case 'worshipDailySummary': return settings.notifications.soundType ?? 'general_reminder';
+      case 'quranReading': return settings.notifications.quranReminderSoundType ?? 'default';
+      case 'worshipDailySummary': return settings.notifications.soundType ?? 'default';
       default: return 'default';
     }
   };
@@ -1285,11 +1285,14 @@ export default function NotificationsScreen() {
               <MaterialCommunityIcons name="alert" size={18} color="#f59e0b" />
             </View>
             <Text style={[styles.prayerBatteryTipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              لضمان وصول الإشعارات
+              {uiText({ ar: 'لضمان وصول الإشعارات', en: 'To keep notifications reliable' })}
             </Text>
           </View>
           <Text style={[styles.prayerBatteryTipBody, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-            استثناء التطبيق من توفير البطارية يساعد إشعارات الصلاة على الوصول في وقتها دائماً.
+            {uiText({
+              ar: 'استثناء التطبيق من توفير البطارية يساعد إشعارات الصلاة على الوصول في وقتها دائماً.',
+              en: 'Excluding the app from battery optimization helps prayer notifications arrive on time.',
+            })}
           </Text>
           <TouchableOpacity
             style={[styles.prayerBatteryTipButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -1298,7 +1301,7 @@ export default function NotificationsScreen() {
           >
             <MaterialCommunityIcons name="battery-check" size={18} color="#fff" />
             <Text style={styles.prayerBatteryTipButtonText}>
-              استثناء التطبيق
+              {uiText({ ar: 'استثناء التطبيق', en: 'Exclude app' })}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1318,10 +1321,13 @@ export default function NotificationsScreen() {
           <MaterialCommunityIcons name="link-variant" size={18} color="#0d8e62" />
           <View style={{ flex: 1, marginHorizontal: 8 }}>
             <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              ربط بأوقات الصلاة تلقائياً
+              {uiText({ ar: 'ربط بأوقات الصلاة تلقائياً', en: 'Link automatically to prayer times' })}
             </Text>
             <Text style={[{ color: colors.textLight, fontSize: 11, marginTop: 2, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              صباح: بعد الفجر بنصف ساعة • مساء: بعد العصر بربع ساعة
+              {uiText({
+                ar: 'صباح: بعد الفجر بنصف ساعة • مساء: بعد العصر بربع ساعة',
+                en: 'Morning: 30 min after Fajr • Evening: 15 min after Asr',
+              })}
             </Text>
           </View>
         </View>
@@ -1817,7 +1823,10 @@ export default function NotificationsScreen() {
                       selectedSurah === num && { color: 'rgba(255,255,255,0.7)' },
                       { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
                     ]}>
-                      {AYAH_COUNTS[num - 1]} آية
+                      {uiText({
+                        ar: `${AYAH_COUNTS[num - 1]} آية`,
+                        en: `${AYAH_COUNTS[num - 1]} ayahs`,
+                      })}
                     </Text>
                   </TouchableOpacity>
                 ))}

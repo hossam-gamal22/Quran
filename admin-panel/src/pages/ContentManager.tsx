@@ -4,12 +4,12 @@
  * All content stored in Firestore `appContent` collection.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Save, Plus, Trash2, Edit2, ChevronDown, ChevronUp,
   BookOpen, Mountain, Footprints, Users, RefreshCw,
   GripVertical, AlertCircle, CheckCircle, Calendar, Star,
-  Upload, X, Download,
+  Upload, X, Download, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -20,6 +20,13 @@ import {
   getDefaultSeerahContent,
   getDefaultCompanionsContent,
 } from '../data/app-defaults';
+import {
+  RELIGIOUS_STORY_PRESETS,
+  type ReligiousStoryPreset,
+} from '../data/religious-story-presets';
+import { findCompleteReligiousStory, preferLongerText } from '@app-data/religious-story-complete';
+import { expandCompanionsContent } from '@app-data/full-story-texts';
+import { dedupByName } from '@app-lib/dedup-by-name';
 import {
   getDefaultSeasonalPageContent,
   getDefaultSeasonsMetadata,
@@ -81,6 +88,9 @@ interface CMSSeerahSection {
 
 interface SeerahContent {
   sections: CMSSeerahSection[];
+  audioUrl?: string;
+  audioTitle?: string;
+  audioStoragePath?: string;
   updatedAt?: string;
 }
 
@@ -96,6 +106,11 @@ interface CMSCompanion {
   videoUrl?: string;
   videoTitle?: string;
   videoStoragePath?: string;
+  audioUrl?: string;
+  audioTitle?: string;
+  audioStoragePath?: string;
+  transcript?: string;
+  transcriptEn?: string;
   icon?: string;
   iconUrl?: string;
   iconStoragePath?: string;
@@ -107,6 +122,244 @@ interface CompanionsContent {
   updatedAt?: string;
 }
 
+interface CMSReligiousStory {
+  id: string;
+  title: string;
+  titleEn?: string;
+  brief?: string;
+  briefEn?: string;
+  icon?: string;
+  audioUrl: string;
+  audioTitle?: string;
+  transcript: string;
+  transcriptEn?: string;
+  sourceUrl?: string;
+  order?: number;
+}
+
+interface ReligiousStoriesContent {
+  stories: CMSReligiousStory[];
+  updatedAt?: string;
+  contentVersion?: number;
+  updateMode?: 'manual' | 'interval';
+  refreshIntervalMinutes?: number;
+}
+
+interface ArchiveAudioFile {
+  name: string;
+  format?: string;
+  source?: string;
+}
+
+interface ArchiveMetadata {
+  files?: ArchiveAudioFile[];
+  d1?: string;
+  d2?: string;
+  dir?: string;
+  alternate_locations?: {
+    servers?: Array<{ server?: string; dir?: string }>;
+    workable?: Array<{ server?: string; dir?: string }>;
+  };
+}
+
+const AUDIO_FILE_EXTENSIONS = ['.mp3', '.m4a', '.ogg', '.wav', '.aac'];
+const AUDIO_FORMAT_PRIORITY = ['vbr mp3', 'mp3', 'm4a', 'ogg', 'wav', 'aac'];
+
+function getArchiveIdentifier(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (!url.hostname.endsWith('archive.org')) return null;
+    const parts = url.pathname.split('/').filter(Boolean);
+    if ((parts[0] === 'details' || parts[0] === 'download' || parts[0] === 'metadata') && parts[1]) {
+      return decodeURIComponent(parts[1]);
+    }
+    if (/^\d+$/.test(parts[0] || '') && parts[1] === 'items' && parts[2]) {
+      return decodeURIComponent(parts[2]);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function getArchiveAudioFileName(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (!url.hostname.endsWith('archive.org')) return null;
+    const parts = url.pathname.split('/').filter(Boolean);
+    if ((parts[0] === 'details' || parts[0] === 'download') && parts[1] && parts.length > 2) {
+      return parts.slice(2).map(part => decodeURIComponent(part)).join('/');
+    }
+    if (/^\d+$/.test(parts[0] || '') && parts[1] === 'items' && parts[2] && parts.length > 3) {
+      return parts.slice(3).map(part => decodeURIComponent(part)).join('/');
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function isDirectAudioUrl(input: string): boolean {
+  const lower = input.trim().toLowerCase().split('?')[0];
+  return AUDIO_FILE_EXTENSIONS.some(ext => lower.endsWith(ext));
+}
+
+function archiveDownloadUrl(identifier: string, fileName: string): string {
+  const encodedPath = fileName
+    .split('/')
+    .map(part => encodeURIComponent(part))
+    .join('/');
+  return `https://archive.org/download/${encodeURIComponent(identifier)}/${encodedPath}`;
+}
+
+function archiveDirectFileUrl(identifier: string, metadata: ArchiveMetadata, fileName: string): string {
+  const encodedPath = fileName
+    .split('/')
+    .map(part => encodeURIComponent(part))
+    .join('/');
+  if (metadata.d1 && metadata.dir) {
+    return `https://${metadata.d1}${metadata.dir.replace(/\/$/, '')}/${encodedPath}`;
+  }
+  if (metadata.d2 && metadata.dir) {
+    return `https://${metadata.d2}${metadata.dir.replace(/\/$/, '')}/${encodedPath}`;
+  }
+  const directLocation = metadata.alternate_locations?.workable?.[0] || metadata.alternate_locations?.servers?.[0];
+  if (directLocation?.server && directLocation?.dir) {
+    return `https://${directLocation.server}${directLocation.dir.replace(/\/$/, '')}/${encodedPath}`;
+  }
+  return archiveDownloadUrl(identifier, fileName);
+}
+
+function pickArchiveAudioFile(files: ArchiveAudioFile[]): ArchiveAudioFile | null {
+  const audioFiles = files.filter(file => {
+    const name = (file.name || '').toLowerCase();
+    return AUDIO_FILE_EXTENSIONS.some(ext => name.endsWith(ext));
+  });
+  if (audioFiles.length === 0) return null;
+  return [...audioFiles].sort((a, b) => {
+    const aName = (a.name || '').toLowerCase();
+    const bName = (b.name || '').toLowerCase();
+    const aFormat = (a.format || '').toLowerCase();
+    const bFormat = (b.format || '').toLowerCase();
+    const aScore = AUDIO_FORMAT_PRIORITY.findIndex(token => aFormat.includes(token) || aName.endsWith(`.${token.replace('vbr ', '')}`));
+    const bScore = AUDIO_FORMAT_PRIORITY.findIndex(token => bFormat.includes(token) || bName.endsWith(`.${token.replace('vbr ', '')}`));
+    return (aScore === -1 ? 99 : aScore) - (bScore === -1 ? 99 : bScore);
+  })[0];
+}
+
+async function resolveArchiveAudioUrl(input: string): Promise<{ audioUrl: string; sourceUrl: string; fileName: string }> {
+  const trimmed = input.trim();
+  if (!trimmed) throw new Error('empty');
+  const identifier = getArchiveIdentifier(trimmed);
+  if (isDirectAudioUrl(trimmed)) {
+    const archiveFileName = getArchiveAudioFileName(trimmed);
+    if (identifier && archiveFileName) {
+      return {
+        audioUrl: archiveDownloadUrl(identifier, archiveFileName),
+        sourceUrl: `https://archive.org/details/${encodeURIComponent(identifier)}`,
+        fileName: archiveFileName,
+      };
+    }
+    return {
+      audioUrl: trimmed,
+      sourceUrl: identifier ? `https://archive.org/details/${encodeURIComponent(identifier)}` : trimmed,
+      fileName: decodeURIComponent(trimmed.split('/').pop()?.split('?')[0] || ''),
+    };
+  }
+  if (!identifier) throw new Error('not-archive');
+  const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`);
+  if (!res.ok) throw new Error('metadata');
+  const metadata = await res.json() as ArchiveMetadata;
+  const audioFile = pickArchiveAudioFile(metadata.files || []);
+  if (!audioFile) throw new Error('no-audio');
+  return {
+    audioUrl: archiveDirectFileUrl(identifier, metadata, audioFile.name),
+    sourceUrl: `https://archive.org/details/${encodeURIComponent(identifier)}`,
+    fileName: audioFile.name,
+  };
+}
+
+function normalizeSearchText(value?: string): string {
+  return (value || '')
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/[ًٌٍَُِّْ]/g, '')
+    .trim();
+}
+
+function presetSearchText(preset: ReligiousStoryPreset): string {
+  return normalizeSearchText([
+    preset.label,
+    preset.title,
+    preset.titleEn,
+    preset.brief,
+    preset.briefEn,
+  ].filter(Boolean).join(' '));
+}
+
+function findReligiousStoryPreset(story: CMSReligiousStory): ReligiousStoryPreset | undefined {
+  const title = normalizeSearchText(story.title);
+  const titleEn = normalizeSearchText(story.titleEn);
+  if (!title && !titleEn) return undefined;
+  return RELIGIOUS_STORY_PRESETS.find((preset) => {
+    const presetTitle = normalizeSearchText(preset.title);
+    const presetTitleEn = normalizeSearchText(preset.titleEn);
+    const presetLabel = normalizeSearchText(preset.label);
+    return Boolean(
+      (title && (title === presetTitle || title.includes(presetLabel) || presetLabel.includes(title))) ||
+      (titleEn && presetTitleEn && (titleEn === presetTitleEn || titleEn.includes(presetTitleEn) || presetTitleEn.includes(titleEn)))
+    );
+  });
+}
+
+function hydrateReligiousStoryFromPreset(story: CMSReligiousStory): CMSReligiousStory {
+  const preset = findReligiousStoryPreset(story);
+  const complete = findCompleteReligiousStory(story);
+  if (!preset && !complete) return story;
+  return {
+    ...story,
+    title: complete?.title || story.title || preset?.title || '',
+    titleEn: complete?.titleEn || story.titleEn || preset?.titleEn,
+    brief: complete?.brief || story.brief || preset?.brief,
+    briefEn: complete?.briefEn || story.briefEn || preset?.briefEn,
+    transcript: preferLongerText(story.transcript || preset?.transcript || '', complete?.transcript || ''),
+    transcriptEn: preferLongerText(story.transcriptEn || preset?.transcriptEn || '', complete?.transcriptEn || ''),
+    icon: '',
+  };
+}
+
+function splitFullStoryText(text: string): string[] {
+  return text
+    .split(/\n{2,}/)
+    .map(part => part.trim())
+    .filter(Boolean);
+}
+
+function getCompanionFullStory(companion: CMSCompanion): string {
+  const transcript = (companion.transcript || '').trim();
+  const storyText = (companion.story || []).filter(Boolean).join('\n\n').trim();
+  if (!transcript) return storyText;
+  if (!storyText) return transcript;
+  return transcript.length >= storyText.length ? transcript : storyText;
+}
+
+function normalizeCompanionForSave(companion: CMSCompanion): CMSCompanion {
+  const fullStory = getCompanionFullStory(companion);
+  return {
+    ...companion,
+    transcript: fullStory,
+    story: splitFullStoryText(fullStory),
+    virtues: (companion.virtues || []).map(v => v.trim()).filter(Boolean),
+  };
+}
+
 // ─── Seasonal CMS types ────────────────────────────────────────────────
 
 interface CMSSeasonalDua {
@@ -114,10 +367,6 @@ interface CMSSeasonalDua {
   titleKey: string;
   arabic: string;
   translation: string;
-  reference?: string;
-  sourceUrl?: string;
-  grade?: string;
-  note?: string;
 }
 
 interface CMSSeasonalChecklist {
@@ -125,10 +374,6 @@ interface CMSSeasonalChecklist {
   icon: string;
   labelKey: string;
   color: string;
-  reference?: string;
-  sourceUrl?: string;
-  grade?: string;
-  note?: string;
 }
 
 interface SeasonalPageContent {
@@ -155,10 +400,6 @@ interface AdminSpecialDay {
   description: string;
   virtues: string[];
   recommendedActions: string[];
-  reference?: string;
-  sourceUrl?: string;
-  grade?: string;
-  note?: string;
 }
 
 interface AdminSeasonMeta {
@@ -194,7 +435,7 @@ const SEASON_KEYS: { key: string; label: string }[] = [
 
 // ─── Tab types ─────────────────────────────────────────────────────────
 
-type ContentTab = 'hajj' | 'umrah' | 'duas' | 'seerah' | 'companions' | 'seasonal' | 'seasons';
+type ContentTab = 'hajj' | 'umrah' | 'duas' | 'seerah' | 'companions' | 'religiousStories' | 'seasonal' | 'seasons';
 
 const TABS: { key: ContentTab; label: string; icon: React.ElementType }[] = [
   { key: 'hajj', label: 'مناسك الحج', icon: Mountain },
@@ -202,9 +443,13 @@ const TABS: { key: ContentTab; label: string; icon: React.ElementType }[] = [
   { key: 'duas', label: 'الأدعية', icon: BookOpen },
   { key: 'seerah', label: 'السيرة النبوية', icon: BookOpen },
   { key: 'companions', label: 'الصحابة', icon: Users },
+  { key: 'religiousStories', label: 'قصص دينية', icon: BookOpen },
   { key: 'seasonal', label: 'المواسم', icon: Calendar },
   { key: 'seasons', label: 'بيانات المواسم', icon: Star },
 ];
+
+const getFullDefaultCompanionsContent = () =>
+  expandCompanionsContent(getDefaultCompanionsContent()) as unknown as CompanionsContent;
 
 const withDefaultSeasonalPageContent = (
   page: SeasonalPageKey,
@@ -212,9 +457,6 @@ const withDefaultSeasonalPageContent = (
 ): SeasonalPageContent => {
   const defaults = getDefaultSeasonalPageContent(page) as SeasonalPageContent;
   if (!data) return defaults;
-
-  const hasUnsourcedDuas = data.duas?.some((dua) => dua.arabic && !dua.reference && !dua.sourceUrl && !dua.note);
-  if (hasUnsourcedDuas) return defaults;
 
   const mergeDuas = (items: CMSSeasonalDua[] | undefined) => (
     items?.length
@@ -293,10 +535,6 @@ const withDefaultSeasonsMetadata = (data: SeasonsMetadata | null): SeasonsMetada
     const hasPlaceholderIcon = current.icon === 'calendar' && fallback.icon !== 'calendar';
     const hasPlaceholderColor = current.color === '#2f7659' && fallback.color !== '#2f7659';
 
-    const hasUnsourcedSpecialDays = current.specialDays?.some((day) => (
-      day.description && !day.reference && !day.sourceUrl && !day.note
-    ));
-
     seasons[key] = {
       ...fallback,
       ...current,
@@ -307,7 +545,7 @@ const withDefaultSeasonsMetadata = (data: SeasonsMetadata | null): SeasonsMetada
       endDate: !hasPlaceholderRange && hasUsableDate(current.endDate) ? current.endDate : fallback.endDate,
       color: !hasPlaceholderColor && current.color ? current.color : fallback.color,
       icon: !hasPlaceholderIcon && current.icon ? current.icon : fallback.icon,
-      specialDays: key === 'shaban' || hasUnsourcedSpecialDays ? fallback.specialDays : mergeSpecialDays(current.specialDays, fallback.specialDays),
+      specialDays: key === 'shaban' ? fallback.specialDays : mergeSpecialDays(current.specialDays, fallback.specialDays),
       greetings: ['rajab', 'shaban'].includes(key) ? fallback.greetings : (current.greetings?.length ? current.greetings : fallback.greetings),
     };
   });
@@ -427,6 +665,9 @@ function IconUploadField({
 const CONTENT_VIDEO_STORAGE_PATH = 'content-videos';
 const MAX_VIDEO_SIZE_MB = 200;
 const VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/webm,video/x-m4v';
+const CONTENT_AUDIO_STORAGE_PATH = 'content-audio';
+const MAX_AUDIO_SIZE_MB = 120;
+const AUDIO_ACCEPT = 'audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,audio/webm,audio/x-m4a,.mp3,.m4a,.aac,.wav,.ogg,.webm';
 
 function VideoUploadField({
   videoUrl,
@@ -567,6 +808,223 @@ function VideoUploadField({
         className="hidden"
         title="اختيار ملف فيديو"
       />
+    </div>
+  );
+}
+
+// ─── Audio Upload Field ────────────────────────────────────────────────
+
+function AudioUploadField({
+  audioUrl,
+  audioStoragePath,
+  onUpload,
+  onClear,
+}: {
+  audioUrl?: string;
+  audioStoragePath?: string;
+  onUpload: (url: string, storagePath: string) => void;
+  onClear: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const isHostedFile = !!audioStoragePath;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isAudioFile = file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|webm)$/i.test(file.name);
+    if (file.size > MAX_AUDIO_SIZE_MB * 1024 * 1024) {
+      alert(`حجم الصوت أكبر من ${MAX_AUDIO_SIZE_MB} MB`);
+      return;
+    }
+    if (!isAudioFile) {
+      alert('يجب اختيار ملف صوت MP3 / M4A / AAC / WAV / OGG');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      if (audioStoragePath) {
+        try {
+          await deleteObject(ref(storage, audioStoragePath));
+        } catch {
+          // Previous file may not exist
+        }
+      }
+
+      const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? '.mp3').toLowerCase();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '');
+      const fileName = `audio_${Date.now()}_${safeName}${ext}`;
+      const storagePath = `${CONTENT_AUDIO_STORAGE_PATH}/${fileName}`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file, { contentType: file.type || 'audio/mpeg' });
+      const url = await getDownloadURL(storageRef);
+      onUpload(url, storagePath);
+    } catch (err) {
+      alert(`خطأ في رفع الصوت: ${(err as Error).message}`);
+    } finally {
+      setUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm('هل تريد إزالة ملف الصوت المرفوع؟')) return;
+    if (audioStoragePath) {
+      try {
+        await deleteObject(ref(storage, audioStoragePath));
+      } catch {
+        // Storage file may not exist
+      }
+    }
+    onClear();
+  };
+
+  return (
+    <div className="border border-admin-border rounded-lg p-3 bg-admin-bg/30">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-slate-400">رفع ملف صوت مباشر للقصة</span>
+        {isHostedFile && (
+          <button
+            onClick={handleRemove}
+            className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+            title="حذف الصوت المرفوع"
+          >
+            <X size={12} /> حذف
+          </button>
+        )}
+      </div>
+
+      {isHostedFile && audioUrl ? (
+        <div className="space-y-2">
+          <audio src={audioUrl} controls className="w-full" preload="metadata" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1 px-3 py-1.5 bg-admin-surface border border-admin-border rounded text-xs text-slate-300 hover:text-white disabled:opacity-50"
+            >
+              {uploading ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
+              {uploading ? 'جاري الرفع...' : 'استبدال الصوت'}
+            </button>
+            <span className="text-xs text-slate-500 truncate" dir="ltr">{audioUrl}</span>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 px-3 py-3 bg-admin-surface border border-dashed border-admin-border rounded text-xs text-slate-400 hover:text-white hover:border-slate-500 disabled:opacity-50"
+        >
+          {uploading ? (
+            <>
+              <RefreshCw size={14} className="animate-spin" />
+              جاري رفع الصوت...
+            </>
+          ) : (
+            <>
+              <Upload size={14} />
+              اختر ملف صوت (MP3 / M4A / AAC، حد أقصى {MAX_AUDIO_SIZE_MB} MB)
+            </>
+          )}
+        </button>
+      )}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept={AUDIO_ACCEPT}
+        onChange={handleUpload}
+        className="hidden"
+        title="اختيار ملف صوت"
+      />
+    </div>
+  );
+}
+
+// ─── Internet Archive Audio Resolver ───────────────────────────────────
+
+function ArchiveAudioUrlField({
+  value,
+  disabled,
+  onChange,
+  onResolve,
+  label = 'رابط صفحة Internet Archive أو ملف صوت مباشر',
+  placeholder = 'https://archive.org/details/... أو https://archive.org/download/.../story.mp3',
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  onResolve: (audioUrl: string, fileName: string, sourceUrl: string) => void;
+  label?: string;
+  placeholder?: string;
+}) {
+  const [resolving, setResolving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleResolve = async () => {
+    const input = value.trim();
+    if (!input || disabled) return;
+    if (isDirectAudioUrl(input)) {
+      setMessage({ type: 'success', text: 'الرابط مباشر وجاهز للاستخدام.' });
+      return;
+    }
+    if (!getArchiveIdentifier(input)) return;
+    setResolving(true);
+    setMessage(null);
+    try {
+      const resolved = await resolveArchiveAudioUrl(input);
+      onResolve(resolved.audioUrl, resolved.fileName, resolved.sourceUrl);
+      setMessage({ type: 'success', text: `تم جلب رابط الصوت: ${resolved.fileName}` });
+    } catch (err) {
+      const reason = (err as Error).message;
+      const text =
+        reason === 'no-audio'
+          ? 'لم أجد ملف صوت داخل صفحة الأرشيف.'
+          : reason === 'not-archive'
+            ? 'ضع رابط Internet Archive صحيح أو رابط صوت مباشر.'
+            : 'تعذر جلب بيانات Internet Archive الآن.';
+      setMessage({ type: 'error', text });
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="text-xs text-slate-400 mb-1 block">{label}</label>
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => {
+            setMessage(null);
+            onChange(e.target.value);
+          }}
+          onBlur={handleResolve}
+          disabled={disabled}
+          className="flex-1 bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left text-sm disabled:opacity-40"
+          dir="ltr"
+          title={label}
+          aria-label={label}
+          placeholder={disabled ? 'تم استخدام صوت مرفوع — احذفه لاستخدام رابط' : placeholder}
+        />
+        <button
+          type="button"
+          onClick={handleResolve}
+          disabled={disabled || resolving || !value.trim()}
+          className="flex items-center gap-1 px-3 py-2 bg-admin-surface border border-admin-border rounded text-xs text-slate-300 hover:text-white disabled:opacity-40"
+          title="جلب رابط الصوت المباشر"
+        >
+          <RefreshCw size={13} className={resolving ? 'animate-spin' : ''} />
+          {resolving ? 'جاري الجلب' : 'جلب الرابط'}
+        </button>
+      </div>
+      {message && (
+        <p className={`text-xs mt-1 ${message.type === 'success' ? 'text-accent-light' : 'text-red-400'}`}>
+          {message.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -1105,17 +1563,53 @@ function SeerahSectionEditor({
 function CompanionEditor({
   companion,
   index,
+  total,
   categories,
   onUpdate,
   onDelete,
+  onMoveUp,
+  onMoveDown,
+  onMoveTo,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isDragOver,
 }: {
   companion: CMSCompanion;
   index: number;
+  total: number;
   categories: { key: string; title: string }[];
   onUpdate: (updated: CMSCompanion) => void;
   onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onMoveTo: (newIndex: number) => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
+  isDragOver: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [orderInput, setOrderInput] = useState<string>(String(index + 1));
+  useEffect(() => { setOrderInput(String(index + 1)); }, [index]);
+  const fullStoryText = getCompanionFullStory(companion);
+  const categoryTitle = categories.find(c => c.key === companion.category)?.title || companion.category;
+
+  const commitOrder = () => {
+    const parsed = Number(orderInput);
+    if (!Number.isFinite(parsed)) { setOrderInput(String(index + 1)); return; }
+    const target = Math.max(1, Math.min(total, Math.floor(parsed))) - 1;
+    if (target !== index) onMoveTo(target);
+    else setOrderInput(String(index + 1));
+  };
+
+  const updateFullStory = (text: string) => {
+    onUpdate({
+      ...companion,
+      transcript: text,
+      story: splitFullStoryText(text),
+    });
+  };
 
   const addVirtue = () => {
     onUpdate({ ...companion, virtues: [...companion.virtues, ''] });
@@ -1132,12 +1626,60 @@ function CompanionEditor({
   };
 
   return (
-    <div className="border border-admin-border rounded-lg mb-3 overflow-hidden">
+    <div
+      className={`border rounded-lg mb-3 overflow-hidden transition-colors ${isDragOver ? 'border-accent-light bg-accent-dark/10' : 'border-admin-border'}`}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(e); }}
+      onDrop={(e) => { e.preventDefault(); onDrop(); }}
+    >
       <div className="flex items-center gap-2 p-3 bg-admin-surface cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <span
+          draggable
+          onDragStart={(e) => { e.stopPropagation(); onDragStart(); e.dataTransfer.effectAllowed = 'move'; }}
+          onClick={(e) => e.stopPropagation()}
+          className="p-1 rounded text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+          title="اسحب لإعادة الترتيب"
+          aria-label="اسحب لإعادة الترتيب"
+        >
+          <GripVertical size={14} />
+        </span>
+        <input
+          type="number"
+          min={1}
+          max={total}
+          value={orderInput}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setOrderInput(e.target.value)}
+          onBlur={commitOrder}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+          className="w-14 bg-admin-bg border border-admin-border rounded px-2 py-1 text-white text-center text-xs"
+          title="اكتب الرقم الجديد للترتيب"
+          aria-label="ترتيب جديد"
+        />
         <span className="text-sm font-medium text-slate-300 flex-1">
           {index + 1}. {companion.nameAr || 'صحابي جديد'}
         </span>
-        <span className="text-xs text-slate-500">{companion.category}</span>
+        <span className="text-xs text-slate-500">{categoryTitle}</span>
+        <span className={`text-xs ${companion.audioUrl?.trim() ? 'text-accent-light' : 'text-amber-400'}`}>
+          {companion.audioUrl?.trim() ? 'صوت جاهز' : 'ينقصها رابط صوت'}
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+          disabled={index === 0}
+          className="p-1 rounded text-slate-300 hover:text-white hover:bg-admin-bg/40 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="نقل للأعلى"
+          aria-label="نقل للأعلى"
+        >
+          <ArrowUp size={14} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+          disabled={index >= total - 1}
+          className="p-1 rounded text-slate-300 hover:text-white hover:bg-admin-bg/40 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="نقل للأسفل"
+          aria-label="نقل للأسفل"
+        >
+          <ArrowDown size={14} />
+        </button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm(`هل تريد حذف "${companion.nameAr || 'صحابي جديد'}"؟`)) onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف">
           <Trash2 size={14} className="text-red-400" />
         </button>
@@ -1185,7 +1727,7 @@ function CompanionEditor({
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div>
+            <div className="col-span-2">
               <label className="text-xs text-slate-400 mb-1 block">الوصف المختصر</label>
               <input
                 value={companion.brief}
@@ -1197,21 +1739,16 @@ function CompanionEditor({
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">الأيقونة</label>
+              <label className="text-xs text-slate-400 mb-1 block">ترتيب العرض</label>
               <input
-                value={companion.icon || ''}
-                onChange={(e) => onUpdate({ ...companion, icon: e.target.value })}
-                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
-                title="أيقونة الصحابي"
-                aria-label="أيقونة الصحابي"
+                type="number"
+                value={index}
+                readOnly
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-slate-400"
+                title="ترتيب العرض"
+                aria-label="ترتيب العرض"
               />
             </div>
-            <IconUploadField
-              iconUrl={companion.iconUrl}
-              iconStoragePath={companion.iconStoragePath}
-              onUpload={(url, path) => onUpdate({ ...companion, iconUrl: url, iconStoragePath: path })}
-              onRemove={() => onUpdate({ ...companion, iconUrl: undefined, iconStoragePath: undefined })}
-            />
           </div>
           {/* Name translations */}
           {companion.nameTranslations && Object.keys(companion.nameTranslations).length > 0 && (
@@ -1240,70 +1777,62 @@ function CompanionEditor({
           >
             {companion.nameTranslations ? '+ تعديل ترجمات الاسم' : '+ إضافة ترجمات الاسم'}
           </button>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="border border-admin-border rounded-lg p-3 bg-admin-bg/30 space-y-3">
+            <div className="text-right">
+              <h4 className="text-sm font-semibold text-white">صوت القصة من Internet Archive</h4>
+              <p className="text-xs text-slate-400 mt-1">
+                ضع رابط صفحة الأرشيف أو رابط MP3 مباشر، وسيتم تحويل صفحة الأرشيف تلقائيًا لرابط صوت مباشر. الاستماع داخل التطبيق أونلاين فقط.
+              </p>
+            </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">عنوان الفيديو (اختياري)</label>
-              <input
-                value={companion.videoTitle || ''}
-                onChange={(e) => onUpdate({ ...companion, videoTitle: e.target.value })}
-                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
-                dir="rtl"
-                title="عنوان الفيديو"
-                aria-label="عنوان الفيديو"
-                placeholder="مثال: قصة أبي بكر"
+              <ArchiveAudioUrlField
+                value={companion.audioUrl || ''}
+                onChange={(value) => onUpdate({ ...companion, audioUrl: value })}
+                onResolve={(audioUrl, fileName) => onUpdate({
+                  ...companion,
+                  audioUrl,
+                  audioTitle: companion.audioTitle || fileName.replace(/\.[^.]+$/, ''),
+                })}
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs text-slate-400 mb-1 block">رابط يوتيوب أو فيمو (اختياري)</label>
-              <textarea
-                value={companion.videoStoragePath ? '' : companion.videoUrl || ''}
-                onChange={(e) => onUpdate({ ...companion, videoUrl: e.target.value, videoStoragePath: undefined })}
-                disabled={!!companion.videoStoragePath}
-                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left text-sm min-h-[78px] disabled:opacity-40"
-                dir="ltr"
-                title="رابط أو كود الفيديو"
-                aria-label="رابط أو كود الفيديو"
-                placeholder={companion.videoStoragePath ? 'تم استخدام فيديو مرفوع — احذفه لاستخدام رابط' : 'YouTube URL أو كود iframe'}
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">عنوان الاستماع (اختياري)</label>
+              <input
+                value={companion.audioTitle || ''}
+                onChange={(e) => onUpdate({ ...companion, audioTitle: e.target.value })}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                dir="rtl"
+                title="عنوان الاستماع"
+                aria-label="عنوان الاستماع"
+                placeholder="مثال: استمع إلى قصة أبي بكر"
               />
             </div>
           </div>
 
-          <VideoUploadField
-            videoUrl={companion.videoStoragePath ? companion.videoUrl : undefined}
-            videoStoragePath={companion.videoStoragePath}
-            onUpload={(url, storagePath) =>
-              onUpdate({ ...companion, videoUrl: url, videoStoragePath: storagePath })
-            }
-            onClear={() => onUpdate({ ...companion, videoUrl: undefined, videoStoragePath: undefined })}
-          />
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <button onClick={() => onUpdate({ ...companion, story: [...companion.story, ''] })} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
-                <Plus size={14} /> إضافة فقرة
-              </button>
-              <span className="text-xs text-slate-400 font-medium">القصة ({companion.story.length} فقرة)</span>
-            </div>
-            {companion.story.map((paragraph, i) => (
-              <div key={i} className="flex items-start gap-2 mb-2">
-                <span className="text-xs text-slate-500 mt-2 w-5 text-center">{i + 1}</span>
-                <textarea
-                  value={paragraph}
-                  onChange={(e) => {
-                    const newStory = [...companion.story];
-                    newStory[i] = e.target.value;
-                    onUpdate({ ...companion, story: newStory });
-                  }}
-                  className="flex-1 bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[80px]"
-                  dir="rtl"
-                  title="فقرة من القصة"
-                  aria-label="فقرة من القصة"
-                  placeholder="أدخل فقرة"
-                />
-                <button onClick={() => onUpdate({ ...companion, story: companion.story.filter((_, idx) => idx !== i) })} className="p-1 mt-1 hover:bg-red-900/30 rounded" title="حذف الفقرة">
-                  <Trash2 size={12} className="text-red-400" />
-                </button>
-              </div>
-            ))}
+            <label className="text-xs text-slate-400 font-medium mb-2 block text-right">نص القصة الكامل</label>
+            <textarea
+              value={fullStoryText}
+              onChange={(e) => updateFullStory(e.target.value)}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[220px]"
+              dir="rtl"
+              title="نص القصة الكامل"
+              aria-label="نص القصة الكامل"
+              placeholder="اكتب القصة كاملة هنا..."
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-400 font-medium mb-2 block text-left">Full story text (English)</label>
+            <textarea
+              value={companion.transcriptEn || ''}
+              onChange={(e) => onUpdate({ ...companion, transcriptEn: e.target.value })}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left text-sm min-h-[150px]"
+              dir="ltr"
+              title="Full story text in English"
+              aria-label="Full story text in English"
+              placeholder="Write the full English story here..."
+            />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -1334,6 +1863,430 @@ function CompanionEditor({
   );
 }
 
+// ─── Religious Story Editor ─────────────────────────────────────────────
+
+function ReligiousStoryEditor({
+  story,
+  index,
+  total,
+  onUpdate,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  onMoveTo,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isDragOver,
+}: {
+  story: CMSReligiousStory;
+  index: number;
+  total: number;
+  onUpdate: (updated: CMSReligiousStory) => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onMoveTo: (newIndex: number) => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
+  isDragOver: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [presetSearch, setPresetSearch] = useState('');
+  const [orderInput, setOrderInput] = useState<string>(String(index + 1));
+  useEffect(() => { setOrderInput(String(index + 1)); }, [index]);
+  const matchedPreset = findReligiousStoryPreset(story);
+  const effectiveStory = hydrateReligiousStoryFromPreset(story);
+  const presetQuery = normalizeSearchText(presetSearch);
+  const filteredPresets = useMemo(() => {
+    if (!presetQuery) return [];
+    return RELIGIOUS_STORY_PRESETS.filter((preset) => presetSearchText(preset).includes(presetQuery));
+  }, [presetQuery]);
+
+  const commitOrder = () => {
+    const parsed = Number(orderInput);
+    if (!Number.isFinite(parsed)) { setOrderInput(String(index + 1)); return; }
+    const target = Math.max(1, Math.min(total, Math.floor(parsed))) - 1;
+    if (target !== index) onMoveTo(target);
+    else setOrderInput(String(index + 1));
+  };
+
+  const applyStoryPreset = (presetId: string) => {
+    const preset = RELIGIOUS_STORY_PRESETS.find(item => item.id === presetId);
+    if (!preset) return;
+    const hasText = Boolean(story.title.trim() || story.brief?.trim() || (story.transcript || '').trim());
+    if (hasText && !confirm('سيتم استبدال العنوان والوصف ونص القصة بالقصة الجاهزة، مع الحفاظ على رابط الصوت الحالي. هل تريد المتابعة؟')) {
+      return;
+    }
+    onUpdate({
+      ...story,
+      title: preset.title,
+      titleEn: preset.titleEn || '',
+      brief: preset.brief,
+      briefEn: preset.briefEn || '',
+      icon: '',
+      transcript: preset.transcript,
+      transcriptEn: preset.transcriptEn || '',
+      audioTitle: story.audioTitle || preset.title,
+    });
+    setPresetSearch('');
+  };
+
+  return (
+    <div
+      className={`border rounded-lg mb-3 overflow-hidden transition-colors ${isDragOver ? 'border-accent-light bg-accent-dark/10' : 'border-admin-border'}`}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(e); }}
+      onDrop={(e) => { e.preventDefault(); onDrop(); }}
+    >
+      <div className="flex items-center gap-2 p-3 bg-admin-surface cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <span
+          draggable
+          onDragStart={(e) => { e.stopPropagation(); onDragStart(); e.dataTransfer.effectAllowed = 'move'; }}
+          onClick={(e) => e.stopPropagation()}
+          className="p-1 rounded text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+          title="اسحب لإعادة الترتيب"
+          aria-label="اسحب لإعادة الترتيب"
+        >
+          <GripVertical size={14} />
+        </span>
+        <input
+          type="number"
+          min={1}
+          max={total}
+          value={orderInput}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setOrderInput(e.target.value)}
+          onBlur={commitOrder}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+          className="w-14 bg-admin-bg border border-admin-border rounded px-2 py-1 text-white text-center text-xs"
+          title="اكتب الرقم الجديد للترتيب"
+          aria-label="ترتيب جديد"
+        />
+        <span className="text-sm font-medium text-slate-300 flex-1">
+          {index + 1}. {story.title || 'قصة جديدة'}
+        </span>
+        <span className={`text-xs ${story.audioUrl?.trim() ? 'text-accent-light' : 'text-amber-400'}`}>
+          {story.audioUrl?.trim() ? 'صوت جاهز' : 'ينقصها رابط صوت'}
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+          disabled={index === 0}
+          className="p-1 rounded text-slate-300 hover:text-white hover:bg-admin-bg/40 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="نقل للأعلى"
+          aria-label="نقل للأعلى"
+        >
+          <ArrowUp size={14} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+          disabled={index >= total - 1}
+          className="p-1 rounded text-slate-300 hover:text-white hover:bg-admin-bg/40 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="نقل للأسفل"
+          aria-label="نقل للأسفل"
+        >
+          <ArrowDown size={14} />
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); if (confirm(`هل تريد حذف "${story.title || 'قصة جديدة'}"؟`)) onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف">
+          <Trash2 size={14} className="text-red-400" />
+        </button>
+        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </div>
+
+      {expanded && (
+        <div className="p-4 space-y-3 bg-admin-bg/50">
+          <div className="border border-accent-dark/30 rounded-lg p-3 bg-accent-dark/10">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-xs text-slate-400 text-right">
+                ابحث باسم النبي أو الرسول لملء العنوان والوصف ونص القصة العربي والإنجليزي. رابط الصوت الحالي لا يتغير.
+              </p>
+              <label className="text-sm font-semibold text-white whitespace-nowrap">بحث القصص الجاهزة</label>
+            </div>
+            <input
+              value={presetSearch}
+              onChange={(e) => setPresetSearch(e.target.value)}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+              dir="rtl"
+              placeholder="اكتب مثل: موسى، يوسف، إبراهيم، نوح..."
+              title="البحث باسم النبي أو الرسول"
+              aria-label="البحث باسم النبي أو الرسول"
+            />
+            {matchedPreset && (
+              <button
+                type="button"
+                onClick={() => applyStoryPreset(matchedPreset.id)}
+                className="mt-2 w-full rounded border border-accent-dark/40 bg-accent-dark/20 px-3 py-2 text-sm text-accent-light hover:bg-accent-dark/30"
+              >
+                تحديث هذه القصة من البيانات الجاهزة: {matchedPreset.label}
+              </button>
+            )}
+            {!!presetQuery && (
+              <div className="mt-2 max-h-48 overflow-y-auto rounded border border-admin-border bg-admin-bg/40">
+                {filteredPresets.length === 0 ? (
+                  <div className="px-3 py-3 text-center text-sm text-slate-400">لا توجد نتائج</div>
+                ) : (
+                  filteredPresets.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.id}
+                      onClick={() => applyStoryPreset(preset.id)}
+                      className="flex w-full items-center justify-between gap-3 border-b border-admin-border/60 px-3 py-2 text-right hover:bg-admin-surface last:border-b-0"
+                    >
+                      <span className="text-xs text-slate-500">نبي</span>
+                      <span className="flex-1 text-sm text-white">{preset.label}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">عنوان القصة (عربي)</label>
+              <input
+                value={story.title}
+                onChange={(e) => onUpdate({ ...story, title: e.target.value })}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                dir="rtl"
+                title="عنوان القصة"
+                aria-label="عنوان القصة"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">العنوان (إنجليزي اختياري)</label>
+              <input
+                value={effectiveStory.titleEn || ''}
+                onChange={(e) => onUpdate({ ...story, titleEn: e.target.value })}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
+                dir="ltr"
+                title="العنوان بالإنجليزية"
+                aria-label="العنوان بالإنجليزية"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">وصف مختصر</label>
+            <input
+              value={story.brief || ''}
+              onChange={(e) => onUpdate({ ...story, brief: e.target.value })}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+              dir="rtl"
+              title="وصف مختصر"
+              aria-label="وصف مختصر"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Short description (English)</label>
+            <input
+              value={effectiveStory.briefEn || ''}
+              onChange={(e) => onUpdate({ ...story, briefEn: e.target.value })}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left"
+              dir="ltr"
+              title="Short description in English"
+              aria-label="Short description in English"
+              placeholder="English description shown when the app language is English"
+            />
+          </div>
+
+          <div className="border border-admin-border rounded-lg p-3 bg-admin-bg/30 space-y-3">
+              <div className="text-right">
+                <h4 className="text-sm font-semibold text-white">صوت القصة من Internet Archive</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                ضع رابط صفحة الأرشيف أو رابط MP3 مباشر، وسيتم تحويل صفحة الأرشيف تلقائيًا لرابط صوت مباشر. الاستماع داخل التطبيق أونلاين فقط.
+              </p>
+            </div>
+            <div>
+              <ArchiveAudioUrlField
+                value={story.audioUrl || ''}
+                onChange={(value) => onUpdate({ ...story, audioUrl: value })}
+                onResolve={(audioUrl, fileName, sourceUrl) => onUpdate({
+                  ...story,
+                  audioUrl,
+                  sourceUrl,
+                  audioTitle: story.audioTitle || fileName.replace(/\.[^.]+$/, ''),
+                })}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">عنوان الاستماع (اختياري)</label>
+              <input
+                value={story.audioTitle || ''}
+                onChange={(e) => onUpdate({ ...story, audioTitle: e.target.value })}
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                dir="rtl"
+                title="عنوان الاستماع"
+                aria-label="عنوان الاستماع"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block text-right">نص القصة الكامل (اختياري للقراءة والتمرير التلقائي)</label>
+            <textarea
+              value={effectiveStory.transcript || ''}
+              onChange={(e) => onUpdate({ ...story, transcript: e.target.value })}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[190px]"
+              dir="rtl"
+              title="نص القصة الكامل"
+              aria-label="نص القصة الكامل"
+              placeholder="اكتب القصة كاملة هنا..."
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Full story text (English)</label>
+            <textarea
+              value={effectiveStory.transcriptEn || ''}
+              onChange={(e) => onUpdate({ ...story, transcriptEn: e.target.value })}
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-left text-sm min-h-[190px]"
+              dir="ltr"
+              title="Full story text in English"
+              aria-label="Full story text in English"
+              placeholder="Write the full English story here..."
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Religious stories auto-sync ─────────────────────────────────────────
+// Reconciles the Firestore religiousStoriesContent doc against the bundled
+// preset catalog on every load so the admin sees the latest content without
+// manual re-publishing.
+//
+//   1. removes stories whose id is in REMOVED_STORY_IDS (deleted presets)
+//   2. for stories whose id matches a preset, refreshes text fields from the
+//      preset (preserves audio/video URLs and admin-uploaded media)
+//   3. adds any preset that isn't yet in Firestore
+//   4. runs dedup-by-name as a final pass
+
+const REMOVED_STORY_IDS = new Set<string>([
+  // Standalone Ishaq merged into the combined Ishaq + Yaqub story.
+  'prophet-ishaq',
+  // Six religious-story entries removed for being political/historical or
+  // sect-specific. See history of data/religious-stories-extra.ts for context.
+  'religious-saladin',
+  'religious-jilani',
+  'religious-yazid-ibn-zubayr',
+  'religious-hajjaj',
+  'religious-harun-rashid',
+  'religious-fall-babylon',
+  // Three Sahaba biographies kept exclusively in the Companions page because
+  // they have no dedicated audio track in the religious-stories archive.
+  // Khadijah and Umm Sulaym remain here because their audio tracks DO exist
+  // in the archive collection.
+  'religious-handhalah',
+  'religious-salman-farisi',
+  'religious-hamza',
+]);
+
+function presetToStory(preset: ReligiousStoryPreset): CMSReligiousStory {
+  return {
+    id: preset.id,
+    title: preset.title,
+    titleEn: preset.titleEn,
+    brief: preset.brief,
+    briefEn: preset.briefEn,
+    icon: preset.icon,
+    audioUrl: '',
+    audioTitle: '',
+    transcript: preset.transcript,
+    transcriptEn: preset.transcriptEn,
+  };
+}
+
+function refreshStoryFromPreset(
+  story: CMSReligiousStory,
+  preset: ReligiousStoryPreset
+): CMSReligiousStory {
+  // Text fields come from the latest preset. Media URLs and admin-attached
+  // assets stay on the Firestore record so audio uploads survive a sync.
+  return {
+    ...story,
+    title: preset.title,
+    titleEn: preset.titleEn || story.titleEn,
+    brief: preset.brief,
+    briefEn: preset.briefEn || story.briefEn,
+    icon: preset.icon || story.icon,
+    transcript: preferLongerText(preset.transcript, story.transcript || ''),
+    transcriptEn: preferLongerText(preset.transcriptEn || '', story.transcriptEn || ''),
+  };
+}
+
+function seedReligiousStoriesFromPresets(): ReligiousStoriesContent {
+  return {
+    stories: RELIGIOUS_STORY_PRESETS.map(presetToStory),
+    updateMode: 'manual',
+    refreshIntervalMinutes: 60,
+    contentVersion: 1,
+  };
+}
+
+function syncReligiousStoriesWithPresets(
+  current: ReligiousStoriesContent
+): { content: ReligiousStoriesContent; changed: boolean; summary: string } {
+  const presetById = new Map(RELIGIOUS_STORY_PRESETS.map((p) => [p.id, p]));
+  const incoming = current.stories || [];
+
+  const removedIds: string[] = [];
+  const refreshed: CMSReligiousStory[] = [];
+  let refreshedCount = 0;
+
+  for (const story of incoming) {
+    if (story.id && REMOVED_STORY_IDS.has(story.id)) {
+      removedIds.push(story.id);
+      continue;
+    }
+    const preset = story.id ? presetById.get(story.id) : undefined;
+    if (preset) {
+      const next = refreshStoryFromPreset(story, preset);
+      // Detect a meaningful refresh (title or brief differs).
+      if (next.title !== story.title || next.brief !== story.brief) refreshedCount++;
+      refreshed.push(next);
+    } else {
+      refreshed.push(story);
+    }
+  }
+
+  // Add any preset that isn't already represented (matched on id).
+  const existingIds = new Set(refreshed.map((s) => s.id).filter(Boolean));
+  const newlyAdded: CMSReligiousStory[] = [];
+  for (const preset of RELIGIOUS_STORY_PRESETS) {
+    if (!existingIds.has(preset.id)) {
+      const seeded = presetToStory(preset);
+      refreshed.push(seeded);
+      newlyAdded.push(seeded);
+    }
+  }
+
+  // Dedup by title as a final pass.
+  const { deduped, removedIds: dedupRemovedIds } = dedupByName(refreshed, (s) => s.title);
+
+  const changed =
+    removedIds.length > 0 ||
+    refreshedCount > 0 ||
+    newlyAdded.length > 0 ||
+    dedupRemovedIds.length > 0;
+
+  const summaryParts: string[] = [];
+  if (newlyAdded.length > 0) summaryParts.push(`أُضيفت ${newlyAdded.length} قصة جديدة`);
+  if (refreshedCount > 0) summaryParts.push(`حُدِّثت ${refreshedCount} قصة`);
+  if (removedIds.length > 0) summaryParts.push(`حُذفت ${removedIds.length} قصة منسوخة`);
+  if (dedupRemovedIds.length > 0) summaryParts.push(`أُزيلت ${dedupRemovedIds.length} نسخة مكررة`);
+  const summary = summaryParts.join(' · ') || 'تم مزامنة القصص الدينية';
+
+  return {
+    content: { ...current, stories: deduped },
+    changed,
+    summary,
+  };
+}
+
 // ─── Main ContentManager ────────────────────────────────────────────────
 
 export default function ContentManager() {
@@ -1341,15 +2294,32 @@ export default function ContentManager() {
   const [hajjUmrah, setHajjUmrah] = useState<HajjUmrahContent | null>(null);
   const [seerah, setSeerah] = useState<SeerahContent | null>(null);
   const [companions, setCompanions] = useState<CompanionsContent | null>(null);
+  const [religiousStories, setReligiousStories] = useState<ReligiousStoriesContent | null>(null);
   const [seasonal, setSeasonal] = useState<Record<SeasonalPageKey, SeasonalPageContent | null>>({
     ramadan: null, hajj: null, mawlid: null, ashura: null,
   });
   const [activeSeasonalPage, setActiveSeasonalPage] = useState<SeasonalPageKey>('ramadan');
   const [seasonsMeta, setSeasonsMeta] = useState<SeasonsMetadata | null>(null);
   const [activeSeasonKey, setActiveSeasonKey] = useState<string>('ramadan');
+  const [companionCategoryFilter, setCompanionCategoryFilter] = useState<string>('all');
+  const [companionSearch, setCompanionSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  // Drag-and-drop state: which array index is currently being dragged, and
+  // which index is the current drop target (for hover highlight).
+  const [draggedStoryIndex, setDraggedStoryIndex] = useState<number | null>(null);
+  const [storyDropTarget, setStoryDropTarget] = useState<number | null>(null);
+  const [draggedCompanionIndex, setDraggedCompanionIndex] = useState<number | null>(null);
+  const [companionDropTarget, setCompanionDropTarget] = useState<number | null>(null);
+
+  const reorderArray = <T,>(arr: T[], from: number, to: number): T[] => {
+    if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr;
+    const next = [...arr];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  };
 
   // Load all content on mount
   useEffect(() => {
@@ -1359,10 +2329,11 @@ export default function ContentManager() {
   const loadAllContent = async () => {
     setLoading(true);
     try {
-      const [hajjDoc, seerahDoc, companionsDoc, seasonsMetaDoc, ...seasonalDocs] = await Promise.all([
+      const [hajjDoc, seerahDoc, companionsDoc, religiousStoriesDoc, seasonsMetaDoc, ...seasonalDocs] = await Promise.all([
         getDoc(doc(db, 'appContent', 'hajjUmrahContent')),
         getDoc(doc(db, 'appContent', 'seerahContent')),
         getDoc(doc(db, 'appContent', 'companionsContent')),
+        getDoc(doc(db, 'appContent', 'religiousStoriesContent')),
         getDoc(doc(db, 'appContent', 'seasonsMetadata')),
         ...SEASONAL_PAGES.map(p => getDoc(doc(db, 'appContent', `seasonalContent_${p.key}`))),
       ]);
@@ -1371,8 +2342,60 @@ export default function ContentManager() {
       else setHajjUmrah(getDefaultHajjUmrahContent() as unknown as HajjUmrahContent);
       if (seerahDoc.exists()) setSeerah(seerahDoc.data() as SeerahContent);
       else setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
-      if (companionsDoc.exists()) setCompanions(companionsDoc.data() as CompanionsContent);
-      else setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
+      if (companionsDoc.exists()) {
+        const companionsData = expandCompanionsContent(companionsDoc.data() as CompanionsContent) as unknown as CompanionsContent;
+        const { deduped: dedupedCompanions, removedIds: removedCompanionIds } = dedupByName(
+          companionsData.companions || [],
+          (c) => c.nameAr
+        );
+        if (removedCompanionIds.length > 0) {
+          // Persist the cleanup back to Firestore so duplicates are gone for
+          // real — not just hidden in the UI.
+          const cleaned = { ...companionsData, companions: dedupedCompanions };
+          setCompanions(cleaned);
+          setDoc(doc(db, 'appContent', 'companionsContent'), {
+            ...cleaned,
+            updatedAt: new Date().toISOString(),
+          }).then(() => {
+            setStatus({ type: 'success', message: `تم حذف ${removedCompanionIds.length} نسخة مكررة من قصص الصحابة` });
+          }).catch((err) => {
+            console.warn('Companion dedup save failed', err);
+          });
+        } else {
+          setCompanions(companionsData);
+        }
+      } else {
+        setCompanions(getFullDefaultCompanionsContent());
+      }
+      if (religiousStoriesDoc.exists()) {
+        const storiesData = religiousStoriesDoc.data() as ReligiousStoriesContent;
+        const synced = syncReligiousStoriesWithPresets(storiesData);
+        setReligiousStories(synced.content);
+        if (synced.changed) {
+          // Persist sync (removed IDs, refreshed text, added new presets, dedup)
+          // back to Firestore so the cleanup is real, not just in-memory.
+          setDoc(doc(db, 'appContent', 'religiousStoriesContent'), {
+            ...synced.content,
+            updatedAt: new Date().toISOString(),
+            contentVersion: (storiesData.contentVersion || 0) + 1,
+          }).then(() => {
+            setStatus({ type: 'success', message: synced.summary });
+          }).catch((err) => {
+            console.warn('Religious stories auto-sync save failed', err);
+          });
+        }
+      } else {
+        // No Firestore doc yet — seed it with all bundled presets so the
+        // admin sees the full catalog on first run.
+        const seeded = seedReligiousStoriesFromPresets();
+        setReligiousStories(seeded);
+        setDoc(doc(db, 'appContent', 'religiousStoriesContent'), {
+          ...seeded,
+          updatedAt: new Date().toISOString(),
+        }).catch((err) => {
+          console.warn('Religious stories initial seed failed', err);
+        });
+      }
       if (seasonsMetaDoc.exists()) setSeasonsMeta(withDefaultSeasonsMetadata(seasonsMetaDoc.data() as SeasonsMetadata));
       else setSeasonsMeta(getDefaultSeasonsMetadata() as SeasonsMetadata);
 
@@ -1394,7 +2417,8 @@ export default function ContentManager() {
       console.warn('CMS content load failed; using bundled defaults instead.', err);
       setHajjUmrah(getDefaultHajjUmrahContent() as unknown as HajjUmrahContent);
       setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
-      setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
+      setCompanions(getFullDefaultCompanionsContent());
+      setReligiousStories({ stories: [], updateMode: 'manual', refreshIntervalMinutes: 60, contentVersion: 0 });
       setSeasonsMeta(getDefaultSeasonsMetadata() as SeasonsMetadata);
       setSeasonal({
         ramadan: getDefaultSeasonalPageContent('ramadan') as SeasonalPageContent,
@@ -1429,8 +2453,21 @@ export default function ContentManager() {
     if (!seerah) return;
     setSaving(true);
     try {
+      let toSave: SeerahContent = seerah;
+      if (seerah.audioUrl && !seerah.audioStoragePath && getArchiveIdentifier(seerah.audioUrl)) {
+        try {
+          const resolved = await resolveArchiveAudioUrl(seerah.audioUrl);
+          toSave = {
+            ...seerah,
+            audioUrl: resolved.audioUrl,
+            audioTitle: seerah.audioTitle || resolved.fileName.replace(/\.[^.]+$/, ''),
+          };
+        } catch {
+          // keep the original URL if resolution fails
+        }
+      }
       await setDoc(doc(db, 'appContent', 'seerahContent'), {
-        ...seerah,
+        ...toSave,
         updatedAt: new Date().toISOString(),
       });
       setStatus({ type: 'success', message: 'تم حفظ السيرة النبوية' });
@@ -1446,11 +2483,32 @@ export default function ContentManager() {
     if (!companions) return;
     setSaving(true);
     try {
+      // Dedup by name before save — duplicates created during the edit
+      // session shouldn't be persisted to Firestore.
+      const { deduped, removedIds: dupRemovedIds } = dedupByName(companions.companions, (c) => c.nameAr);
+      const hydratedCompanions = await Promise.all(deduped.map(async (companion) => {
+        const normalized = normalizeCompanionForSave(companion);
+        if (!normalized.audioUrl || normalized.audioStoragePath || !getArchiveIdentifier(normalized.audioUrl)) return normalized;
+        try {
+          const resolved = await resolveArchiveAudioUrl(normalized.audioUrl);
+          return {
+            ...normalized,
+            audioUrl: resolved.audioUrl,
+            videoUrl: normalized.videoUrl || resolved.sourceUrl,
+            audioTitle: normalized.audioTitle || normalized.videoTitle || resolved.fileName.replace(/\.[^.]+$/, ''),
+          };
+        } catch {
+          return normalized;
+        }
+      }));
       await setDoc(doc(db, 'appContent', 'companionsContent'), {
         ...companions,
+        companions: hydratedCompanions,
         updatedAt: new Date().toISOString(),
       });
-      setStatus({ type: 'success', message: 'تم حفظ قصص الصحابة' });
+      setCompanions({ ...companions, companions: hydratedCompanions });
+      const dupMsg = dupRemovedIds.length > 0 ? ` (أُزيلت ${dupRemovedIds.length} نسخة مكررة)` : '';
+      setStatus({ type: 'success', message: `تم حفظ قصص الصحابة${dupMsg}` });
     } catch (err) {
       console.error('Save error:', err);
       setStatus({ type: 'error', message: 'فشل حفظ المحتوى' });
@@ -1458,6 +2516,54 @@ export default function ContentManager() {
       setSaving(false);
     }
   }, [companions]);
+
+  const saveReligiousStories = useCallback(async () => {
+    if (!religiousStories) return;
+    setSaving(true);
+    try {
+      // Dedup by title before save so duplicates created during the edit
+      // session don't get persisted back to Firestore.
+      const { deduped, removedIds } = dedupByName(religiousStories.stories, (s) => s.title);
+      const hydratedStories = await Promise.all(deduped.map(async (story, idx) => {
+        const hydrated = hydrateReligiousStoryFromPreset({ ...story, order: idx });
+        if (!hydrated.audioUrl || !getArchiveIdentifier(hydrated.audioUrl)) return hydrated;
+        try {
+          const resolved = await resolveArchiveAudioUrl(hydrated.audioUrl);
+          return {
+            ...hydrated,
+            audioUrl: resolved.audioUrl,
+            sourceUrl: hydrated.sourceUrl || resolved.sourceUrl,
+            audioTitle: hydrated.audioTitle || resolved.fileName.replace(/\.[^.]+$/, ''),
+          };
+        } catch {
+          return hydrated;
+        }
+      }));
+      const nextVersion = (religiousStories.contentVersion || 0) + 1;
+      await setDoc(doc(db, 'appContent', 'religiousStoriesContent'), {
+        ...religiousStories,
+        stories: hydratedStories,
+        contentVersion: nextVersion,
+        updateMode: religiousStories.updateMode || 'manual',
+        refreshIntervalMinutes: Math.max(1, Number(religiousStories.refreshIntervalMinutes || 60)),
+        updatedAt: new Date().toISOString(),
+      });
+      setReligiousStories({
+        ...religiousStories,
+        stories: hydratedStories,
+        contentVersion: nextVersion,
+        updateMode: religiousStories.updateMode || 'manual',
+        refreshIntervalMinutes: Math.max(1, Number(religiousStories.refreshIntervalMinutes || 60)),
+      });
+      const dupMsg = removedIds.length > 0 ? ` (أُزيلت ${removedIds.length} نسخة مكررة)` : '';
+      setStatus({ type: 'success', message: `تم حفظ القصص الدينية${dupMsg}` });
+    } catch (err) {
+      console.error('Save error:', err);
+      setStatus({ type: 'error', message: 'فشل حفظ المحتوى' });
+    } finally {
+      setSaving(false);
+    }
+  }, [religiousStories]);
 
   const saveSeasonal = useCallback(async () => {
     const entries = Object.entries(seasonal).filter((entry): entry is [SeasonalPageKey, SeasonalPageContent] => Boolean(entry[1]));
@@ -1501,6 +2607,7 @@ export default function ContentManager() {
     if (activeTab === 'hajj' || activeTab === 'umrah' || activeTab === 'duas') saveHajjUmrah();
     else if (activeTab === 'seerah') saveSeerah();
     else if (activeTab === 'companions') saveCompanions();
+    else if (activeTab === 'religiousStories') saveReligiousStories();
     else if (activeTab === 'seasonal') saveSeasonal();
     else if (activeTab === 'seasons') saveSeasonsMeta();
   };
@@ -1557,8 +2664,13 @@ export default function ContentManager() {
   };
 
   const initCompanions = () => {
-    setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
+    setCompanions(getFullDefaultCompanionsContent());
     setStatus({ type: 'success', message: 'تم تحميل المحتوى الافتراضي للصحابة' });
+  };
+
+  const initReligiousStories = () => {
+    setReligiousStories({ stories: [], updateMode: 'manual', refreshIntervalMinutes: 60, contentVersion: 0 });
+    setStatus({ type: 'success', message: 'تم تجهيز قسم القصص الدينية' });
   };
 
   const initSeasonal = (page: SeasonalPageKey) => {
@@ -1614,7 +2726,7 @@ export default function ContentManager() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">إدارة المحتوى</h1>
-          <p className="text-sm text-slate-400 mt-1">تعديل محتوى الحج والعمرة والسيرة والصحابة</p>
+          <p className="text-sm text-slate-400 mt-1">تعديل محتوى الحج والعمرة والسيرة والصحابة والقصص الدينية</p>
         </div>
         <div className="flex items-center gap-3">
           {status && (
@@ -1807,6 +2919,49 @@ export default function ContentManager() {
             <EmptyState label="السيرة النبوية" onInit={initSeerah} />
           ) : (
             <>
+              <div className="border border-admin-border rounded-lg p-4 mb-6 bg-admin-bg/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-right">
+                    <h3 className="text-base font-semibold text-white">صوت السيرة النبوية كاملة</h3>
+                    <p className="text-xs text-slate-400 mt-1">صوت واحد يشغّله المستخدم في صفحة السيرة كلها (ليس لكل قسم).</p>
+                  </div>
+                  <span className={`text-xs ${seerah.audioUrl?.trim() ? 'text-accent-light' : 'text-amber-400'}`}>
+                    {seerah.audioUrl?.trim() ? 'صوت جاهز' : 'ينقصها رابط صوت'}
+                  </span>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">عنوان الصوت (اختياري)</label>
+                  <input
+                    value={seerah.audioTitle || ''}
+                    onChange={(e) => setSeerah({ ...seerah, audioTitle: e.target.value })}
+                    className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                    dir="rtl"
+                    title="عنوان الصوت"
+                    aria-label="عنوان الصوت"
+                    placeholder="مثال: استمع إلى السيرة النبوية كاملة"
+                  />
+                </div>
+                <ArchiveAudioUrlField
+                  value={seerah.audioStoragePath ? '' : seerah.audioUrl || ''}
+                  disabled={!!seerah.audioStoragePath}
+                  label="رابط صفحة Internet Archive أو ملف صوت مباشر (اختياري)"
+                  onChange={(value) => setSeerah({ ...seerah, audioUrl: value, audioStoragePath: undefined })}
+                  onResolve={(audioUrl, fileName) => setSeerah({
+                    ...seerah,
+                    audioUrl,
+                    audioStoragePath: undefined,
+                    audioTitle: seerah.audioTitle || fileName.replace(/\.[^.]+$/, ''),
+                  })}
+                />
+                <AudioUploadField
+                  audioUrl={seerah.audioStoragePath ? seerah.audioUrl : undefined}
+                  audioStoragePath={seerah.audioStoragePath}
+                  onUpload={(url, storagePath) =>
+                    setSeerah({ ...seerah, audioUrl: url, audioStoragePath: storagePath })
+                  }
+                  onClear={() => setSeerah({ ...seerah, audioUrl: undefined, audioStoragePath: undefined })}
+                />
+              </div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">أقسام السيرة ({seerah.sections.length} قسم)</h2>
                 <div className="flex items-center gap-2">
@@ -1856,10 +3011,13 @@ export default function ContentManager() {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">الصحابة ({companions.companions.length} صحابي)</h2>
+                <div className="text-right">
+                  <h2 className="text-lg font-semibold text-white">الصحابة ({companions.companions.length} صحابي)</h2>
+                  <p className="text-xs text-slate-400 mt-1">نفس أقسام التطبيق. اكتب القصة كاملة في حقل واحد، وأضف رابط Internet Archive أو ملف صوت مباشر.</p>
+                </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { if (confirm('سيتم استبدال قائمة الصحابة الحالية بالمحتوى الافتراضي من التطبيق. متأكد؟')) { setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent); setStatus({ type: 'success', message: 'تم استيراد بيانات الصحابة الافتراضية' }); } }}
+                    onClick={() => { if (confirm('سيتم استبدال قائمة الصحابة الحالية بالمحتوى الافتراضي من التطبيق. متأكد؟')) { setCompanions(getFullDefaultCompanionsContent()); setStatus({ type: 'success', message: 'تم استيراد بيانات الصحابة الافتراضية المطولة' }); } }}
                     className="flex items-center gap-1 px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30"
                   >
                     <Download size={14} /> استيراد الافتراضي
@@ -1869,30 +3027,323 @@ export default function ContentManager() {
                       ...companions,
                       companions: [...companions.companions, {
                         id: `companion-${Date.now()}`, nameAr: '', nameEn: '', category: companions.categories[0]?.key || 'ashara',
-                        brief: '', story: [], virtues: [], videoUrl: '', videoTitle: '',
+                        brief: '', story: [], virtues: [], videoUrl: '', videoTitle: '', audioUrl: '', audioTitle: '', transcript: '',
                       }],
                     })}
                     className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
                   >
                     <Plus size={14} /> إضافة صحابي
                   </button>
+                  <button
+                    onClick={() => {
+                      const { deduped, removedIds } = dedupByName(companions.companions, (c) => c.nameAr);
+                      if (removedIds.length === 0) {
+                        setStatus({ type: 'success', message: 'لا توجد صحابة مكررة' });
+                        return;
+                      }
+                      setCompanions({ ...companions, companions: deduped });
+                      setStatus({ type: 'success', message: `تم حذف ${removedIds.length} نسخة مكررة. لا تنسَ "حفظ".` });
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-700/30 text-amber-200 rounded-lg text-sm hover:bg-amber-700/50"
+                    title="حذف المتكرر بناءً على نفس الاسم"
+                  >
+                    <RefreshCw size={14} /> تنظيف المكررات
+                  </button>
                 </div>
               </div>
-              {companions.companions.map((comp, i) => (
-                <CompanionEditor
-                  key={i}
-                  companion={comp}
-                  index={i}
-                  categories={companions.categories}
-                  onUpdate={(updated) => {
-                    const comps = [...companions.companions];
-                    comps[i] = updated;
-                    setCompanions({ ...companions, companions: comps });
-                  }}
-                  onDelete={() => setCompanions({
-                    ...companions,
-                    companions: companions.companions.filter((_, idx) => idx !== i),
+              <div className="mb-4 space-y-3">
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setCompanionCategoryFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-sm border ${companionCategoryFilter === 'all' ? 'bg-accent-dark text-white border-accent-dark' : 'bg-admin-surface text-slate-300 border-admin-border hover:text-white'}`}
+                  >
+                    الكل
+                  </button>
+                  {companions.categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.key}
+                      onClick={() => setCompanionCategoryFilter(category.key)}
+                      className={`px-3 py-1.5 rounded-lg text-sm border ${companionCategoryFilter === category.key ? 'bg-accent-dark text-white border-accent-dark' : 'bg-admin-surface text-slate-300 border-admin-border hover:text-white'}`}
+                    >
+                      {category.title}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={companionSearch}
+                  onChange={(e) => setCompanionSearch(e.target.value)}
+                  className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
+                  dir="rtl"
+                  placeholder="بحث باسم الصحابي أو التصنيف..."
+                  title="بحث في الصحابة"
+                  aria-label="بحث في الصحابة"
+                />
+              </div>
+              {companions.companions
+                .map((comp, i) => ({ comp, i }))
+                .filter(({ comp }) => companionCategoryFilter === 'all' || comp.category === companionCategoryFilter)
+                .filter(({ comp }) => {
+                  const query = normalizeSearchText(companionSearch);
+                  if (!query) return true;
+                  const categoryTitle = companions.categories.find(c => c.key === comp.category)?.title || comp.category;
+                  return normalizeSearchText([comp.nameAr, comp.nameEn, comp.brief, categoryTitle].filter(Boolean).join(' ')).includes(query);
+                })
+                .map(({ comp, i }) => (
+                  <CompanionEditor
+                    key={comp.id || i}
+                    companion={comp}
+                    index={i}
+                    total={companions.companions.length}
+                    categories={companions.categories}
+                    onUpdate={(updated) => {
+                      const comps = [...companions.companions];
+                      comps[i] = updated;
+                      setCompanions({ ...companions, companions: comps });
+                    }}
+                    onDelete={() => setCompanions({
+                      ...companions,
+                      companions: companions.companions.filter((_, idx) => idx !== i),
+                    })}
+                    onMoveUp={() => {
+                      if (i === 0) return;
+                      setCompanions({
+                        ...companions,
+                        companions: reorderArray(companions.companions, i, i - 1),
+                      });
+                    }}
+                    onMoveDown={() => {
+                      if (i >= companions.companions.length - 1) return;
+                      setCompanions({
+                        ...companions,
+                        companions: reorderArray(companions.companions, i, i + 1),
+                      });
+                    }}
+                    onMoveTo={(target) => {
+                      setCompanions({
+                        ...companions,
+                        companions: reorderArray(companions.companions, i, target),
+                      });
+                    }}
+                    onDragStart={() => setDraggedCompanionIndex(i)}
+                    onDragOver={() => { if (draggedCompanionIndex !== null && draggedCompanionIndex !== i) setCompanionDropTarget(i); }}
+                    onDrop={() => {
+                      if (draggedCompanionIndex === null || draggedCompanionIndex === i) {
+                        setDraggedCompanionIndex(null); setCompanionDropTarget(null); return;
+                      }
+                      setCompanions({
+                        ...companions,
+                        companions: reorderArray(companions.companions, draggedCompanionIndex, i),
+                      });
+                      setDraggedCompanionIndex(null);
+                      setCompanionDropTarget(null);
+                    }}
+                    isDragOver={companionDropTarget === i && draggedCompanionIndex !== null && draggedCompanionIndex !== i}
+                  />
+                ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Religious Stories tab */}
+      {activeTab === 'religiousStories' && (
+        <div>
+          {!religiousStories ? (
+            <EmptyState label="القصص الدينية" onInit={initReligiousStories} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-right">
+                  <h2 className="text-lg font-semibold text-white">قصص دينية ({religiousStories.stories.length} قصة)</h2>
+                  <p className="text-xs text-slate-400 mt-1">أضف عنوانًا ورابط صفحة Internet Archive أو MP3 مباشر. النص اختياري، ويُستخدم للقراءة والتمرير التلقائي.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Bulk-import: surface every bundled preset (prophets + extra */}
+                  {/* religious stories) as Firestore entries, so the admin can */}
+                  {/* attach audio without manually re-creating each one. Skips */}
+                  {/* presets that already exist by id to avoid duplicates. */}
+                  <button
+                    onClick={() => {
+                      const existingIds = new Set(religiousStories.stories.map(s => s.id));
+                      const additions = RELIGIOUS_STORY_PRESETS
+                        .filter(p => !existingIds.has(p.id))
+                        .map((preset, idx): CMSReligiousStory => ({
+                          id: preset.id,
+                          title: preset.title,
+                          titleEn: preset.titleEn || '',
+                          brief: preset.brief || '',
+                          briefEn: preset.briefEn || '',
+                          icon: preset.icon || '',
+                          audioUrl: '',
+                          audioTitle: preset.title,
+                          transcript: preset.transcript,
+                          transcriptEn: preset.transcriptEn || '',
+                          order: religiousStories.stories.length + idx,
+                        }));
+                      if (additions.length === 0) {
+                        setStatus({ type: 'success', message: 'كل القصص الافتراضية موجودة بالفعل' });
+                        return;
+                      }
+                      if (!confirm(`سيتم استيراد ${additions.length} قصة افتراضية (أنبياء + قصص دينية). متابعة؟`)) return;
+                      setReligiousStories({
+                        ...religiousStories,
+                        stories: [...religiousStories.stories, ...additions],
+                      });
+                      setStatus({ type: 'success', message: `تم استيراد ${additions.length} قصة. لا تنسَ الضغط على "حفظ" لرفعها.` });
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-700/40 text-emerald-200 rounded-lg text-sm hover:bg-emerald-700/60"
+                    title="استيراد كل القصص الافتراضية الجديدة"
+                  >
+                    <Download size={14} /> استيراد الكل
+                  </button>
+                  <button
+                  onClick={() => setReligiousStories({
+                    ...religiousStories,
+                    stories: [...religiousStories.stories, {
+                      id: `religious-story-${Date.now()}`,
+                      title: '',
+                      titleEn: '',
+                      brief: '',
+                      briefEn: '',
+                      icon: '',
+                      audioUrl: '',
+                      audioTitle: '',
+                      transcript: '',
+                      transcriptEn: '',
+                      order: religiousStories.stories.length,
+                    }],
                   })}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
+                >
+                  <Plus size={14} /> إضافة قصة
+                </button>
+                <button
+                  onClick={() => {
+                    const { deduped, removedIds } = dedupByName(religiousStories.stories, (s) => s.title);
+                    if (removedIds.length === 0) {
+                      setStatus({ type: 'success', message: 'لا توجد قصص مكررة' });
+                      return;
+                    }
+                    setReligiousStories({
+                      ...religiousStories,
+                      stories: deduped.map((st, idx) => ({ ...st, order: idx })),
+                    });
+                    setStatus({ type: 'success', message: `تم حذف ${removedIds.length} نسخة مكررة. لا تنسَ "حفظ".` });
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-amber-700/30 text-amber-200 rounded-lg text-sm hover:bg-amber-700/50"
+                  title="حذف المتكرر بناءً على نفس العنوان"
+                >
+                  <RefreshCw size={14} /> تنظيف المكررات
+                </button>
+                </div>
+              </div>
+
+              <div className="mb-4 rounded-lg border border-admin-border bg-admin-surface/70 p-4">
+                <div className="mb-3 text-right">
+                  <h3 className="text-sm font-semibold text-white">طريقة تحديث القصص في التطبيق</h3>
+                  <p className="mt-1 text-xs text-slate-400">
+                    الأفضل هو التحديث اليدوي: التطبيق يستخدم النسخة المحفوظة عند المستخدم، ولا يظهر مودال التحديث إلا عند أول فتح بدون كاش أو بعد حفظ نسخة جديدة من هنا.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">وضع التحديث</label>
+                    <select
+                      value={religiousStories.updateMode || 'manual'}
+                      onChange={(e) => setReligiousStories({
+                        ...religiousStories,
+                        updateMode: e.target.value as 'manual' | 'interval',
+                      })}
+                      className="w-full rounded border border-admin-border bg-admin-bg px-3 py-2 text-white"
+                      title="وضع تحديث القصص"
+                      aria-label="وضع تحديث القصص"
+                    >
+                      <option value="manual">يدوي عند حفظ الادمن</option>
+                      <option value="interval">كل مدة محددة</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">كل كام دقيقة</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={religiousStories.refreshIntervalMinutes || 60}
+                      disabled={(religiousStories.updateMode || 'manual') === 'manual'}
+                      onChange={(e) => setReligiousStories({
+                        ...religiousStories,
+                        refreshIntervalMinutes: Math.max(1, Number(e.target.value) || 60),
+                      })}
+                      className="w-full rounded border border-admin-border bg-admin-bg px-3 py-2 text-white disabled:opacity-45"
+                      title="مدة تحديث القصص بالدقائق"
+                      aria-label="مدة تحديث القصص بالدقائق"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">نسخة القصص الحالية</label>
+                    <div className="rounded border border-admin-border bg-admin-bg px-3 py-2 text-white">
+                      {religiousStories.contentVersion || 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {religiousStories.stories.map((story, i) => (
+                <ReligiousStoryEditor
+                  key={story.id || i}
+                  story={story}
+                  index={i}
+                  total={religiousStories.stories.length}
+                  onUpdate={(updated) => {
+                    const stories = [...religiousStories.stories];
+                    stories[i] = updated;
+                    setReligiousStories({ ...religiousStories, stories });
+                  }}
+                  onDelete={() => setReligiousStories({
+                    ...religiousStories,
+                    stories: religiousStories.stories
+                      .filter((_, idx) => idx !== i)
+                      .map((st, idx) => ({ ...st, order: idx })),
+                  })}
+                  onMoveUp={() => {
+                    if (i === 0) return;
+                    const stories = reorderArray(religiousStories.stories, i, i - 1);
+                    setReligiousStories({
+                      ...religiousStories,
+                      stories: stories.map((st, idx) => ({ ...st, order: idx })),
+                    });
+                  }}
+                  onMoveDown={() => {
+                    if (i >= religiousStories.stories.length - 1) return;
+                    const stories = reorderArray(religiousStories.stories, i, i + 1);
+                    setReligiousStories({
+                      ...religiousStories,
+                      stories: stories.map((st, idx) => ({ ...st, order: idx })),
+                    });
+                  }}
+                  onMoveTo={(target) => {
+                    const stories = reorderArray(religiousStories.stories, i, target);
+                    setReligiousStories({
+                      ...religiousStories,
+                      stories: stories.map((st, idx) => ({ ...st, order: idx })),
+                    });
+                  }}
+                  onDragStart={() => setDraggedStoryIndex(i)}
+                  onDragOver={() => { if (draggedStoryIndex !== null && draggedStoryIndex !== i) setStoryDropTarget(i); }}
+                  onDrop={() => {
+                    if (draggedStoryIndex === null || draggedStoryIndex === i) {
+                      setDraggedStoryIndex(null); setStoryDropTarget(null); return;
+                    }
+                    const stories = reorderArray(religiousStories.stories, draggedStoryIndex, i);
+                    setReligiousStories({
+                      ...religiousStories,
+                      stories: stories.map((st, idx) => ({ ...st, order: idx })),
+                    });
+                    setDraggedStoryIndex(null);
+                    setStoryDropTarget(null);
+                  }}
+                  isDragOver={storyDropTarget === i && draggedStoryIndex !== null && draggedStoryIndex !== i}
                 />
               ))}
             </>
@@ -1955,12 +3406,6 @@ export default function ContentManager() {
                         <Trash2 size={14} className="text-red-400" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      <input value={dua.reference || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, reference: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="المصدر / المرجع" title="المصدر أو المرجع" aria-label="المصدر أو المرجع" />
-                      <input value={dua.sourceUrl || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, sourceUrl: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="رابط المصدر" title="رابط المصدر" aria-label="رابط المصدر" />
-                      <input value={dua.grade || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, grade: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الدرجة" title="درجة الحديث" aria-label="درجة الحديث" />
-                    </div>
-                    <input value={dua.note || ''} onChange={(e) => updateSeasonalDua(i, { ...dua, note: e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="ملاحظة تحريرية اختيارية" title="ملاحظة تحريرية" aria-label="ملاحظة تحريرية" />
                   </div>
                 ))}
               </div>
@@ -1994,11 +3439,6 @@ export default function ContentManager() {
                       <button onClick={() => { const data = seasonal[activeSeasonalPage]!; setSeasonal(prev => ({ ...prev, [activeSeasonalPage]: { ...data, checklist: data.checklist.filter((_, idx) => idx !== i) } })); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف العنصر">
                         <Trash2 size={14} className="text-red-400" />
                       </button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input value={item.reference || ''} onChange={(e) => updateSeasonalChecklist(i, { ...item, reference: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="المصدر / المرجع" title="المصدر أو المرجع" aria-label="المصدر أو المرجع" />
-                      <input value={item.sourceUrl || ''} onChange={(e) => updateSeasonalChecklist(i, { ...item, sourceUrl: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="رابط المصدر" title="رابط المصدر" aria-label="رابط المصدر" />
-                      <input value={item.grade || ''} onChange={(e) => updateSeasonalChecklist(i, { ...item, grade: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الدرجة" title="درجة الحديث" aria-label="درجة الحديث" />
                     </div>
                   </div>
                 ))}
@@ -2110,12 +3550,6 @@ export default function ContentManager() {
                             </button>
                           </div>
                           <textarea value={sd.description} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, description: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[40px]" dir="rtl" placeholder="الوصف" title="الوصف" aria-label="وصف اليوم" />
-                          <div className="grid grid-cols-3 gap-2 mb-2">
-                            <input value={sd.reference || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, reference: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="المصدر / المرجع" title="المصدر أو المرجع" aria-label="المصدر أو المرجع" />
-                            <input value={sd.sourceUrl || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, sourceUrl: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="رابط المصدر" title="رابط المصدر" aria-label="رابط المصدر" />
-                            <input value={sd.grade || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, grade: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الدرجة" title="درجة الحديث" aria-label="درجة الحديث" />
-                          </div>
-                          <input value={sd.note || ''} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, note: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-xs text-right mb-2" dir="rtl" placeholder="ملاحظة تحريرية اختيارية" title="ملاحظة تحريرية" aria-label="ملاحظة تحريرية" />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <span className="text-xs text-slate-500 block mb-1">الفضائل</span>

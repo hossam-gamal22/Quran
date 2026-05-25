@@ -63,6 +63,7 @@ export function handleNotificationNavigation(
   switch (type) {
     // ─── Prayer ───
     case 'prayer':
+    case 'prayer_fallback':
       router.push('/(tabs)/prayer');
       return { navigated: true };
 
@@ -227,6 +228,17 @@ export function handleNotificationNavigation(
     case 'prize':
       router.push('/honor-board' as any);
       return { navigated: true };
+
+    // ─── Q&A admin reply ───
+    case 'question_answered': {
+      const questionId = typeof data.questionId === 'string' ? data.questionId : '';
+      if (questionId) {
+        router.push(`/qa-thread/${questionId}` as any);
+      } else {
+        router.push('/question-answer' as any);
+      }
+      return { navigated: true };
+    }
 
     default:
       return { navigated: false };

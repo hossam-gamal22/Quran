@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 import {
   LayoutGrid, Plus, Save, Trash2, GripVertical, Eye, EyeOff,
-  ChevronDown, ChevronUp, Settings, Type, Minus, Layers,
+  ChevronDown, ChevronUp, Settings, Type, Minus, Layers, ExternalLink,
+  Smartphone, Code2,
 } from 'lucide-react';
 
 type SDUISectionType = 'html_block' | 'spacer';
@@ -38,6 +39,27 @@ const SECTION_TYPES: { type: SDUISectionType; label: string; icon: React.ReactNo
   { type: 'spacer', label: 'مسافة فارغة', icon: <Minus className="w-4 h-4" /> },
 ];
 
+const sortScreens = (items: SDUIScreenConfig[]) =>
+  [...items].sort((a, b) => a.screenId.localeCompare(b.screenId));
+
+const getAppRoute = (screenId: string) => `/sdui/${screenId}`;
+
+function SectionPreview({ section }: { section: SDUISection }) {
+  if (!section.enabled) return null;
+  if (section.type === 'spacer') {
+    const height = typeof section.data?.height === 'number' ? section.data.height : 16;
+    return <div className="rounded-lg border border-dashed border-slate-600 text-slate-500 text-xs flex items-center justify-center" style={{ height: Math.min(Math.max(height, 12), 80) }}>مسافة {height}px</div>;
+  }
+
+  const html = typeof section.data?.html === 'string' ? section.data.html : '';
+  return (
+    <div className="rounded-xl border border-admin-border bg-white text-slate-900 p-3 text-sm leading-7 overflow-hidden">
+      {section.title && <div className="font-semibold mb-1">{section.title}</div>}
+      {html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <div className="text-slate-400">اكتب HTML في بيانات القسم ليظهر هنا</div>}
+    </div>
+  );
+}
+
 function SDUIManager() {
   const sectionIdRef = React.useRef(0);
   const [screens, setScreens] = useState<SDUIScreenConfig[]>([]);
@@ -51,8 +73,7 @@ function SDUIManager() {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, 'sdui_screens'));
-      const items = snap.docs.map(d => d.data() as SDUIScreenConfig);
-      items.sort((a, b) => a.screenId.localeCompare(b.screenId));
+      const items = sortScreens(snap.docs.map(d => d.data() as SDUIScreenConfig));
       setScreens(items);
       if (items.length > 0) setSelectedScreen(prev => prev || items[0]);
     } catch (err) {
@@ -62,19 +83,20 @@ function SDUIManager() {
   };
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'sdui_screens'));
-        const items = snap.docs.map(d => d.data() as SDUIScreenConfig);
-        items.sort((a, b) => a.screenId.localeCompare(b.screenId));
-        setScreens(items);
-        if (items.length > 0) setSelectedScreen(items[0]);
-      } catch (err) {
-        console.error('Failed to load SDUI screens:', err);
-      }
+    const unsubscribe = onSnapshot(collection(db, 'sdui_screens'), (snap) => {
+      const items = sortScreens(snap.docs.map(d => d.data() as SDUIScreenConfig));
+      setScreens(items);
+      setSelectedScreen((prev) => {
+        if (!prev) return items[0] || null;
+        return items.find((item) => item.screenId === prev.screenId) || items[0] || null;
+      });
       setIsLoading(false);
-    };
-    init();
+    }, (err) => {
+      console.error('Failed to load SDUI screens:', err);
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   const saveScreen = async (screen: SDUIScreenConfig) => {
@@ -177,11 +199,44 @@ function SDUIManager() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <LayoutGrid className="w-6 h-6 text-accent-light" />
-          <h1 className="text-2xl font-bold text-white">مدير واجهات SDUI</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-white">مدير واجهات SDUI</h1>
+            <p className="text-sm text-slate-400 mt-1">صفحات ديناميكية يقرأها التطبيق من Firestore وتظهر عند فتح مسارها داخل التطبيق.</p>
+          </div>
         </div>
         <button onClick={createScreen} className="flex items-center gap-2 px-4 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent-dark">
           <Plus className="w-4 h-4" /> شاشة جديدة
         </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-admin-border bg-admin-surface/60 p-4">
+          <div className="flex items-center gap-2 text-white font-semibold mb-2">
+            <Smartphone className="w-4 h-4 text-accent-light" />
+            أين تظهر؟
+          </div>
+          <p className="text-sm text-slate-400 leading-7">
+            لا تظهر تلقائيا في الرئيسية. تظهر عندما يفتح المستخدم رابط الشاشة مثل <code className="text-emerald-300 ltr:inline-block" dir="ltr">/sdui/ramadan-offer</code> أو عندما تربطها من بانر، وصول سريع، إشعار، أو رابط داخلي.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-admin-border bg-admin-surface/60 p-4">
+          <div className="flex items-center gap-2 text-white font-semibold mb-2">
+            <Code2 className="w-4 h-4 text-accent-light" />
+            ما المدعوم الآن؟
+          </div>
+          <p className="text-sm text-slate-400 leading-7">
+            التطبيق يدعم حاليا نوعين فقط: HTML مخصص، ومسافة فارغة. أي نوع آخر سيظهر كقسم غير متاح داخل التطبيق.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-admin-border bg-admin-surface/60 p-4">
+          <div className="flex items-center gap-2 text-white font-semibold mb-2">
+            <ExternalLink className="w-4 h-4 text-accent-light" />
+            هل يتحدث لحظيا؟
+          </div>
+          <p className="text-sm text-slate-400 leading-7">
+            نعم، route التطبيق يستخدم اشتراك مباشر على مستند الشاشة. التعديل يصل للمستخدمين الموجودين على نفس شاشة SDUI، ومعه كاش محلي للفتح لاحقا.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -203,14 +258,60 @@ function SDUIManager() {
                 <div className="flex items-center gap-3">
                   <input className="bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm w-48" value={selectedScreen.title || ''} onChange={e => setSelectedScreen({ ...selectedScreen, title: e.target.value })} placeholder="عنوان الشاشة" aria-label="عنوان الشاشة" />
                   <span className="text-slate-500 text-xs">ID: {selectedScreen.screenId}</span>
+                  <span className="text-slate-500 text-xs" dir="ltr">{getAppRoute(selectedScreen.screenId)}</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(getAppRoute(selectedScreen.screenId))}
+                    className="flex items-center gap-2 px-3 py-2 bg-admin-bg text-slate-300 rounded-xl hover:text-white text-sm"
+                  >
+                    نسخ المسار
+                  </button>
                   <button onClick={() => saveScreen(selectedScreen)} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-xl hover:bg-accent-dark disabled:opacity-50">
                     <Save className="w-4 h-4" /> {isSaving ? 'جاري...' : 'حفظ'}
                   </button>
                   <button onClick={() => deleteScreen(selectedScreen.screenId)} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg" aria-label="حذف الشاشة" title="حذف الشاشة">
                     <Trash2 className="w-4 h-4" />
                   </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-7 rounded-2xl border border-admin-border bg-admin-surface/50 p-4">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                      <h3 className="text-white font-semibold">معاينة قريبة من التطبيق</h3>
+                      <p className="text-xs text-slate-500 mt-1">هذه معاينة للترتيب والمحتوى، والشكل النهائي يتأثر بثيم وخط المستخدم داخل التطبيق.</p>
+                    </div>
+                    <span className="text-xs text-slate-500">v{selectedScreen.version}</span>
+                  </div>
+                  <div className="mx-auto w-[320px] min-h-[520px] rounded-[32px] border-4 border-slate-700 bg-slate-950 p-4 shadow-2xl">
+                    {selectedScreen.settings?.headerStyle !== 'hidden' && (
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="w-8 h-8 rounded-full bg-slate-800" />
+                        <div className="text-white font-semibold text-sm truncate px-3">{selectedScreen.title || selectedScreen.screenId}</div>
+                        <div className="w-8" />
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      {selectedScreen.sections.filter((section) => section.enabled).sort((a, b) => a.order - b.order).map((section) => (
+                        <SectionPreview key={section.id} section={section} />
+                      ))}
+                      {selectedScreen.sections.filter((section) => section.enabled).length === 0 && (
+                        <div className="text-center text-slate-500 text-sm py-20">لا يوجد محتوى مفعل في هذه الشاشة</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-span-5 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+                  <h3 className="text-blue-100 font-semibold mb-3">طريقة استخدامها فعليا</h3>
+                  <div className="space-y-3 text-sm text-blue-100/80 leading-7">
+                    <p>1. أنشئ الشاشة واحفظها.</p>
+                    <p>2. استخدم المسار داخل التطبيق: <code className="text-blue-200" dir="ltr">{getAppRoute(selectedScreen.screenId)}</code>.</p>
+                    <p>3. اربط هذا المسار من صفحة أخرى مثل البانر، الوصول السريع، الإشعارات، أو أي زر داخلي.</p>
+                    <p>4. أي تعديل بعد الحفظ يصل مباشرة لمن يفتح نفس الشاشة.</p>
+                  </div>
                 </div>
               </div>
 
@@ -276,19 +377,77 @@ function SDUIManager() {
 
                     {expandedSection === section.id && (
                       <div className="border-t border-admin-border px-4 py-3 space-y-3">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-slate-400 text-xs block mb-1">العنوان</label>
-                            <input className="w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" value={section.title || ''} onChange={e => updateSectionField(section.id, 'title', e.target.value)} placeholder="عنوان القسم" aria-label="عنوان القسم" dir="rtl" />
+	                        <div className="grid grid-cols-2 gap-4">
+	                          <div>
+	                            <label className="text-slate-400 text-xs block mb-1">العنوان</label>
+	                            <input className="w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" value={section.title || ''} onChange={e => updateSectionField(section.id, 'title', e.target.value)} placeholder="عنوان القسم" aria-label="عنوان القسم" dir="rtl" />
                           </div>
                           <div>
                             <label className="text-slate-400 text-xs block mb-1">عنوان فرعي</label>
-                            <input className="w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" value={section.subtitle || ''} onChange={e => updateSectionField(section.id, 'subtitle', e.target.value)} placeholder="اختياري" aria-label="عنوان فرعي" dir="rtl" />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-slate-400 text-xs block mb-1">بيانات القسم (JSON)</label>
-                          <textarea className="w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm font-mono" rows={4} aria-label="بيانات القسم" title="بيانات القسم" placeholder="{}‏" value={JSON.stringify(section.data || {}, null, 2)} onChange={e => { try { updateSectionField(section.id, 'data', JSON.parse(e.target.value)); } catch { /* skip */ } }} dir="ltr" />
+	                            <input className="w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" value={section.subtitle || ''} onChange={e => updateSectionField(section.id, 'subtitle', e.target.value)} placeholder="اختياري" aria-label="عنوان فرعي" dir="rtl" />
+	                          </div>
+	                        </div>
+	                        {section.type === 'html_block' && (
+	                          <div className="space-y-3 rounded-xl bg-admin-bg/60 border border-admin-border/50 p-3">
+	                            <div className="flex items-center gap-2 text-white text-sm font-semibold">
+	                              <Type className="w-4 h-4 text-accent-light" />
+	                              محتوى HTML الذي سيراه المستخدم
+	                            </div>
+	                            <textarea
+	                              className="w-full bg-admin-bg text-white rounded-lg px-3 py-2 border border-admin-border text-sm font-mono"
+	                              rows={6}
+	                              value={typeof section.data?.html === 'string' ? section.data.html : ''}
+	                              onChange={e => updateSectionField(section.id, 'data', { ...(section.data || {}), html: e.target.value })}
+	                              placeholder="<h2>عنوان</h2><p>نص يظهر داخل التطبيق</p>"
+	                              dir="ltr"
+	                            />
+	                            <div className="grid grid-cols-3 gap-3">
+	                              <label className="text-slate-300 text-xs">
+	                                Padding
+	                                <input
+	                                  type="number"
+	                                  className="mt-1 w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm"
+	                                  value={Number(section.data?.padding ?? 16)}
+	                                  onChange={e => updateSectionField(section.id, 'data', { ...(section.data || {}), padding: Number(e.target.value) || 0 })}
+	                                />
+	                              </label>
+	                              <label className="text-slate-300 text-xs">
+	                                Border radius
+	                                <input
+	                                  type="number"
+	                                  className="mt-1 w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm"
+	                                  value={Number(section.data?.borderRadius ?? 20)}
+	                                  onChange={e => updateSectionField(section.id, 'data', { ...(section.data || {}), borderRadius: Number(e.target.value) || 0 })}
+	                                />
+	                              </label>
+	                              <label className="flex items-end gap-2 text-slate-300 text-xs pb-2">
+	                                <input
+	                                  type="checkbox"
+	                                  checked={section.data?.useGlassContainer !== false}
+	                                  onChange={e => updateSectionField(section.id, 'data', { ...(section.data || {}), useGlassContainer: e.target.checked })}
+	                                  className="accent-emerald-500"
+	                                />
+	                                زجاج داخل التطبيق
+	                              </label>
+	                            </div>
+	                          </div>
+	                        )}
+	                        {section.type === 'spacer' && (
+	                          <div className="rounded-xl bg-admin-bg/60 border border-admin-border/50 p-3">
+	                            <label className="text-slate-300 text-xs">
+	                              ارتفاع المسافة بالبكسل
+	                              <input
+	                                type="number"
+	                                className="mt-1 w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm"
+	                                value={Number(section.data?.height ?? 16)}
+	                                onChange={e => updateSectionField(section.id, 'data', { ...(section.data || {}), height: Number(e.target.value) || 0 })}
+	                              />
+	                            </label>
+	                          </div>
+	                        )}
+	                        <div>
+	                          <label className="text-slate-400 text-xs block mb-1">بيانات القسم (JSON)</label>
+	                          <textarea className="w-full bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm font-mono" rows={4} aria-label="بيانات القسم" title="بيانات القسم" placeholder="{}‏" value={JSON.stringify(section.data || {}, null, 2)} onChange={e => { try { updateSectionField(section.id, 'data', JSON.parse(e.target.value)); } catch { /* skip */ } }} dir="ltr" />
                         </div>
                         <div>
                           <label className="text-slate-400 text-xs block mb-1">شروط العرض (JSON)</label>

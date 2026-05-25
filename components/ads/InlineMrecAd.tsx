@@ -6,6 +6,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useAds } from '@/lib/ads-context';
 import { isInSacredContext } from '@/lib/smart-ad-manager';
+import { uiText } from '@/lib/ui-text';
 
 let GoogleBannerAd: any = null;
 let BannerAdSize: any = null;
@@ -61,7 +62,7 @@ export const InlineMrecAd: React.FC<InlineMrecAdProps> = ({ screen, darkMode = f
         ]}
       >
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>إعلان</Text>
+          <Text style={styles.badgeText}>{uiText({ ar: 'إعلان', en: 'Ad' })}</Text>
         </View>
         <View style={[styles.adFrame, !adLoaded && styles.hidden]}>
           <GoogleBannerAd

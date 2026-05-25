@@ -31,7 +31,7 @@ import {
   registryFingerprint,
 } from './registry';
 import type { PreviewSize, WidgetThemeKey } from '@/components/widgets/previews/shared';
-import { getSizeDims } from '@/components/widgets/previews/shared';
+import { getSizeDims, paletteFor } from '@/components/widgets/previews/shared';
 import {
   WidgetSnapshotCaptureContext,
   WidgetForcedThemeContext,
@@ -39,6 +39,8 @@ import {
   type CaptureAnchor,
 } from '@/components/widgets/previews/snapshot-capture-context';
 import type { SharedWidgetData } from '@/lib/widget-data';
+import { getVerseQcfData } from '@/lib/qcf-page-data';
+import { loadPageFont } from '@/lib/qcf-font-loader';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Anchor manifest — per-slot collector
@@ -456,6 +458,45 @@ async function captureOne(
   };
 }
 
+function currentVersePoolEntry(sharedData?: SharedWidgetData): any | null {
+  const verse = (sharedData as any)?.verse;
+  if (verse?.arabic && typeof verse.surahNumber === 'number') {
+    return {
+      surahNumber: verse.surahNumber,
+      ayahNumber: verse.numberInSurah || verse.ayahNumber,
+    };
+  }
+  const pool = (sharedData as any)?.versePool;
+  if (!pool || !Array.isArray(pool.entries) || pool.entries.length === 0) return null;
+  const now = new Date();
+  const startOfYear = Date.UTC(now.getFullYear(), 0, 0);
+  const todayDOY = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - startOfYear) / 86400000);
+  const yearDelta = now.getFullYear() - Number(pool.seedYear ?? now.getFullYear());
+  const daysElapsed = yearDelta * 365 + (todayDOY - Number(pool.seedDayOfYear ?? todayDOY));
+  const idx = ((daysElapsed % pool.entries.length) + pool.entries.length) % pool.entries.length;
+  return pool.entries[idx] ?? null;
+}
+
+async function preloadFontsForSnapshotSlot(
+  def: WidgetDefinition,
+  input: SnapshotInput,
+  theme: ResolvedWidgetTheme,
+): Promise<void> {
+  if (def.id !== 'verseOfDay') return;
+  const entry = currentVersePoolEntry(input.sharedData);
+  const surahNumber = Number(entry?.surahNumber ?? 2);
+  const ayahNumber = Number(entry?.ayahNumber ?? 286);
+  const qcf = typeof entry?.qcfPage === 'number'
+    ? { page: entry.qcfPage }
+    : getVerseQcfData(surahNumber, ayahNumber);
+  if (!qcf?.page) return;
+  try {
+    await loadPageFont(qcf.page, !paletteFor(theme).isLight);
+  } catch (e) {
+    if (__DEV__) console.warn(`[snapshot] QCF preload failed for verse page ${qcf.page}`, e);
+  }
+}
+
 async function writeIosSnapshot(name: string, tmpUri: string): Promise<string | null> {
   try {
     const { WidgetReloadModule } = NativeModules;
@@ -625,6 +666,7 @@ async function runSnapshotPass(
         // 250 ms gives Android time to apply custom widget fonts before capture;
         // 120 ms was sometimes too short on slower devices causing system-font fallback.
         resetAnchors(key);
+        await preloadFontsForSnapshotSlot(def, input, theme);
         hostSetSlots({ [key]: slot });
         await settleNextFrame(250);
 
@@ -1018,6 +1060,11 @@ const PRAYER_NAME_AR: Record<PrayerStateKey, string> = {
 const PRAYER_NAME_EN: Record<PrayerStateKey, string> = {
   fajr: 'Fajr', sunrise: 'Sunrise', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha',
 };
+const isFriday = (date: Date) => date.getDay() === 5;
+const prayerNameAr = (key: PrayerStateKey, date: Date) =>
+  key === 'dhuhr' && isFriday(date) ? 'صلاة الجمعة' : PRAYER_NAME_AR[key];
+const prayerNameEn = (key: PrayerStateKey, date: Date) =>
+  key === 'dhuhr' && isFriday(date) ? 'Jumuah' : PRAYER_NAME_EN[key];
 /** Canonical 6-prayer schedule used by the bake fixture. Times are illustrative
  *  only — they're rendered with `opacity: 0` (transparent placeholder) because
  *  the home-screen overlay draws the user's actual time on top. */
@@ -1043,11 +1090,12 @@ function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateK
   // correct prev/next names for the requested state.
   const allPrayers = order.map((k, i) => {
     const offsetMin = (i - targetIdx) * 90 + 30;  // nextState → +30 min, prior → negative
+    const prayerDate = new Date(nowMs + offsetMin * 60 * 1000);
     return {
-      name: PRAYER_NAME_EN[k],
-      nameAr: PRAYER_NAME_AR[k],
+      name: prayerNameEn(k, prayerDate),
+      nameAr: prayerNameAr(k, prayerDate),
       time: BAKE_TIMES[k],
-      epochMs: nowMs + offsetMin * 60 * 1000,
+      epochMs: prayerDate.getTime(),
       isPassed: i < targetIdx,
       isNext: k === nextState,
     };
@@ -1055,12 +1103,12 @@ function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateK
   return {
     prayer: {
       nextPrayer: nextState,
-      nextPrayerName: PRAYER_NAME_EN[nextState],
-      nextPrayerNameAr: PRAYER_NAME_AR[nextState],
+      nextPrayerName: prayerNameEn(nextState, new Date(nowMs + 30 * 60 * 1000)),
+      nextPrayerNameAr: prayerNameAr(nextState, new Date(nowMs + 30 * 60 * 1000)),
       nextPrayerTime: BAKE_TIMES[nextState],
       nextPrayerAtEpochMs: nowMs + 30 * 60 * 1000,
-      previousPrayerName: PRAYER_NAME_EN[previousState],
-      previousPrayerNameAr: PRAYER_NAME_AR[previousState],
+      previousPrayerName: prayerNameEn(previousState, new Date(nowMs - 90 * 60 * 1000)),
+      previousPrayerNameAr: prayerNameAr(previousState, new Date(nowMs - 90 * 60 * 1000)),
       previousPrayerAtEpochMs: nowMs - 90 * 60 * 1000,
       timeRemaining: '30:00',
       timeRemainingMinutes: 30,

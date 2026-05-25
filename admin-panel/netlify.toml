@@ -2,12 +2,22 @@
   command = "pnpm install --no-frozen-lockfile && pnpm run build"
   publish = "dist"
 
+[dev]
+  port = 8888
+  autoLaunch = false
+
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--version"
 
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Schedule the auto-notify cron hourly. The function uses a pure-fetch Firestore
+# REST client (see _lib/firebase-admin.ts) so no native deps need bundling.
+[functions."islamic-events-cron"]
+  schedule = "@hourly"
 
 [[redirects]]
   from = "/api/expo-push"
@@ -17,9 +27,4 @@
 [[redirects]]
   from = "/api/verify-admin"
   to = "/.netlify/functions/verify-admin"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
   status = 200

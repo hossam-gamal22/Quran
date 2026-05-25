@@ -150,6 +150,35 @@ export async function runNotificationSelfTest(): Promise<SelfTestReport> {
         });
       }
     } catch {}
+
+    try {
+      const notificationPerms = await Notifications.getPermissionsAsync();
+      const ios = notificationPerms.ios;
+      const issues: string[] = [];
+      if (ios?.allowsSound === false) issues.push('الصوت مغلق');
+      if (ios?.allowsAlert === false) issues.push('التنبيهات مغلقة');
+      if (ios?.allowsDisplayOnLockScreen === false) issues.push('شاشة القفل مغلقة');
+      if (ios?.allowsDisplayInNotificationCenter === false) issues.push('مركز الإشعارات مغلق');
+
+      steps.push({
+        id: 'ios_sound_time_sensitive',
+        label: 'صوت وتنبيهات iOS',
+        status: issues.length === 0 ? 'pass' : 'warning',
+        details: issues.length === 0
+          ? 'الصوت والتنبيهات مفعلة. إشعارات التطبيق تُرسل كـ Time Sensitive عند الجدولة.'
+          : issues.join('، '),
+        fixHint: issues.length > 0
+          ? 'افتح إعدادات iOS للتطبيق وفعّل Sounds وAlerts وTime Sensitive Notifications'
+          : undefined,
+      });
+    } catch {
+      steps.push({
+        id: 'ios_sound_time_sensitive',
+        label: 'صوت وتنبيهات iOS',
+        status: 'skip',
+        details: 'تعذّر فحص إعدادات الصوت والتنبيهات',
+      });
+    }
   }
 
   // ─── 4. صحة الجدول الفعلي ─────────────────
@@ -272,10 +301,17 @@ export async function runNotificationSelfTest(): Promise<SelfTestReport> {
       content: {
         title: '🩺 اختبار صحة الإشعارات',
         body: 'لو وصلتك هذه الرسالة، النظام يعمل بشكل سليم ✓',
+        sound: 'default',
+        ...(Platform.OS === 'android' && {
+          channelId: 'general',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 2,
+        ...(Platform.OS === 'android' && { channelId: 'general' }),
       },
     });
     steps.push({

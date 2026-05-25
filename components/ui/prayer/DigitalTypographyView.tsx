@@ -22,6 +22,7 @@ import {
   getTimeRemaining,
   formatPrayerTime,
   getPrayerIcon,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { t } from '@/lib/i18n';
 
@@ -90,7 +91,7 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
     );
   }
 
-  const prayerName = t(`prayer.${nextPrayer.name}`);
+  const prayerName = t(getPrayerTranslationKey(nextPrayer.name));
   const prayerIcon = getPrayerIcon(nextPrayer.name);
   const pad = (n: number) => String(n).padStart(2, '0');
 

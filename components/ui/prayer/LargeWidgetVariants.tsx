@@ -10,6 +10,7 @@ import {
   getNextPrayer,
   getTimeRemaining,
   formatPrayerTime,
+  getPrayerTranslationKey,
 } from '@/lib/prayer-times';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
@@ -58,7 +59,7 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
 
   const pad = (n: number) => String(n).padStart(2, '0');
   const nextName = nextPrayer?.name ?? 'fajr';
-  const prayerName = t(`prayer.${nextName}`);
+  const prayerName = t(getPrayerTranslationKey(nextName));
 
   const countdownStr = timeRemaining
     ? `${pad(timeRemaining.hours)}:${pad(timeRemaining.minutes)}:${pad(timeRemaining.seconds)}`
@@ -70,7 +71,7 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   // Build schedule from prayerTimes
   const schedule = PRAYER_KEYS.map((key) => ({
     key,
-    name: t(`prayer.${key}`),
+    name: t(getPrayerTranslationKey(key)),
     time: prayerTimes ? prayerTimes[key] : '--:--',
     isNext: key === nextName,
   }));

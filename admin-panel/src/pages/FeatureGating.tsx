@@ -2,9 +2,9 @@
 // صفحة إدارة بوابة الميزات — تحديد أي ميزة للبريميوم فقط
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Shield, Save, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Shield, Save, Loader2, ToggleLeft, ToggleRight, Wifi, AlertCircle } from 'lucide-react';
 
 interface FeatureGateEntry {
   premiumOnly: boolean;
@@ -82,23 +82,29 @@ export default function FeatureGating() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadConfig();
-  }, []);
-
-  const loadConfig = async () => {
-    try {
-      const snap = await getDoc(doc(db, 'config', 'feature-gating'));
-      if (snap.exists()) {
-        setConfig({ ...DEFAULT_CONFIG, ...snap.data() } as FeatureGatingConfig);
+    const unsubscribe = onSnapshot(
+      doc(db, 'config', 'feature-gating'),
+      (snap) => {
+        if (snap.exists()) {
+          setConfig({ ...DEFAULT_CONFIG, ...snap.data() } as FeatureGatingConfig);
+        } else {
+          setConfig(DEFAULT_CONFIG);
+        }
+        setLiveError(null);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error listening to feature gating config:', err);
+        setLiveError('تعذر الاتصال اللحظي ببيانات بوابة المميزات');
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error loading feature gating config:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    );
+
+    return unsubscribe;
+  }, []);
 
   const toggleFeature = (key: PremiumFeatureKey) => {
     setConfig(prev => ({
@@ -141,8 +147,8 @@ export default function FeatureGating() {
             <Shield className="w-6 h-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">بوابة الميزات</h1>
-            <p className="text-sm text-slate-500">تحديد أي ميزة متاحة للجميع وأي ميزة للمشتركين فقط</p>
+            <h1 className="text-2xl font-bold text-white">بوابة الميزات</h1>
+            <p className="text-sm text-slate-400">تحديد أي ميزة متاحة للجميع وأي ميزة للمشتركين فقط</p>
           </div>
         </div>
         <button
@@ -153,6 +159,24 @@ export default function FeatureGating() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saving ? 'جاري الحفظ...' : saved ? 'تم الحفظ ✓' : 'حفظ'}
         </button>
+      </div>
+
+      <div
+        className={`flex items-start gap-3 rounded-xl border p-4 mb-6 ${
+          liveError
+            ? 'bg-red-500/10 border-red-500/30 text-red-300'
+            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+        }`}
+      >
+        {liveError ? <AlertCircle className="w-5 h-5 mt-0.5" /> : <Wifi className="w-5 h-5 mt-0.5" />}
+        <div>
+          <div className="font-semibold text-sm">
+            {liveError ? liveError : 'متصل لحظياً بالتطبيق'}
+          </div>
+          <div className="text-xs opacity-80 mt-1">
+            بعد الحفظ، التطبيق يقرأ نفس الوثيقة من Firestore وتُحدّث الأقفال للمستخدمين المفتوح عندهم التطبيق فوراً، وتُحفظ ككاش للمرة التالية.
+          </div>
+        </div>
       </div>
 
       {/* Stats */}

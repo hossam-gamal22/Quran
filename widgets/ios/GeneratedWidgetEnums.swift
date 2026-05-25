@@ -41,10 +41,6 @@ enum RoohSmallKind: String, AppEnum {
     case monthSimple
     case prayerSingle
     case prayerTable
-    case verseOfDay
-    case azkarMorning
-    case azkarEvening
-    case dailyDhikr
     case hijriDate
 
     static var typeDisplayRepresentation = TypeDisplayRepresentation(
@@ -71,18 +67,6 @@ enum RoohSmallKind: String, AppEnum {
         ),
         .prayerTable: DisplayRepresentation(
             title: LocalizedStringResource("widget.kind.prayerTable", defaultValue: "Prayer Table")
-        ),
-        .verseOfDay: DisplayRepresentation(
-            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "🔒 Verse of the Day")
-        ),
-        .azkarMorning: DisplayRepresentation(
-            title: LocalizedStringResource("widget.kind.azkarMorning.premium", defaultValue: "🔒 Morning Azkar")
-        ),
-        .azkarEvening: DisplayRepresentation(
-            title: LocalizedStringResource("widget.kind.azkarEvening.premium", defaultValue: "🔒 Evening Azkar")
-        ),
-        .dailyDhikr: DisplayRepresentation(
-            title: LocalizedStringResource("widget.kind.dailyDhikr.premium", defaultValue: "🔒 Daily Dhikr")
         ),
         .hijriDate: DisplayRepresentation(
             title: LocalizedStringResource("widget.kind.hijriDate.premium", defaultValue: "Hijri")
@@ -160,7 +144,6 @@ enum RoohMediumKind: String, AppEnum {
 enum RoohLargeKind: String, AppEnum {
     case placeholder
     case prayerTable
-    case verseOfDay
 
     static var typeDisplayRepresentation = TypeDisplayRepresentation(
         name: LocalizedStringResource("widget.picker.title", defaultValue: "Widget")
@@ -171,9 +154,6 @@ enum RoohLargeKind: String, AppEnum {
         ),
         .prayerTable: DisplayRepresentation(
             title: LocalizedStringResource("widget.kind.prayerTable", defaultValue: "Prayer Table")
-        ),
-        .verseOfDay: DisplayRepresentation(
-            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "🔒 Verse of the Day")
         ),
     ]
 }

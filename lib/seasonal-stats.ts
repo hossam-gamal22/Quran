@@ -33,7 +33,7 @@ export function getRamadanStats(): SeasonStats {
 export function getHajjStats(): SeasonStats {
   const hijri = getHijriDate();
   
-  // الحج في شهر ذو الحجة (الشهر 12)
+  // الحج في شهر ذي الحجة (الشهر 12)
   // الأيام الرئيسية: 8-13 (التروية إلى أيام التشريق)
   const isHajjSeason = hijri.month === 12 && hijri.day >= 1 && hijri.day <= 13;
   const hajjStartDay = 8; // يوم التروية

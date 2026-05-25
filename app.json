@@ -56,7 +56,11 @@
         "UIBackgroundModes": [
           "audio",
           "fetch",
+          "processing",
           "remote-notification"
+        ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.expo.modules.backgroundtask.processing"
         ],
         "SKAdNetworkItems": [
           {
@@ -147,7 +151,6 @@
           "androidMode": "default",
           "androidCollapsedTitle": "روح المسلم",
           "sounds": [
-            "./assets/sounds/general_reminder.mp3",
             "./assets/sounds/salawat.mp3",
             "./assets/sounds/istighfar.mp3",
             "./assets/sounds/tasbih.mp3",

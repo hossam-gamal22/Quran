@@ -168,14 +168,14 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 },
     emptyTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 17,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     emptyText: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 13,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -188,21 +188,21 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     summaryTitle: {
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 16,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     summaryHint: {
       color: colors.textLight,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: 'Rubik-Regular',
       fontSize: 12,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     summaryCount: {
       color: '#F59E0B',
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 26,
       minWidth: 42,
       textAlign: 'center',
@@ -217,7 +217,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     ayahLabel: {
       flex: 1,
       color: colors.text,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 15,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
@@ -232,7 +232,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     },
     failureText: {
       color: '#F59E0B',
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 12,
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
@@ -261,7 +261,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
     doneBtn: { backgroundColor: colors.primary },
     actionText: {
       color: '#fff',
-      fontFamily: 'Cairo-Bold',
+      fontFamily: 'Rubik-Bold',
       fontSize: 12,
       textAlign: 'center',
       writingDirection: isRTL ? 'rtl' : 'ltr',

@@ -33,6 +33,7 @@ import { PrayerStatus, PrayerName, DailyPrayerRecord, formatDate, getTodayDate }
 import {
   getCachedPrayerTimes,
   formatPrayerTime,
+  getPrayerTranslationKey,
   PrayerTimes,
 } from '@/lib/prayer-times';
 import {
@@ -99,6 +100,7 @@ interface PrayerItemProps {
   timeString?: string;
   windowState: PrayerWindowState;
   isPastDay: boolean;
+  displayDate: Date;
 }
 
 const PrayerItem: React.FC<PrayerItemProps> = ({
@@ -110,6 +112,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   timeString,
   windowState,
   isPastDay,
+  displayDate,
 }) => {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -194,7 +197,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           </View>
           <View style={styles.prayerInfo}>
             <Text style={[styles.prayerName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {t(prayer.nameKey)}
+              {t(getPrayerTranslationKey(prayer.key, displayDate))}
             </Text>
             <Text style={[styles.prayerTime, { color: colors.textLight }]}>
               {timeString || '--:--'}
@@ -619,6 +622,7 @@ export default function PrayerTrackerScreen() {
                 timeString={isSelectedToday ? getPrayerTimeDisplay(prayer.key) : undefined}
                 windowState={getWindowState(prayer.key)}
                 isPastDay={!isSelectedToday}
+                displayDate={selectedDate}
               />
             ))}
           </View>

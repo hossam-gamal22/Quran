@@ -13,7 +13,7 @@
  * when navigating between admin pages.
  */
 
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { deduplicateByDevice, type DeviceUser } from './device-dedup';
 
@@ -100,6 +100,10 @@ const isValidExpoPushToken = (token: unknown): boolean => (
   typeof token === 'string' && token.startsWith('ExponentPushToken')
 );
 
+const isMarkedUninstalled = (data: Record<string, any>): boolean => (
+  data.appStatus === 'uninstalled' || data.pushTokenInvalid === true || Boolean(data.uninstalledDetectedAt)
+);
+
 const toDate = (value: unknown): Date | null => {
   if (!value) return null;
   try {
@@ -119,6 +123,10 @@ const toDate = (value: unknown): Date | null => {
 let _cache: ActiveDevicesResult | null = null;
 let _cacheTimestamp = 0;
 
+type UsersSnapshotLike = {
+  forEach: (callback: (docSnap: { id: string; data: () => Record<string, any> }) => void) => void;
+};
+
 /** Force-clear the cache (e.g. after a user delete operation). */
 export function invalidateActiveDevicesCache(): void {
   _cache = null;
@@ -127,45 +135,13 @@ export function invalidateActiveDevicesCache(): void {
 
 // ── Core SSOT query ────────────────────────────────────────────────────────
 
-/**
- * Fetch all active installed devices from Firestore.
- *
- * Applies the unified filter:
- *   !placeholder  &&  storeSource  &&  valid ExponentPushToken
- *
- * Then deduplicates so one physical device = one user.
- *
- * Returns `{ users, stats, groupMap }`.
- * Results are cached for 30 s to avoid redundant Firestore reads.
- *
- * @param forceRefresh  Skip cache and re-fetch from Firestore.
- */
-export async function fetchActiveDevices(
-  forceRefresh = false,
-): Promise<ActiveDevicesResult> {
-  // Return cached result if still fresh
-  if (!forceRefresh && _cache && Date.now() - _cacheTimestamp < CACHE_TTL_MS) {
-    return _cache;
-  }
-
-  const snapshot = await getDocs(collection(db, 'users'));
-  const storeUsers: ActiveDevice[] = [];
-  const rawUsers: ActiveDevice[] = [];
+export function buildActiveDevicesResult(snapshot: UsersSnapshotLike): ActiveDevicesResult {
+  const storeUserCandidates: ActiveDevice[] = [];
 
   const now = Date.now();
   const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
   const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
   let firestoreUsers = 0;
-  let storeRegistered = 0;
-  let storeActive = 0;
-  let storeDaily = 0;
-  let namedUsers = 0;
-  let pushReachable = 0;
-  let storeIos = 0;
-  let storeAndroid = 0;
-  const storeByLanguage: Record<string, number> = {};
-  const storeByCountry: Record<string, number> = {};
-
   snapshot.forEach(docSnap => {
     const data = docSnap.data();
 
@@ -175,25 +151,9 @@ export async function fetchActiveDevices(
     firestoreUsers++;
     const storeSource = isStoreSource(data.installSource);
     const token: string = data.fcmToken || '';
-    const validToken = isValidExpoPushToken(token);
-    const displayName = data.displayName || data.name || '';
-    const lastActive = toDate(data.lastActive);
 
     if (storeSource) {
-      storeRegistered++;
-      if (displayName) namedUsers++;
-      if (validToken) pushReachable++;
-      if (lastActive && lastActive > weekAgo) storeActive++;
-      if (lastActive && lastActive > dayAgo) storeDaily++;
-      const platform = String(data.platform || '').toLowerCase();
-      if (platform === 'ios') storeIos++;
-      else if (platform === 'android') storeAndroid++;
-      const lang = data.language || 'ar';
-      const country = data.country || 'unknown';
-      storeByLanguage[lang] = (storeByLanguage[lang] || 0) + 1;
-      storeByCountry[country] = (storeByCountry[country] || 0) + 1;
-
-      storeUsers.push({
+      storeUserCandidates.push({
         id: docSnap.id,
         ...data,
         fcmToken: token,
@@ -208,34 +168,39 @@ export async function fetchActiveDevices(
         installSource: data.installSource,
       } as ActiveDevice);
     }
-
-    // Actionable user list: real store install + valid Expo push token + name.
-    if (!storeSource || !validToken || !displayName) return;
-
-    rawUsers.push({
-      id: docSnap.id,
-      ...data,
-      fcmToken: token,
-      platform: data.platform || 'unknown',
-      language: data.language || 'ar',
-      country: data.country || '',
-      countrySource: data.countrySource || '',
-      prayerCity: data.prayerCity || '',
-      prayerLatitude: typeof data.prayerLatitude === 'number' ? data.prayerLatitude : undefined,
-      prayerLongitude: typeof data.prayerLongitude === 'number' ? data.prayerLongitude : undefined,
-      lastActive: data.lastActive ?? null,
-      installSource: data.installSource,
-    } as ActiveDevice);
   });
 
-  // Deduplicate: one physical device = one unique user
-  const { uniqueUsers, duplicateCount, groupMap } = deduplicateByDevice(rawUsers);
+  // Deduplicate store installs first: one physical device/person context should
+  // appear once in Users/Dashboard, even if it has both named and anonymous docs.
+  const {
+    uniqueUsers: storeUsers,
+    duplicateCount: storeDuplicateCount,
+    groupMap,
+  } = deduplicateByDevice(storeUserCandidates);
+
+  const rawUsers = storeUsers.filter(user => {
+    const displayName = user.displayName || user.name || '';
+    return displayName && isValidExpoPushToken(user.fcmToken) && !isMarkedUninstalled(user);
+  });
+
+  // Keep the historical actionable notification list deduped too.
+  const { uniqueUsers, duplicateCount: actionableDuplicateCount } = deduplicateByDevice(rawUsers);
+  const duplicateCount = storeDuplicateCount + actionableDuplicateCount;
 
   if (duplicateCount > 0) {
     console.log(`[user-query] Deduplicated ${duplicateCount} duplicate device records`);
   }
 
   // Compute stats
+  let storeRegistered = storeUsers.length;
+  let storeActive = 0;
+  let storeDaily = 0;
+  let namedUsers = 0;
+  let pushReachable = 0;
+  let storeIos = 0;
+  let storeAndroid = 0;
+  const storeByLanguage: Record<string, number> = {};
+  const storeByCountry: Record<string, number> = {};
   const byLanguage: Record<string, number> = {};
   const byCountry: Record<string, number> = {};
   let activeCount = 0;
@@ -245,6 +210,23 @@ export async function fetchActiveDevices(
   let monthlyAzkar = 0;
   let monthlyQuran = 0;
   let monthlyPrayers = 0;
+
+  for (const user of storeUsers) {
+    const displayName = user.displayName || user.name || '';
+    const token = user.fcmToken || '';
+    const lastActive = toDate(user.lastActive);
+    const platform = (user.platform || '').toLowerCase();
+    if (displayName) namedUsers++;
+    if (isValidExpoPushToken(token) && !isMarkedUninstalled(user)) pushReachable++;
+    if (lastActive && lastActive > weekAgo) storeActive++;
+    if (lastActive && lastActive > dayAgo) storeDaily++;
+    if (platform === 'ios') storeIos++;
+    else if (platform === 'android') storeAndroid++;
+    const lang = user.language || 'ar';
+    const country = user.country || 'unknown';
+    storeByLanguage[lang] = (storeByLanguage[lang] || 0) + 1;
+    storeByCountry[country] = (storeByCountry[country] || 0) + 1;
+  }
 
   for (const user of uniqueUsers) {
     // Platform
@@ -276,7 +258,7 @@ export async function fetchActiveDevices(
 
   const total = uniqueUsers.length;
 
-  const result: ActiveDevicesResult = {
+  return {
     storeUsers,
     users: uniqueUsers,
     stats: {
@@ -306,6 +288,47 @@ export async function fetchActiveDevices(
     },
     groupMap,
   };
+}
+
+export function subscribeActiveDevices(
+  onUpdate: (result: ActiveDevicesResult) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onSnapshot(
+    collection(db, 'users'),
+    (snapshot) => {
+      const result = buildActiveDevicesResult(snapshot);
+      _cache = result;
+      _cacheTimestamp = Date.now();
+      onUpdate(result);
+    },
+    (error) => onError?.(error),
+  );
+}
+
+/**
+ * Fetch all active installed devices from Firestore.
+ *
+ * Applies the unified filter:
+ *   !placeholder  &&  storeSource  &&  valid ExponentPushToken
+ *
+ * Then deduplicates so one physical device = one user.
+ *
+ * Returns `{ users, stats, groupMap }`.
+ * Results are cached for 30 s to avoid redundant Firestore reads.
+ *
+ * @param forceRefresh  Skip cache and re-fetch from Firestore.
+ */
+export async function fetchActiveDevices(
+  forceRefresh = false,
+): Promise<ActiveDevicesResult> {
+  // Return cached result if still fresh
+  if (!forceRefresh && _cache && Date.now() - _cacheTimestamp < CACHE_TTL_MS) {
+    return _cache;
+  }
+
+  const snapshot = await getDocs(collection(db, 'users'));
+  const result = buildActiveDevicesResult(snapshot);
 
   // Persist to cache
   _cache = result;

@@ -320,8 +320,9 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
   // 6. App-wide fallback — Makkah calculation
   try {
     const result = getCountryFallbackPrayerTimes(new Date(today + 'T12:00:00'));
+    const times = applyAdjustments(result.times, eff.adjustments as any);
     console.log(`🌍 Offline: used country fallback (${result.countryCode} → ${result.cityNameEn})`);
-    return { times: result.times, source: 'countryFallback', cacheAgeDays: 0 };
+    return { times, source: 'countryFallback', cacheAgeDays: 0 };
   } catch (e) {
     console.warn('Country fallback failed:', e);
   }
@@ -461,7 +462,8 @@ export async function getOfflinePrayerTimesRange(
     // 5. Country fallback
     try {
       const fb = getCountryFallbackPrayerTimes(d);
-      results.push({ date: dateStr, times: fb.times, source: 'countryFallback' });
+      const times = applyAdjustments(fb.times, eff.adjustments as any);
+      results.push({ date: dateStr, times, source: 'countryFallback' });
     } catch {
       // Skip this day if everything fails
     }

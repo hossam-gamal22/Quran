@@ -2,7 +2,7 @@
 // صفحة إدارة المكافآت الشهرية — أفضل المستخدمين نشاطاً
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Trophy, Save, Loader2, Settings, History, Users, Gift, AlertTriangle } from 'lucide-react';
 import { sendPrizeNotification } from '../services/pushNotifications';
@@ -73,7 +73,7 @@ const DEFAULT_CONFIG: RewardsConfig = {
     quran: 3,
     prayer: 5,
     tasbih: 1,
-    khatma: 5,
+    khatma: 100,
     fasting: 4,
   },
   currentMonth: '',
@@ -102,6 +102,9 @@ const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsCon
   scoreWeights: {
     ...DEFAULT_CONFIG.scoreWeights,
     ...((raw as any)?.scoreWeights || {}),
+    khatma: (raw as any)?.scoreWeights?.khatma === undefined || (raw as any)?.scoreWeights?.khatma === 5
+      ? DEFAULT_CONFIG.scoreWeights.khatma
+      : (raw as any)?.scoreWeights?.khatma,
   },
   currentWinners: raw?.currentWinners || [],
   history: raw?.history || [],
@@ -109,6 +112,40 @@ const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsCon
 
 const isWinnerEligible = (user: LeaderboardUser): boolean => {
   return !user.hidden && !!user.displayName?.trim();
+};
+
+const buildLeaderboardUsers = (
+  docs: Array<{ id: string; data: () => Record<string, any> }>,
+  selectedIds = new Set<string>(),
+): LeaderboardUser[] => {
+  const users: LeaderboardUser[] = [];
+
+  docs.forEach(docSnap => {
+    const data = docSnap.data();
+    // Only skip placeholders — admin sees ALL real users
+    if (data.placeholder) return;
+    const engagement = data.monthlyEngagement;
+    if (engagement && engagement.score > 0) {
+      const displayName = String(data.displayName || data.name || '').trim();
+      users.push({
+        id: docSnap.id,
+        displayName,
+        email: data.email,
+        platform: data.platform,
+        score: engagement.score,
+        month: engagement.month,
+        lastActive: data.lastActive?.toDate?.()?.toLocaleDateString('ar-EG') || '',
+        selected: selectedIds.has(docSnap.id),
+        hidden: !!data.hiddenFromLeaderboard,
+        deviceName: data.deviceName,
+        deviceBrand: data.deviceBrand,
+        installSource: data.installSource,
+        fcmToken: data.fcmToken,
+      });
+    }
+  });
+
+  return users;
 };
 
 export default function Rewards() {
@@ -126,8 +163,51 @@ export default function Rewards() {
   const [editingNameValue, setEditingNameValue] = useState('');
 
   useEffect(() => {
-    loadConfig();
-    // Initial rewards config load only.
+    const unsubscribeConfig = onSnapshot(
+      doc(db, 'config', 'rewards-settings'),
+      (snap) => {
+        if (snap.exists()) {
+          setConfig(normalizeRewardsConfig(snap.data() as Partial<RewardsConfig>));
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error listening to rewards config:', err);
+        loadConfig();
+      }
+    );
+
+    const currentMonth = getCurrentMonth();
+    const usersRef = collection(db, 'users');
+    const leaderboardQuery = query(
+      usersRef,
+      where('monthlyEngagement.month', '==', currentMonth),
+      orderBy('monthlyEngagement.score', 'desc'),
+      limit(50)
+    );
+
+    setLoadingBoard(true);
+    const unsubscribeLeaderboard = onSnapshot(
+      leaderboardQuery,
+      (snapshot) => {
+        setLeaderboard(prev => {
+          const selectedIds = new Set(prev.filter(u => u.selected).map(u => u.id));
+          return buildLeaderboardUsers(snapshot.docs, selectedIds);
+        });
+        setLoadingBoard(false);
+      },
+      (err) => {
+        console.error('Error listening to leaderboard:', err);
+        setLoadingBoard(false);
+        loadLeaderboard();
+      }
+    );
+
+    return () => {
+      unsubscribeConfig();
+      unsubscribeLeaderboard();
+    };
+    // Initial listeners only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -174,32 +254,10 @@ export default function Rewards() {
       );
       const snapshot = await getDocs(q);
 
-      const users: LeaderboardUser[] = [];
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        // Only skip placeholders — admin sees ALL real users
-        if (data.placeholder) return;
-        const engagement = data.monthlyEngagement;
-        if (engagement && engagement.score > 0) {
-          const displayName = String(data.displayName || data.name || '').trim();
-          users.push({
-            id: docSnap.id,
-            displayName,
-            email: data.email,
-            platform: data.platform,
-            score: engagement.score,
-            month: engagement.month,
-            lastActive: data.lastActive?.toDate?.()?.toLocaleDateString('ar-EG') || '',
-            selected: false,
-            hidden: !!data.hiddenFromLeaderboard,
-            deviceName: data.deviceName,
-            deviceBrand: data.deviceBrand,
-            installSource: data.installSource,
-            fcmToken: data.fcmToken,
-          });
-        }
+      setLeaderboard(prev => {
+        const selectedIds = new Set(prev.filter(u => u.selected).map(u => u.id));
+        return buildLeaderboardUsers(snapshot.docs, selectedIds);
       });
-      setLeaderboard(users);
     } catch (err) {
       console.error('Error loading leaderboard:', err);
     } finally {
@@ -420,8 +478,8 @@ export default function Rewards() {
             <Trophy className="w-6 h-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">المكافآت الشهرية</h1>
-            <p className="text-sm text-slate-500">مكافأة أنشط المستخدمين ببريميوم مجاني</p>
+            <h1 className="text-2xl font-bold text-white">المكافآت الشهرية</h1>
+            <p className="text-sm text-slate-400">مكافأة أنشط المستخدمين ببريميوم مجاني</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

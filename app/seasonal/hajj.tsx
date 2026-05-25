@@ -33,8 +33,10 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
 import { getHijriDate, hijriToGregorian } from '@/lib/hijri-date';
+import { uiText } from '@/lib/ui-text';
 
 import TranslatedText from '@/components/ui/TranslatedText';
+import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { useSeasonalCMS } from '@/lib/content-api';
 
 const { width } = Dimensions.get('window');
@@ -43,11 +45,11 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const HAJJ_COLOR = '#5D4037';
-const HAJJ_GRADIENT = ['#5D4037', '#3E2723'];
-const ARAFAH_COLOR = '#1565C0';
-const EID_COLOR = '#C62828';
-const GREEN_ACCENT = '#2E7D32';
+const HAJJ_COLOR = '#7C3AED';
+const TARWIYAH_COLOR = '#FACC15';
+const ARAFAH_COLOR = '#2563EB';
+const EID_COLOR = '#DC2626';
+const GREEN_ACCENT = '#15803D';
 
 // أيام الحج ومناسكه
 const HAJJ_DAYS = [
@@ -79,8 +81,8 @@ const HAJJ_DAYS = [
       'اللهم إنك عفو تحب العفو فاعف عني',
     ],
     virtues: [
-      'أفضل يوم طلعت فيه الشمس',
-      'يوم يعتق الله فيه أكثر عباده من النار',
+      'الحج عرفة',
+      'يوم دعاء وذكر',
       'صيامه لغير الحاج يكفر سنة ماضية وسنة قادمة',
     ],
   },
@@ -149,8 +151,15 @@ const FIRST_TEN_DAYS = [
   { day: 10, virtue: 'يوم النحر - عيد الأضحى' },
 ];
 
+type HajjDuaType = {
+  id: string;
+  title: string;
+  arabic: string;
+  occasion: string;
+};
+
 // أدعية الحج
-const HAJJ_DUAS = [
+const HAJJ_DUAS: HajjDuaType[] = [
   {
     id: 'talbiyah',
     title: 'التلبية',
@@ -171,8 +180,8 @@ const HAJJ_DUAS = [
   },
   {
     id: 'arafah',
-    title: 'دعاء عرفة',
-    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+    title: 'دعاء جامع يوم عرفة',
+    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
     occasion: 'يوم عرفة',
   },
   {
@@ -187,10 +196,73 @@ const HAJJ_DUAS = [
     arabic: 'اللَّهُ أَكْبَرُ اللَّهُ أَكْبَرُ لَا إِلَهَ إِلَّا اللَّهُ، اللَّهُ أَكْبَرُ اللَّهُ أَكْبَرُ وَلِلَّهِ الْحَمْدُ',
     occasion: 'أيام التشريق',
   },
+  {
+    id: 'enter_makkah',
+    title: 'دعاء دخول مكة',
+    arabic: 'اللَّهُمَّ هَذَا حَرَمُكَ وَأَمْنُكَ، فَحَرِّمْنِي عَلَى النَّارِ، وَآمِنِّي مِنْ عَذَابِكَ يَوْمَ تَبْعَثُ عِبَادَكَ',
+    occasion: 'عند دخول مكة',
+  },
+  {
+    id: 'see_kaaba',
+    title: 'دعاء عند رؤية الكعبة',
+    arabic: 'اللَّهُمَّ زِدْ هَذَا الْبَيْتَ تَشْرِيفًا وَتَعْظِيمًا وَتَكْرِيمًا وَمَهَابَةً، وَزِدْ مَنْ شَرَّفَهُ وَكَرَّمَهُ مِمَّنْ حَجَّهُ أَوِ اعْتَمَرَهُ تَشْرِيفًا وَتَكْرِيمًا',
+    occasion: 'أول رؤية للكعبة',
+  },
+  {
+    id: 'zamzam',
+    title: 'دعاء عند شرب ماء زمزم',
+    arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا وَاسِعًا، وَشِفَاءً مِنْ كُلِّ دَاءٍ',
+    occasion: 'عند شرب ماء زمزم',
+  },
+  {
+    id: 'accept_hajj',
+    title: 'دعاء قبول الحج',
+    arabic: 'اللَّهُمَّ اجْعَلْهُ حَجًّا مَبْرُورًا، وَذَنْبًا مَغْفُورًا، وَسَعْيًا مَشْكُورًا، وَتِجَارَةً لَنْ تَبُورَ',
+    occasion: 'في ختام المناسك',
+  },
+  {
+    id: 'comprehensive_hajj_dua',
+    title: 'دعاء جامع للحاج',
+    arabic: 'رَبِّ اغْفِرْ وَارْحَمْ، وَأَنْتَ الْأَعَزُّ الْأَكْرَمُ',
+    occasion: 'في كل مواطن الدعاء',
+  },
 ];
 
-type HajjDuaType = typeof HAJJ_DUAS[number];
 type HajjDayType = typeof HAJJ_DAYS[number];
+
+const isTarwiyahDay = (dayInfo: { day: number }) => dayInfo.day === 8;
+
+const getHajjDayAccentColor = (dayInfo: { day: number; isSpecial?: boolean; isEid?: boolean }) => {
+  if (isTarwiyahDay(dayInfo)) return TARWIYAH_COLOR;
+  if (dayInfo.isSpecial) return ARAFAH_COLOR;
+  if (dayInfo.isEid) return EID_COLOR;
+  return HAJJ_COLOR;
+};
+
+const getHajjDayAccentTextColor = (dayInfo: { day: number }) => (
+  isTarwiyahDay(dayInfo) ? '#241400' : '#fff'
+);
+
+const getHajjDayModalColor = (dayInfo: { day: number; isSpecial?: boolean; isEid?: boolean }) => {
+  if (isTarwiyahDay(dayInfo)) return '#A16207';
+  if (dayInfo.isSpecial) return '#1D4ED8';
+  if (dayInfo.isEid) return '#B91C1C';
+  return '#5B21B6';
+};
+
+const getDhulHijjahDay = (season: { startDate: { month: number; day: number }; currentDay: number } | null) => {
+  if (season?.startDate.month === 12 && season.currentDay > 0) {
+    return season.startDate.day + season.currentDay - 1;
+  }
+
+  const hijriDate = getHijriDate();
+  return hijriDate.month === 12 ? hijriDate.day : 1;
+};
+
+type CMSHajjDua = Partial<HajjDuaType> & {
+  titleKey?: string;
+  translation?: string;
+};
 
 // ========================================
 // مكونات فرعية
@@ -218,6 +290,10 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
   const isRTL = useIsRTL();
   const { t } = useSettings();
   const isArabicLang = getLanguage() === 'ar';
+  const isTarwiyah = isTarwiyahDay(dayInfo);
+  const accentColor = getHajjDayAccentColor(dayInfo);
+  const accentTextColor = getHajjDayAccentTextColor(dayInfo);
+  const hasAccentFill = isActive || isTarwiyah || dayInfo.isSpecial || dayInfo.isEid;
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
       <TouchableOpacity
@@ -225,6 +301,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
           styles.hajjDayCard,
           { backgroundColor: colors.card },
           isActive && styles.hajjDayCardActive,
+          isTarwiyah && styles.hajjDayCardTarwiyah,
           dayInfo.isSpecial && styles.hajjDayCardSpecial,
           dayInfo.isEid && styles.hajjDayCardEid,
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
@@ -240,17 +317,18 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
           style={[
             styles.dayNumber,
             isActive && styles.dayNumberActive,
+            isTarwiyah && styles.dayNumberTarwiyah,
             dayInfo.isSpecial && styles.dayNumberSpecial,
             dayInfo.isEid && styles.dayNumberEid,
           ]}
         >
           <Text style={[
             styles.dayNumberText,
-            (isActive || dayInfo.isSpecial || dayInfo.isEid) && { color: '#fff' },
+            hasAccentFill && { color: accentTextColor },
           ]}>{dayInfo.day}</Text>
           <Text style={[
             styles.dayNumberLabel,
-            (isActive || dayInfo.isSpecial || dayInfo.isEid) && { color: 'rgba(255,255,255,0.85)' },
+            hasAccentFill && { color: isTarwiyah ? 'rgba(36,20,0,0.75)' : 'rgba(255,255,255,0.85)' },
           ]}>{t('seasonal.hajj.dhulHijjah')}</Text>
         </View>
 
@@ -274,7 +352,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
           <View style={[styles.ritualsPreview, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {dayInfo.rituals.slice(0, 3).map((ritual) => (
               <View key={ritual.id} style={styles.ritualBadge}>
-                <AppIcon name={ritual.icon} size={14} color={dayInfo.isSpecial ? ARAFAH_COLOR : HAJJ_COLOR} />
+                <AppIcon name={ritual.icon} size={14} color={accentColor} />
               </View>
             ))}
             {dayInfo.rituals.length > 3 && (
@@ -300,6 +378,7 @@ interface TenDaysProgressProps {
   currentDay: number;
   completedDays: number[];
   onDayPress: (day: number) => void;
+  onInfoPress: () => void;
   isDarkMode: boolean;
 }
 
@@ -307,6 +386,7 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
   currentDay,
   completedDays,
   onDayPress,
+  onInfoPress,
   isDarkMode,
 }) => {
   const colors = useColors();
@@ -331,9 +411,22 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
 
   return (
     <View style={[styles.tenDaysContainer, { backgroundColor: colors.card }]}>
-      <Text style={[styles.tenDaysTitle, { color: colors.text }]}>
-        {t('seasonal.hajj.tenDaysTitle')}
-      </Text>
+      <View style={[styles.tenDaysHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={styles.tenDaysHeaderSpacer} />
+        <Text style={[styles.tenDaysTitle, { color: colors.text }]}>
+          {t('seasonal.hajj.tenDaysTitle')}
+        </Text>
+        <TouchableOpacity
+          style={styles.tenDaysInfoButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onInfoPress();
+          }}
+          activeOpacity={0.75}
+        >
+          <MaterialCommunityIcons name="information-outline" size={18} color={colors.icon} />
+        </TouchableOpacity>
+      </View>
       <Text style={[styles.tenDaysSubtitle, { color: colors.textLight }]}>
         {t('seasonal.hajj.tenDaysSubtitle')}
       </Text>
@@ -341,10 +434,12 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
         {FIRST_TEN_DAYS.map((day, index) => {
           const isCompleted = completedDays.includes(day.day);
           const isCurrent = day.day === currentDay;
+          const isTarwiyah = day.day === 8;
           const isArafah = day.day === 9;
           const isEid = day.day === 10;
           const gDate = gregorianDates[index];
-          const hasHighlight = isCompleted || isCurrent || isArafah || isEid;
+          const hasHighlight = isCompleted || isCurrent || isTarwiyah || isArafah || isEid;
+          const highlightTextColor = isTarwiyah && !isCompleted ? '#241400' : '#fff';
 
           return (
             <TouchableOpacity
@@ -352,10 +447,11 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
               style={[
                 styles.tenDayItem,
                 { backgroundColor: colors.surface },
-                isCompleted && styles.tenDayItemCompleted,
-                isCurrent && !isArafah && !isEid && styles.tenDayItemCurrent,
+                isCurrent && !isCompleted && !isTarwiyah && !isArafah && !isEid && styles.tenDayItemCurrent,
+                isTarwiyah && styles.tenDayItemTarwiyah,
                 isArafah && styles.tenDayItemArafah,
                 isEid && styles.tenDayItemEid,
+                isCompleted && styles.tenDayItemCompleted,
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -366,7 +462,7 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
                 style={[
                   styles.tenDayNumber,
                   { color: colors.text },
-                  hasHighlight && styles.tenDayNumberActive,
+                  hasHighlight && { color: highlightTextColor },
                 ]}
               >
                 {day.day}
@@ -375,7 +471,7 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
                 <Text
                   style={[
                     styles.tenDayGregorian,
-                    { color: hasHighlight ? 'rgba(255,255,255,0.8)' : colors.textLight },
+                    { color: hasHighlight ? (isTarwiyah && !isCompleted ? 'rgba(36,20,0,0.72)' : 'rgba(255,255,255,0.8)') : colors.textLight },
                   ]}
                 >
                   {gDate.day}/{gDate.month}
@@ -396,7 +492,7 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
 };
 
 interface DuaCardProps {
-  dua: typeof HAJJ_DUAS[0];
+  dua: HajjDuaType;
   onPress: () => void;
   isDarkMode: boolean;
   index: number;
@@ -458,6 +554,8 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
   const isArabicLang = getLanguage() === 'ar';
   if (!dayInfo) return null;
 
+  const modalAccentColor = getHajjDayModalColor(dayInfo);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -467,7 +565,7 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
         >
           {/* Header */}
           <View
-            style={[styles.ritualModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: dayInfo.isSpecial ? `${ARAFAH_COLOR}DD` : `${HAJJ_GRADIENT[0]}CC` }]}
+            style={[styles.ritualModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: `${modalAccentColor}DD` }]}
           >
             <View style={styles.ritualModalDay}>
               <Text style={styles.ritualModalDayNumber}>{dayInfo.day}</Text>
@@ -587,14 +685,25 @@ export default function HajjScreen() {
   const { seasonalProgress, markDayCompleted } = useSeasonalProgress();
 
   // CMS data with hardcoded fallback
-  const { duas: hajjDuas } = useSeasonalCMS<HajjDuaType>('hajj', HAJJ_DUAS);
+  const { duas: rawHajjDuas } = useSeasonalCMS<CMSHajjDua>('hajj', HAJJ_DUAS);
+  const hajjDuas = useMemo<HajjDuaType[]>(() => (
+    rawHajjDuas
+      .filter((dua) => dua.arabic)
+      .map((dua, index) => ({
+        id: dua.id || `cms-hajj-dua-${index}`,
+        title: dua.title || dua.titleKey || '',
+        arabic: dua.arabic || '',
+        occasion: dua.occasion || dua.translation || '',
+      }))
+  ), [rawHajjDuas]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDay, setSelectedDay] = useState<HajjDayType | null>(null);
   const [selectedDua, setSelectedDua] = useState<HajjDuaType | null>(null);
+  const [showCompletionInfo, setShowCompletionInfo] = useState(false);
 
-  const isHajjSeason = currentSeason?.type === 'hajj' || currentSeason?.type === 'dhul_hijjah';
-  const currentDay = currentSeason?.currentDay || 1;
+  const isHajjSeason = currentSeason?.startDate.month === 12;
+  const currentDay = getDhulHijjahDay(currentSeason);
   const completedDays = seasonalProgress?.completedDays || [];
 
   const handleRefresh = useCallback(async () => {
@@ -655,12 +764,14 @@ export default function HajjScreen() {
           />
         }
       >
+        <ContentLanguageNotice style={{ marginHorizontal: 0 }} />
         {/* العشر الأوائل */}
         <Animated.View entering={FadeInDown.duration(500)}>
           <TenDaysProgress
             currentDay={currentDay}
             completedDays={completedDays}
             onDayPress={handleTenDayPress}
+            onInfoPress={() => setShowCompletionInfo(true)}
             isDarkMode={isDarkMode}
           />
         </Animated.View>
@@ -668,16 +779,24 @@ export default function HajjScreen() {
         {/* مفتاح الألوان */}
         <View style={[styles.legendRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.legendDot, styles.legendDotIncomplete]} />
+            <Text style={[styles.legendText, { color: colors.textLight }]}>{uiText({ ar: 'غير مكتمل', en: 'Incomplete' })}</Text>
+          </View>
+          <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.legendDot, { backgroundColor: TARWIYAH_COLOR }]} />
+            <Text style={[styles.legendText, { color: colors.textLight }]}>{uiText({ ar: 'التروية', en: 'Tarwiyah' })}</Text>
+          </View>
+          <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[styles.legendDot, { backgroundColor: ARAFAH_COLOR }]} />
-            <Text style={[styles.legendText, { color: colors.textLight }]}>عرفة</Text>
+            <Text style={[styles.legendText, { color: colors.textLight }]}>{uiText({ ar: 'عرفة', en: 'Arafah' })}</Text>
           </View>
           <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[styles.legendDot, { backgroundColor: EID_COLOR }]} />
-            <Text style={[styles.legendText, { color: colors.textLight }]}>العيد</Text>
+            <Text style={[styles.legendText, { color: colors.textLight }]}>{uiText({ ar: 'العيد', en: 'Eid' })}</Text>
           </View>
           <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[styles.legendDot, { backgroundColor: GREEN_ACCENT }]} />
-            <Text style={[styles.legendText, { color: colors.textLight }]}>مكتمل</Text>
+            <Text style={[styles.legendText, { color: colors.textLight }]}>{uiText({ ar: 'مكتمل', en: 'Completed' })}</Text>
           </View>
         </View>
 
@@ -779,6 +898,39 @@ export default function HajjScreen() {
           </Animated.View>
         </TouchableOpacity>
       </Modal>
+
+      <Modal
+        visible={showCompletionInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCompletionInfo(false)}
+      >
+        <TouchableOpacity
+          style={styles.duaModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCompletionInfo(false)}
+        >
+          <Animated.View
+            entering={FadeIn.duration(250)}
+            style={[styles.completionInfoModal, { backgroundColor: colors.modalSurface }]}
+          >
+            <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[styles.duaModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                {uiText({ ar: 'ما معنى اكتمال اليوم؟', en: 'What does completed mean?' })}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCompletionInfo(false)} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.completionInfoText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {uiText({
+                ar: 'الأيام غير الملوّنة تعني أنها لم تُعلَّم كمكتملة بعد. بعد الانتهاء من أعمال أو ورد اليوم، اضغط على رقم اليوم في العشر الأوائل لتسجيله كمكتمل. لا يمكن تعليم الأيام القادمة قبل الوصول إليها.',
+                en: 'Uncolored days are not marked as completed yet. After finishing that day’s deeds or routine, tap its number in the first ten days to mark it completed. Future days cannot be completed before they arrive.',
+              })}
+            </Text>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
     </BackgroundWrapper>
   );
@@ -845,7 +997,24 @@ const _styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
   },
+  tenDaysHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tenDaysHeaderSpacer: {
+    width: 34,
+    height: 34,
+  },
+  tenDaysInfoButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tenDaysTitle: {
+    flex: 1,
     fontSize: 18,
     fontFamily: fontBold(),
     textAlign: 'center',
@@ -867,6 +1036,8 @@ const _styles = StyleSheet.create({
     width: 56,
     height: 64,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
@@ -876,6 +1047,9 @@ const _styles = StyleSheet.create({
   },
   tenDayItemCurrent: {
     backgroundColor: HAJJ_COLOR,
+  },
+  tenDayItemTarwiyah: {
+    backgroundColor: TARWIYAH_COLOR,
   },
   tenDayItemArafah: {
     backgroundColor: ARAFAH_COLOR,
@@ -915,6 +1089,10 @@ const _styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: HAJJ_COLOR,
   },
+  hajjDayCardTarwiyah: {
+    borderWidth: 2,
+    borderColor: TARWIYAH_COLOR,
+  },
   hajjDayCardSpecial: {
     borderWidth: 2,
     borderColor: ARAFAH_COLOR,
@@ -927,12 +1105,17 @@ const _styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 14,
-    backgroundColor: `${HAJJ_COLOR}20`,
+    backgroundColor: `${HAJJ_COLOR}26`,
+    borderWidth: 1,
+    borderColor: `${HAJJ_COLOR}66`,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayNumberActive: {
     backgroundColor: HAJJ_COLOR,
+  },
+  dayNumberTarwiyah: {
+    backgroundColor: TARWIYAH_COLOR,
   },
   dayNumberSpecial: {
     backgroundColor: ARAFAH_COLOR,
@@ -977,7 +1160,9 @@ const _styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: `${HAJJ_COLOR}10`,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1001,7 +1186,9 @@ const _styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: `${HAJJ_COLOR}15`,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderWidth: 1,
+    borderColor: `${HAJJ_COLOR}66`,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1020,7 +1207,6 @@ const _styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 20,
   },
-
   // النصيحة
   tipCard: {
     flexDirection: 'row',
@@ -1200,6 +1386,17 @@ const _styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
+  completionInfoModal: {
+    borderRadius: 24,
+    padding: 22,
+    width: '100%',
+    maxWidth: 400,
+  },
+  completionInfoText: {
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    lineHeight: 24,
+  },
   duaModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1232,8 +1429,10 @@ const _styles = StyleSheet.create({
   // مفتاح الألوان
   legendRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 16,
+    columnGap: 16,
+    rowGap: 8,
     marginBottom: 8,
   },
   legendItem: {
@@ -1245,6 +1444,11 @@ const _styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  legendDotIncomplete: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.42)',
   },
   legendText: {
     fontSize: 11,

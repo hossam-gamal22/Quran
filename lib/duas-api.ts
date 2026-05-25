@@ -2,11 +2,11 @@
 // أدعية من السنة — Firestore مع 3-tier cache — روح المسلم
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
 const CACHE_KEY = '@selected_duas_cache';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes, so admin edits reach users quickly
 
 export interface SelectedDua {
   id: string;
@@ -31,23 +31,33 @@ interface CachedDuas {
  */
 let memoryCache: CachedDuas | null = null;
 
-export async function fetchSelectedDuas(): Promise<SelectedDua[]> {
+async function persistDuas(duas: SelectedDua[]): Promise<void> {
+  const cacheData: CachedDuas = { duas, timestamp: Date.now() };
+  memoryCache = cacheData;
+  try {
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+  } catch {}
+}
+
+export async function fetchSelectedDuas(options: { forceRefresh?: boolean } = {}): Promise<SelectedDua[]> {
   // Tier 1: Memory cache
-  if (memoryCache && Date.now() - memoryCache.timestamp < CACHE_DURATION) {
+  if (!options.forceRefresh && memoryCache && Date.now() - memoryCache.timestamp < CACHE_DURATION) {
     return memoryCache.duas;
   }
 
   // Tier 2: AsyncStorage cache
-  try {
-    const cached = await AsyncStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const parsed: CachedDuas = JSON.parse(cached);
-      if (Date.now() - parsed.timestamp < CACHE_DURATION) {
-        memoryCache = parsed;
-        return parsed.duas;
+  if (!options.forceRefresh) {
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed: CachedDuas = JSON.parse(cached);
+        if (Date.now() - parsed.timestamp < CACHE_DURATION) {
+          memoryCache = parsed;
+          return parsed.duas;
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 
   // Tier 3: Firestore
   try {
@@ -63,9 +73,7 @@ export async function fetchSelectedDuas(): Promise<SelectedDua[]> {
     } as SelectedDua));
 
     if (duas.length > 0) {
-      const cacheData: CachedDuas = { duas, timestamp: Date.now() };
-      memoryCache = cacheData;
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      await persistDuas(duas);
       return duas;
     }
   } catch (error) {
@@ -74,6 +82,33 @@ export async function fetchSelectedDuas(): Promise<SelectedDua[]> {
 
   // Fallback: return empty (caller will use local data)
   return [];
+}
+
+export function subscribeToSelectedDuas(
+  onUpdate: (duas: SelectedDua[]) => void,
+  onError?: (error: unknown) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, 'selectedDuas'),
+    where('enabled', '==', true),
+    orderBy('order', 'asc')
+  );
+
+  return onSnapshot(
+    q,
+    snapshot => {
+      const duas: SelectedDua[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as SelectedDua));
+      void persistDuas(duas);
+      onUpdate(duas);
+    },
+    error => {
+      console.log('Error subscribing to selected duas:', error);
+      onError?.(error);
+    }
+  );
 }
 
 /**
@@ -112,8 +147,12 @@ export function duaToZikr(dua: SelectedDua): {
   translations: Record<string, string>;
   audio?: string;
 } {
+  const numericId = typeof dua.id === 'string'
+    ? parseInt(dua.id, 10) || Array.from(dua.id).reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 0)
+    : 0;
+
   return {
-    id: typeof dua.id === 'string' ? parseInt(dua.id, 10) || 0 : 0,
+    id: numericId,
     arabic: dua.arabic,
     reference: dua.reference || dua.source,
     count: 1,
