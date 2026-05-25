@@ -7,11 +7,14 @@ import { db } from '../firebase';
 import {
   collection,
   getDocs,
+  getDoc,
+  doc as firestoreDoc,
   query,
   where,
   Timestamp,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore';
 // ==================== الأنواع ====================
 
@@ -43,15 +46,27 @@ export type NotificationTranslations = {
 
 interface ExpoPushMessage {
   to: string;
-  title: string;
-  body: string;
+  title?: string;
+  body?: string;
   data?: Record<string, any>;
   sound?: 'default' | null;
   badge?: number;
   channelId?: string;
   priority?: 'default' | 'normal' | 'high';
+  interruptionLevel?: 'active' | 'critical' | 'passive' | 'time-sensitive';
   ttl?: number;
+  _contentAvailable?: boolean;
   _displayInForeground?: boolean;
+}
+
+interface ExpoPushTicket {
+  status?: 'ok' | 'error';
+  id?: string;
+  message?: string;
+  details?: {
+    error?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface PushNotificationPayload {
@@ -87,10 +102,23 @@ interface UserToken {
   lastActive: Timestamp | null;
 }
 
+interface PrayerLocationDoc {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  updatedAt?: unknown;
+}
+
 interface BatchResult {
   successCount: number;
   failureCount: number;
   errors: string[];
+  uninstalledCount: number;
+}
+
+interface PushTarget {
+  id?: string;
+  fcmToken: string;
 }
 
 export interface UserStats {
@@ -105,6 +133,82 @@ export interface UserStats {
 // ==================== الثوابت ====================
 
 const BATCH_SIZE = 100;
+
+const hasPrayerLocation = (data: Record<string, any>, prayerLocation?: PrayerLocationDoc): boolean => (
+  typeof data.locationLatitude === 'number' ||
+  typeof data.locationLongitude === 'number' ||
+  typeof prayerLocation?.latitude === 'number' ||
+  typeof prayerLocation?.longitude === 'number'
+);
+
+const resolveCountryForTargeting = (
+  data: Record<string, any>,
+  prayerLocation?: PrayerLocationDoc,
+): { country: string; countrySource: string; countryVerified: boolean } => {
+  const storedCountry = String(data.country || '').toUpperCase();
+  const countrySource = String(data.countrySource || '');
+  const locationAvailable = hasPrayerLocation(data, prayerLocation);
+  const prayerCountry = String(data.prayerCountryCode || '').toUpperCase();
+
+  // Source of truth = prayer location whenever the user has confirmed one
+  // from the prayer screen. This is the ONLY trusted source for country.
+  if (prayerCountry) {
+    return { country: prayerCountry, countrySource: 'gps', countryVerified: true };
+  }
+  if (locationAvailable && countrySource === 'gps' && storedCountry) {
+    return { country: storedCountry, countrySource: 'gps', countryVerified: true };
+  }
+  if (countrySource === 'admin' && storedCountry) {
+    return { country: storedCountry, countrySource: 'admin', countryVerified: true };
+  }
+
+  // No trusted country signal. Device locale and timezone are NOT used as
+  // fallbacks — users without GPS-confirmed location cannot be targeted by
+  // country. They still receive global / language / platform campaigns.
+  return { country: '', countrySource: countrySource || 'unknown', countryVerified: false };
+};
+
+const fetchPrayerLocationsByUserId = async (): Promise<Map<string, PrayerLocationDoc>> => {
+  const locations = new Map<string, PrayerLocationDoc>();
+  try {
+    const snapshot = await getDocs(collection(db, 'userPrayerSettings'));
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const latitude = typeof data.latitude === 'number' ? data.latitude : undefined;
+      const longitude = typeof data.longitude === 'number' ? data.longitude : undefined;
+      if (latitude === undefined && longitude === undefined) return;
+      locations.set(docSnap.id, {
+        latitude,
+        longitude,
+        city: typeof data.city === 'string' ? data.city : undefined,
+        updatedAt: data.updatedAt,
+      });
+    });
+  } catch (error) {
+    console.warn('Could not load prayer locations for notification targeting:', error);
+  }
+  return locations;
+};
+
+const buildUserToken = (
+  id: string,
+  data: Record<string, any>,
+  prayerLocation?: PrayerLocationDoc,
+): UserToken | null => {
+  if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return null;
+  if (data.appStatus === 'uninstalled' || data.pushTokenInvalid === true) return null;
+  const countryInfo = resolveCountryForTargeting(data, prayerLocation);
+  return {
+    id,
+    fcmToken: data.fcmToken,
+    platform: data.platform || 'unknown',
+    language: data.language || 'ar',
+    country: countryInfo.country,
+    countrySource: countryInfo.countrySource,
+    countryVerified: countryInfo.countryVerified,
+    lastActive: data.lastActive,
+  };
+};
 
 const PREMIUM_GRANT_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
   ar: { title: 'تم تفعيل البريميم 🎉', body: 'تم منحك اشتراكاً مميزاً من الإدارة. استمتع بكل المميزات الآن.' },
@@ -130,7 +234,8 @@ const fetchUserTokens = async (
   targetAudience: string,
   targetLanguages?: string[],
   targetCountries?: string[],
-  targetUserId?: string
+  targetUserId?: string,
+  requireVerifiedCountry = true
 ): Promise<UserToken[]> => {
   try {
     const usersRef = collection(db, 'users');
@@ -138,21 +243,20 @@ const fetchUserTokens = async (
 
     // Single user targeting — fetch just that one doc
     if (targetAudience === 'single_user' && targetUserId) {
-      const { getDoc, doc: docRef } = await import('firebase/firestore');
-      const userSnap = await getDoc(docRef(db, 'users', targetUserId));
+      const userSnap = await getDoc(firestoreDoc(db, 'users', targetUserId));
       if (!userSnap.exists()) return [];
       const data = userSnap.data();
-      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return [];
-      return [{
-        id: userSnap.id,
-        fcmToken: data.fcmToken,
-        platform: data.platform || 'unknown',
-        language: data.language || 'ar',
-        country: (data.country || 'SA').toUpperCase(),
-        countrySource: data.countrySource || 'device_locale',
-        countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
-        lastActive: data.lastActive,
-      }];
+      const prayerSnap = await getDoc(firestoreDoc(db, 'userPrayerSettings', targetUserId)).catch(() => null);
+      const user = buildUserToken(
+        userSnap.id,
+        data,
+        prayerSnap?.exists() ? prayerSnap.data() as PrayerLocationDoc : undefined,
+      );
+      return user ? [user] : [];
+    }
+
+    if (targetAudience === 'single_user') {
+      return [];
     }
 
     // تصفية حسب المنصة
@@ -162,7 +266,10 @@ const fetchUserTokens = async (
       usersQuery = query(usersRef, where('platform', '==', 'android'));
     }
     
-    const snapshot = await getDocs(usersQuery);
+    const [snapshot, prayerLocationsByUserId] = await Promise.all([
+      getDocs(usersQuery),
+      fetchPrayerLocationsByUserId(),
+    ]);
     const STORE_SOURCES = new Set(['play_store', 'app_store']);
     let users: UserToken[] = [];
     
@@ -172,18 +279,8 @@ const fetchUserTokens = async (
       if (data.placeholder) return;
       if (!STORE_SOURCES.has(data.installSource)) return;
       // تجاهل المستخدمين بدون توكن
-      if (data.fcmToken && data.fcmToken.startsWith('ExponentPushToken')) {
-        users.push({
-          id: doc.id,
-          fcmToken: data.fcmToken,
-          platform: data.platform || 'unknown',
-          language: data.language || 'ar',
-          country: (data.country || 'SA').toUpperCase(),
-          countrySource: data.countrySource || 'device_locale',
-          countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
-          lastActive: data.lastActive,
-        });
-      }
+      const user = buildUserToken(doc.id, data, prayerLocationsByUserId.get(doc.id));
+      if (user) users.push(user);
     });
     
     // تصفية المستخدمين النشطين/غير النشطين
@@ -213,7 +310,7 @@ const fetchUserTokens = async (
       const countrySet = new Set(targetCountries.map(c => c.toUpperCase()));
       users = users.filter(u =>
         countrySet.has((u.country || '').toUpperCase()) &&
-        u.countryVerified
+        (!requireVerifiedCountry || u.countryVerified)
       );
     }
 
@@ -230,6 +327,19 @@ const fetchUserTokens = async (
     return [];
   }
 };
+
+export interface HijriOverrideSyncPayload {
+  countryCode: string;
+  countryName: string;
+  hijriYear: number;
+  hijriMonth: number;
+  monthLength: 29 | 30;
+  hijriStartGregorian: string;
+  source: string;
+  sourceUrl?: string;
+  isVerified: boolean;
+  deleted?: boolean;
+}
 
 /**
  * الحصول على الترجمة المناسبة للمستخدم
@@ -273,10 +383,84 @@ const getTranslationForUser = (
  *   لمنع أي شخص من استدعاء الـ proxy مباشرة من خارج الـ admin panel.
  */
 const ADMIN_SESSION_KEY = 'rooh_admin_session';
+const USE_NETLIFY_API =
+  (import.meta.env.VITE_USE_NETLIFY_API as string | undefined) === 'true' ||
+  !import.meta.env.DEV;
+const USE_DIRECT_NETLIFY_FUNCTIONS =
+  import.meta.env.PROD ||
+  (import.meta.env.VITE_NETLIFY_FUNCTIONS_DIRECT as string | undefined) === 'true';
 
-const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
-  // Both dev (Vite proxy) and production (Netlify function) use the same path pattern
-  const pushUrl = import.meta.env.DEV ? '/expo-push' : '/api/expo-push';
+const isDeviceNotRegisteredTicket = (ticket: ExpoPushTicket | undefined): boolean => (
+  ticket?.status === 'error' && ticket.details?.error === 'DeviceNotRegistered'
+);
+
+const markUninstalledTargets = async (
+  targets: PushTarget[],
+  tickets: ExpoPushTicket[],
+): Promise<number> => {
+  const userIds = new Set<string>();
+  tickets.forEach((ticket, index) => {
+    const target = targets[index];
+    if (target?.id && isDeviceNotRegisteredTicket(ticket)) {
+      userIds.add(target.id);
+    }
+  });
+
+  if (userIds.size === 0) return 0;
+
+  await Promise.all(Array.from(userIds).map(async (userId) => {
+    try {
+      await updateDoc(firestoreDoc(db, 'users', userId), {
+        appStatus: 'uninstalled',
+        appStatusUpdatedAt: serverTimestamp(),
+        uninstalledDetectedAt: serverTimestamp(),
+        uninstallDetectionSource: 'expo_push_device_not_registered',
+        pushTokenInvalid: true,
+        lastPushError: 'DeviceNotRegistered',
+        fcmToken: '',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.warn('Could not mark user as uninstalled:', userId, error);
+    }
+  }));
+  const { invalidateActiveDevicesCache } = await import('../utils/user-query');
+  invalidateActiveDevicesCache();
+
+  return userIds.size;
+};
+
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchExpoReceipts = async (
+  pushUrl: string,
+  sessionToken: string,
+  ticketIds: string[],
+): Promise<Record<string, ExpoPushTicket>> => {
+  if (ticketIds.length === 0) return {};
+  const res = await fetch(pushUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${sessionToken}`,
+    },
+    body: JSON.stringify({ action: 'receipts', ids: ticketIds }),
+  });
+  if (!res.ok) return {};
+  const result = await res.json();
+  return (result.data ?? {}) as Record<string, ExpoPushTicket>;
+};
+
+const sendBatch = async (
+  messages: ExpoPushMessage[],
+  targets: PushTarget[] = [],
+): Promise<BatchResult> => {
+  // Vite-only dev keeps the lightweight proxy. Netlify dev/prod use the
+  // serverless function so auth and Expo token handling match production.
+  const pushUrl = USE_DIRECT_NETLIFY_FUNCTIONS
+    ? '/.netlify/functions/expo-push'
+    : USE_NETLIFY_API ? '/api/expo-push' : '/expo-push';
   const sessionToken = (typeof localStorage !== 'undefined'
     ? localStorage.getItem(ADMIN_SESSION_KEY)
     : null) || '';
@@ -298,19 +482,145 @@ const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
     const result = await res.json();
     let ok = 0, fail = 0;
     const errs: string[] = [];
-    (result.data ?? []).forEach((t: any, i: number) => {
+    const tickets = (result.data ?? []) as ExpoPushTicket[];
+    tickets.forEach((t, i) => {
       if (t.status === 'ok') ok++;
       else { fail++; errs.push(`Token ${i}: ${t.message ?? 'error'}`); }
     });
-    console.log(`✅ Sent ${ok} notifications`);
-    return { successCount: ok, failureCount: fail, errors: errs };
+    let uninstalledCount = await markUninstalledTargets(targets, tickets);
+
+    const canCheckReceipts = (USE_NETLIFY_API || USE_DIRECT_NETLIFY_FUNCTIONS) && tickets.some(t => t.status === 'ok' && t.id);
+    if (canCheckReceipts) {
+      await sleep(1000);
+      const ticketIndexById = new Map<string, number>();
+      tickets.forEach((ticket, index) => {
+        if (ticket.status === 'ok' && ticket.id) ticketIndexById.set(ticket.id, index);
+      });
+      const receipts = await fetchExpoReceipts(pushUrl, sessionToken, Array.from(ticketIndexById.keys()));
+      const receiptTickets: ExpoPushTicket[] = [];
+      let receiptFailures = 0;
+      Object.entries(receipts).forEach(([ticketId, receipt]) => {
+        const index = ticketIndexById.get(ticketId);
+        if (index === undefined) return;
+        receiptTickets[index] = receipt;
+        if (receipt.status === 'error') {
+          receiptFailures++;
+          errs.push(`Receipt ${index}: ${receipt.message ?? receipt.details?.error ?? 'error'}`);
+        }
+      });
+      const receiptUninstalledCount = await markUninstalledTargets(targets, receiptTickets);
+      if (receiptFailures > 0) {
+        ok = Math.max(0, ok - receiptFailures);
+        fail += receiptFailures;
+      }
+      uninstalledCount += receiptUninstalledCount;
+    }
+
+    console.log(`✅ Sent ${ok} notifications${uninstalledCount ? `, marked ${uninstalledCount} uninstalled` : ''}`);
+    return { successCount: ok, failureCount: fail, errors: errs, uninstalledCount };
   } catch (error: any) {
     console.error('Push send error:', error);
-    return { successCount: 0, failureCount: messages.length, errors: [error.message] };
+    return { successCount: 0, failureCount: messages.length, errors: [error.message], uninstalledCount: 0 };
   }
 };
 
 // ==================== الدوال الرئيسية ====================
+
+/**
+ * Sends a lightweight data push when an admin updates a country's Hijri date.
+ * The mobile app caches this override locally, invalidates its Hijri cache, and
+ * refreshes widget shared data. Country verification is intentionally relaxed
+ * here so users whose country came from device locale still receive official
+ * date corrections for that country.
+ */
+export const sendHijriOverrideSyncNotification = async (
+  payload: HijriOverrideSyncPayload
+): Promise<SendResult> => {
+  const users = await fetchUserTokens('custom', undefined, [payload.countryCode], undefined, false);
+  if (users.length === 0) {
+    return {
+      success: false,
+      sentCount: 0,
+      failedCount: 0,
+      errors: ['لا يوجد مستخدمين لديهم push token لهذه الدولة'],
+      perLanguage: {},
+    };
+  }
+
+  const data = {
+    type: 'hijri_override_sync',
+    actionType: 'screen',
+    actionUrl: '/hijri',
+    countryCode: payload.countryCode.toUpperCase(),
+    countryName: payload.countryName,
+    hijriYear: payload.hijriYear,
+    hijriMonth: payload.hijriMonth,
+    monthLength: payload.monthLength,
+    hijriStartGregorian: payload.hijriStartGregorian,
+    source: payload.source,
+    sourceUrl: payload.sourceUrl || '',
+    isVerified: payload.isVerified,
+    deleted: Boolean(payload.deleted),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const messages: ExpoPushMessage[] = users.map(user => ({
+    to: user.fcmToken,
+    priority: 'high',
+    ttl: 86400,
+    _contentAvailable: true,
+    _displayInForeground: false,
+    sound: null,
+    channelId: 'silent',
+    data: {
+      ...data,
+      language: user.language,
+    },
+  }));
+
+  let sentCount = 0;
+  let failedCount = 0;
+  const errors: string[] = [];
+  const perLanguage: Record<string, number> = {};
+  for (const user of users) {
+    perLanguage[user.language] = (perLanguage[user.language] || 0) + 1;
+  }
+
+  for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+    const batch = messages.slice(i, i + BATCH_SIZE);
+    const batchTargets = users.slice(i, i + BATCH_SIZE);
+    const result = await sendBatch(batch, batchTargets);
+    sentCount += result.successCount;
+    failedCount += result.failureCount;
+    errors.push(...result.errors);
+    if (i + BATCH_SIZE < messages.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  await addDoc(collection(db, 'notifications'), {
+    type: 'hijri_override_sync',
+    targetAudience: 'custom',
+    targetCountries: [payload.countryCode.toUpperCase()],
+    payload: data,
+    status: sentCount > 0 ? 'sent' : 'failed',
+    sentCount,
+    failedCount,
+    perLanguage,
+    deliveredCount: sentCount,
+    createdAt: serverTimestamp(),
+    sentAt: serverTimestamp(),
+    ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
+  });
+
+  return {
+    success: sentCount > 0,
+    sentCount,
+    failedCount,
+    errors,
+    perLanguage,
+  };
+};
 
 /**
  * إرسال إشعار push لجميع المستخدمين المستهدفين (يدعم 12 لغة)
@@ -358,6 +668,7 @@ export const sendPushNotification = async (
         sound: 'default',
         priority: 'high',
         channelId: 'general',
+        interruptionLevel: 'time-sensitive',
         ttl: 86400,
         _displayInForeground: true,
         data: {
@@ -398,7 +709,8 @@ export const sendPushNotification = async (
     // 5. إرسال على دفعات
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
       const batch = messages.slice(i, i + BATCH_SIZE);
-      const result = await sendBatch(batch);
+      const batchTargets = users.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch, batchTargets);
 
       sentCount += result.successCount;
       failedCount += result.failureCount;
@@ -412,17 +724,18 @@ export const sendPushNotification = async (
     // 6. Update the doc with final send counts
     const { updateDoc: updateDocFn } = await import('firebase/firestore');
     await updateDocFn(notifDocRef, {
-      status: 'sent',
+      status: sentCount > 0 ? 'sent' : 'failed',
       sentCount,
       failedCount,
       perLanguage,
       deliveredCount: sentCount,
       sentAt: serverTimestamp(),
+      ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
     });
-    
+
     console.log(`✅ Sent: ${sentCount}, Failed: ${failedCount}`);
     console.log('📊 Per language:', perLanguage);
-    
+
     return {
       success: sentCount > 0,
       sentCount,
@@ -479,6 +792,7 @@ export const sendPremiumGrantNotification = async (
         sound: 'default',
         priority: 'high',
         channelId: 'general',
+        interruptionLevel: 'time-sensitive',
         ttl: 86400,
         _displayInForeground: true,
         data: {
@@ -519,7 +833,8 @@ export const sendPremiumGrantNotification = async (
 
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
       const batch = messages.slice(i, i + BATCH_SIZE);
-      const result = await sendBatch(batch);
+      const batchTargets = users.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch, batchTargets);
       sentCount += result.successCount;
       failedCount += result.failureCount;
       errors.push(...result.errors);
@@ -527,12 +842,13 @@ export const sendPremiumGrantNotification = async (
 
     const { updateDoc: updateDocFn } = await import('firebase/firestore');
     await updateDocFn(notifDocRef, {
-      status: 'sent',
+      status: sentCount > 0 ? 'sent' : 'failed',
       sentCount,
       failedCount,
       perLanguage,
       deliveredCount: sentCount,
       sentAt: serverTimestamp(),
+      ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
     });
 
     return {
@@ -551,6 +867,137 @@ export const sendPremiumGrantNotification = async (
       perLanguage,
     };
   }
+};
+
+const QUESTION_ANSWERED_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
+  ar: { title: 'تم الرد على سؤالك ✅', body: 'اضغط لقراءة الإجابة من فريق روح المسلم.' },
+  en: { title: 'Your question has been answered ✅', body: 'Tap to read the reply from the Rooh Al-Muslim team.' },
+  fr: { title: 'Réponse à votre question ✅', body: "Appuyez pour lire la réponse de l'équipe Rooh Al-Muslim." },
+  de: { title: 'Antwort auf deine Frage ✅', body: 'Tippe, um die Antwort des Ruh-Al-Muslim-Teams zu lesen.' },
+  es: { title: 'Respuesta a tu pregunta ✅', body: 'Toca para leer la respuesta del equipo de Rooh Al-Muslim.' },
+  tr: { title: 'Sorunuza cevap geldi ✅', body: 'Rooh Al-Muslim ekibinin cevabını okumak için dokunun.' },
+  ur: { title: 'آپ کے سوال کا جواب آ گیا ✅', body: 'روح المسلم ٹیم کی طرف سے جواب پڑھنے کے لیے دبائیں۔' },
+  id: { title: 'Pertanyaan Anda dijawab ✅', body: 'Ketuk untuk membaca jawaban dari tim Rooh Al-Muslim.' },
+  ms: { title: 'Soalan anda telah dijawab ✅', body: 'Ketik untuk membaca jawapan daripada pasukan Rooh Al-Muslim.' },
+  hi: { title: 'आपके सवाल का जवाब आ गया ✅', body: 'रूह अल-मुस्लिम टीम का जवाब पढ़ने के लिए टैप करें।' },
+  bn: { title: 'আপনার প্রশ্নের উত্তর এসেছে ✅', body: 'রুহ আল-মুসলিম দলের উত্তর পড়তে ট্যাপ করুন।' },
+  ru: { title: 'Ответ на ваш вопрос ✅', body: 'Нажмите, чтобы прочитать ответ команды Rooh Al-Muslim.' },
+};
+
+/**
+ * Send a push to the user who submitted a question once the admin publishes
+ * an in-app reply. Targets either the `fcmToken` stored on the question doc
+ * (works for anonymous submissions) or — as a fallback — the user's current
+ * device token via the `users` collection when only `userId` is known.
+ *
+ * Tapping the notification deep-links to `/qa-thread/{questionId}` where the
+ * app renders the question, the corrected answer, the disclaimer, and sources.
+ */
+export const sendQuestionAnsweredNotification = async (params: {
+  questionId: string;
+  userId?: string | null;
+  fcmToken?: string | null;
+  language?: string;
+  questionPreview?: string;
+}): Promise<SendResult> => {
+  const { questionId, userId, fcmToken, language, questionPreview } = params;
+  const perLanguage: { [lang: string]: number } = {};
+
+  const targets: { token: string; language: string; userId?: string }[] = [];
+  if (fcmToken && isValidExpoToken(fcmToken)) {
+    targets.push({ token: fcmToken, language: language || 'ar', userId: userId || undefined });
+  } else if (userId) {
+    const users = await fetchUserTokens('single_user', undefined, undefined, userId);
+    users.forEach(u => targets.push({ token: u.fcmToken, language: u.language || language || 'ar', userId: u.id }));
+  }
+
+  if (targets.length === 0) {
+    return {
+      success: false,
+      sentCount: 0,
+      failedCount: 0,
+      errors: ['لا يوجد توكن لهذا المستخدم — لن يصل الإشعار. يمكنك مراسلته بالبريد.'],
+      perLanguage: {},
+    };
+  }
+
+  const actionUrl = `/qa-thread/${questionId}`;
+  const messages: ExpoPushMessage[] = targets.map(t => {
+    const translation = getTranslationForUser(QUESTION_ANSWERED_NOTIFICATION_TRANSLATIONS, t.language);
+    perLanguage[t.language] = (perLanguage[t.language] || 0) + 1;
+    return {
+      to: t.token,
+      title: translation.title,
+      body: translation.body,
+      sound: 'default',
+      priority: 'high',
+      channelId: 'general',
+      interruptionLevel: 'time-sensitive',
+      ttl: 86400,
+      _displayInForeground: true,
+      data: {
+        type: 'question_answered',
+        actionType: 'screen',
+        actionUrl,
+        questionId,
+        questionPreview: questionPreview ? questionPreview.slice(0, 140) : '',
+      },
+    };
+  });
+
+  const notificationDoc: Record<string, any> = {
+    translations: QUESTION_ANSWERED_NOTIFICATION_TRANSLATIONS,
+    targetAudience: 'single_user',
+    actionType: 'screen',
+    actionUrl,
+    status: 'sending',
+    type: 'question_answered',
+    questionId,
+    sentCount: 0,
+    failedCount: 0,
+    perLanguage: {},
+    deliveredCount: 0,
+    openedCount: 0,
+    clickedCount: 0,
+    createdAt: serverTimestamp(),
+  };
+  if (userId) notificationDoc.targetUserId = userId;
+
+  const notifDocRef = await addDoc(collection(db, 'notifications'), notificationDoc);
+  for (const msg of messages) {
+    (msg as any).data = { ...(msg as any).data, notificationDocId: notifDocRef.id };
+  }
+
+  let sentCount = 0;
+  let failedCount = 0;
+  const errors: string[] = [];
+  for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+    const batch = messages.slice(i, i + BATCH_SIZE);
+    const batchTargets = targets.slice(i, i + BATCH_SIZE).map(t => ({ id: t.userId, fcmToken: t.token }));
+    const result = await sendBatch(batch, batchTargets);
+    sentCount += result.successCount;
+    failedCount += result.failureCount;
+    errors.push(...result.errors);
+  }
+
+  const { updateDoc: updateDocFn } = await import('firebase/firestore');
+  await updateDocFn(notifDocRef, {
+    status: sentCount > 0 ? 'sent' : 'failed',
+    sentCount,
+    failedCount,
+    perLanguage,
+    deliveredCount: sentCount,
+    sentAt: serverTimestamp(),
+    ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
+  });
+
+  return {
+    success: sentCount > 0,
+    sentCount,
+    failedCount,
+    errors: errors.slice(0, 10),
+    perLanguage,
+  };
 };
 
 /**
@@ -578,6 +1025,9 @@ export const sendTestNotification = async (token: string, language: string = 'ar
     title: msg.title,
     body: msg.body,
     sound: 'default',
+    priority: 'high',
+    channelId: 'general',
+    interruptionLevel: 'time-sensitive',
   }]);
   return result.successCount > 0 || result.errors.length === 0;
 };
@@ -652,26 +1102,20 @@ export const sendReengagementNotification = async (params: {
     // Fetch inactive users with configurable threshold
     const threshold = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
     const STORE_SOURCES = new Set(['play_store', 'app_store']);
-    const snapshot = await getDocs(collection(db, 'users'));
+    const [snapshot, prayerLocationsByUserId] = await Promise.all([
+      getDocs(collection(db, 'users')),
+      fetchPrayerLocationsByUserId(),
+    ]);
     const users: UserToken[] = [];
 
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.placeholder) return;
       if (!STORE_SOURCES.has(data.installSource)) return;
-      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
       const isInactive = !data.lastActive || data.lastActive.toDate() <= threshold;
       if (isInactive) {
-        users.push({
-          id: doc.id,
-          fcmToken: data.fcmToken,
-          platform: data.platform || 'unknown',
-          language: data.language || 'ar',
-          country: data.country || 'SA',
-          countrySource: data.countrySource || 'device_locale',
-          countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
-          lastActive: data.lastActive,
-        });
+        const user = buildUserToken(doc.id, data, prayerLocationsByUserId.get(doc.id));
+        if (user) users.push(user);
       }
     });
 
@@ -689,13 +1133,15 @@ export const sendReengagementNotification = async (params: {
         sound: 'default',
         priority: 'high' as const,
         channelId: 'general',
+        interruptionLevel: 'time-sensitive',
         data: { actionType: 'screen', actionUrl: actionUrl || '/', type: 'reengagement' },
       };
     });
 
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
       const batch = messages.slice(i, i + BATCH_SIZE);
-      const result = await sendBatch(batch);
+      const batchTargets = users.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch, batchTargets);
       sentCount += result.successCount;
       failedCount += result.failureCount;
       errors.push(...result.errors);
@@ -707,14 +1153,16 @@ export const sendReengagementNotification = async (params: {
       targetAudience: 'inactive',
       actionType: 'screen',
       actionUrl: actionUrl || '/',
-      status: 'sent',
+      status: sentCount > 0 ? 'sent' : 'failed',
       type: 'reengagement',
       inactiveDays,
       sentCount,
       failedCount,
+      deliveredCount: sentCount,
       perLanguage,
       sentAt: serverTimestamp(),
       createdAt: serverTimestamp(),
+      ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
     });
 
     return { success: sentCount > 0, sentCount, failedCount, errors: errors.slice(0, 10), perLanguage };
@@ -779,6 +1227,7 @@ export const sendUpdatePushNotification = async (
         sound: 'default' as const,
         priority: 'high' as const,
         channelId: 'general',
+        interruptionLevel: 'time-sensitive',
         ttl: 86400,
         _displayInForeground: true,
         data: {
@@ -812,7 +1261,8 @@ export const sendUpdatePushNotification = async (
 
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
       const batch = messages.slice(i, i + BATCH_SIZE);
-      const result = await sendBatch(batch);
+      const batchTargets = users.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch, batchTargets);
       sentCount += result.successCount;
       failedCount += result.failureCount;
       errors.push(...result.errors);
@@ -823,12 +1273,13 @@ export const sendUpdatePushNotification = async (
 
     const { updateDoc: updateDocFn } = await import('firebase/firestore');
     await updateDocFn(notifDocRef, {
-      status: 'sent',
+      status: sentCount > 0 ? 'sent' : 'failed',
       sentCount,
       failedCount,
       perLanguage,
       deliveredCount: sentCount,
       sentAt: serverTimestamp(),
+      ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
     });
 
     return { success: sentCount > 0, sentCount, failedCount, errors: errors.slice(0, 10), perLanguage };
@@ -867,23 +1318,17 @@ export const sendPrizeNotification = async (
   const perLanguage: { [lang: string]: number } = {};
 
   try {
-    const snapshot = await getDocs(collection(db, 'users'));
+    const [snapshot, prayerLocationsByUserId] = await Promise.all([
+      getDocs(collection(db, 'users')),
+      fetchPrayerLocationsByUserId(),
+    ]);
     const winners: UserToken[] = [];
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (!winnerUserIds.includes(docSnap.id)) return;
-      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
-      winners.push({
-        id: docSnap.id,
-        fcmToken: data.fcmToken,
-        platform: data.platform || 'unknown',
-        language: data.language || 'ar',
-        country: data.country || 'SA',
-        countrySource: data.countrySource || 'device_locale',
-        countryVerified: data.countrySource === 'admin' || (data.countrySource === 'gps' && Boolean(data.locationUpdatedAt || data.locationLatitude)),
-        lastActive: data.lastActive,
-      });
+      const user = buildUserToken(docSnap.id, data, prayerLocationsByUserId.get(docSnap.id));
+      if (user) winners.push(user);
     });
 
     if (winners.length === 0) {
@@ -900,13 +1345,15 @@ export const sendPrizeNotification = async (
         sound: 'default',
         priority: 'high' as const,
         channelId: 'general',
+        interruptionLevel: 'time-sensitive',
         data: { actionType: 'screen', actionUrl: '/honor-board', type: 'prize' },
       };
     });
 
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
       const batch = messages.slice(i, i + BATCH_SIZE);
-      const result = await sendBatch(batch);
+      const batchTargets = winners.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch, batchTargets);
       sentCount += result.successCount;
       failedCount += result.failureCount;
       errors.push(...result.errors);
@@ -917,14 +1364,16 @@ export const sendPrizeNotification = async (
       targetAudience: 'custom',
       actionType: 'screen',
       actionUrl: '/honor-board',
-      status: 'sent',
+      status: sentCount > 0 ? 'sent' : 'failed',
       type: 'prize',
       winnerUserIds,
       sentCount,
       failedCount,
+      deliveredCount: sentCount,
       perLanguage,
       sentAt: serverTimestamp(),
       createdAt: serverTimestamp(),
+      ...(sentCount === 0 ? { error: errors[0] || 'No matching users or Expo send failed' } : {}),
     });
 
     return { success: sentCount > 0, sentCount, failedCount, errors: errors.slice(0, 10), perLanguage };

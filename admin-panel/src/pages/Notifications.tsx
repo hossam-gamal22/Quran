@@ -68,10 +68,10 @@ interface PushNotification {
   actionUrl?: string;
   targetAudience: TargetAudience;
   scheduledAt?: string;
-  sentCount: number;
-  deliveredCount: number;
-  openedCount: number;
-  clickedCount: number;
+  sentCount?: number;
+  deliveredCount?: number;
+  openedCount?: number;
+  clickedCount?: number;
   perLanguage?: { [lang: string]: number };
   createdAt: Timestamp | string;
   sentAt?: Timestamp | string;
@@ -134,6 +134,7 @@ const APP_SCREENS = [
   { value: '/ruqya', label: 'الرقية الشرعية' },
   { value: '/companions', label: 'قصص الصحابة' },
   { value: '/seerah', label: 'السيرة النبوية' },
+  { value: '/religious-stories', label: 'قصص دينية' },
   { value: '/radio', label: 'إذاعة القرآن' },
   { value: '/hadith-of-day', label: 'حديث اليوم' },
   { value: '/worship-tracker', label: 'تتبع العبادات' },
@@ -192,7 +193,7 @@ const ALL_NOTIFICATION_TYPES = [
   { id: 'daily_ayah', category: 'quran', name: 'آية اليوم', emoji: '📖', time: '13:30',
     titleAr: 'رسالة الله إليك اليوم 📖', bodyAr: '(يتم إضافة نص الآية تلقائياً)',
     titleEn: 'Verse of the Day', bodyEn: '(Verse text added automatically)',
-    hasScheduling: true, firestoreCategory: 'dailyAyah', note: 'نص الآية يُضاف تلقائياً أسفل العنوان' },
+    hasScheduling: true, firestoreCategory: 'dailyVerse', note: 'نص الآية يُضاف تلقائياً أسفل العنوان' },
   { id: 'friday', category: 'quran', name: 'سورة الكهف', emoji: '🕯️', time: '14:00',
     titleAr: 'نورٌ ما بين الجمعتين 🕯️', bodyAr: 'لا تنسَ قراءة سورة الكهف اليوم.. نورٌ وبركة ليومك.',
     titleEn: 'Friday — Surah Al-Kahf', bodyEn: 'Don\'t forget to read Surah Al-Kahf today.',
@@ -251,7 +252,7 @@ const REMINDER_TO_CATEGORY: Record<string, string> = {
   wakeup: 'wakeupAzkar',
   friday: 'kahfFriday',
   quran: 'quranReading',
-  daily_ayah: 'dailyAyah',
+  daily_ayah: 'dailyVerse',
   salawat: 'salawat',
   tasbih: 'tasbih',
   istighfar: 'istighfar',
@@ -420,7 +421,8 @@ const NotificationsPage: React.FC = () => {
         setReminders(
           ALL_NOTIFICATION_TYPES.map(r => {
             const categoryKey = r.firestoreCategory;
-            const adminConfig = categoryKey ? defaultsData[categoryKey] : null;
+            const legacyDailyAyahConfig = r.id === 'daily_ayah' ? defaultsData.dailyAyah : null;
+            const adminConfig = categoryKey ? (defaultsData[categoryKey] || legacyDailyAyahConfig) : null;
             const textOverride = textsData[r.id];
             return {
               id: r.id,
@@ -619,6 +621,11 @@ const NotificationsPage: React.FC = () => {
   const handleSchedule = async () => {
     if (!translations.ar?.title || !translations.ar?.body || !scheduledAt) {
       setSendResult({ success: false, message: 'يرجى ملء جميع الحقول المطلوبة' });
+      return;
+    }
+
+    if (targetAudience === 'single_user' && !targetUserId.trim()) {
+      setSendResult({ success: false, message: 'يرجى إدخال معرّف المستخدم قبل جدولة إشعار لمستخدم محدد' });
       return;
     }
 
@@ -834,9 +841,19 @@ const NotificationsPage: React.FC = () => {
     return '';
   };
 
+  const getAcceptedCount = (n: PushNotification): number => {
+    const delivered = Number(n.deliveredCount);
+    if (Number.isFinite(delivered) && delivered > 0) return delivered;
+
+    const sent = Number(n.sentCount);
+    return Number.isFinite(sent) && sent > 0 ? sent : 0;
+  };
+
   const getOpenRate = (n: PushNotification): string => {
-    if (n.deliveredCount === 0) return '0%';
-    return `${((n.openedCount / n.deliveredCount) * 100).toFixed(1)}%`;
+    const acceptedCount = getAcceptedCount(n);
+    const openedCount = Number(n.openedCount);
+    if (!acceptedCount || !Number.isFinite(openedCount)) return '0%';
+    return `${((openedCount / acceptedCount) * 100).toFixed(1)}%`;
   };
 
   const getStatusMeta = (status: NotificationStatus) => {
@@ -1259,7 +1276,7 @@ const NotificationsPage: React.FC = () => {
                               أُرسل: <span className="text-white font-medium">{notification.sentCount?.toLocaleString() || 0}</span>
                             </span>
                             <span className="text-slate-400">
-                              وصل: <span className="text-white font-medium">{notification.deliveredCount?.toLocaleString() || 0}</span>
+                              قُبل: <span className="text-white font-medium">{getAcceptedCount(notification).toLocaleString()}</span>
                             </span>
                             <span className="text-slate-400">
                               فتح: <span className="text-accent-light font-medium">{getOpenRate(notification)}</span>
@@ -2017,7 +2034,7 @@ const NotificationsPage: React.FC = () => {
                 </div>
                 {targetCountries.length > 0 && (
                   <p className="text-xs text-accent-light mt-2">
-                    سيتم الإرسال فقط للمستخدمين المؤكدين عبر GPS أو تعديل الأدمن في: {targetCountries.join('، ')}
+                    سيتم الإرسال حسب بلد موقع الصلاة أو تعديل الأدمن أو تصحيح تعارض التوقيت في: {targetCountries.join('، ')}
                   </p>
                 )}
               </div>

@@ -34,6 +34,7 @@ import {
 } from '@/lib/country-prayer-defaults';
 import { getSavedUserCountry } from '@/services/hijriCalendarService';
 import { calculationMethods, getPrayerSettings, getStoredLocation, savePrayerSettings } from '@/lib/prayer-times';
+import { subscribeRemoteTranslationChanges } from '@/lib/remote-translations';
 
 // ========================================
 // Eager theme cache — read previous session's theme/background at module load
@@ -79,9 +80,9 @@ export type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 99;
 
-export type NotificationSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'general_reminder' | 'silent';
+export type NotificationSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'silent';
 
-export type ReminderSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'general_reminder' | 'silent';
+export type ReminderSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'silent';
 
 export type AdhanSoundType = 'default' | 'makkah' | 'madinah' | 'alaqsa' | 'mishary' | 'abdulbasit' | 'sudais' | 'egypt' | 'dosari' | 'ajman' | 'ali_mulla' | 'naqshbandi' | 'sharif' | 'mansoor_zahrani' | 'haramain' | 'silent';
 
@@ -603,6 +604,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const [isLoading, setIsLoading] = useState(true);
   const [initialSchedulingDone, setInitialSchedulingDone] = useState(false);
   const [systemTheme, setSystemTheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
+  const [remoteTranslationVersion, setRemoteTranslationVersion] = useState(0);
 
   // حساب الوضع الداكن
   // When theme is 'custom', use background-based contrast detection
@@ -653,8 +655,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
       setSystemTheme(colorScheme);
     });
+    const unsubscribeRemoteTranslations = subscribeRemoteTranslationChanges(() => {
+      setRemoteTranslationVersion(version => version + 1);
+    });
     
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      unsubscribeRemoteTranslations();
+    };
   }, []);
 
   const loadSettings = async () => {
@@ -1084,16 +1092,17 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   // ========================================
 
   const updateLanguage = useCallback(async (language: Language) => {
-    // تحديث نظام الترجمة
+    // setI18nLanguage saves to AsyncStorage AND mirrors to Firestore so admin
+    // notification targeting always reflects the user's reading language.
     await setI18nLanguage(language);
-    
+
     // RTL is handled manually via useIsRTL() hook — do NOT call
     // I18nManager.forceRTL() as it causes double-reversal on Android production builds.
-    
+
     // حفظ الإعدادات
     const newSettings = { ...settings, language };
     await saveSettings(newSettings);
-    
+
     // تحديث بيانات الويدجت باللغة الجديدة
     try { await updateSharedData(); } catch (e) { console.log('Widget data update failed:', e); }
 
@@ -1169,7 +1178,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       // 'default' adhan → treat as 'makkah' so channels always get a real adhan sound
       const adhan = (n2.adhanSoundType && n2.adhanSoundType !== 'default') ? n2.adhanSoundType : 'makkah';
       const fajr = adhan; // Fajr uses same adhan by default
-      const reminder = (n2.soundType && n2.soundType !== 'default') ? n2.soundType : 'general_reminder';
+      const reminder = (n2.soundType && n2.soundType !== 'default') ? n2.soundType : 'default';
       // Persist for backward compatibility
       await AsyncStorage.multiSet([
         ['selectedAdhanSound', adhan],
@@ -1355,12 +1364,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       // Invalidate any week-cache built with a previous method/school so the next
       // prayer-time fetch re-builds with the new params (root-cause fix for the
       // "display shows 6:46, notifications fire 6:49" bug).
-      if ('calculationMethod' in prayer || 'asrJuristic' in prayer) {
+      if ('calculationMethod' in prayer || 'asrJuristic' in prayer || 'adjustments' in prayer) {
         try {
           const { clearAllWeekCaches } = require('@/lib/prayer-week-cache');
           await clearAllWeekCaches();
         } catch (e) {
           console.warn('[updatePrayer] clearAllWeekCaches failed:', e);
+        }
+        try {
+          const { clearPrayerTimeCaches } = require('@/lib/prayer-times');
+          await clearPrayerTimeCaches();
+        } catch (e) {
+          console.warn('[updatePrayer] clearPrayerTimeCaches failed:', e);
         }
       }
       // Force-reschedule notifications so they use the updated prayer times
@@ -1374,7 +1389,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       }
       // Update widget shared data immediately so widgets reflect the new prayer times
       // without waiting for the user to open the prayer tab (which has its own useEffect).
-      if ('adjustments' in prayer) {
+      if ('calculationMethod' in prayer || 'asrJuristic' in prayer || 'adjustments' in prayer) {
         try {
           updateSharedData().catch(() => {});
         } catch {}
@@ -1414,7 +1429,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     return translate(key, params);
-  }, [settings.language]); // تتحدث عند تغيير اللغة
+  }, [settings.language, remoteTranslationVersion]); // تتحدث عند تغيير اللغة أو ترجمات الأدمن
 
   // ========================================
   // القيمة

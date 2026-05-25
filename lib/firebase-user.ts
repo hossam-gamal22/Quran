@@ -10,7 +10,8 @@ import {
   getDoc, 
   serverTimestamp,
   Timestamp,
-  increment 
+  increment,
+  deleteField,
 } from 'firebase/firestore';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
@@ -28,6 +29,20 @@ const STORAGE_KEYS = {
   FCM_TOKEN: '@rooh_fcm_token',
   FIRST_OPEN: '@rooh_first_open',
   DISPLAY_NAME: '@rooh_display_name',
+  APP_LANGUAGE: '@app_language',
+};
+
+const SUPPORTED_LANGUAGE_CODES = new Set([
+  'ar', 'en', 'fr', 'de', 'es', 'tr', 'ur', 'id', 'ms', 'hi', 'bn', 'ru',
+]);
+
+const resolveLanguage = async (deviceLocale: string | null | undefined): Promise<string> => {
+  try {
+    const saved = await AsyncStorage.getItem(STORAGE_KEYS.APP_LANGUAGE);
+    if (saved && SUPPORTED_LANGUAGE_CODES.has(saved)) return saved;
+  } catch {}
+  const normalized = (deviceLocale || '').slice(0, 2).toLowerCase();
+  return SUPPORTED_LANGUAGE_CODES.has(normalized) ? normalized : 'ar';
 };
 
 const SECURE_KEYS = {
@@ -71,8 +86,12 @@ const secureSetItem = async (key: string, value: string): Promise<void> => {
 export interface UserData {
   id: string;
   platform: 'ios' | 'android' | 'web';
+  nativeDeviceId?: string;
+  originalDeviceUserId?: string;
+  deviceFingerprint?: string;
   deviceName: string;
   deviceBrand: string;
+  deviceModel?: string;
   osVersion: string;
   appVersion: string;
   language: string;
@@ -85,6 +104,11 @@ export interface UserData {
   locationUpdatedAt?: Timestamp | null;
   timezone: string;
   fcmToken: string;
+  appStatus?: 'installed' | 'uninstalled';
+  appStatusUpdatedAt?: Timestamp | null;
+  uninstalledDetectedAt?: Timestamp | null;
+  pushTokenInvalid?: boolean;
+  lastPushError?: string;
   installSource: string;
   isActive: boolean;
   isPremium: boolean;
@@ -295,6 +319,8 @@ const detectInstallSource = async (): Promise<string> => {
 export const registerUser = async (): Promise<{ success: boolean; userId: string }> => {
   try {
     const userId = await getUserId();
+    const originalDeviceUserId = await getOriginalDeviceUserId();
+    const nativeDeviceId = await getNativeDeviceId();
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
     const fcmToken = await getFCMToken();
@@ -302,19 +328,40 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     
     const locales = Localization.getLocales();
     const appVersion = Constants.expoConfig?.version || '1.2.1';
-    const localeCountry = locales[0]?.regionCode || 'SA';
+    const timezone = Localization.getCalendars()[0]?.timeZone || 'Asia/Riyadh';
+    const deviceName = Device.deviceName || 'Unknown Device';
+    const deviceBrand = Device.brand || 'Unknown';
+    const deviceModel = Device.modelName || '';
+    const deviceFingerprint = [
+      Platform.OS,
+      nativeDeviceId || originalDeviceUserId,
+      deviceBrand,
+      deviceModel || deviceName,
+    ]
+      .filter(Boolean)
+      .join('::')
+      .toLowerCase();
     const userData: Partial<UserData> = {
       id: userId,
       platform: Platform.OS as 'ios' | 'android' | 'web',
-      deviceName: Device.deviceName || 'Unknown Device',
-      deviceBrand: Device.brand || 'Unknown',
+      nativeDeviceId: nativeDeviceId || originalDeviceUserId,
+      originalDeviceUserId,
+      deviceFingerprint,
+      deviceName,
+      deviceBrand,
+      ...(deviceModel ? { deviceModel } : {}),
       osVersion: Device.osVersion || 'Unknown',
       appVersion,
-      language: locales[0]?.languageCode || 'ar',
-      country: localeCountry,
-      countrySource: 'device_locale',
-      timezone: Localization.getCalendars()[0]?.timeZone || 'Asia/Riyadh',
+      language: await resolveLanguage(locales[0]?.languageCode),
+      // country is intentionally NOT written here — it must come from GPS via
+      // `updateUserCountryFromGPS` (triggered when the user grants location for
+      // prayer times). Device locale / timezone are unreliable signals and were
+      // polluting notification targeting filters.
+      timezone,
       fcmToken,
+      appStatus: 'installed',
+      appStatusUpdatedAt: serverTimestamp() as any,
+      pushTokenInvalid: false,
       isActive: true,
       isPremium: false,
       installSource,
@@ -352,32 +399,30 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
       
       console.log('✅ New user registered:', userId, 'from:', installSource);
     } else {
-      // Existing user — update session data
+      // Existing user — update session data.
+      // Country is owned by GPS / admin only. We never write it from
+      // registerUser; if a legacy device_locale value is still in Firestore,
+      // we clear it so notification targeting doesn't act on a guessed country.
       const existingData = userDoc.data();
       const existingCountrySource = existingData?.countrySource;
-      const shouldPreserveCountry =
-        existingCountrySource === 'gps' ||
-        existingCountrySource === 'admin';
+      const isTrustedCountrySource =
+        existingCountrySource === 'gps' || existingCountrySource === 'admin';
+      const clearLegacyCountry = !isTrustedCountrySource && Boolean(existingData?.country);
       await updateDoc(userRef, {
         ...userData,
-        ...(shouldPreserveCountry
+        ...(clearLegacyCountry
           ? {
-              country: existingData.country,
-              countrySource: existingCountrySource,
-              countryName: existingData.countryName,
-              locationCity: existingData.locationCity,
-              locationLatitude: existingData.locationLatitude,
-              locationLongitude: existingData.locationLongitude,
-              locationUpdatedAt: existingData.locationUpdatedAt,
+              country: deleteField(),
+              countrySource: deleteField(),
             }
-          : {
-              country: localeCountry,
-              countrySource: existingCountrySource || 'device_locale',
-            }),
+          : {}),
         // Preserve installSource if already set (don't override on subsequent sessions)
         ...(existingData?.installSource ? {} : { installSource }),
         // Don't overwrite a valid token with empty string
         ...((!fcmToken && existingData?.fcmToken) ? { fcmToken: existingData.fcmToken } : {}),
+        uninstalledDetectedAt: deleteField(),
+        uninstallDetectionSource: deleteField(),
+        lastPushError: deleteField(),
       });
       console.log('✅ User data updated:', userId);
     }
@@ -396,6 +441,23 @@ export const updateLastActive = async (): Promise<void> => {
     await updateDoc(userRef, { lastActive: serverTimestamp() });
   } catch (error) {
     console.log('Could not update last active');
+  }
+};
+
+/**
+ * Persist the user's chosen app language to Firestore so admin notification
+ * targeting can reach them in the language they actually read the app in.
+ * Without this, `users/{id}.language` stays pinned to the device locale and
+ * language filters miss users who switched language in-app.
+ */
+export const updateUserLanguage = async (language: string): Promise<void> => {
+  if (!SUPPORTED_LANGUAGE_CODES.has(language)) return;
+  try {
+    const userId = await getUserId();
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { language, updatedAt: serverTimestamp() });
+  } catch (error) {
+    console.log('Could not update user language');
   }
 };
 
@@ -421,6 +483,10 @@ export const updateUserCountryFromGPS = async (
       id: userId,
       country: code,
       countrySource: 'gps',
+      // Permanent GPS-derived country: admin manual edits never overwrite this
+      // field, so it stays as the source of truth for notification targeting.
+      prayerCountryCode: code,
+      prayerCountryUpdatedAt: serverTimestamp(),
       ...(location?.countryName ? { countryName: location.countryName } : {}),
       ...(location?.city ? { locationCity: location.city } : {}),
       ...(typeof location?.latitude === 'number' ? { locationLatitude: location.latitude } : {}),
@@ -443,10 +509,22 @@ export const getDisplayName = async (): Promise<string | null> => {
 };
 
 export const setDisplayName = async (name: string): Promise<void> => {
+  const trimmed = name.trim();
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, name.trim());
+    await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, trimmed);
   } catch (error) {
     console.error('❌ Failed to save display name locally:', error);
+  }
+  // Mirror to Firestore so server-side targeting (engagement notifications,
+  // admin panel filters) sees the name immediately.
+  try {
+    const userId = await getUserId();
+    await setDoc(doc(db, 'users', userId), {
+      displayName: trimmed,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.warn('Could not sync display name to Firestore:', error);
   }
 };
 

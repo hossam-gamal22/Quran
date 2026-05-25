@@ -59,10 +59,20 @@ const isValidLanguage = (lang: string): lang is Language => {
 
 /**
  * تعيين اللغة الحالية
+ *
+ * Single source of truth for the user's reading language. Saves locally and
+ * mirrors to Firestore (`users/{id}.language`) so admin notification targeting
+ * reaches the user in the language they actually read the app in — NOT the
+ * device locale. Called from onboarding, settings, and any other flow.
  */
 export const setLanguage = async (lang: Language): Promise<void> => {
   currentLanguage = lang;
   await saveLanguage(lang);
+  // Fire-and-forget sync to Firestore. Lazy import avoids a circular dep
+  // (firebase-user.ts → firebase-config; i18n is imported by many leaf files).
+  import('@/lib/firebase-user')
+    .then(({ updateUserLanguage }) => updateUserLanguage(lang))
+    .catch(() => {});
 };
 
 /**
