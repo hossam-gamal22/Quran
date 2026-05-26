@@ -22,6 +22,15 @@ function isAbsoluteUri(value: string | undefined | null): boolean {
   return /^(https?:|file:|asset:|content:|data:)/i.test(value);
 }
 
+function cleanAudioDisplayText(value: string | undefined | null): string {
+  const raw = value || '';
+  try {
+    return decodeURIComponent(raw).replace(/\+/g, ' ').replace(/\s+/g, ' ').trim();
+  } catch {
+    return raw.replace(/\+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+}
+
 // Resolve a track's `url` field to a real playable URI.
 // If `localSource` is provided, prefer the bundled asset's localUri.
 // Otherwise, if `url` is a bare azkar filename (e.g. "75.m4a"), resolve it via
@@ -373,8 +382,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
           queueIndexRef.current = index;
           setQueueIndex(index);
           setCurrentTrackId(nextTrack?.id);
-          setTrackTitle(event.track.title || '');
-          setTrackSubtitle(event.track.artist);
+          setTrackTitle(cleanAudioDisplayText(event.track.title));
+          setTrackSubtitle(cleanAudioDisplayText(event.track.artist));
           setPosition(0);
           setDuration(0);
           progressRef.current = { position: 0, duration: 0 };
@@ -514,8 +523,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     progressRef.current = { position: 0, duration: 0 };
     setQueueIndex(idx);
     setCurrentTrackId(track.id);
-    setTrackTitle(track.title);
-    setTrackSubtitle(track.subtitle);
+    setTrackTitle(cleanAudioDisplayText(track.title));
+    setTrackSubtitle(cleanAudioDisplayText(track.subtitle));
     setAzkarLoading(true);
     setAudioError(null);
     setAzkarDelayPending(false);
@@ -561,8 +570,8 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
           return {
             id: `azkar-${t.id}-${i}`,
             url: resolvedUrl,
-            title: t.title,
-            artist: t.subtitle || 'أذكار',
+            title: cleanAudioDisplayText(t.title),
+            artist: cleanAudioDisplayText(t.subtitle || 'أذكار'),
             album: 'الأذكار',
             artwork: require('../assets/images/icons/icon.png'),
           };
@@ -861,17 +870,20 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [cleanupAzkar]);
 
   const seekTo = useCallback(async (positionMs: number) => {
+    const targetPosition = Math.max(0, positionMs);
     const currentSource = sourceRef.current;
     if (currentSource === 'quran') {
-      audioPlayer.seekTo(positionMs);
+      setQuranState(prev => ({ ...prev, position: targetPosition }));
+      audioPlayer.seekTo(targetPosition);
     } else if (currentSource === 'azkar') {
+      setPosition(targetPosition);
       if (azkarSound.current) {
         try {
           const status = await azkarSound.current.getStatusAsync();
-          if (status.isLoaded) await azkarSound.current.setPositionAsync(positionMs);
+          if (status.isLoaded) await azkarSound.current.setPositionAsync(targetPosition);
         } catch {}
       } else if (isTrackPlayerReady() && TrackPlayer) {
-        await TrackPlayer.seekTo(positionMs / 1000); // TrackPlayer uses seconds
+        await TrackPlayer.seekTo(targetPosition / 1000); // TrackPlayer uses seconds
       }
     }
   }, []);

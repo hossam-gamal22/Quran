@@ -1592,10 +1592,38 @@ export default function HomeScreen() {
         {/* الرسالة الترحيبية - Firebase banner → Admin seasonal → Auto-seasonal → Friday → Prayer Countdown */}
         {(() => {
           // Shared countdown formatter
-          const fmtCountdown = (c: { hours: number; minutes: number; seconds: number }) =>
-            `${String(c.hours).padStart(2, '0')}:${String(c.minutes).padStart(2, '0')}:${String(c.seconds).padStart(2, '0')}`;
-            const countdownLine = bannerCountdown && bannerNextPrayer ? (textColor?: string) => (
-              <Text style={[styles.bannerSecondaryCountdown, textColor ? { color: textColor } : {}, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+          const fmtCountdown = (c: { hours: number; minutes: number; seconds: number }) => {
+            const isArabic = settings.language === 'ar';
+            const hourTextAr = (hours: number) => {
+              if (hours === 1) return 'ساعة';
+              if (hours === 2) return 'ساعتان';
+              if (hours >= 3 && hours <= 10) return `${hours} ساعات`;
+              return `${hours} ساعة`;
+            };
+            const minuteTextAr = (minutes: number) => {
+              if (minutes === 1) return 'دقيقة';
+              if (minutes === 2) return 'دقيقتان';
+              if (minutes >= 3 && minutes <= 10) return `${minutes} دقائق`;
+              return `${minutes} دقيقة`;
+            };
+
+            if (isArabic) {
+              if (c.hours <= 0 && c.minutes <= 0) return 'أقل من دقيقة';
+              if (c.hours <= 0) return minuteTextAr(c.minutes);
+              if (c.minutes <= 0) return hourTextAr(c.hours);
+              return `${hourTextAr(c.hours)} ${minuteTextAr(c.minutes)}`;
+            }
+
+            const unit = (value: number, singular: string) => (
+              settings.language === 'en' && value !== 1 ? `${singular}s` : singular
+            );
+            if (c.hours <= 0 && c.minutes <= 0) return `< 1 ${t('home.minuteLabel')}`;
+            if (c.hours <= 0) return `${c.minutes} ${unit(c.minutes, t('home.minuteLabel'))}`;
+            if (c.minutes <= 0) return `${c.hours} ${unit(c.hours, t('home.hour'))}`;
+            return `${c.hours} ${unit(c.hours, t('home.hour'))} ${c.minutes} ${unit(c.minutes, t('home.minuteLabel'))}`;
+          };
+          const countdownLine = bannerCountdown && bannerNextPrayer ? (textColor?: string) => (
+            <Text style={[styles.bannerSecondaryCountdown, textColor ? { color: textColor } : {}, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {`${t(getPrayerTranslationKey(bannerNextPrayer.name))} · ${fmtCountdown(bannerCountdown)}`}
             </Text>
           ) : null;
@@ -2569,12 +2597,12 @@ const _styles = StyleSheet.create({
     includeFontPadding: false,
   },
   prayerCountdownTimer: {
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: fontBold(),
     color: '#D4AF37',
     lineHeight: 36,
     includeFontPadding: false,
-    letterSpacing: 2,
+    letterSpacing: 0,
     fontVariant: ['tabular-nums'] as any,
     marginTop: 4,
   },

@@ -60,6 +60,16 @@ export interface HajjUmrahContent {
 // Types for Seerah content
 // ========================================
 
+// Citation for a specific story or section. Used to attribute claims to their
+// primary Islamic sources (Qur'an, Sahih hadith collections, Sira, tafsir).
+// `note` flags ikhtilaf, Israʾiliyyat, or weak chains so readers know what is
+// disputed even when the source is named.
+export interface StorySource {
+  reference: string;     // e.g. "صحيح مسلم 2937" or "سورة البقرة 259"
+  url?: string;          // canonical URL on sunnah.com / quran.com / dorar.net
+  note?: string;         // optional: "روي عند ابن حبان وحسّنه بعضهم وضعّفه آخرون"
+}
+
 export interface CMSSeerahSection {
   title: string;
   titleEn: string;
@@ -70,6 +80,7 @@ export interface CMSSeerahSection {
   videoStoragePath?: string;
   titleTranslations?: Record<string, string>;
   iconUrl?: string;
+  sources?: StorySource[];
 }
 
 export interface SeerahContent {
@@ -84,6 +95,15 @@ export interface SeerahContentResult<T> {
   sections: T[];
   audioUrl?: string;
   audioTitle?: string;
+}
+
+function cleanCMSAudioTitle(value?: string): string | undefined {
+  if (!value) return value;
+  try {
+    return decodeURIComponent(value).replace(/\+/g, ' ').replace(/\s+/g, ' ').trim();
+  } catch {
+    return value.replace(/\+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
 }
 
 // ========================================
@@ -109,6 +129,7 @@ export interface CMSCompanion {
   icon?: string;
   nameTranslations?: Record<string, string>;
   iconUrl?: string;
+  sources?: StorySource[];
 }
 
 export interface CMSCategory {
@@ -140,7 +161,8 @@ export interface CMSReligiousStory {
   audioTitle?: string;
   transcript?: string;
   transcriptEn?: string;
-  sourceUrl?: string;
+  sourceUrl?: string;       // legacy single URL; kept for backwards compat
+  sources?: StorySource[];  // preferred structured citations
   order?: number;
 }
 
@@ -371,7 +393,7 @@ export function useSeerahContent<T>(defaultSections: T[]): SeerahContentResult<T
       setResult({
         sections,
         audioUrl: data.audioUrl,
-        audioTitle: data.audioTitle,
+        audioTitle: cleanCMSAudioTitle(data.audioTitle),
       });
     };
 
@@ -416,7 +438,7 @@ export function useCompanionsContent<C extends { id?: string }, K>(
         if (!id) continue;
         const cms = cmsById.get(id);
         if (cms) {
-          merged.push({ ...hc, ...cms, ...pickEnFields(hc, cms) } as unknown as C);
+          merged.push({ ...hc, ...cms, audioTitle: cleanCMSAudioTitle(cms.audioTitle), ...pickEnFields(hc, cms) } as unknown as C);
         } else {
           merged.push(hc);
         }
@@ -424,7 +446,7 @@ export function useCompanionsContent<C extends { id?: string }, K>(
       }
       for (const cms of cmsData) {
         if (cms.id && seen.has(cms.id)) continue;
-        merged.push(cms as unknown as C);
+        merged.push({ ...cms, audioTitle: cleanCMSAudioTitle(cms.audioTitle) } as unknown as C);
       }
       // Dedup by Arabic name (after normalization): keep the entry with
       // audio/video if any, else the longer transcript. Stops the same
@@ -462,20 +484,28 @@ export function useReligiousStoriesContent(): CMSReligiousStory[] {
 // Bundled religious-story seed — lifted from data/religious-stories-extra.ts
 // into the CMSReligiousStory shape so the merge logic below can treat seed
 // and Firestore docs uniformly. Stable order matches the source array.
-const BUNDLED_RELIGIOUS_SEED: CMSReligiousStory[] = EXTRA_RELIGIOUS_STORIES.map((story) => ({
-  id: story.id,
-  title: story.title,
-  titleEn: story.titleEn,
-  brief: story.brief,
-  briefEn: story.briefEn,
-  icon: story.icon,
-  audioUrl: '',
-  audioTitle: '',
-  transcript: story.transcript,
-  transcriptEn: story.transcriptEn,
-  sourceUrl: story.sourceUrl,
-  order: story.order,
-}));
+const EXCLUDED_RELIGIOUS_STORY_IDS = new Set<string>([
+  // Kept exclusively in the Companions page to avoid duplicate biography cards.
+  'religious-khadijah-jibreel-salam',
+]);
+
+const BUNDLED_RELIGIOUS_SEED: CMSReligiousStory[] = EXTRA_RELIGIOUS_STORIES
+  .filter((story) => !EXCLUDED_RELIGIOUS_STORY_IDS.has(story.id))
+  .map((story) => ({
+    id: story.id,
+    title: story.title,
+    titleEn: story.titleEn,
+    brief: story.brief,
+    briefEn: story.briefEn,
+    icon: story.icon,
+    audioUrl: '',
+    audioTitle: cleanCMSAudioTitle(''),
+    transcript: story.transcript,
+    transcriptEn: story.transcriptEn,
+    sources: story.sources,
+    sourceUrl: story.sourceUrl,
+    order: story.order,
+  }));
 
 export function useReligiousStoriesContentStatus(): {
   stories: CMSReligiousStory[];
@@ -504,7 +534,8 @@ export function useReligiousStoriesContentStatus(): {
       const firestoreById = new Map<string, CMSReligiousStory>();
       for (const story of items) {
         if (!story?.id || !story.title?.trim()) continue;
-        firestoreById.set(story.id, story);
+        if (EXCLUDED_RELIGIOUS_STORY_IDS.has(story.id)) continue;
+        firestoreById.set(story.id, { ...story, audioTitle: cleanCMSAudioTitle(story.audioTitle) });
       }
       // Merge: bundled seed first, Firestore wins on collision (per id). Any
       // Firestore-only stories that don't shadow a seed are appended.

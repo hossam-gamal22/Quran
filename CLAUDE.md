@@ -178,6 +178,16 @@ cd admin-panel && pnpm install && pnpm dev
 - Wrap translation text in a `<View style={{ direction: dir }}>` to isolate bidi context from RTL parent containers
 - Use `(N)` parentheses for LTR translations, `﴿N﴾` ornamental brackets for RTL translations
 
+## RTL Mandatory Rules (apply to EVERY new component)
+- **Detect RTL once per render**: `const isRTL = RTL_LANGS.has(getLanguage())` where `RTL_LANGS = new Set(['ar','ur','fa'])`. Do NOT assume Arabic only via `lang === 'ar'` — Urdu and Persian also need RTL.
+- **Every horizontal row** that mixes icon + text MUST use `flexDirection: isRTL ? 'row-reverse' : 'row'`. Never hardcode `'row'`.
+- **Every text node** MUST carry both `textAlign: isRTL ? 'right' : 'left'` AND `writingDirection: isRTL ? 'rtl' : 'ltr'` — iOS falls back to LTR for mixed Arabic/Latin (hadith numbers, URLs) without explicit `writingDirection`.
+- **Bullet-style lists**: bullet sits on the OPPOSITE side of the text in RTL (right side for Arabic). Use `flexDirection: 'row-reverse'` on the item row, not a hardcoded margin.
+- **Directional icons** (chevron, arrow): pick the icon name conditionally — `chevron-left` for next in RTL, `chevron-right` for back in RTL. The reverse for LTR. Do NOT rely on auto-flip.
+- **Titles & cards**: never apply `numberOfLines={1}` to titles that may legitimately be long (Arabic titles like "قصة المستهزئين الستة — حين أشار جبريل فأهلكهم الله" wrap to 2-3 lines). Use `numberOfLines={2}` minimum, or omit entirely for full content cards.
+- **Headers**: page header titles MUST allow `numberOfLines={2}` so long Arabic titles don't get truncated with "...".
+- **Reference component**: see `components/ui/SourcesList.tsx` for the canonical pattern (RTL detection + row-reverse + per-text textAlign/writingDirection).
+
 ## Quran Reader Header
 - Mushaf page header icons: tafsir, play, heart/favorite, share
 - Mushaf page header should NOT include bookmark icon

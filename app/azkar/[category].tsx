@@ -85,6 +85,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { useQuran } from '@/contexts/QuranContext';
 import { getAyahAudioUrl } from '@/lib/quran-cache';
+import { formatAudioTime } from '@/lib/audio-time';
 import { expandQuranAudioMarker, getSurahArabicName } from '@/lib/azkar-quran-audio';
 import { expandAudioTracksForRepeat, getEffectiveZikrRepeatCount } from '@/lib/azkar-repeat';
 import { areAzkarCountsCompleted, getAzkarCompletionPercentage, getAzkarCompletionRatio } from '@/lib/azkar-progress';
@@ -1257,13 +1258,6 @@ export default function CategoryAzkarScreen() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [playbackSpeed, globalAudio]);
 
-  const formatTime = (ms: number) => {
-    const totalSec = Math.floor(ms / 1000);
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec % 60;
-    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-  };
-
   // Currently playing zikr id for highlighting
   const currentlyPlayingZikrId = currentAudioQueueItem?.zikr.id ?? null;
 
@@ -1655,10 +1649,10 @@ export default function CategoryAzkarScreen() {
                 />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
                   <Text style={{ fontSize: 12, fontFamily: fontRegular(), color: darkMode ? '#9CA3AF' : '#6B7280', fontVariant: ['tabular-nums'] }}>
-                    {formatTime(audioPosition)}
+                    {formatAudioTime(audioPosition)}
                   </Text>
                   <Text style={{ fontSize: 12, fontFamily: fontRegular(), color: darkMode ? '#9CA3AF' : '#6B7280', fontVariant: ['tabular-nums'] }}>
-                    {formatTime(audioDuration)}
+                    {formatAudioTime(audioDuration)}
                   </Text>
                 </View>
               </View>

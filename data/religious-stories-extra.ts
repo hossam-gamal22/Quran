@@ -18,6 +18,16 @@
 // audioUrl is intentionally empty; admins attach audio later from the panel.
 // ============================================================================
 
+// Citation for a specific claim or section of a story. Mirrors StorySource
+// in lib/content-api.ts so the bundled seed and Firestore docs share one
+// shape. `note` is for flagging ikhtilaf or weak chains the reader should
+// know about even when the named source is authentic.
+export interface StorySourceEntry {
+  reference: string;
+  url?: string;
+  note?: string;
+}
+
 export interface ExtraReligiousStory {
   id: string;
   label: string;             // short Arabic label for admin preset list
@@ -29,7 +39,8 @@ export interface ExtraReligiousStory {
   order: number;             // default sort order
   transcript: string;        // full Arabic body, paragraphs joined by \n\n
   transcriptEn: string;
-  sourceUrl?: string;        // optional canonical reference URL
+  sourceUrl?: string;        // legacy single canonical URL
+  sources?: StorySourceEntry[]; // structured citations shown under the story
 }
 
 function P(parts: string[]): string {
@@ -95,6 +106,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'And for every tyrant after them: Dhu Nuwas died in the sea fleeing, his rule was lost and his state vanished. What remained is the memory of the believers he killed, on the tongues of believers in every congregational prayer in which Surah al-Buruj is recited. The fire went away with its ashes; faith remained with its light.',
     ]),
     sourceUrl: 'https://sunnah.com/muslim:3005',
+    sources: [
+      { reference: 'سورة البروج، الآيات 4-9', url: 'https://quran.com/85/4-9' },
+      { reference: 'صحيح مسلم 3005 (حديث صهيب — قصة الغلام والساحر والراهب)', url: 'https://sunnah.com/muslim:3005' },
+      { reference: 'السيرة النبوية لابن هشام — قصة ذي نواس واليهود وأهل نجران' },
+      { reference: 'البداية والنهاية لابن كثير — تحديد القرية بأنها نجران باليمن، والملك ذو نواس الحميري' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -153,6 +170,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'So O Allah, Lord of Jibril, Mika\'il, and Israfil, Originator of the heavens and the earth, make us among those who are safe when the Trumpet is blown, among the winners when the people stand for the Lord of the Worlds.',
     ]),
     sourceUrl: 'https://sunnah.com/muslim:770',
+    sources: [
+      { reference: 'صحيح مسلم 770 (دعاء النبي ﷺ في صلاة الليل: "اللهم رب جبرائيل وميكائيل وإسرافيل…")', url: 'https://sunnah.com/muslim:770' },
+      { reference: 'سورة الزمر، الآية 68 — وصف النفخ في الصور', url: 'https://quran.com/39/68' },
+      { reference: 'صحيح مسلم 2940 — حديث صاحب القرن قد التقم القرن وحنى جبهته منتظرًا متى يُؤمر' },
+      { reference: 'البداية والنهاية لابن كثير — كتاب الفتن وأشراط الساعة، فصل النفخ في الصور' },
+      { reference: 'فتح الباري لابن حجر — شرح كتاب الرقاق' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -161,26 +185,26 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
   // ──────────────────────────────────────────────────────────────────────
   {
     id: 'religious-mustahzioon',
-    label: 'المستهزئون الستة',
-    title: 'قصة المستهزئين الستة — حين أشار جبريل فأهلكهم الله',
-    titleEn: 'The Six Mockers — When Jibreel Pointed and Allah Destroyed Them',
-    brief: 'ستة من قريش جمعوا الاستهزاء بالنبي ﷺ، فأنزل الله فيهم آية، وأشار جبريل إلى كل واحد منهم، فلقي حتفه بطريقة أعجب من الأخرى.',
-    briefEn: 'Six men of Quraysh persisted in mocking the Prophet ﷺ. Allah revealed a verse about them and Jibreel pointed to each, and each met a stranger end than the last.',
+    label: 'المستهزئون الخمسة',
+    title: 'قصة المستهزئين الخمسة — حين أشار جبريل فأهلكهم الله',
+    titleEn: 'The Five Mockers — When Jibreel Pointed and Allah Destroyed Them',
+    brief: 'خمسة من سادة قريش أصرّوا على الاستهزاء بالنبي ﷺ، فأنزل الله فيهم آية، وأشار جبريل إلى كل واحد منهم، فلقي حتفه بطريقة أعجب من الأخرى.',
+    briefEn: 'Five chiefs of Quraysh persisted in mocking the Prophet ﷺ. Allah revealed a verse about them and Jibreel pointed to each, and each met a stranger end than the last.',
     icon: 'lightning-bolt',
     order: 4,
     transcript: P([
       'في مكة قبل الهجرة، حين كانت دعوة النبي ﷺ تشتد وقريش تواجهها بأسلوبين: الأذى البدني للضعفاء، والاستهزاء العقلي للأقوياء. كان الاستهزاء أخطر، لأنه يستهدف قلوب الناس قبل أبدانهم، ويخلق صورة ساخرة عن الرسالة لتمنع الناس من الاقتراب منها.',
-      'برزت في مكة ستة من سادة قريش جمعوا الاستهزاء بالنبي ﷺ كصناعة كاملة. كل واحد منهم اختار طريقًا في الإيذاء: واحد يقول الشعر يهجو به الرسول ﷺ، وواحد يتسلق على المنابر يخطب ضده، وواحد يستوقف الحجاج عند الكعبة ليحذرهم منه، وواحد يبيع للناس ما يطعن في الدين، وواحد يتسلل بين الأنصار ليفسد عليهم رأيهم.',
-      'ذكرهم العلماء بأسمائهم: الوليد بن المغيرة المخزومي، والعاص بن وائل السهمي، والأسود بن عبد المطلب الأسدي، والأسود بن عبد يغوث الزهري، والحارث بن قيس السهمي، والعاص بن العاص بن قيس. كل واحد كان من السادة، له بيت وعشيرة، وله مكانة بين العرب، فاستخدم مكانته في حرب الرسالة بدل أن ينصرها.',
-      'ضاق صدر النبي ﷺ بأذاهم، فكان يصبر ويصبر، ويعلم أن البلاغ عليه وأن الجزاء على الله. ثم نزل عليه ملك الله جبريل عليه السلام بالوحي وقال له: يا محمد، إنا قد كفيناك المستهزئين. أنزل الله في حقهم آية في سورة الحجر: إنا كفيناك المستهزئين، الذين يجعلون مع الله إلهًا آخر فسوف يعلمون.',
-      'لم تكن هذه الآية بشارة عامة، بل وعدًا محددًا بست ميتات قادمة لستة أشخاص بأعيانهم. ووقف جبريل عليه السلام إلى جانب النبي ﷺ، وبدأ المستهزئون يمرّون أمامه، فكان جبريل يشير إلى كل واحد منهم بإصبعه إلى موضع من جسده، يعلن النبي ﷺ بإذن الله كيف سيموت كل واحد منهم.',
-      'مرّ الأسود بن عبد المطلب، فأشار جبريل إلى عينيه. ولم تمض أيام حتى عمي بطريقة عجيبة. روى أهل السير أنه خرج إلى رحلة فضربه فرع شجرة في عينه فأذهب بصره، ثم أصابت عينه الأخرى داء ففقدها. مات أعمى ذليلًا بعد أن كان يرى الدنيا كلها بعينيه.',
-      'مرّ الأسود بن عبد يغوث، فأشار جبريل إلى بطنه. خرج ذات يوم في رحلة، فأصابه نبت ذو شوك فدخل في بطنه — ويقال خرج في رأسه قروح بسبب الشمس — فلم يزل يصرخ من شدة الألم حتى مات.',
-      'مرّ الوليد بن المغيرة — وكان يلقب في الجاهلية بالوحيد — فأشار جبريل إلى أسفل قدمه. وكان قد مرّ على رجل من خزاعة يبري نبلًا فعلق سهم بإزاره فأصاب أسفل قدمه. لم يكن جرحًا قاتلًا في ظاهره، لكن استشرى وصار قرحة لم يفلح طبيب في علاجها، فمات منها.',
-      'مرّ العاص بن وائل، فأشار جبريل إلى أخمص قدمه. خرج العاص في رحلة على حمار، فدخلت شوكة في باطن قدمه فانتفخت قدمه كأنها كتلة من لحم. حُمل إلى أهله يصرخ من الألم حتى مات.',
-      'مرّ الحارث بن قيس، فأشار جبريل إلى رأسه. روى أن سمكة مالحة دخلت في حلقه فاختنق ومات. مات هذا الذي ركّب الحجج وألّب الناس على الرسول ﷺ بطعام صار في فمه عقوبة.',
-      'مرّ العاص بن العاص بن قيس — السادس — فأشار جبريل إليه. روى أنه خرج في يوم حارّ، فلدغته شوكة فلم تستفظع، ثم انتفخ وانتفخ حتى مات. كل واحد من هؤلاء الستة لم يمت ميتة عادية، بل بطريقة لا يستطيع طبيبهم أن يفسرها، لتبقى آية واضحة لأهل مكة.',
-      'كل هذه الميتات وقعت في وقت قصير نسبيًا قبل الهجرة. شاهد أهل مكة كيف يموت هؤلاء الستة الواحد تلو الآخر، بطرق أعجب من الأخرى، وكلهم في وقت متقارب. كانوا يعرفون أن النبي ﷺ قد قال شيئًا عن هلاكهم، فلما حدث ما حدث، كانت آية لكل من يتدبر.',
+      'برز في مكة خمسة من سادة قريش جمعوا الاستهزاء بالنبي ﷺ كصناعة كاملة. كل واحد منهم اختار طريقًا في الإيذاء: واحد يقول الشعر يهجو به الرسول ﷺ، وواحد يتسلق على المنابر يخطب ضده، وواحد يستوقف الحجاج عند الكعبة ليحذرهم منه، وواحد يبيع للناس ما يطعن في الدين، وواحد يتسلل بين الأنصار ليفسد عليهم رأيهم.',
+      'ذكرهم أهل السير والتفسير بأسمائهم: الوليد بن المغيرة المخزومي، والعاص بن وائل السهمي، والأسود بن المطلب بن أسد بن عبد العزى الأسدي (أبو زمعة)، والأسود بن عبد يغوث الزهري، والحارث بن الطُّلاطلة الخُزاعي. كل واحد كان من السادة، له بيت وعشيرة، وله مكانة بين العرب، فاستخدم مكانته في حرب الرسالة بدل أن ينصرها.',
+      'ضاق صدر النبي ﷺ بأذاهم، فكان يصبر ويصبر، ويعلم أن البلاغ عليه وأن الجزاء على الله. ثم نزل عليه ملك الله جبريل عليه السلام بالوحي وقال له: يا محمد، إنا قد كفيناك المستهزئين. أنزل الله في حقهم آية في سورة الحجر: ﴿إنا كفيناك المستهزئين، الذين يجعلون مع الله إلهًا آخر فسوف يعلمون﴾.',
+      'لم تكن هذه الآية بشارة عامة، بل وعدًا محددًا بخمس ميتات قادمة لخمسة أشخاص بأعيانهم. ووقف جبريل عليه السلام إلى جانب النبي ﷺ، وبدأ المستهزئون يمرّون أمامه، فكان جبريل يشير إلى كل واحد منهم بإصبعه إلى موضع من جسده، فيعلم النبي ﷺ بإذن الله كيف سيموت كل واحد منهم. ذكر ابن إسحاق رواية هذه القصة، ونقلها عنه ابن هشام في السيرة وابن كثير في البداية والنهاية، وفي بعض طرقها لين، لكن أصلها ثابت بمجموع الروايات.',
+      'مرّ الأسود بن المطلب، فأشار جبريل إلى عينيه فعمي. ذكر بعض المؤرخين أنه خرج تحت شجرة فضربه فرع منها في عينيه فأذهب بصره، وقيل بل ذهب بصره فجأة دون سبب ظاهر. مات أعمى ذليلًا بعد أن كان يرى الدنيا كلها بعينيه.',
+      'مرّ الأسود بن عبد يغوث، فأشار جبريل إلى رأسه. وفي رواية ابن إسحاق: خرج في يوم حار فأصابه السموم (الريح الحارة) فاسودّ وجهه، ثم رجع إلى أهله فلم يعرفوه ولم يقبلوه، فمات كمدًا. وفي رواية أخرى: ظهرت في رأسه قروح من الشمس قتلته. اختلفت الروايات في تفاصيل موته لكن الإصابة كانت في رأسه.',
+      'مرّ الوليد بن المغيرة — وكان يلقب بالوحيد في الجاهلية — فأشار جبريل إلى كعبه (وفي رواية: إلى أخمص قدمه). كان قد مرّ على رجل من خزاعة يبري نبلًا فعلق سهم بإزاره فجرح قدمه جرحًا يسيرًا في ظاهره، لكنه استشرى وصار قرحة لم تندمل، فمات منها.',
+      'مرّ العاص بن وائل، فأشار جبريل إلى أخمص قدمه. خرج العاص في رحلة، فدخلت في أسفل قدمه شوكة من شجر يقال له الشَّبْرَق، فانتفخت قدمه حتى صارت كأنها بطن بعير، فمات من ذلك.',
+      'مرّ الحارث بن الطلاطلة الخزاعي، فأشار جبريل إلى رأسه. خرج في رحلة، فأصابه ماء السماء (المطر) ثم اشتد عليه الحر، فخرج من رأسه قيح أصفر فمات منه. وفي رواية أخرى: استسقى بطنه فمات منه. وكل هذه الروايات تجمع على أن موته كان عجيبًا بعد إشارة جبريل.',
+      'كل هذه الميتات وقعت في وقت متقارب قبيل الهجرة. شاهد أهل مكة كيف يموت هؤلاء الخمسة الواحد تلو الآخر، بطرق أعجب من الأخرى. كانوا يعرفون أن النبي ﷺ قد أُوحي إليه بشأنهم، فلما حدث ما حدث، كانت آية لكل من يتدبر.',
+      'تنبيه: ورد في بعض الروايات ذكر "ستة" بدلًا من خمسة، لكن المعتمد عند أكثر المفسرين (الطبري والقرطبي وابن كثير) أنهم خمسة. واختلفت الروايات أيضًا في تفاصيل ميتة كل واحد منهم، وما ذكرناه هو ما رجّحه أهل السير من روايات ابن إسحاق وابن سعد، وفي بعضها ضعف، فتُذكر للعبرة لا للقطع.',
       'في القصة درس عميق عن الاستهزاء كذنب خطير. كثير من الناس يستخفون بالاستهزاء بالدين أو بأهله ويقولون: إنما نحن نمزح. لكن قد يكون المزح في حدود الدنيا مزحًا، أما إذا مسّ الدين أو رمزًا من رموزه فقد يدخل صاحبه في باب لا يخرج منه.',
       'وفيها درس عن سرعة الرد الإلهي حين تستحق المسألة. النبي ﷺ صبر سنوات على أذاهم لم يدعُ عليهم. لكن حين تجاوز الأمر حدودًا أعلنها الله بنفسه، تدخل بالكفاية: إنا كفيناك المستهزئين. هذا هو الفرق بين انتقام النفس وانتقام السماء؛ الأول قد ينحرف، والثاني لا يخطئ موعدًا.',
       'وفيها درس لكل من يحارب رسالة بسلاح الكلمة. الرسالة لها رب يحميها، والكلمة الباطلة قد تنتصر لساعة لكنها تذوب أمام الكلمة الحق. الستة كانوا أصحاب لسان مع نفوذ ومال، فهلكوا، وبقي اللسان النبيل الذي تكلم بالقرآن ينير الدنيا إلى يومنا هذا.',
@@ -190,17 +214,17 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
     ]),
     transcriptEn: P([
       'In Makkah, before the Hijrah, when the Prophet\'s ﷺ call was growing and Quraysh was confronting it on two fronts — bodily harm to the weak and intellectual mockery from the strong — the mockery was the more dangerous. It targeted hearts before bodies and crafted a ridiculing image of the message to prevent people from approaching it.',
-      'Six chiefs of Quraysh raised the mockery of the Prophet ﷺ to a complete profession. Each chose his road: one composed satirical poetry, one mounted pulpits to denounce him, one intercepted pilgrims at the Ka\'bah to warn against him, one spread doubts in the markets, one slipped among the Ansar to corrupt their opinion.',
-      'Scholars named them: al-Walid ibn al-Mughirah al-Makhzumi, al-As ibn Wa\'il al-Sahmi, al-Aswad ibn Abd al-Muttalib al-Asadi, al-Aswad ibn Abd Yaghuth al-Zuhri, al-Harith ibn Qays al-Sahmi, and al-As ibn al-As ibn Qays. Each was a noble who used his standing to fight the message rather than support it.',
+      'Five chiefs of Quraysh raised the mockery of the Prophet ﷺ to a complete profession. Each chose his road: one composed satirical poetry, one mounted pulpits to denounce him, one intercepted pilgrims at the Ka\'bah to warn against him, one spread doubts in the markets, one slipped among the Ansar to corrupt their opinion.',
+      'The scholars of sirah and tafsir named them: al-Walid ibn al-Mughirah al-Makhzumi, al-As ibn Wa\'il al-Sahmi, al-Aswad ibn al-Muttalib ibn Asad ibn Abd al-Uzza al-Asadi (Abu Zam\'ah), al-Aswad ibn Abd Yaghuth al-Zuhri, and al-Harith ibn al-Tulatla al-Khuza\'i. Each was a noble who used his standing to fight the message rather than support it.',
       'The Prophet\'s ﷺ chest grew tight with their harm, yet he kept patient. Then Jibril came down with revelation: O Muhammad, We have sufficed you against the mockers. Allah revealed in Surah al-Hijr: "Indeed, We are sufficient for you against the mockers — those who set up another god with Allah; they will come to know."',
-      'This was not a general promise but a specific guarantee of six approaching deaths for six named men. Jibril stood beside the Prophet ﷺ. The mockers began passing before them, and Jibril would point to each man at a part of his body, foretelling how each would die.',
-      'Al-Aswad ibn Abd al-Muttalib passed by; Jibril pointed to his eyes. Within days, he went blind in a strange way. A traveler\'s branch struck one eye and blinded it; then a disease took the other. He died blind and humiliated.',
-      'Al-Aswad ibn Abd Yaghuth passed by; Jibril pointed to his belly. One day he set out on a journey and a thorny plant entered his belly. He kept screaming in pain until he died.',
-      'Al-Walid ibn al-Mughirah passed by — called "the Unique" in pre-Islamic times. Jibril pointed to the underside of his foot. He had passed a man of Khuza\'ah sharpening arrows, and an arrowhead caught on his garment and pricked the sole of his foot. The wound was not lethal in appearance, but it spread into an incurable sore.',
-      'Al-As ibn Wa\'il passed by; Jibril pointed to the arch of his foot. Al-As travelled on his donkey when a thorn pierced the underside of his foot. It swelled until the foot was a mass of flesh. He was carried home screaming until he died.',
-      'Al-Harith ibn Qays passed by; Jibril pointed to his head. It is narrated that a salted fish stuck in his throat and he choked to death. The man who marshalled arguments and turned people against the Messenger ﷺ was felled by food in his mouth.',
-      'Al-As ibn al-As ibn Qays — the sixth — passed by; Jibril pointed to him. He went out on a hot day, was pricked by a thorn that seemed trivial, then swelled until he died. None of the six died an ordinary death; each went in a way no physician could explain.',
-      'All these deaths fell in a relatively short span before the Hijrah. The people of Makkah watched the six fall one after another, in stranger and stranger ways, all close in time. They knew the Prophet ﷺ had foretold their ends, so when it occurred, it was a sign for whoever reflected.',
+      'This was not a general promise but a specific guarantee of five approaching deaths for five named men. Jibril stood beside the Prophet ﷺ. The mockers began passing before them, and Jibril would point to each man at a part of his body, so the Prophet ﷺ knew by Allah\'s leave how each would die. Ibn Ishaq narrated this; Ibn Hisham relayed it in his Sirah and Ibn Kathir in al-Bidayah wa al-Nihayah. Some chains are weak, but the core meaning is established by the aggregate of reports.',
+      'Al-Aswad ibn al-Muttalib passed by; Jibril pointed to his eyes, and he went blind. Some historians say a branch struck him; others say his sight left him suddenly without apparent cause. He died blind and humiliated after having seen the whole world.',
+      'Al-Aswad ibn Abd Yaghuth passed by; Jibril pointed to his head. In Ibn Ishaq\'s narration he went out on a hot day, the scorching wind (al-samum) struck him, his face turned black, and his family did not recognise him or take him in, so he died in grief. Another narration says sores erupted on his head from the sun and killed him. Narrations differ on the detail, but the affliction was at the head.',
+      'Al-Walid ibn al-Mughirah passed by — called "the Unique" in pre-Islamic times. Jibril pointed to his heel (in another narration: the arch of his foot). He had passed a man of Khuza\'ah sharpening arrows, and an arrow point caught on his garment and grazed his foot — an injury minor in appearance, but it festered into an incurable sore that killed him.',
+      'Al-As ibn Wa\'il passed by; Jibril pointed to the arch of his foot. On a journey, a thorn of a plant called al-shabraq pierced the underside of his foot. The foot swelled until it was like the belly of a camel, and he died of it.',
+      'Al-Harith ibn al-Tulatla al-Khuza\'i passed by; Jibril pointed to his head. On a journey he was struck by rain and then by intense heat; yellow pus came out of his head and killed him. Another narration says his belly swelled with fluid until he died. All the reports agree that his death was extraordinary after Jibril\'s pointing.',
+      'All these deaths fell in close succession just before the Hijrah. The people of Makkah watched the five fall one after another, in stranger and stranger ways. They knew the Prophet ﷺ had been informed about them, so when it occurred, it was a sign for whoever reflected.',
+      'Note: some narrations mention "six" instead of five, but the position adopted by most commentators (al-Tabari, al-Qurtubi, Ibn Kathir) is that they were five. The narrations also differ on the manner of each death; what is cited above is what scholars of sirah preferred from Ibn Ishaq and Ibn Sa\'d. Some of these chains have weakness, so they are cited for reflection rather than absolute certainty.',
       'There is a deep lesson on mockery as a grave sin. Many take mocking religion or its people lightly: "We were only joking." But what is a joke in worldly matters may become, when it touches religion or one of its symbols, a door that does not close.',
       'There is a lesson in the speed of the divine response when a matter merits it. The Prophet ﷺ patiently endured their harm for years without supplicating against them. But when the matter crossed certain limits, Allah Himself announced the response. The difference between the soul\'s revenge and the sky\'s revenge — the first may stray, the second never misses an appointment.',
       'There is a lesson for anyone who fights a message with the weapon of speech. The message has a Lord who defends it, and false speech may win for an hour but melts before true speech. The six were men of tongue, influence, and wealth — and they perished, while the noble tongue that spoke the Qur\'an illuminates the world to this day.',
@@ -209,6 +233,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The story of the six mockers remains a reminder for every generation: the contest between truth and falsehood runs on two tracks, harm and mockery; Allah is always with the truth; and whoever mocks His prophet, religion, or signs declares a war he can never win.',
     ]),
     sourceUrl: 'https://quran.com/15/95-96',
+    sources: [
+      { reference: 'سورة الحجر، الآيتان 95-96', url: 'https://quran.com/15/95-96' },
+      { reference: 'سيرة ابن إسحاق (رواية ابن هشام) — تسمية المستهزئين الخمسة وكيفية هلاكهم', note: 'في بعض طرق الرواية لين، وأصلها ثابت بمجموع الروايات' },
+      { reference: 'تفسير الطبري للآية 95 من الحجر', url: 'https://tafsir.app/tabari/15/95' },
+      { reference: 'البداية والنهاية لابن كثير — ذكر المستهزئين بالنبي ﷺ' },
+      { reference: 'IslamQA — من هم المستهزئون الخمسة الذين قتلهم جبريل عليه السلام؟', url: 'https://islamqa.info/ar/answers/402869', note: 'يرجح أن العدد خمسة لا ستة، ويورد خلاف الروايات في تفاصيل كل ميتة' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -259,6 +290,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'A final lesson: the woman who left gold in this world only left it to take something greater in the next. The Prophet ﷺ mentioned Umm Sulaym in Paradise before her death. He said: I entered Paradise and heard footsteps, and asked: Who is this? They said: al-Ghumaysa\' bint Milhan, the mother of Anas ibn Malik.',
     ]),
     sourceUrl: 'https://sunnah.com/nasai:3341',
+    sources: [
+      { reference: 'سنن النسائي 3341 — قصة مهر أم سُليم (الإسلام مهرًا)', url: 'https://sunnah.com/nasai:3341' },
+      { reference: 'صحيح مسلم 2455 — فضل أم سُليم وذكر النبي ﷺ سماعه خشف نعليها في الجنة' },
+      { reference: 'صحيح البخاري 6202 / صحيح مسلم 2144 — قصة موت ابنها وحوارها مع أبي طلحة' },
+      { reference: 'مسند الإمام أحمد — مرويات أنس بن مالك عن أمه أم سليم' },
+      { reference: 'حلية الأولياء لأبي نعيم — ترجمة أم سليم بنت ملحان' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -319,6 +357,14 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Aad and Thamud remain in the Qur\'an a single story with two faces: bodily strength, and craft strength. Both faces were destroyed when measure was lost. Whoever reads with the heart knows that a blessing does not protect itself, that the grateful is the survivor, and that arrogance is the first door of punishment. That is why Allah sealed both stories with the words: "Do you see any of them remaining?"',
     ]),
     sourceUrl: 'https://quran.com/7/65-79',
+    sources: [
+      { reference: 'سورة الأعراف 65-79 — قصة عاد وثمود', url: 'https://quran.com/7/65-79' },
+      { reference: 'سورة هود 50-68 — تفصيل دعوة هود وصالح', url: 'https://quran.com/11/50-68' },
+      { reference: 'سورة الشعراء 123-159 — دعوة هود وصالح', url: 'https://quran.com/26/123-159' },
+      { reference: 'سورة الأحقاف 21-25 — هلاك عاد بالريح', url: 'https://quran.com/46/21-25' },
+      { reference: 'سورة الحاقة 4-8 — وصف هلاكهم', url: 'https://quran.com/69/4-8' },
+      { reference: 'قصص الأنبياء لابن كثير — قصة عاد وقصة ثمود' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -365,6 +411,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'A final lesson: a good house in this world brings a good house in the Hereafter. Khadijah made her house a refuge for the Prophet ﷺ, and Allah prepared for her a house in Paradise without noise or weariness. The believer builds in this world what he wishes to find in the next.',
     ]),
     sourceUrl: 'https://sunnah.com/bukhari:3820',
+    sources: [
+      { reference: 'صحيح البخاري 3820 — قراءة جبريل عليها السلام من ربها', url: 'https://sunnah.com/bukhari:3820' },
+      { reference: 'صحيح البخاري 3815 / صحيح مسلم 2435 — فضل خديجة على نساء العالمين' },
+      { reference: 'صحيح البخاري 3 / صحيح مسلم 160 — قصة بدء الوحي وموقفها يوم نزل عليه جبريل', url: 'https://sunnah.com/bukhari:3' },
+      { reference: 'سيرة ابن هشام — أول من آمن به ﷺ من النساء خديجة بنت خويلد' },
+      { reference: 'البداية والنهاية لابن كثير — ترجمة أم المؤمنين خديجة' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -415,6 +468,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The People of the Sabbath remain in the Qur\'an a model for every generation that tries to circumvent the law of Allah. Whoever reads their story and reflects knows that Allah sees every trick, even if hidden from people. Sincerity in obedience is safer than trickery in sin. The truthful believer is the one who fears tricks before he fears open sins.',
     ]),
     sourceUrl: 'https://quran.com/7/163-166',
+    sources: [
+      { reference: 'سورة الأعراف 163-166 — قصة القرية الحاضرة البحر وحيلة السبت', url: 'https://quran.com/7/163-166' },
+      { reference: 'سورة البقرة 65 — والذين اعتدوا منكم في السبت', url: 'https://quran.com/2/65' },
+      { reference: 'تفسير الطبري لسورة الأعراف 163-166', url: 'https://tafsir.app/tabari/7/163' },
+      { reference: 'تفسير ابن كثير لقصة أصحاب السبت', url: 'https://quran.com/7:163/tafsirs/en-tafisr-ibn-kathir' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -467,6 +526,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Uzair remains in the Qur\'an a sign of Allah\'s power, and a reminder for those who reflect on Allah\'s creation and then find peace of heart. For everyone who reads his story there is a message: do not rush an answer from Allah. It may come to you from where you do not expect, and in a form you do not anticipate. A single sign is enough to turn faith from knowledge to certainty.',
     ]),
     sourceUrl: 'https://quran.com/2/259',
+    sources: [
+      { reference: 'سورة البقرة 259 — قصة الرجل الذي مر على قرية', url: 'https://quran.com/2/259' },
+      { reference: 'سورة التوبة 30 — "وقالت اليهود عزير ابن الله"', url: 'https://quran.com/9/30' },
+      { reference: 'تفسير ابن كثير لآية البقرة 259', url: 'https://quran.com/2:259/tafsirs/en-tafisr-ibn-kathir', note: 'تحديد هوية الرجل بأنه عزير هو القول السائد عند جمهور المفسرين، لكن قال آخرون: هو إرميا عليه السلام أو الخضر، ولم يجزم الله ولا رسوله ﷺ باسمه' },
+      { reference: 'تفسير الطبري لآية البقرة 259', url: 'https://tafsir.app/tabari/2/259' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -521,6 +586,15 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'al-Dajjal remains in the memory of Muslims not as mere fear but as training. Every time a Muslim reads Surah al-Kahf, he remembers al-Dajjal and learns monotheism from the People of the Cave, knowledge from Musa and al-Khidr, power and justice from Dhu al-Qarnayn, and wealth from Qarun. Four stories Allah placed in a single Surah to be the believer\'s shield in the time of the great trial.',
     ]),
     sourceUrl: 'https://sunnah.com/muslim:2937a',
+    sources: [
+      { reference: 'صحيح مسلم 2937 — حديث النواس بن سمعان في الدجال (الحديث الجامع)', url: 'https://sunnah.com/muslim:2937a' },
+      { reference: 'صحيح مسلم 2944 — سبعون ألفًا من يهود أصبهان يتبعون الدجال', url: 'https://sunnah.com/muslim:2944' },
+      { reference: 'صحيح البخاري 7408 / صحيح مسلم 169 — مكتوب بين عينيه "كافر" يقرؤها كل مؤمن', url: 'https://sunnah.com/bukhari:7408' },
+      { reference: 'صحيح مسلم 169 — صفة الدجال بأنه أعور العين اليمنى كأنها عنبة طافية' },
+      { reference: 'سنن الترمذي 2237 — خروج الدجال من خراسان', url: 'https://en.islamicurdubooks.com/hadith/hadith-.php?bookid=6&hadith_number=2237', note: 'صححه الألباني' },
+      { reference: 'صحيح مسلم 809 / 2937 — حفظ أول/آخر عشر آيات من سورة الكهف يعصم من فتنته' },
+      { reference: 'سنن أبي داود 4324 — تفاصيل خلافة عيسى عليه السلام', url: 'https://sunnah.com/abudawud:4324', note: 'وردت روايات بسبع سنين وأخرى بأربعين، والأشهر أربعون' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -573,6 +647,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Laylat al-Qadr remains a chance of a lifetime that comes every year. Whoever Allah grants its revival has won the merit of a thousand months. Whoever neglects it and treats it like other nights has wasted what cannot be made up. The supplication today: O Lord, "O Allah, You are forgiving, You love forgiveness, so forgive us."',
     ]),
     sourceUrl: 'https://quran.com/97',
+    sources: [
+      { reference: 'سورة القدر كاملة', url: 'https://quran.com/97' },
+      { reference: 'سورة الدخان 3-4 — إنا أنزلناه في ليلة مباركة', url: 'https://quran.com/44/3-4' },
+      { reference: 'صحيح البخاري 2017 / صحيح مسلم 1169 — التماسها في العشر الأواخر من رمضان', url: 'https://sunnah.com/bukhari:2017' },
+      { reference: 'صحيح البخاري 2014 / صحيح مسلم 760 — من قام ليلة القدر إيمانًا واحتسابًا غفر له ما تقدم من ذنبه', url: 'https://sunnah.com/bukhari:2014' },
+      { reference: 'سنن الترمذي 3513 / سنن ابن ماجه 3850 — دعاء ليلة القدر "اللهم إنك عفو تحب العفو فاعف عني"', url: 'https://sunnah.com/ibnmajah:3850', note: 'صححه الألباني، وزيادة "كريم" بعد "عفو" لا تصح في الروايات الثابتة' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -623,6 +704,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Qarun remains in the Qur\'an a model for everyone given wealth who then transgresses. Whenever a Muslim sees a rich person boasting of his wealth, he remembers Qarun. Whenever someone wishes for wealth and pride, he remembers Qarun. Wealth, if unaccompanied by gratitude and righteous deeds, is better for its owner not to have come to him at all.',
     ]),
     sourceUrl: 'https://quran.com/28/76-82',
+    sources: [
+      { reference: 'سورة القصص 76-82 — قصة قارون', url: 'https://quran.com/28/76-82' },
+      { reference: 'سورة العنكبوت 39 — وقارون وفرعون وهامان', url: 'https://quran.com/29/39' },
+      { reference: 'سورة غافر 24 — إلى فرعون وهامان وقارون', url: 'https://quran.com/40/24' },
+      { reference: 'تفسير الطبري لسورة القصص', url: 'https://tafsir.app/tabari/28/76' },
+      { reference: 'تفسير ابن كثير لقصة قارون', url: 'https://quran.com/28:76/tafsirs/en-tafisr-ibn-kathir' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -679,6 +767,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Dhu al-Qarnayn remains in the Qur\'an a model of the believing ruler who combined strength, justice, and humility. Yajuj and Majuj are a constant reminder that behind every barrier is a trial, and that present security is a mercy that may be lifted. The wise does not feel safe regarding what he does not know. Preparing to meet Allah is the best preparation.',
     ]),
     sourceUrl: 'https://quran.com/18/83-101',
+    sources: [
+      { reference: 'سورة الكهف 83-101 — قصة ذي القرنين ويأجوج ومأجوج', url: 'https://quran.com/18/83-101' },
+      { reference: 'سورة الأنبياء 96-97 — فتح يأجوج ومأجوج قبيل الساعة', url: 'https://quran.com/21/96-97' },
+      { reference: 'صحيح البخاري 3346 / صحيح مسلم 2880 — فتح يأجوج ومأجوج وذكر اليوم العظيم' },
+      { reference: 'تفسير ابن كثير لقصة ذي القرنين', url: 'https://quran.com/18:83/tafsirs/en-tafisr-ibn-kathir', note: 'اختلف العلماء في هويته: هل هو إسكندر المقدوني (مرجوح) أم ملك عربي يماني أو حِميري؟ ابن كثير رجّح أنه ملك مؤمن قديم لا يُعرف بدقة' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -735,6 +829,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The People of the Elephant remain in the Qur\'an a decisive proof of Allah\'s care for His House and His religion. Whoever tries today to demolish a symbol of Islam, let him look at Abraha. Whoever thinks his strength suffices, let him look at the elephant that refused to walk. The divine will is above every will, and the divine power is above every power.',
     ]),
     sourceUrl: 'https://quran.com/105',
+    sources: [
+      { reference: 'سورة الفيل كاملة', url: 'https://quran.com/105' },
+      { reference: 'السيرة النبوية لابن هشام — قصة أبرهة وأصحاب الفيل وعام الفيل (570م تقريبًا)' },
+      { reference: 'تاريخ الطبري — قصة أبرهة الأشرم الحبشي ومسيره إلى مكة' },
+      { reference: 'البداية والنهاية لابن كثير — مسير أبرهة بفيله المسمى "محمود" إلى الكعبة' },
+      { reference: 'صحيح البخاري 4117 / صحيح مسلم 1782 — ذكر الفيل يوم الحديبية وأن الله حبسه عن مكة', note: 'حديث "حبس الفيل" ورد في صلح الحديبية وفيه إشارة إلى عام الفيل' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -785,6 +886,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The story of the Yellow Cow remains a sign in the Qur\'an. An entire surah was named after it — Surat al-Baqarah — to teach the Ummah: direct obedience is better than repeated questioning; obstinacy harms; truth appears; resurrection is real. Whoever reads its story and reflects knows that nothing is hidden from Allah, that every dead one will be resurrected, every killer will be exposed, and every oppressor will be reckoned.',
     ]),
     sourceUrl: 'https://quran.com/2/67-73',
+    sources: [
+      { reference: 'سورة البقرة 67-73 — قصة البقرة وإحياء القتيل', url: 'https://quran.com/2/67-73' },
+      { reference: 'تفسير الطبري لسورة البقرة 67-73', url: 'https://tafsir.app/tabari/2/67' },
+      { reference: 'تفسير ابن كثير لقصة البقرة الصفراء', url: 'https://quran.com/2:67/tafsirs/en-tafisr-ibn-kathir' },
+      { reference: 'تفصيل القصة عند المفسرين مأخوذ بعضه من الإسرائيليات', note: 'تفاصيل الأخذ من بيت الميت وقصة الصبي ذاكر للأم — مذكورة عند المفسرين عن أحبار اليهود، تذكر للعبرة لا للقطع' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -849,6 +956,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Luqman the Wise remains in the Qur\'an a complete school of upbringing. His counsels should be memorised by every father and mother, every son and daughter. Because they are counsels whose validity does not end, fitting for every time and place. Whoever applied them in his life became wise — and even if he was not a prophet, Allah raised him to a high station.',
     ]),
     sourceUrl: 'https://quran.com/31/12-19',
+    sources: [
+      { reference: 'سورة لقمان 12-19 — وصايا لقمان لابنه', url: 'https://quran.com/31/12-19' },
+      { reference: 'تفسير ابن كثير لسورة لقمان', url: 'https://quran.com/31:12/tafsirs/en-tafisr-ibn-kathir', note: 'اختلف العلماء: هل كان لقمان نبيًا أم رجلًا صالحًا؟ القول الراجح عند الجمهور (ابن كثير والقرطبي وابن تيمية) أنه عبد صالح وليس نبيًا' },
+      { reference: 'تفسير الطبري لسورة لقمان', url: 'https://tafsir.app/tabari/31/12' },
+      { reference: 'الجامع لأحكام القرآن للقرطبي — تفسير سورة لقمان' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -915,6 +1028,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The story of Musa and al-Khidr remains among the greatest stories of the Qur\'an, teaching the Muslim a new lesson in every reading. Read it every Friday — it is in Surah al-Kahf, whose recitation the Prophet ﷺ established on Friday. With every reading, the Muslim remembers: knowledge is an ocean; the hidden is deeper than the apparent; patience is a rank; and Allah manages what we do not see.',
     ]),
     sourceUrl: 'https://quran.com/18/60-82',
+    sources: [
+      { reference: 'سورة الكهف 60-82 — رحلة موسى مع الخضر', url: 'https://quran.com/18/60-82' },
+      { reference: 'صحيح البخاري 122 — حديث ابن عباس عن أبيّ بن كعب في تفصيل القصة', url: 'https://sunnah.com/bukhari:122' },
+      { reference: 'صحيح البخاري 3401 — تفصيل ركوب السفينة وقتل الغلام وإقامة الجدار', url: 'https://sunnah.com/bukhari:3401' },
+      { reference: 'صحيح مسلم 2380 — قصة موسى والخضر بطرق متعددة' },
+      { reference: 'تفسير ابن كثير لسورة الكهف 60-82', url: 'https://quran.com/18:60/tafsirs/en-tafisr-ibn-kathir' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -981,6 +1101,13 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The greatest lesson from the miracles of the prophets is that Allah supports the truth by extraordinary means when ordinary means fail. Faith opens the doors of the universe. The believer reads these miracles and grows in certainty that the One who raised the dead for Isa, cooled the fire for Ibrahim, and split the sea for Musa, is able to remove his worries, open the doors of his sustenance, and protect him from his enemies.',
     ]),
     sourceUrl: 'https://quran.com',
+    sources: [
+      { reference: 'القرآن الكريم — مواضع المعجزات في سور البقرة والأعراف وهود والإسراء والأنبياء وطه والكهف والنمل وغيرها' },
+      { reference: 'صحيح البخاري ومسلم — معجزات النبي ﷺ (انشقاق القمر، نبع الماء، الإسراء، الإخبار بالغيب)' },
+      { reference: 'صحيح البخاري 3637 — حديث انشقاق القمر', url: 'https://sunnah.com/bukhari:3637' },
+      { reference: 'البداية والنهاية لابن كثير — كتاب قصص الأنبياء' },
+      { reference: 'دلائل النبوة للبيهقي — جمع لمعجزات النبي ﷺ' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -1059,6 +1186,14 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'The story of the prophets\' deaths remains a lesson for the living. They lived upon monotheism, taught it to their peoples, were patient through trial, and died upon faith. Whoever wishes to join their caravan should walk their path: pure monotheism, righteous deeds, patience through trial, and dying upon Islam. That is the best of what is treasured for the hour of meeting Allah.',
     ]),
     sourceUrl: 'https://sunnah.com/bukhari:1339',
+    sources: [
+      { reference: 'صحيح البخاري 1339 / صحيح مسلم 2372 — قصة موسى وملك الموت والكثيب الأحمر', url: 'https://sunnah.com/bukhari:1339' },
+      { reference: 'صحيح البخاري 4451 / صحيح مسلم 2444 — وفاة النبي ﷺ في حجرة عائشة', url: 'https://sunnah.com/bukhari:4451' },
+      { reference: 'سورة سبأ 14 — وفاة سليمان عليه السلام واتكاؤه على عصاه', url: 'https://quran.com/34/14' },
+      { reference: 'سورة آل عمران 144 — قول الصديق "ومن كان يعبد محمدًا فإن محمدًا قد مات"', url: 'https://quran.com/3/144' },
+      { reference: 'صحيح ابن حبان — حديث أبي ذر في عدد الصحف المنزلة (50 صحيفة لشيث)', note: 'صححه بعض العلماء وضعّفه آخرون' },
+      { reference: 'البداية والنهاية لابن كثير — وفيات الأنبياء وقبورهم', note: 'كثير مما يتعلق بمواقع قبور الأنبياء من الإسرائيليات والروايات التاريخية الضعيفة، يُذكر إحالة لا قطعًا' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -1122,6 +1257,15 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Faith in the unseen — in the angels and jinn and what we do not see — remains part of a Muslim\'s faith. We do not deny their existence because the eye does not see them, and we do not fill our hearts with them in fear. Allah is greater than all of them, and whoever is with Allah is harmed by nothing. Whoever says, "Allah suffices me; there is no god but He; upon Him I rely, and He is the Lord of the mighty Throne," seven times in the morning and seven in the evening, Allah will suffice him in all that troubles him of the world and the Hereafter.',
     ]),
     sourceUrl: 'https://sunnah.com/muslim:450',
+    sources: [
+      { reference: 'صحيح مسلم 450 — حديث ابن مسعود في ذهاب النبي ﷺ إلى الجن وقراءة القرآن عليهم', url: 'https://sunnah.com/muslim:450' },
+      { reference: 'سورة الجن كاملة — استماع نفر من الجن إلى القرآن', url: 'https://quran.com/72' },
+      { reference: 'سورة الأحقاف 29-32 — "وإذ صرفنا إليك نفرًا من الجن"', url: 'https://quran.com/46/29-32' },
+      { reference: 'سورة البقرة 102 — قصة هاروت وماروت', url: 'https://quran.com/2/102', note: 'القول الراجح عند الجمهور (ابن كثير) أنهما ملكان أُنزلا ابتلاء، وذهب الطبري إلى أنهما رجلان صالحان، والأشهر الأول' },
+      { reference: 'صحيح البخاري 5763 / صحيح مسلم 2189 — قصة سحر لبيد بن الأعصم للنبي ﷺ', url: 'https://sunnah.com/bukhari:5763' },
+      { reference: 'صحيح البخاري 2766 / صحيح مسلم 89 — السبع الموبقات، منها السحر' },
+      { reference: 'صحيح البخاري 5010 — قراءة آية الكرسي قبل النوم تحفظ من الشيطان' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -1183,6 +1327,16 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Always remember: the entire earth belongs to Allah; He gives it as an inheritance to whom He wills of His servants; and the final outcome belongs to the pious. However long the night of falsehood, the dawn is coming inevitably. Whoever is truthful with Allah, Allah gives him what is better than the whole world. Prepare for meeting your Lord, increase in righteous deeds, and stand firm upon your religion — for victory is near, and the Hour is nearer.',
     ]),
     sourceUrl: 'https://sunnah.com/bukhari:2926',
+    sources: [
+      { reference: 'صحيح البخاري 2926 / صحيح مسلم 2922 — حديث الحجر والشجر وشجر الغرقد', url: 'https://sunnah.com/bukhari:2926' },
+      { reference: 'صحيح مسلم 2901 — حديث حذيفة بن أُسيد في علامات الساعة الكبرى العشر', url: 'https://hadithunlocked.com/muslim:2901a' },
+      { reference: 'سنن أبي داود 4284 — حديث أم سلمة "المهدي من عترتي من ولد فاطمة"', url: 'https://sunnah.com/abudawud:4284' },
+      { reference: 'صحيح مسلم 2937 — حديث النواس بن سمعان في نزول عيسى وقتله الدجال', url: 'https://sunnah.com/muslim:2937a' },
+      { reference: 'صحيح مسلم 2948 — العبادة في الهرج كهجرة إليّ', url: 'https://www.abuaminaelias.com/dailyhadithonline/2012/04/18/ibadah-harj-hijrah/' },
+      { reference: 'سورة الإسراء 4-8 — لتفسدن في الأرض مرتين', url: 'https://quran.com/17/4-8' },
+      { reference: 'سورة الأنبياء 96-97 — فتح يأجوج ومأجوج' },
+      { reference: 'صحيح البخاري 6504 / صحيح مسلم 867 — "بُعثت أنا والساعة كهاتين"' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -1238,6 +1392,12 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'Finally, in the story of Sheeth is a reminder that the beginning of humanity was upon monotheism, not upon shirk. The human being was fashioned upon the recognition of Allah, and the first prophets carried this fitrah to him. So if a person returns to monotheism, he has not innovated a thing; he has only returned to the origin upon which he was created. O Allah, make us firm upon the inheritance of Adam and Sheeth and Nuh and Ibrahim, and join us with them in the abode of bliss.',
     ]),
     sourceUrl: 'https://sunnah.com/urn/2196890',
+    sources: [
+      { reference: 'حديث أبي ذر في عدد الأنبياء والصحف عند صحيح ابن حبان والمسند', url: 'https://sunnah.com/urn/2196890', note: 'صححه بعض العلماء (ابن حبان) وضعّفه آخرون (الألباني). يُذكر إحالة لا قطعًا' },
+      { reference: 'البداية والنهاية لابن كثير — قصة شيث عليه السلام بن آدم' },
+      { reference: 'تاريخ الطبري — أخبار آدم وذريته وشيث' },
+      { reference: 'قصص الأنبياء لابن كثير — فصل شيث عليه السلام', note: 'كثير من تفاصيل حياته (كعمره 912 سنة) مأخوذ من الإسرائيليات، ينقلها المؤرخون المسلمون بصيغة "قيل" دون قطع' },
+    ],
   },
 
   // ──────────────────────────────────────────────────────────────────────
@@ -1295,6 +1455,14 @@ export const EXTRA_RELIGIOUS_STORIES: ExtraReligiousStory[] = [
       'A final lesson: the battle between Iblis and the human being was not a passing moment in the history of the heaven. It extended to every home, every heart, every instant. Iblis is an enemy who does not sleep, and he declared war from the first day. The believer is the one who keeps this enemy present at every step, seeks refuge in Allah from him, and turns to his Lord to preserve him. O Allah, we seek refuge in You from the promptings of the devils, and we seek refuge in You, our Lord, lest they be present with us.',
     ]),
     sourceUrl: 'https://quran.com/18/50',
+    sources: [
+      { reference: 'سورة الكهف 50 — "كان من الجن ففسق عن أمر ربه" (الفيصل في كون إبليس من الجن لا من الملائكة)', url: 'https://quran.com/18/50' },
+      { reference: 'سورة الأعراف 11-18 — قصة الخلق والسجود والامتناع', url: 'https://quran.com/7/11-18' },
+      { reference: 'سورة الحجر 26-44 / سورة ص 71-85 — تفصيل قصة إبليس', url: 'https://quran.com/15/26-44' },
+      { reference: 'سورة البقرة 30 — "أتجعل فيها من يفسد فيها"', url: 'https://quran.com/2/30' },
+      { reference: 'تفسير الطبري لسورة البقرة 30 — أخبار جن الأرض قبل آدم (عن ابن عباس وغيره)', url: 'https://tafsir.app/tabari/2/30', note: 'روايات من قبيل المرويات عن السلف، تذكر إحالة لا قطعًا. منها قول الحسن البصري: "ما كان إبليس من الملائكة طرفة عين قط"' },
+      { reference: 'البداية والنهاية لابن كثير — أخبار خلق إبليس وعداوته لآدم' },
+    ],
   },
 ];
 

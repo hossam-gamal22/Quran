@@ -16,6 +16,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { formatAudioTime } from '@/lib/audio-time';
 
 interface AudioPlayerProps {
   audioUrl?: string;
@@ -125,12 +126,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
   };
 
-  const formatTime = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
   if (!audioUrl) {
     return null;
   }
@@ -162,7 +157,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       </View>
 
       <View style={[styles.controls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <Text style={[styles.time, { color: colors.textLight }]}>{formatTime(position)}</Text>
+        <Text style={[styles.time, { color: colors.textLight }]}>{formatAudioTime(position)}</Text>
 
         <TouchableOpacity
           onPress={togglePlayPause}
@@ -180,7 +175,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           )}
         </TouchableOpacity>
 
-        <Text style={[styles.time, { color: colors.textLight }]}>{formatTime(duration)}</Text>
+        <Text style={[styles.time, { color: colors.textLight }]}>{formatAudioTime(duration)}</Text>
       </View>
     </View>
   );
@@ -235,7 +230,7 @@ const _styles = StyleSheet.create({
   },
   time: {
     fontSize: 12,
-    minWidth: 45,
+    minWidth: 58,
     textAlign: 'center',
   },
 });

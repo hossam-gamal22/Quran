@@ -15,6 +15,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
+import Slider from '@react-native-community/slider';
 import { useLocalSearchParams } from 'expo-router';
 
 import { BannerAdComponent } from '@/components/ads/BannerAd';
@@ -29,20 +30,24 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useAudioSeekPreview } from '@/hooks/use-audio-seek-preview';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { getLanguage } from '@/lib/i18n';
+import { formatAudioTime } from '@/lib/audio-time';
 import { CMSReligiousStory, useReligiousStoriesContentStatus } from '@/lib/content-api';
 import { findReligiousStoryEnglishFields } from '@/data/religious-story-english';
-import { findCompleteReligiousStory, preferLongerText } from '@/data/religious-story-complete';
+import { findCompleteReligiousStory, getStorySources, preferLongerText } from '@/data/religious-story-complete';
 import { expandProphetEnglishTranscript, expandProphetTranscript } from '@/data/full-story-texts';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
-import { prepareStoryAudio, isStoryAudioCached } from '@/lib/story-audio-cache';
+import { SourcesList } from '@/components/ui/SourcesList';
+import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
 import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
 import type { IslamicPdfSection } from '@/lib/pdf/islamicPdfTemplate';
+import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
 
-const ACCENT = '#6d5dfc';
-const ACCENT_LIGHT = 'rgba(109, 93, 252, 0.16)';
+const ACCENT = '#0d8e62';
+const ACCENT_LIGHT = 'rgba(6,79,47,0.16)';
 const SCREEN_KEY = 'religious_stories';
 const AUDIO_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
@@ -54,19 +59,22 @@ function copy() {
         subtitle: 'قصص إيمانية للاستماع والقراءة',
         emptyTitle: 'لا توجد قصص متاحة الآن',
         emptyBody: 'سيتم إضافة قصص جديدة قريبًا.',
-        onlineOnly: 'الاستماع متاح أونلاين فقط ويحتاج اتصالًا بالإنترنت.',
         audioArabicOnly: '',
         limitedLanguages: '',
         loadingAudioTitle: 'جاري تحميل الصوت',
         loadingAudioBody: 'انتظر لحظات، سيتم تشغيل القصة تلقائيًا.',
         noInternetTitle: 'لا يوجد اتصال بالإنترنت',
-        noInternetBody: 'هذه القصص متاحة للاستماع أونلاين فقط. اتصل بالإنترنت ثم حاول مرة أخرى.',
+        noInternetBody: 'الصوت غير محمل على الجهاز. اتصل بالإنترنت للتشغيل أو حمّله مسبقًا للاستماع أوفلاين.',
         audioErrorTitle: 'تعذر تشغيل الصوت',
         audioErrorBody: 'استغرق تحميل الصوت وقتًا طويلًا. تحقق من الاتصال ثم حاول مرة أخرى.',
         updatingStoriesTitle: 'جاري تحديث القصص',
         updatingStoriesBody: 'نجهز لك أحدث نسخة من القصص.',
         retry: 'حاول مرة أخرى',
         close: 'إغلاق',
+        download: 'تحميل',
+        downloading: 'جاري التحميل',
+        downloaded: 'محمل',
+        downloadFailed: 'تعذر تحميل الصوت. تحقق من الاتصال ثم حاول مرة أخرى.',
         listen: 'استمع للقصة',
         storyText: 'نص القصة',
         audio: 'الصوت',
@@ -81,20 +89,23 @@ function copy() {
         subtitle: 'Faith stories for listening and reading',
         emptyTitle: 'No stories available yet',
         emptyBody: 'New stories will be added soon.',
-        onlineOnly: 'Listening is online-only and requires an internet connection.',
         audioArabicOnly: 'Audio is available in Arabic only. The full story text is available in English below.',
         limitedLanguages:
           'Religious stories are currently available only in Arabic and English. Audio is available in Arabic only.',
         loadingAudioTitle: 'Loading audio',
         loadingAudioBody: 'Please wait. The story will start automatically.',
         noInternetTitle: 'No internet connection',
-        noInternetBody: 'These stories are online-only. Connect to the internet and try again.',
+        noInternetBody: 'This audio is not downloaded on this device. Connect to play it, or download it first for offline listening.',
         audioErrorTitle: 'Audio could not be played',
         audioErrorBody: 'Audio loading took too long. Check your connection and try again.',
         updatingStoriesTitle: 'Updating stories',
         updatingStoriesBody: 'Preparing the latest stories version for you.',
         retry: 'Try again',
         close: 'Close',
+        download: 'Download',
+        downloading: 'Downloading',
+        downloaded: 'Downloaded',
+        downloadFailed: 'Audio could not be downloaded. Check your connection and try again.',
         listen: 'Listen to the story',
         storyText: 'Story text',
         audio: 'Audio',
@@ -147,6 +158,10 @@ function getCompleteStoryFields(story: CMSReligiousStory) {
 function getTitle(story: CMSReligiousStory) {
   if (getStoryLanguage() === 'ar') return story.title;
   return story.titleEn?.trim() || getStoryEnglishFields(story)?.titleEn || story.title;
+}
+
+function getStoryAudioDisplayTitle(story: CMSReligiousStory) {
+  return getTitle(story);
 }
 
 function getBrief(story: CMSReligiousStory) {
@@ -276,26 +291,6 @@ function buildReligiousStoryPdfSections(transcript: string, storyTitle: string):
   return sections.length ? sections : [{ title: storyTitle, body: transcript, keepTogether: true, largeText: true }];
 }
 
-function formatAudioTime(milliseconds: number): string {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function OnlineNotice({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const isRTL = useIsRTL();
-  const s = useScaledStyles(_s, colors.fs);
-  return (
-    <View style={[s.notice, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-      <MaterialCommunityIcons name="wifi" size={18} color={colors.text} />
-      <Text style={[s.noticeText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-        {copy().onlineOnly}
-      </Text>
-    </View>
-  );
-}
-
 function LanguageNotice({ colors }: { colors: ReturnType<typeof useColors> }) {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_s, colors.fs);
@@ -346,7 +341,7 @@ function AudioStatusModal({
   const icon = iconOverride || (isLoading ? 'headphones' : mode === 'offline' ? 'wifi-off' : 'alert-circle-outline');
   const tint = mode === 'offline' ? '#f59e0b' : mode === 'error' ? '#ef4444' : ACCENT;
   const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
-  const iconBg = colors.isDarkMode ? 'rgba(109,93,252,0.16)' : 'rgba(109,93,252,0.12)';
+  const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -399,7 +394,7 @@ function StoriesUpdateModal({
   const labels = copy();
   const s = useScaledStyles(_s, colors.fs);
   const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
-  const iconBg = colors.isDarkMode ? 'rgba(109,93,252,0.16)' : 'rgba(109,93,252,0.12)';
+  const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
     <Modal transparent visible={visible} animationType="fade">
@@ -455,11 +450,11 @@ function StoryCard({
           <Text style={s.storyNumberText}>{index + 1}</Text>
         </View>
         <View style={s.cardText}>
-          <Text style={[s.cardTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+          <Text style={[s.cardTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {getTitle(story)}
           </Text>
           {!!brief && (
-            <Text style={[s.cardBrief, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>
+            <Text style={[s.cardBrief, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {brief}
             </Text>
           )}
@@ -488,6 +483,7 @@ function StoryListening({
     state: globalAudioState,
     playAzkarQueue,
     togglePlayPause: toggleGlobalAudio,
+    seekTo: seekGlobalAudio,
     playbackSpeed,
     setPlaybackSpeed,
   } = useGlobalAudio();
@@ -503,7 +499,8 @@ function StoryListening({
   const [audioModalDismissed, setAudioModalDismissed] = useState(false);
   const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
   const [isFav, setIsFav] = useState(false);
-  const [audioCachedLocally, setAudioCachedLocally] = useState(false);
+  const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
   const favoriteId = useMemo(() => `story_${story.id}`, [story.id]);
   const trackId = useMemo(() => `religious-story-${story.id}`, [story.id]);
 
@@ -531,7 +528,22 @@ function StoryListening({
   // so the user gets visible feedback even after they dismiss the loading modal.
   const isResolvingAudio = audioResolveState === 'resolving'
     || (isThisStoryAudio && globalAudioState.isLoading && !isPlaying && currentPosition === 0);
-  const formattedPosition = formatAudioTime(currentPosition);
+  const canSeekAudio = isThisStoryAudio && duration > 0 && !isResolvingAudio;
+  const {
+    displayPosition,
+    sliderPosition,
+    handleSeekStart,
+    handleSeekChange,
+    handleSeekComplete,
+  } = useAudioSeekPreview({
+    currentPosition,
+    duration,
+    canSeek: canSeekAudio,
+    isCurrentTrack: isThisStoryAudio,
+    resetKey: trackId,
+    seekTo: seekGlobalAudio,
+  });
+  const formattedPosition = formatAudioTime(displayPosition);
   const formattedDuration = formatAudioTime(duration);
 
   const checkConnection = useCallback(async () => {
@@ -560,10 +572,13 @@ function StoryListening({
     setAudioAttempted(false);
     setAudioStartError(false);
     setAudioModalDismissed(false);
-    setAudioCachedLocally(false);
+    setAudioDownloadState('idle');
+    setAudioDownloadError(null);
     if (story.audioUrl) {
       isStoryAudioCached(story.id, story.audioUrl)
-        .then(setAudioCachedLocally)
+        .then((cached) => {
+          setAudioDownloadState(cached ? 'downloaded' : 'idle');
+        })
         .catch(() => {});
     }
   }, [story.id, story.audioUrl]);
@@ -586,7 +601,9 @@ function StoryListening({
     setAudioResolveState('resolving');
     const prepared = await prepareStoryAudio(story.id, story.audioUrl);
     setAudioResolveState('ready');
-    if (prepared.isLocal) setAudioCachedLocally(true);
+    if (prepared.isLocal) {
+      setAudioDownloadState('downloaded');
+    }
     return prepared;
   }, [story.audioUrl, story.id]);
 
@@ -619,7 +636,9 @@ function StoryListening({
 
     // Cache check first — if the file is already on disk, we can play offline.
     const cachedLocally = await isStoryAudioCached(story.id, story.audioUrl || '');
-    if (cachedLocally) setAudioCachedLocally(true);
+    if (cachedLocally) {
+      setAudioDownloadState('downloaded');
+    }
 
     // Only block on the network check when we actually need to stream.
     if (!cachedLocally && !hasStartedCurrentAudio) {
@@ -657,7 +676,7 @@ function StoryListening({
       await playAzkarQueue(
         [{
           id: trackId,
-          title: story.audioTitle?.trim() || getTitle(story),
+          title: getStoryAudioDisplayTitle(story),
           subtitle: labels.audio,
           url: prepared.uri,
           forceExpoAv: true,
@@ -686,6 +705,55 @@ function StoryListening({
     toggleGlobalAudio,
     trackId,
   ]);
+
+  const handleDownloadAudio = useCallback(async () => {
+    if (!story.audioUrl || audioDownloadState === 'downloading') return;
+
+    setAudioDownloadError(null);
+
+    const cachedLocally = await isStoryAudioCached(story.id, story.audioUrl);
+    if (cachedLocally) {
+      setAudioDownloadState('downloaded');
+      return;
+    }
+
+    const net = await NetInfo.fetch().catch(() => null);
+    const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+    setNetworkState(offline ? 'offline' : 'online');
+    if (offline) {
+      setAudioAttempted(true);
+      setAudioModalDismissed(false);
+      return;
+    }
+
+    setAudioDownloadState('downloading');
+    const didShowPreDownloadAd = await showInterstitial({
+      allowInSacredContext: false,
+      ignoreSmartFrequencyCaps: true,
+      ignoreSmartSessionDelay: true,
+      ignoreGlobalCooldown: true,
+      timeoutMs: 5000,
+    }).catch(() => false);
+
+    try {
+      setAudioDownloadState('downloading');
+      await downloadStoryAudio(story.id, story.audioUrl);
+      setAudioDownloadState('downloaded');
+      if (didShowPreDownloadAd !== true) {
+        showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+      }
+    } catch (downloadError) {
+      setAudioDownloadState('error');
+      setAudioDownloadError(labels.downloadFailed);
+      console.log('Religious story audio download failed', downloadError);
+    }
+  }, [audioDownloadState, labels.downloadFailed, story.audioUrl, story.id]);
 
   const handleSharePdf = useCallback(async () => {
     try {
@@ -719,14 +787,12 @@ function StoryListening({
           style: { backgroundColor: 'rgba(109, 93, 252, 0.16)' },
         }]}
       >
-        <Text style={[s.headerTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[s.headerTitle, { color: colors.text }]} numberOfLines={2}>
           {getTitle(story)}
         </Text>
       </UniversalHeader>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
-        {/* Online notice only matters when an audio file actually needs to stream. */}
-        {!!story.audioUrl && !audioCachedLocally && <OnlineNotice colors={colors} />}
         <LanguageNotice colors={colors} />
 
         {/* Audio panel is hidden until an admin attaches a recording. */}
@@ -736,25 +802,55 @@ function StoryListening({
             tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[s.panelOverlay, { backgroundColor: isDarkMode ? 'rgba(109,93,252,0.14)' : 'rgba(109,93,252,0.08)' }]} />
+          <View style={[s.panelOverlay, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.14)' : 'rgba(6,79,47,0.08)' }]} />
           <View style={s.audioContent}>
             <View style={[s.audioTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={s.cardIcon}>
                 <MaterialCommunityIcons name="headphones" size={26} color="#fff" />
               </View>
               <View style={s.cardText}>
-                <Text style={[s.cardTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
-                  {story.audioTitle?.trim() || getTitle(story)}
+                <Text style={[s.cardTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {getStoryAudioDisplayTitle(story)}
                 </Text>
                 <Text style={[s.cardBrief, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
                   {labels.audio}
                 </Text>
               </View>
+              <Pressable
+                onPress={handleDownloadAudio}
+                disabled={audioDownloadState === 'downloading' || audioDownloadState === 'downloaded'}
+                style={[s.downloadButton, audioDownloadState === 'downloaded' && s.downloadButtonDone]}
+                accessibilityRole="button"
+                accessibilityLabel={labels.download}
+              >
+                {audioDownloadState === 'downloading' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name={audioDownloadState === 'downloaded' ? 'check' : 'download'} size={16} color="#fff" />
+                )}
+                <Text style={s.downloadButtonText} numberOfLines={1}>
+                  {audioDownloadState === 'downloading'
+                    ? labels.downloading
+                    : audioDownloadState === 'downloaded'
+                      ? labels.downloaded
+                      : labels.download}
+                </Text>
+              </Pressable>
             </View>
 
-            <View style={s.progressTrack}>
-              <View style={[s.progressFill, { width: duration > 0 ? `${Math.min(Math.max(currentPosition / duration, 0), 1) * 100}%` : '0%' }]} />
-            </View>
+            <Slider
+              style={s.progressSlider}
+              minimumValue={0}
+              maximumValue={duration > 0 ? duration : 1}
+              value={sliderPosition}
+              disabled={!canSeekAudio}
+              minimumTrackTintColor={ACCENT}
+              maximumTrackTintColor="rgba(6,79,47,0.18)"
+              thumbTintColor={canSeekAudio ? ACCENT : 'rgba(255,255,255,0.45)'}
+              onSlidingStart={handleSeekStart}
+              onValueChange={handleSeekChange}
+              onSlidingComplete={handleSeekComplete}
+            />
 
             <View style={s.controls}>
               <Text style={[s.time, { color: colors.textLight }]}>{formattedPosition}</Text>
@@ -784,8 +880,22 @@ function StoryListening({
               })}
             </View>
 
+            {!!audioDownloadError && (
+              <Text style={[s.downloadErrorText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {audioDownloadError}
+              </Text>
+            )}
+
           </View>
         </View>}
+
+        <View style={{ paddingHorizontal: Spacing.lg }}>
+          <StoryInteractionBar
+            storyId={story.id}
+            section="prophet"
+            storyTitle={getTitle(story)}
+          />
+        </View>
 
         <InlineMrecAd screen={SCREEN_KEY} darkMode={isDarkMode} />
 
@@ -820,6 +930,8 @@ function StoryListening({
                 </Text>
               </ScrollView>
             </View>
+
+            <SourcesList sources={story.sources && story.sources.length > 0 ? story.sources : getStorySources(story)} />
 
             <InlineMrecAd screen={SCREEN_KEY} darkMode={isDarkMode} />
           </>
@@ -922,7 +1034,7 @@ export default function ReligiousStoriesScreen() {
               tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
               style={StyleSheet.absoluteFill}
             />
-            <View style={[s.panelOverlay, { backgroundColor: isDarkMode ? 'rgba(109,93,252,0.14)' : 'rgba(109,93,252,0.08)' }]} />
+            <View style={[s.panelOverlay, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.14)' : 'rgba(6,79,47,0.08)' }]} />
             <View style={[s.heroContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={s.cardIcon}>
                 <MaterialCommunityIcons name="book-heart" size={28} color="#fff" />
@@ -938,7 +1050,6 @@ export default function ReligiousStoriesScreen() {
             </View>
           </View>
 
-          <OnlineNotice colors={colors} />
           <LanguageNotice colors={colors} />
 
           <View style={s.searchOuter}>
@@ -1031,21 +1142,13 @@ const _s = StyleSheet.create({
     fontSize: 20,
     lineHeight: 32,
   },
-  notice: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 14,
-    backgroundColor: 'rgba(13,142,98,0.16)',
-  },
   languageNotice: {
     alignItems: 'center',
     gap: Spacing.sm,
     padding: 12,
     borderRadius: 16,
     marginBottom: 14,
-    backgroundColor: 'rgba(109,93,252,0.16)',
+    backgroundColor: 'rgba(6,79,47,0.16)',
   },
   noticeText: {
     flex: 1,
@@ -1149,16 +1252,9 @@ const _s = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
-  progressTrack: {
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(109,93,252,0.18)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: ACCENT,
+  progressSlider: {
+    width: '100%',
+    height: 34,
   },
   controls: {
     flexDirection: 'row',
@@ -1177,7 +1273,7 @@ const _s = StyleSheet.create({
     opacity: 0.5,
   },
   time: {
-    width: 62,
+    width: 76,
     fontFamily: fontSemiBold(),
     fontSize: 13,
     lineHeight: 22,
@@ -1217,6 +1313,34 @@ const _s = StyleSheet.create({
   },
   speedButtonTextActive: {
     color: '#fff',
+  },
+  downloadButton: {
+    flexShrink: 0,
+    minWidth: 92,
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: ACCENT,
+  },
+  downloadButtonDone: {
+    backgroundColor: '#0d8e62',
+  },
+  downloadButtonText: {
+    color: '#fff',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  downloadErrorText: {
+    color: '#ef4444',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
   },
   errorText: {
     color: '#ef4444',

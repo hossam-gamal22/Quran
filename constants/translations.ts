@@ -2710,6 +2710,42 @@ export interface TranslationKeys {
     tipTitle: string;
     tipDesc: string;
   };
+
+  // التفاعل مع القصص الدينية (إعجاب + تعليق + إبلاغ)
+  social?: {
+    like: string;
+    unlike: string;
+    comments: string;
+    send: string;
+    moreActions: string;
+    actions: string;
+    deleteComment: string;
+    deleteReply: string;
+    reply: string;
+    showReplies: string;
+    hideReplies: string;
+    writeReplyAs: string;
+    reportReason: string;
+    reportInappropriate: string;
+    reportSectarian: string;
+    reportMisinformation: string;
+    reportSpam: string;
+    reportHarassment: string;
+    reportOther: string;
+    reportedThanks: string;
+    noComments: string;
+    beFirst: string;
+    writeCommentAs: string;
+    setNameToComment: string;
+    bannedPermanent: string;
+    bannedUntil: string;
+    errorNoName: string;
+    errorBanned: string;
+    errorProfanity: string;
+    errorTooLong: string;
+    errorEmpty: string;
+    errorNetwork: string;
+  };
 }
 // ==================== العربية ====================
 const ar: TranslationKeys = {
@@ -5366,6 +5402,40 @@ const ar: TranslationKeys = {
     tipTitle: 'نصيحة',
     tipDesc: 'للحصول على أفضل نتيجة، ضع الهاتف مقلوباً (الشاشة لأسفل) في موضع السجود.',
   },
+  social: {
+    like: 'إعجاب',
+    unlike: 'إلغاء الإعجاب',
+    comments: 'التعليقات',
+    send: 'إرسال',
+    moreActions: 'المزيد',
+    actions: 'الإجراءات',
+    deleteComment: 'حذف التعليق',
+    deleteReply: 'حذف الردّ',
+    reply: 'ردّ',
+    showReplies: 'عرض الردود ({count})',
+    hideReplies: 'إخفاء الردود',
+    writeReplyAs: 'اكتب رداً باسم {name}…',
+    reportReason: 'سبب الإبلاغ',
+    reportInappropriate: 'محتوى غير لائق',
+    reportSectarian: 'كلام طائفي أو فتنة',
+    reportMisinformation: 'معلومات دينية غير صحيحة',
+    reportSpam: 'سبام أو إعلان',
+    reportHarassment: 'إساءة أو تنمّر',
+    reportOther: 'سبب آخر',
+    reportedThanks: 'تم استلام إبلاغك. شكراً لمساعدتك.',
+    noComments: 'لا توجد تعليقات بعد',
+    beFirst: 'كن أول من يشارك تأمّلاً',
+    writeCommentAs: 'اكتب تعليقاً باسم {name}…',
+    setNameToComment: 'أضف اسمك من الإعدادات لتتمكن من التعليق',
+    bannedPermanent: 'تم حظرك من التعليق',
+    bannedUntil: 'محظور من التعليق حتى {date}',
+    errorNoName: 'يجب إضافة اسم قبل التعليق',
+    errorBanned: 'لا يمكنك التعليق حالياً',
+    errorProfanity: 'يرجى مراجعة التعليق — يحتوي على ألفاظ غير مناسبة',
+    errorTooLong: 'التعليق طويل جداً',
+    errorEmpty: 'لا يمكن إرسال تعليق فارغ',
+    errorNetwork: 'تعذّر الإرسال — تحقق من الاتصال وحاول مرة أخرى',
+  },
 };
 // ==================== English ====================
 const en: TranslationKeys = {
@@ -8021,6 +8091,40 @@ const en: TranslationKeys = {
     step3Desc: 'Every 2 sujuds are automatically counted as one rakat. You can also tap the screen to count manually.',
     tipTitle: 'Tip',
     tipDesc: 'For best results, place the phone face-down (screen down) at your sujud position.',
+  },
+  social: {
+    like: 'Like',
+    unlike: 'Unlike',
+    comments: 'Comments',
+    send: 'Send',
+    moreActions: 'More',
+    actions: 'Actions',
+    deleteComment: 'Delete comment',
+    deleteReply: 'Delete reply',
+    reply: 'Reply',
+    showReplies: 'Show replies ({count})',
+    hideReplies: 'Hide replies',
+    writeReplyAs: 'Write a reply as {name}…',
+    reportReason: 'Report reason',
+    reportInappropriate: 'Inappropriate content',
+    reportSectarian: 'Sectarian or divisive speech',
+    reportMisinformation: 'Religious misinformation',
+    reportSpam: 'Spam or advertising',
+    reportHarassment: 'Harassment or bullying',
+    reportOther: 'Other reason',
+    reportedThanks: 'Your report has been received. Thank you.',
+    noComments: 'No comments yet',
+    beFirst: 'Be the first to share a reflection',
+    writeCommentAs: 'Write a comment as {name}…',
+    setNameToComment: 'Add your name from Settings to comment',
+    bannedPermanent: 'You are banned from commenting',
+    bannedUntil: 'Banned from commenting until {date}',
+    errorNoName: 'Please add a name before commenting',
+    errorBanned: 'You cannot comment right now',
+    errorProfanity: 'Please revise — your comment contains inappropriate language',
+    errorTooLong: 'Comment is too long',
+    errorEmpty: 'Cannot send an empty comment',
+    errorNetwork: 'Could not send — check your connection and try again',
   },
 };
 //==================== Français ====================

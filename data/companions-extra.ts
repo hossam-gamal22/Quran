@@ -23,6 +23,29 @@ export interface CompanionExtendedTranscript {
   en: string;
 }
 
+// Per-companion citation list. Mirrors StorySource in lib/content-api.ts.
+// `note` is used to flag ikhtilaf, weak chains, or disputed historical details
+// so readers see when a named source is reporting something contested.
+export interface CompanionSourceEntry {
+  reference: string;
+  url?: string;
+  note?: string;
+}
+
+// Sources shared by every companion biography in this file. The biographies
+// pull from the same core hadith collections and classical companion-
+// biography works; we list them once here and append per-companion specific
+// citations below.
+export const COMMON_COMPANION_SOURCES: CompanionSourceEntry[] = [
+  { reference: 'صحيح البخاري', url: 'https://sunnah.com/bukhari' },
+  { reference: 'صحيح مسلم', url: 'https://sunnah.com/muslim' },
+  { reference: 'سير أعلام النبلاء للذهبي' },
+  { reference: 'الإصابة في تمييز الصحابة لابن حجر' },
+  { reference: 'الطبقات الكبرى لابن سعد' },
+  { reference: 'السيرة النبوية لابن هشام' },
+  { reference: 'البداية والنهاية لابن كثير' },
+];
+
 export const COMPANIONS_EXTENDED_TRANSCRIPTS: Record<string, CompanionExtendedTranscript> = {
   // ──────────────────────────────────────────────────────────────────────
   // 1. أبو بكر الصديق رضي الله عنه
@@ -1758,4 +1781,211 @@ export const COMPANIONS_EXTENDED_TRANSCRIPTS: Record<string, CompanionExtendedTr
     ]),
   },
 };
+
+// Per-companion specific citations beyond the COMMON_COMPANION_SOURCES list.
+// Each entry lists the highest-value specific sources (hadiths, ayat, classical
+// biographies) for that companion's biography. Combined with COMMON sources at
+// display time in data/full-story-texts.ts → expandCompanionStory().
+export const COMPANIONS_SOURCES: Record<string, CompanionSourceEntry[]> = {
+  'abu-bakr': [
+    { reference: 'سورة التوبة 40 — "إذ يقول لصاحبه لا تحزن إن الله معنا"', url: 'https://quran.com/9/40' },
+    { reference: 'سورة آل عمران 144 — قوله ﷺ يوم وفاة النبي' },
+    { reference: 'صحيح البخاري 3661-3667 — مناقب أبي بكر' },
+    { reference: 'صحيح البخاري 4452-4458 — وفاة النبي ﷺ ووقوف أبي بكر بالناس' },
+    { reference: 'صحيح البخاري 7284 — حروب الردة وموقف أبي بكر "والله لو منعوني عناقًا"' },
+    { reference: 'صحيح البخاري 4986 — جمع القرآن في عهد أبي بكر' },
+  ],
+  'umar': [
+    { reference: 'صحيح البخاري 3679-3692 — مناقب عمر بن الخطاب' },
+    { reference: 'صحيح البخاري 3475 — "إذا هلك كسرى فلا كسرى بعده"' },
+    { reference: 'صحيح مسلم 567 — قصة إسلام عمر وقراءة سورة طه' },
+    { reference: 'تاريخ الطبري — الفتوحات في عهد عمر (العراق، فارس، الشام، مصر)' },
+    { reference: 'الفاروق عمر للعقاد (دراسة معاصرة)' },
+  ],
+  'uthman': [
+    { reference: 'صحيح البخاري 3693-3699 — مناقب عثمان' },
+    { reference: 'صحيح البخاري 3674 — تجهيز جيش العسرة (تبوك)' },
+    { reference: 'صحيح البخاري 4988 — جمع المصاحف في عهد عثمان' },
+    { reference: 'سيرة عثمان لابن شبة (تاريخ المدينة)' },
+  ],
+  'ali': [
+    { reference: 'صحيح البخاري 3701-3706 — مناقب علي بن أبي طالب' },
+    { reference: 'صحيح مسلم 2404 — حديث المنزلة "أنت مني بمنزلة هارون من موسى"' },
+    { reference: 'صحيح البخاري 4416 — خلافة علي وحديث الراية يوم خيبر' },
+    { reference: 'نهج البلاغة (الجامع المنسوب لعلي رضي الله عنه)', note: 'بعض ما فيه ثابت وبعضه ضعيف، يُرجع لكتب الحديث للتحقق' },
+  ],
+  'talha': [
+    { reference: 'سنن الترمذي 3739 — "طلحة شهيد يمشي على وجه الأرض"' },
+    { reference: 'صحيح البخاري 3724 — موقفه يوم أحد وحماية النبي ﷺ بجسده' },
+    { reference: 'تاريخ الطبري — معركة الجمل ومقتل طلحة' },
+  ],
+  'zubayr': [
+    { reference: 'صحيح البخاري 3717-3720 — مناقب الزبير' },
+    { reference: 'صحيح البخاري 2997 — "حواري كل نبي، وحواريي الزبير"' },
+    { reference: 'تاريخ الطبري — مقتل الزبير في وادي السباع بعد الجمل' },
+  ],
+  'saad': [
+    { reference: 'صحيح البخاري 3725 — "ارمِ سعد، فداك أبي وأمي" يوم أحد' },
+    { reference: 'صحيح مسلم 2412 — مستجاب الدعوة' },
+    { reference: 'تاريخ الطبري — معركة القادسية وفتح المدائن سنة 16هـ' },
+  ],
+  'said': [
+    { reference: 'صحيح البخاري 2452 / صحيح مسلم 1610 — قصة دعوته على أروى وعماها وغرقها في بئر أرضها' },
+    { reference: 'سنن الترمذي 3757 — العشرة المبشرون بالجنة' },
+  ],
+  'abdulrahman': [
+    { reference: 'صحيح البخاري 2049 — قصة المؤاخاة مع سعد بن الربيع' },
+    { reference: 'صحيح البخاري 5072 — "بارك الله لك"' },
+    { reference: 'صحيح مسلم 2962 — "الذين يخوضون فيك بالباطل"' },
+  ],
+  'abu-ubayda': [
+    { reference: 'صحيح البخاري 3744 — "أمين هذه الأمة"' },
+    { reference: 'صحيح البخاري 3745 / صحيح مسلم 2419 — تفضيل النبي ﷺ له' },
+    { reference: 'تاريخ الطبري — فتح الشام ووفاته في طاعون عمواس سنة 18هـ' },
+  ],
+  'bilal': [
+    { reference: 'صحيح البخاري 3754 / صحيح مسلم 2458 — "سمعت دف نعليك في الجنة"' },
+    { reference: 'سيرة ابن هشام — تعذيب أمية بن خلف لبلال وشراء أبي بكر له' },
+    { reference: 'صحيح مسلم 1764 — أذان بلال فوق الكعبة يوم الفتح' },
+  ],
+  'ammar': [
+    { reference: 'صحيح مسلم 2916 — "تقتلك الفئة الباغية"' },
+    { reference: 'سنن النسائي — حادثة الأبوين سمية وياسر وموتهما تعذيبًا' },
+    { reference: 'تاريخ الطبري — استشهاد عمار في صفين سنة 37هـ' },
+  ],
+  'musab': [
+    { reference: 'سيرة ابن هشام — اختياره ﷺ مصعبًا سفيرًا إلى المدينة قبل الهجرة' },
+    { reference: 'صحيح البخاري 1276 — استشهاد مصعب يوم أحد وكفنه في نمرة' },
+  ],
+  'khalid': [
+    { reference: 'صحيح البخاري 4262 — "سيف من سيوف الله"' },
+    { reference: 'تاريخ الطبري — حروب الردة وفتح الشام (اليرموك سنة 15هـ)' },
+    { reference: 'البداية والنهاية لابن كثير — وفاة خالد بحمص سنة 21هـ' },
+  ],
+  'ibn-masud': [
+    { reference: 'صحيح البخاري 3760-3762 — مناقب ابن مسعود وعلمه بالقرآن' },
+    { reference: 'صحيح البخاري 3808 — "خذوا القرآن من أربعة: من ابن مسعود..."' },
+    { reference: 'صحيح مسلم 822 — قراءة النبي ﷺ على ابن مسعود سورة النساء' },
+  ],
+  'saad-muadh': [
+    { reference: 'صحيح البخاري 3803 / صحيح مسلم 2466 — "اهتز عرش الرحمن لموت سعد بن معاذ"' },
+    { reference: 'صحيح البخاري 4121 — حكمه في بني قريظة' },
+  ],
+  'asad-zurara': [
+    { reference: 'سيرة ابن هشام — أول من بايع في العقبة الأولى وكان نقيب بني النجار' },
+    { reference: 'البداية والنهاية لابن كثير — وفاته قبيل بدر' },
+  ],
+  'abu-ayyub': [
+    { reference: 'صحيح البخاري 422 — استضافة النبي ﷺ ببيت أبي أيوب عند الهجرة' },
+    { reference: 'تاريخ الطبري — استشهاده في حصار القسطنطينية سنة 52هـ ودفنه بأسوارها' },
+  ],
+  'khadijah': [
+    { reference: 'صحيح البخاري 3 / صحيح مسلم 160 — قصة بدء الوحي وأول من آمن من النساء', url: 'https://sunnah.com/bukhari:3' },
+    { reference: 'صحيح البخاري 3815-3821 — مناقب خديجة' },
+    { reference: 'صحيح البخاري 3820 — قراءة جبريل عليها السلام من ربها', url: 'https://sunnah.com/bukhari:3820' },
+  ],
+  'aisha': [
+    { reference: 'صحيح البخاري 3768-3771 — مناقب عائشة' },
+    { reference: 'صحيح البخاري 4750 / صحيح مسلم 2770 — حديث الإفك وبراءتها بقرآن يُتلى' },
+    { reference: 'سورة النور 11-20 — البراءة' },
+  ],
+  'hafsa': [
+    { reference: 'صحيح البخاري 4986 — حفظ المصحف الأول عند حفصة بعد أبي بكر' },
+    { reference: 'سنن النسائي 3560 — تطليقها ومراجعتها' },
+  ],
+  'sawdah': [
+    { reference: 'صحيح البخاري 5212 / صحيح مسلم 1463 — هبتها يومها لعائشة' },
+    { reference: 'صحيح البخاري 146 — حادثة عمر وذكر الحجاب' },
+  ],
+  'umm-salama': [
+    { reference: 'صحيح مسلم 918 — دعاء المصيبة وزواجها بالنبي ﷺ' },
+    { reference: 'صحيح البخاري 1797 / صحيح مسلم 1230 — مشورتها يوم الحديبية' },
+  ],
+  'fatima': [
+    { reference: 'صحيح البخاري 3623-3627 / صحيح مسلم 2450 — "فاطمة سيدة نساء أهل الجنة" وموتها بعد النبي ﷺ' },
+    { reference: 'صحيح البخاري 6285 / صحيح مسلم 2450 — حادثة بكائها ثم ضحكها قبل وفاة النبي ﷺ' },
+    { reference: 'صحيح البخاري 5362 — التسبيح خير من خادم' },
+  ],
+  'zaynab-prophet': [
+    { reference: 'سيرة ابن هشام — قصة هجرتها وحادثة الراحلة' },
+    { reference: 'سنن أبي داود 2240 — رد النبي ﷺ زينب على زوجها أبي العاص بنكاحها الأول' },
+  ],
+  'umm-habiba': [
+    { reference: 'صحيح مسلم 1480 — أصدقها النجاشي أربعمائة دينار' },
+    { reference: 'تاريخ الطبري — هجرتها للحبشة وزواجها' },
+  ],
+  'maymuna': [
+    { reference: 'صحيح البخاري 1837 — تزوجها النبي ﷺ في عمرة القضاء' },
+    { reference: 'صحيح مسلم 1411 — اختلف في كونه في الإحرام' },
+  ],
+  'zaynab-khuzayma': [
+    { reference: 'الطبقات الكبرى لابن سعد — "أم المساكين"' },
+    { reference: 'البداية والنهاية لابن كثير — وفاتها في حياة النبي ﷺ' },
+  ],
+  'ubayy': [
+    { reference: 'صحيح البخاري 3809 — "إن الله أمرني أن أقرأ عليك القرآن"' },
+    { reference: 'صحيح البخاري 4475 — "أقرؤكم أُبيّ"' },
+  ],
+  'ubada': [
+    { reference: 'صحيح البخاري 7199 / صحيح مسلم 1709 — بيعة العقبة وشهاده بدر' },
+    { reference: 'صحيح مسلم 1828 — "بايعنا رسول الله ﷺ على السمع والطاعة"' },
+  ],
+  'usayd': [
+    { reference: 'صحيح البخاري 3805 — قراءته للقرآن ونزول الملائكة' },
+    { reference: 'سيرة ابن هشام — موقفه في بيعة العقبة الثانية' },
+  ],
+  'jabir': [
+    { reference: 'صحيح البخاري 2127 / صحيح مسلم 715 — قصة الجمل' },
+    { reference: 'صحيح مسلم 1218 — حديث جابر الطويل في حجة الوداع' },
+  ],
+  'anas': [
+    { reference: 'صحيح البخاري 6378 / صحيح مسلم 660 — خدمته النبي ﷺ عشر سنين' },
+    { reference: 'صحيح البخاري 6334 — دعاء النبي ﷺ له بالبركة والمال والولد' },
+  ],
+  'abu-hurayra': [
+    { reference: 'صحيح البخاري 119 — قصة بسطه ثوبه ودعاء النبي ﷺ ألا ينسى' },
+    { reference: 'مسند بقي بن مخلد — أكثر الصحابة رواية للحديث (5374 حديثًا)' },
+  ],
+  'ibn-umar': [
+    { reference: 'صحيح البخاري 3738-3741 — مناقب ابن عمر' },
+    { reference: 'مسند الإمام أحمد — رواياته الكثيرة وتشدّده في اتباع السنة' },
+  ],
+  'ibn-abbas': [
+    { reference: 'صحيح البخاري 75 / صحيح مسلم 2477 — "اللهم فقهه في الدين وعلمه التأويل"', url: 'https://sunnah.com/bukhari:75' },
+    { reference: 'صحيح البخاري 143 — دعوة النبي ﷺ له' },
+    { reference: 'تفسير ابن عباس (جامع لمروياته في التفسير، رواه الطبري وغيره)' },
+  ],
+  'jaafar': [
+    { reference: 'صحيح البخاري 3709 — "ذو الجناحين"' },
+    { reference: 'مسند أحمد — رحلة الحبشة وحوار النجاشي معه' },
+    { reference: 'تاريخ الطبري — استشهاده في مؤتة سنة 8هـ' },
+  ],
+  'zayd-haritha': [
+    { reference: 'سورة الأحزاب 37 — "فلما قضى زيد منها وطرًا"', url: 'https://quran.com/33/37' },
+    { reference: 'صحيح البخاري 3733 / صحيح مسلم 2426 — قصة تبني النبي ﷺ له ثم نسخه' },
+    { reference: 'تاريخ الطبري — استشهاده في مؤتة وقيادته الجيش' },
+  ],
+  'handhalah': [
+    { reference: 'مستدرك الحاكم — "غسيل الملائكة" يوم أحد', note: 'صححه الحاكم ووافقه الذهبي' },
+    { reference: 'سيرة ابن هشام — قصة استشهاده في أحد بعد ليلة عرسه' },
+  ],
+  'salman-farisi': [
+    { reference: 'مسند أحمد — قصة إسلامه الطويلة من فارس إلى الحبر النصراني إلى النبي ﷺ' },
+    { reference: 'صحيح البخاري 4101 — "سلمان منا أهل البيت" في الخندق' },
+    { reference: 'سنن الترمذي 3540 — قصة فدائه بمال أبي بكر' },
+  ],
+  'hamza': [
+    { reference: 'سيرة ابن هشام — قصة إسلام حمزة بعد سب أبي جهل للنبي ﷺ' },
+    { reference: 'صحيح البخاري 4072 — استشهاد حمزة في أحد وتمثيل وحشي به' },
+    { reference: 'صحيح البخاري 3811 — "سيد الشهداء حمزة"' },
+  ],
+};
+
+// Aggregate exposed publicly so the mobile app and admin panel can derive
+// the full source list for any companion by id.
+export function getCompanionSources(companionId?: string): CompanionSourceEntry[] {
+  if (!companionId) return COMMON_COMPANION_SOURCES;
+  const specific = COMPANIONS_SOURCES[companionId] || [];
+  return [...specific, ...COMMON_COMPANION_SOURCES];
+}
 

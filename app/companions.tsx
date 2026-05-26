@@ -9,26 +9,33 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Modal,
   Platform,
   TextInput,
   LayoutAnimation,
   UIManager,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import NetInfo from '@react-native-community/netinfo';
+import Slider from '@react-native-community/slider';
 
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings, useTranslation } from '@/contexts/SettingsContext';
+import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
+import { useAudioSeekPreview } from '@/hooks/use-audio-seek-preview';
 import { t, getLanguage } from '@/lib/i18n';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import { SourcesList } from '@/components/ui/SourcesList';
+import { getCompanionSources } from '@/data/companions-extra';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { showAdThenExport } from '@/lib/pdf-export';
 import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
@@ -39,8 +46,11 @@ import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { useCompanionsContent } from '@/lib/content-api';
-import { useAzkarAudio } from '@/hooks/use-azkar-audio';
+import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
+import { formatAudioTime } from '@/lib/audio-time';
 import { expandCompanionStory } from '@/data/full-story-texts';
+import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
+import { companionStoryId } from '@/lib/story-id';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
@@ -1197,6 +1207,10 @@ function getCompanionName(companion: Companion): string {
   return getLanguage() === 'ar' ? companion.nameAr : companion.nameEn;
 }
 
+function getCompanionAudioTitle(companion: Companion): string {
+  return getCompanionName(companion);
+}
+
 function splitStoryParagraphs(text: string): string[] {
   return text
     .split(/\n{2,}/)
@@ -1331,30 +1345,115 @@ function getListenCopy() {
   return lang === 'ar'
     ? {
         title: 'استمع للقصة',
-        subtitle: 'صوت القصة مع النص والتمرير التلقائي',
+        subtitle: 'صوت القصة مع النص',
         open: 'فتح صفحة الاستماع',
         noAudio: 'لم يتم إضافة ملف الصوت بعد',
         noAudioHint: 'الصوت غير متاح لهذه القصة حاليًا.',
+        loadingAudioTitle: 'جاري تحميل الصوت',
+        loadingAudioBody: 'انتظر لحظات، سيتم تشغيل القصة تلقائيًا.',
+        noInternetTitle: 'لا يوجد اتصال بالإنترنت',
+        noInternetBody: 'الصوت غير محمل على الجهاز. اتصل بالإنترنت للتشغيل أو حمّله مسبقًا للاستماع أوفلاين.',
+        audioErrorTitle: 'تعذر تشغيل الصوت',
+        audioErrorBody: 'استغرق تحميل الصوت وقتًا طويلًا. تحقق من الاتصال ثم حاول مرة أخرى.',
+        retry: 'حاول مرة أخرى',
+        close: 'إغلاق',
+        download: 'تحميل',
+        downloading: 'جاري التحميل',
+        downloaded: 'محمل',
+        downloadFailed: 'تعذر تحميل الصوت. تحقق من الاتصال ثم حاول مرة أخرى.',
         play: 'تشغيل',
         pause: 'إيقاف مؤقت',
         transcript: 'نص القصة',
-        autoScrollOn: 'إيقاف التمرير',
-        autoScrollOff: 'تشغيل التمرير',
         audioSource: 'الصوت',
       }
     : {
         title: 'Listen to the story',
-        subtitle: 'Story audio with synced auto-scroll text',
+        subtitle: 'Story audio with text',
         open: 'Open listening page',
         noAudio: 'No audio file has been added yet',
         noAudioHint: 'Audio is not available for this story yet.',
+        loadingAudioTitle: 'Loading audio',
+        loadingAudioBody: 'Please wait. The story will start automatically.',
+        noInternetTitle: 'No internet connection',
+        noInternetBody: 'This audio is not downloaded on this device. Connect to play it, or download it first for offline listening.',
+        audioErrorTitle: 'Audio could not be played',
+        audioErrorBody: 'Audio loading took too long. Check your connection and try again.',
+        retry: 'Try again',
+        close: 'Close',
+        download: 'Download',
+        downloading: 'Downloading',
+        downloaded: 'Downloaded',
+        downloadFailed: 'Audio could not be downloaded. Check your connection and try again.',
         play: 'Play',
         pause: 'Pause',
         transcript: 'Story text',
-        autoScrollOn: 'Pause scroll',
-        autoScrollOff: 'Resume scroll',
         audioSource: 'Audio',
       };
+}
+
+function AudioStatusModal({
+  visible,
+  mode,
+  colors,
+  onRetry,
+  onClose,
+}: {
+  visible: boolean;
+  mode: 'loading' | 'offline' | 'error';
+  colors: ReturnType<typeof useColors>;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  const copy = getListenCopy();
+  const s = useScaledStyles(_s, colors.fs);
+  const isRTL = useIsRTL();
+  const isLoading = mode === 'loading';
+  const title = isLoading ? copy.loadingAudioTitle : mode === 'offline' ? copy.noInternetTitle : copy.audioErrorTitle;
+  const body = isLoading ? copy.loadingAudioBody : mode === 'offline' ? copy.noInternetBody : copy.audioErrorBody;
+  const icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] = isLoading ? 'headphones' : mode === 'offline' ? 'wifi-off' : 'alert-circle-outline';
+  const tint = mode === 'offline' ? '#f59e0b' : mode === 'error' ? '#ef4444' : ACCENT;
+  const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
+  const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <View style={s.modalOverlay}>
+        <View
+          style={[
+            s.modalCard,
+            {
+              backgroundColor: cardBg,
+              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        >
+          <View style={[s.modalIconCircle, { backgroundColor: iconBg }]}>
+            <MaterialCommunityIcons name={icon} size={42} color={tint} />
+          </View>
+          {isLoading && <ActivityIndicator size="large" color={tint} style={s.modalSpinner} />}
+          <Text style={[s.modalTitle, { color: colors.text, textAlign: 'center' }]}>{title}</Text>
+          <Text style={[s.modalBody, { color: colors.textLight, textAlign: 'center' }]}>{body}</Text>
+          {isLoading ? (
+            <Pressable
+              onPress={onClose}
+              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, marginTop: 18, alignSelf: 'stretch' }]}
+            >
+              <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
+            </Pressable>
+          ) : (
+            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 18 }]}>
+              <Pressable onPress={onClose} style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight }]}>
+                <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
+              </Pressable>
+              <Pressable onPress={onRetry} style={[s.modalButton, s.modalButtonPrimary]}>
+                <Text style={[s.modalButtonText, { color: '#fff' }]}>{copy.retry}</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCardProps) {
@@ -1386,7 +1485,7 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
           <MaterialCommunityIcons name="account" size={24} color={colors.text} />
         </View>
         <View style={s.cardTextWrap}>
-          <Text style={[s.cardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+          <Text style={[s.cardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {getCompanionName(companion)}
           </Text>
           {getLanguage() === 'ar' ? (
@@ -1409,148 +1508,293 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
   );
 }
 
-interface StoryDetailProps {
-  companion: Companion;
-  onBack: () => void;
-  onListen: () => void;
-  onShare: () => void;
-  onToggleFav: () => void;
-  isFav: boolean;
-  isDarkMode: boolean;
-  colors: ReturnType<typeof useColors>;
-}
-
-interface StoryListenEntryProps {
-  companion: Companion;
-  onPress: () => void;
-  isDarkMode: boolean;
-  colors: ReturnType<typeof useColors>;
-}
-
-function StoryListenEntry({ companion, onPress, isDarkMode, colors }: StoryListenEntryProps) {
-  const isRTL = useIsRTL();
-  const s = useScaledStyles(_s, colors.fs);
-  const copy = getListenCopy();
-  const hasAudio = !!companion.audioUrl?.trim();
-  if (!hasAudio) return null;
-
-  return (
-    <View style={s.detailSectionOuter}>
-      <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-          <MaterialCommunityIcons name="headphones" size={18} color={colors.text} />
-        </View>
-        <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-          {copy.title}
-        </Text>
-      </View>
-
-      <Pressable onPress={onPress} style={s.listenEntryOuter}>
-        <BlurView
-          intensity={Platform.OS === 'ios' ? 25 : 10}
-          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-          style={StyleSheet.absoluteFill}
-        />
-        <View
-          style={[
-            s.listenEntryOverlay,
-            {
-              backgroundColor: isDarkMode ? 'rgba(6,79,47,0.14)' : 'rgba(6,79,47,0.08)',
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-            },
-          ]}
-        />
-        <View style={[s.listenEntryContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={[s.listenEntryIcon, { backgroundColor: hasAudio ? ACCENT : ACCENT_LIGHT }]}>
-            <MaterialCommunityIcons name={hasAudio ? 'play' : 'text-box-outline'} size={26} color={hasAudio ? '#fff' : colors.text} />
-          </View>
-          <View style={s.listenEntryText}>
-            <Text style={[s.listenEntryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {companion.audioTitle?.trim() || companion.videoTitle?.trim() || copy.open}
-            </Text>
-            <Text style={[s.listenEntrySubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {hasAudio ? copy.subtitle : copy.noAudioHint}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={colors.textLight} />
-        </View>
-      </Pressable>
-    </View>
-  );
-}
-
 interface StoryListeningProps {
   companion: Companion;
   onBack: () => void;
+  onShare?: () => void;
+  onToggleFav?: () => void;
+  isFav?: boolean;
   isDarkMode: boolean;
   colors: ReturnType<typeof useColors>;
 }
 
-function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListeningProps) {
+function StoryListening({ companion, onBack, onShare, onToggleFav, isFav = false, isDarkMode, colors }: StoryListeningProps) {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_s, colors.fs);
   const copy = getListenCopy();
   const transcript = useMemo(() => getCompanionTranscript(companion), [companion]);
-  const transcriptRef = useRef<ScrollView>(null);
-  const scrollMetricsRef = useRef({ viewportHeight: 0, contentHeight: 0 });
-  const finishAdShownRef = useRef(false);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const hasAudio = !!companion.audioUrl?.trim();
-  const handlePlaybackStatusUpdate = useCallback((status: any) => {
-    if (!status?.isLoaded || !status.didJustFinish || finishAdShownRef.current) return;
-    finishAdShownRef.current = true;
-    setAutoScroll(false);
-    showInterstitial({
-      allowInSacredContext: false,
-      ignoreSmartSessionDelay: true,
-    }).catch(() => {});
-  }, []);
+  const audioTitle = getCompanionAudioTitle(companion);
   const {
-    isPlaying,
-    isLoading,
+    state: globalAudioState,
+    playAzkarQueue,
+    togglePlayPause: toggleGlobalAudio,
+    seekTo: seekGlobalAudio,
+    playbackSpeed,
+    setPlaybackSpeed,
+  } = useGlobalAudio();
+  const finishAdShownRef = useRef(false);
+  const prePlayAdShownRef = useRef(false);
+  const prePlayAdDisplayedRef = useRef(false);
+  const [networkState, setNetworkState] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [audioResolveState, setAudioResolveState] = useState<'idle' | 'resolving' | 'ready' | 'error'>('idle');
+  const [audioAttempted, setAudioAttempted] = useState(false);
+  const [audioStartError, setAudioStartError] = useState(false);
+  const [audioModalDismissed, setAudioModalDismissed] = useState(false);
+  const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
+  const hasAudio = !!companion.audioUrl?.trim();
+  const trackId = useMemo(() => `companion-story-${companion.id}`, [companion.id]);
+  const isThisStoryAudio = globalAudioState.source === 'azkar' && globalAudioState.currentTrackId === trackId;
+  const isPlaying = isThisStoryAudio && globalAudioState.isPlaying;
+  const currentPosition = isThisStoryAudio ? globalAudioState.position : 0;
+  const duration = isThisStoryAudio ? globalAudioState.duration : 0;
+  const isResolvingAudio = audioResolveState === 'resolving'
+    || (isThisStoryAudio && globalAudioState.isLoading && !isPlaying && currentPosition === 0);
+  const canSeekAudio = isThisStoryAudio && duration > 0 && !isResolvingAudio;
+  const {
+    displayPosition,
+    sliderPosition,
+    handleSeekStart,
+    handleSeekChange,
+    handleSeekComplete,
+  } = useAudioSeekPreview({
     currentPosition,
     duration,
-    error,
-    formattedPosition,
-    formattedDuration,
-    playbackRate,
-    setPlaybackRate,
-    togglePlayPause,
-  } = useAzkarAudio({
-    audioUrl: companion.audioUrl,
-    onPlaybackStatusUpdate: handlePlaybackStatusUpdate,
+    canSeek: canSeekAudio,
+    isCurrentTrack: isThisStoryAudio,
+    resetKey: trackId,
+    seekTo: seekGlobalAudio,
   });
+  const formattedPosition = formatAudioTime(displayPosition);
+  const formattedDuration = formatAudioTime(duration);
+
+  const checkConnection = useCallback(async () => {
+    setAudioModalDismissed(false);
+    setNetworkState('checking');
+    const net = await NetInfo.fetch().catch(() => null);
+    const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+    setNetworkState(offline ? 'offline' : 'online');
+  }, []);
 
   useEffect(() => {
-    if (!autoScroll || duration <= 0) return;
-    const { viewportHeight, contentHeight } = scrollMetricsRef.current;
-    const maxScroll = Math.max(contentHeight - viewportHeight, 0);
-    if (maxScroll <= 0) return;
-    const progress = Math.min(Math.max(currentPosition / duration, 0), 1);
-    transcriptRef.current?.scrollTo({ y: maxScroll * progress, animated: true });
-  }, [autoScroll, currentPosition, duration]);
+    checkConnection();
+    const unsubscribe = NetInfo.addEventListener((net) => {
+      const offline = net.isConnected === false || net.isInternetReachable === false;
+      setNetworkState(offline ? 'offline' : 'online');
+      if (!offline) setAudioModalDismissed(false);
+    });
+    return () => unsubscribe();
+  }, [checkConnection]);
+
+  useEffect(() => {
+    finishAdShownRef.current = false;
+    prePlayAdShownRef.current = false;
+    prePlayAdDisplayedRef.current = false;
+    setAudioResolveState('idle');
+    setAudioAttempted(false);
+    setAudioStartError(false);
+    setAudioModalDismissed(false);
+    setAudioDownloadState('idle');
+    setAudioDownloadError(null);
+    if (companion.audioUrl) {
+      isStoryAudioCached(companion.id, companion.audioUrl)
+        .then((cached) => {
+          setAudioDownloadState(cached ? 'downloaded' : 'idle');
+        })
+        .catch(() => {});
+    }
+  }, [companion.id, companion.audioUrl]);
+
+  const handleTrackComplete = useCallback(() => {
+    if (finishAdShownRef.current) return;
+    if (prePlayAdDisplayedRef.current) return;
+    finishAdShownRef.current = true;
+    showInterstitial({
+      allowInSacredContext: false,
+      ignoreSmartFrequencyCaps: true,
+      ignoreSmartSessionDelay: true,
+      ignoreGlobalCooldown: true,
+      timeoutMs: 5000,
+    }).catch(() => {});
+  }, []);
+
+  const resolveAudioForPlayback = useCallback(async () => {
+    if (!companion.audioUrl) throw new Error('missing-audio-url');
+    setAudioResolveState('resolving');
+    const prepared = await prepareStoryAudio(companion.id, companion.audioUrl);
+    setAudioResolveState('ready');
+    if (prepared.isLocal) {
+      setAudioDownloadState('downloaded');
+    }
+    return prepared;
+  }, [companion.audioUrl, companion.id]);
+
+  const hasAudioError = audioAttempted && (audioResolveState === 'error' || audioStartError || (isThisStoryAudio && !!globalAudioState.error));
+  const audioStillBuffering = isThisStoryAudio && globalAudioState.isLoading && !isPlaying && currentPosition === 0;
+  const isAudioPreparing = audioAttempted && (networkState === 'checking' || audioResolveState === 'resolving' || audioStillBuffering);
+  const audioModalMode = networkState === 'offline' ? 'offline' : hasAudioError ? 'error' : 'loading';
+  const showAudioModal = !audioModalDismissed && audioAttempted && (isAudioPreparing || networkState === 'offline' || hasAudioError);
+
+  useEffect(() => {
+    if (!audioAttempted) return;
+    if (isPlaying || currentPosition > 0 || duration > 0) {
+      setAudioModalDismissed(true);
+    }
+  }, [audioAttempted, currentPosition, duration, isPlaying]);
+
+  const handlePlayPress = useCallback(async () => {
+    setAudioAttempted(true);
+    setAudioModalDismissed(false);
+    setAudioStartError(false);
+
+    const hasStartedCurrentAudio = isThisStoryAudio && (isPlaying || currentPosition > 0 || duration > 0);
+    const cachedLocally = await isStoryAudioCached(companion.id, companion.audioUrl || '');
+    if (cachedLocally) {
+      setAudioDownloadState('downloaded');
+    }
+
+    if (!cachedLocally && !hasStartedCurrentAudio) {
+      const net = await NetInfo.fetch().catch(() => null);
+      const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+      setNetworkState(offline ? 'offline' : 'online');
+      if (offline) return;
+    } else {
+      setNetworkState('online');
+    }
+
+    if (hasStartedCurrentAudio && !globalAudioState.isLoading) {
+      await toggleGlobalAudio();
+      return;
+    }
+
+    try {
+      if (!prePlayAdShownRef.current && !hasStartedCurrentAudio) {
+        prePlayAdShownRef.current = true;
+        const didShowPrePlayAd = await showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
+      }
+
+      const prepared = await resolveAudioForPlayback();
+      await playAzkarQueue(
+        [{
+          id: trackId,
+          title: audioTitle,
+          subtitle: copy.audioSource,
+          url: prepared.uri,
+          forceExpoAv: true,
+        }],
+        0,
+        '/companions',
+        { onTrackComplete: handleTrackComplete },
+      );
+    } catch (audioError) {
+      setAudioModalDismissed(false);
+      setAudioResolveState('error');
+      setAudioStartError(true);
+      console.log('Companion story audio playback failed', audioError);
+    }
+  }, [
+    audioTitle,
+    companion.audioUrl,
+    companion.id,
+    copy.audioSource,
+    currentPosition,
+    duration,
+    globalAudioState.isLoading,
+    handleTrackComplete,
+    isPlaying,
+    isThisStoryAudio,
+    playAzkarQueue,
+    resolveAudioForPlayback,
+    toggleGlobalAudio,
+    trackId,
+  ]);
+
+  const handleDownloadAudio = useCallback(async () => {
+    if (!companion.audioUrl || audioDownloadState === 'downloading') return;
+
+    setAudioDownloadError(null);
+
+    const cachedLocally = await isStoryAudioCached(companion.id, companion.audioUrl);
+    if (cachedLocally) {
+      setAudioDownloadState('downloaded');
+      return;
+    }
+
+    const net = await NetInfo.fetch().catch(() => null);
+    const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+    setNetworkState(offline ? 'offline' : 'online');
+    if (offline) {
+      setAudioAttempted(true);
+      setAudioModalDismissed(false);
+      return;
+    }
+
+    setAudioDownloadState('downloading');
+    const didShowPreDownloadAd = await showInterstitial({
+      allowInSacredContext: false,
+      ignoreSmartFrequencyCaps: true,
+      ignoreSmartSessionDelay: true,
+      ignoreGlobalCooldown: true,
+      timeoutMs: 5000,
+    }).catch(() => false);
+
+    try {
+      setAudioDownloadState('downloading');
+      await downloadStoryAudio(companion.id, companion.audioUrl);
+      setAudioDownloadState('downloaded');
+      if (didShowPreDownloadAd !== true) {
+        showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+      }
+    } catch (downloadError) {
+      setAudioDownloadState('error');
+      setAudioDownloadError(copy.downloadFailed);
+      console.log('Companion story audio download failed', downloadError);
+    }
+  }, [
+    audioDownloadState,
+    companion.audioUrl,
+    companion.id,
+    copy.downloadFailed,
+  ]);
 
   return (
     <View style={s.detailContainer}>
-      <View style={[s.detailHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <Pressable
-          onPress={onBack}
-          style={[s.detailBackBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
-        >
-          <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={26} color={colors.text} />
-        </Pressable>
-        <Text style={[s.detailHeaderTitle, { color: colors.text }]} numberOfLines={1}>
-          {copy.title}
+      <UniversalHeader
+        onBack={onBack}
+        backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
+        rightActions={onToggleFav ? [{
+          icon: isFav ? 'heart' : 'heart-outline',
+          onPress: onToggleFav,
+          color: isFav ? '#ef4444' : colors.text,
+          size: 22,
+          style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
+        }] : []}
+      >
+        <Text style={[s.detailHeaderTitle, { color: colors.text }]} numberOfLines={2}>
+          {getCompanionName(companion)}
         </Text>
-        <View style={s.headerSpacer} />
-      </View>
+      </UniversalHeader>
 
       <ScrollView
         style={s.detailScroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.listenPageContent}
       >
-        <View style={s.audioPanelOuter}>
+        <ContentLanguageNotice />
+        {hasAudio && <View style={s.audioPanelOuter}>
           <BlurView
             intensity={Platform.OS === 'ios' ? 25 : 10}
             tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
@@ -1572,33 +1816,58 @@ function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListenin
               </View>
               <View style={s.listenEntryText}>
                 <Text style={[s.listenEntryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                  {companion.audioTitle?.trim() || companion.videoTitle?.trim() || getCompanionName(companion)}
+                  {audioTitle}
                 </Text>
                 <Text style={[s.listenEntrySubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {copy.audioSource}
                 </Text>
               </View>
+              <Pressable
+                onPress={handleDownloadAudio}
+                disabled={audioDownloadState === 'downloading' || audioDownloadState === 'downloaded'}
+                style={[s.audioDownloadButton, audioDownloadState === 'downloaded' && s.audioDownloadButtonDone]}
+                accessibilityRole="button"
+                accessibilityLabel={copy.download}
+              >
+                {audioDownloadState === 'downloading' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name={audioDownloadState === 'downloaded' ? 'check' : 'download'} size={16} color="#fff" />
+                )}
+                <Text style={s.audioDownloadButtonText} numberOfLines={1}>
+                  {audioDownloadState === 'downloading'
+                    ? copy.downloading
+                    : audioDownloadState === 'downloaded'
+                      ? copy.downloaded
+                      : copy.download}
+                </Text>
+              </Pressable>
             </View>
 
-            <View style={s.audioProgressTrack}>
-              <View
-                style={[
-                  s.audioProgressFill,
-                  { width: duration > 0 ? `${Math.min(Math.max(currentPosition / duration, 0), 1) * 100}%` : '0%' },
-                ]}
-              />
-            </View>
+            <Slider
+              style={s.audioProgressSlider}
+              minimumValue={0}
+              maximumValue={duration > 0 ? duration : 1}
+              value={sliderPosition}
+              disabled={!canSeekAudio}
+              minimumTrackTintColor={ACCENT}
+              maximumTrackTintColor="rgba(6,79,47,0.18)"
+              thumbTintColor={canSeekAudio ? ACCENT : 'rgba(255,255,255,0.45)'}
+              onSlidingStart={handleSeekStart}
+              onValueChange={handleSeekChange}
+              onSlidingComplete={handleSeekComplete}
+            />
 
             <View style={s.audioControlsRow}>
               <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedPosition}</Text>
               <Pressable
-                onPress={togglePlayPause}
-                disabled={!hasAudio || isLoading}
-                style={[s.audioPlayButton, (!hasAudio || isLoading) && s.audioPlayButtonDisabled]}
+                onPress={handlePlayPress}
+                disabled={!hasAudio || isResolvingAudio}
+                style={[s.audioPlayButton, (!hasAudio || isResolvingAudio) && s.audioPlayButtonDisabled]}
                 accessibilityRole="button"
                 accessibilityLabel={isPlaying ? copy.pause : copy.play}
               >
-                {isLoading ? (
+                {isResolvingAudio ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <MaterialCommunityIcons name={isPlaying ? 'pause' : 'play'} size={30} color="#fff" />
@@ -1610,11 +1879,11 @@ function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListenin
             <View style={[s.audioSpeedRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.audioSpeedLabel, { color: colors.textLight }]}>{getLanguage() === 'ar' ? 'السرعة' : 'Speed'}</Text>
               {AUDIO_SPEEDS.map((speed) => {
-                const active = Math.abs(playbackRate - speed) < 0.01;
+                const active = Math.abs(playbackSpeed - speed) < 0.01;
                 return (
                   <Pressable
                     key={speed}
-                    onPress={() => setPlaybackRate(speed)}
+                    onPress={() => setPlaybackSpeed(speed)}
                     style={[s.audioSpeedButton, active && s.audioSpeedButtonActive]}
                   >
                     <Text style={[s.audioSpeedButtonText, active && s.audioSpeedButtonTextActive]}>{speed}x</Text>
@@ -1628,12 +1897,21 @@ function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListenin
                 {copy.noAudio}. {copy.noAudioHint}
               </Text>
             )}
-            {!!error && (
-              <Text style={[s.audioNotice, { color: '#ef4444', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {error}
+
+            {!!audioDownloadError && (
+              <Text style={[s.audioDownloadErrorText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {audioDownloadError}
               </Text>
             )}
           </View>
+        </View>}
+
+        <View style={{ paddingHorizontal: Spacing.lg }}>
+          <StoryInteractionBar
+            storyId={companionStoryId(companion.id)}
+            section="companion"
+            storyTitle={getCompanionName(companion)}
+          />
         </View>
 
         <InlineMrecAd screen="companions" darkMode={isDarkMode} />
@@ -1643,20 +1921,10 @@ function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListenin
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
               <MaterialCommunityIcons name="book-open-page-variant" size={18} color={colors.text} />
             </View>
-            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            <Text style={[s.detailSectionTitle, { flex: 1, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {copy.transcript}
             </Text>
-            <Pressable
-              onPress={() => setAutoScroll((prev) => !prev)}
-              style={[s.autoScrollToggle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-              accessibilityRole="button"
-              accessibilityLabel={autoScroll ? copy.autoScrollOn : copy.autoScrollOff}
-            >
-              <MaterialCommunityIcons name={autoScroll ? 'pause' : 'play'} size={14} color="#fff" />
-              <Text style={s.autoScrollToggleText}>
-                {autoScroll ? copy.autoScrollOn : copy.autoScrollOff}
-              </Text>
-            </Pressable>
+            {onShare && <PdfShareButton onPress={onShare} />}
           </View>
           <View style={s.transcriptOuter}>
             <BlurView
@@ -1674,16 +1942,8 @@ function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListenin
               ]}
             />
             <ScrollView
-              ref={transcriptRef}
               nestedScrollEnabled
               showsVerticalScrollIndicator
-              onScrollBeginDrag={() => setAutoScroll(false)}
-              onLayout={(event) => {
-                scrollMetricsRef.current.viewportHeight = event.nativeEvent.layout.height;
-              }}
-              onContentSizeChange={(_, height) => {
-                scrollMetricsRef.current.contentHeight = height;
-              }}
               contentContainerStyle={s.transcriptContent}
             >
               <Text style={[s.storyParagraph, { color: colors.text, textAlign: getLanguage() === 'ar' ? 'right' : 'left', writingDirection: getLanguage() === 'ar' ? 'rtl' : 'ltr' }]}>
@@ -1693,178 +1953,6 @@ function StoryListening({ companion, onBack, isDarkMode, colors }: StoryListenin
           </View>
         </View>
 
-        <InlineMrecAd screen="companions" darkMode={isDarkMode} />
-      </ScrollView>
-
-      <BannerAdComponent screen="companions" />
-    </View>
-  );
-}
-
-function StoryDetail({ companion, onBack, onListen, onShare, onToggleFav, isFav, isDarkMode, colors }: StoryDetailProps) {
-  const isRTL = useIsRTL();
-  const { t } = useTranslation();
-  const s = useScaledStyles(_s, colors.fs);
-  return (
-    <View style={s.detailContainer}>
-      {/* Detail header */}
-      <View style={[s.detailHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <Pressable
-          onPress={onBack}
-          style={[
-            s.detailBackBtn,
-            { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
-          ]}
-        >
-          <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={26} color={colors.text} />
-        </Pressable>
-        <Text style={[s.detailHeaderTitle, { color: colors.text }]} numberOfLines={1}>
-          {getCompanionName(companion)}
-        </Text>
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Pressable
-            onPress={onToggleFav}
-            style={[
-              s.detailShareBtn,
-              { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
-            ]}
-          >
-            <MaterialCommunityIcons name={isFav ? 'heart' : 'heart-outline'} size={20} color={isFav ? '#ef4444' : colors.text} />
-          </Pressable>
-        </View>
-      </View>
-
-      <ScrollView
-        style={s.detailScroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.detailScrollContent}
-      >
-        {/* Name hero */}
-        <View style={s.detailHeroOuter}>
-          <BlurView
-           
-            intensity={Platform.OS === 'ios' ? 25 : 10}
-            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            style={[
-              s.detailHeroOverlay,
-              {
-                backgroundColor: isDarkMode
-                  ? 'rgba(6,79,47,0.15)'
-                  : 'rgba(6,79,47,0.08)',
-              },
-            ]}
-          />
-          <View style={s.detailHeroContent}>
-            <View style={[s.detailAvatarLarge, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="account" size={36} color={colors.text} />
-            </View>
-            <Text style={[s.detailName, { color: colors.text }]}>
-              {getCompanionName(companion)}
-            </Text>
-            {getLanguage() !== 'ar' && (
-              <Text style={[s.detailNameEn, { color: colors.textLight }]}>
-                {companion.nameAr}
-              </Text>
-            )}
-            {getLanguage() === 'ar' ? (
-              <Text style={[s.detailBrief, { color: colors.textLight }]}>
-                {companion.brief}
-              </Text>
-            ) : getLanguage() === 'en' ? (
-              <Text style={[s.detailBrief, { color: colors.textLight }]}>
-                {companion.briefEn}
-              </Text>
-            ) : (
-              <TranslatedText from="en" type="section" style={[s.detailBrief, { color: colors.textLight }]}>
-                {companion.briefEn}
-              </TranslatedText>
-            )}
-          </View>
-        </View>
-
-        <StoryListenEntry
-          companion={companion}
-          onPress={onListen}
-          isDarkMode={isDarkMode}
-          colors={colors}
-        />
-
-        {/* Story */}
-        <View style={s.detailSectionOuter}>
-          <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="book-open-variant" size={18} color={colors.text} />
-            </View>
-            <Text style={[s.detailSectionTitle, { flex: 1, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {t('companions.story')}
-            </Text>
-            <PdfShareButton onPress={onShare} />
-          </View>
-          <View style={[s.detailGlassOuter, s.storyScrollOuter]}>
-            <BlurView
-
-              intensity={Platform.OS === 'ios' ? 25 : 10}
-              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                s.detailGlassOverlay,
-                {
-                  backgroundColor: isDarkMode
-                    ? 'rgba(6,79,47,0.08)'
-                    : 'rgba(6,79,47,0.08)',
-                  borderColor: isDarkMode
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,0,0,0.08)',
-                },
-              ]}
-            />
-            {/* Bounded story box: the long companion biographies would otherwise push */}
-            {/* virtues/audio cards off-screen and force the reader to scroll the entire */}
-            {/* page. Internal scroll keeps the rest of the detail view reachable. */}
-            <ScrollView
-              nestedScrollEnabled
-              showsVerticalScrollIndicator
-              contentContainerStyle={s.detailGlassContent}
-            >
-              {getCompanionStoryParagraphs(companion).map((paragraph, idx) => {
-                const stories = getCompanionStoryParagraphs(companion);
-                const lang = getLanguage();
-                return lang === 'ar' || lang === 'en' ? (
-                  <Text
-                    key={idx}
-                    style={[
-                      s.storyParagraph,
-                      { color: colors.text, textAlign: lang === 'ar' ? 'right' : 'left', writingDirection: lang === 'ar' ? 'rtl' : 'ltr' },
-                      idx < stories.length - 1 && s.paragraphSpacing,
-                    ]}
-                  >
-                    {paragraph}
-                  </Text>
-                ) : (
-                  <TranslatedText
-                    from="en"
-                    type="section"
-                    key={idx}
-                    style={[
-                      s.storyParagraph,
-                      { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
-                      idx < stories.length - 1 && s.paragraphSpacing,
-                    ]}
-                  >
-                    {paragraph}
-                  </TranslatedText>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-
-        {/* Virtues */}
         <View style={s.detailSectionOuter}>
           <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
@@ -1876,7 +1964,6 @@ function StoryDetail({ companion, onBack, onListen, onShare, onToggleFav, isFav,
           </View>
           <View style={s.detailGlassOuter}>
             <BlurView
-             
               intensity={Platform.OS === 'ios' ? 25 : 10}
               tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
               style={StyleSheet.absoluteFill}
@@ -1885,12 +1972,8 @@ function StoryDetail({ companion, onBack, onListen, onShare, onToggleFav, isFav,
               style={[
                 s.detailGlassOverlay,
                 {
-                  backgroundColor: isDarkMode
-                    ? 'rgba(6,79,47,0.08)'
-                    : 'rgba(6,79,47,0.08)',
-                  borderColor: isDarkMode
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,0,0,0.08)',
+                  backgroundColor: isDarkMode ? 'rgba(6,79,47,0.08)' : 'rgba(6,79,47,0.08)',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
                 },
               ]}
             />
@@ -1916,57 +1999,19 @@ function StoryDetail({ companion, onBack, onListen, onShare, onToggleFav, isFav,
           </View>
         </View>
 
-        {/* Footer dua */}
-        <View style={s.detailFooterOuter}>
-          <BlurView
-           
-            intensity={Platform.OS === 'ios' ? 25 : 10}
-            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            style={[
-              s.detailFooterOverlay,
-              {
-                backgroundColor: isDarkMode
-                  ? 'rgba(6,79,47,0.12)'
-                  : 'rgba(6,79,47,0.06)',
-              },
-            ]}
-          />
-          <View style={s.detailFooterContent}>
-            {(() => {
-              const isFemale = companion.category === 'mothers' || companion.category === 'daughters';
-              const lang = getLanguage();
-              if (lang === 'ar') {
-                return (
-                  <>
-                    <Text style={[s.detailFooterText, { color: colors.text }]}>
-                      {isFemale ? 'رضي الله عنها وأرضاها' : 'رضي الله عنه وأرضاه'}
-                    </Text>
-                    <Text style={[s.detailFooterNote, { color: colors.textLight }]}>اللهم اجمعنا بهم مع النبي ﷺ في الفردوس الأعلى</Text>
-                  </>
-                );
-              }
-              const enText = isFemale ? 'May Allah be pleased with her' : 'May Allah be pleased with him';
-              if (lang === 'en') {
-                return (
-                  <>
-                    <Text style={[s.detailFooterText, { color: colors.text }]}>{enText}</Text>
-                    <Text style={[s.detailFooterNote, { color: colors.textLight }]}>O Allah, gather us with them and the Prophet ﷺ in the highest Paradise</Text>
-                  </>
-                );
-              }
-              return (
-                <>
-                  <TranslatedText from="en" type="section" style={[s.detailFooterText, { color: colors.text }]}>{enText}</TranslatedText>
-                  <TranslatedText from="en" type="section" style={[s.detailFooterNote, { color: colors.textLight }]}>O Allah, gather us with them and the Prophet ﷺ in the highest Paradise</TranslatedText>
-                </>
-              );
-            })()}
-          </View>
-        </View>
+        <SourcesList sources={getCompanionSources((companion as { id?: string }).id)} />
+
+        <InlineMrecAd screen="companions" darkMode={isDarkMode} />
       </ScrollView>
+
+      <AudioStatusModal
+        visible={showAudioModal}
+        mode={audioModalMode}
+        colors={colors}
+        onRetry={handlePlayPress}
+        onClose={() => setAudioModalDismissed(true)}
+      />
+      <BannerAdComponent screen="companions" />
     </View>
   );
 }
@@ -1976,7 +2021,6 @@ function StoryDetail({ companion, onBack, onListen, onShare, onToggleFav, isFav,
 // ========================================
 
 export default function CompanionsScreen() {
-  const router = useRouter();
   const { isDarkMode } = useSettings();
   const { t } = useTranslation();
   const isRTL = useIsRTL();
@@ -1985,7 +2029,6 @@ export default function CompanionsScreen() {
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('ashara');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanion, setSelectedCompanion] = useState<Companion | null>(null);
-  const [listeningCompanion, setListeningCompanion] = useState<Companion | null>(null);
   const [companionFav, setCompanionFav] = useState(false);
   const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -2038,23 +2081,8 @@ export default function CompanionsScreen() {
 
   const handleBack = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setListeningCompanion(null);
     setSelectedCompanion(null);
   }, []);
-
-  const handleListenBack = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setListeningCompanion(null);
-  }, []);
-
-  const handleOpenListen = useCallback(async () => {
-    if (!selectedCompanion) return;
-    if (!selectedCompanion.audioUrl?.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await showInterstitial({ allowInSacredContext: false, ignoreSmartSessionDelay: true });
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setListeningCompanion(selectedCompanion);
-  }, [selectedCompanion]);
 
   const handleShare = useCallback(async () => {
     if (!selectedCompanion) return;
@@ -2094,28 +2122,13 @@ export default function CompanionsScreen() {
     setCompanionFav(nowSaved);
   }, [selectedCompanion]);
 
-  // Listening view
-  if (listeningCompanion) {
-    return (
-      <ScreenContainer edges={['top', 'left', 'right']} screenKey="companions">
-        <StoryListening
-          companion={listeningCompanion}
-          onBack={handleListenBack}
-          isDarkMode={isDarkMode}
-          colors={colors}
-        />
-      </ScreenContainer>
-    );
-  }
-
   // Detail view
   if (selectedCompanion) {
     return (
       <ScreenContainer edges={['top', 'left', 'right']} screenKey="companions">
-        <StoryDetail
+        <StoryListening
           companion={selectedCompanion}
           onBack={handleBack}
-          onListen={handleOpenListen}
           onShare={handleShare}
           onToggleFav={handleToggleFav}
           isFav={companionFav}
@@ -2328,7 +2341,6 @@ const _s = StyleSheet.create({
     lineHeight: 20,
     marginTop: 2,
   },
-
   // Category tabs
   categoryScroll: {
     maxHeight: 48,
@@ -2601,16 +2613,9 @@ const _s = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
-  audioProgressTrack: {
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(6,79,47,0.18)',
-    overflow: 'hidden',
-  },
-  audioProgressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: ACCENT,
+  audioProgressSlider: {
+    width: '100%',
+    height: 34,
   },
   audioControlsRow: {
     flexDirection: 'row',
@@ -2629,7 +2634,7 @@ const _s = StyleSheet.create({
     opacity: 0.45,
   },
   audioTime: {
-    width: 62,
+    width: 76,
     fontFamily: fontSemiBold(),
     fontSize: 13,
     lineHeight: 22,
@@ -2670,26 +2675,38 @@ const _s = StyleSheet.create({
   audioSpeedButtonTextActive: {
     color: '#fff',
   },
-  audioNotice: {
-    fontFamily: fontRegular(),
-    fontSize: 13,
-    lineHeight: 22,
-  },
-  autoScrollToggle: {
-    marginStart: 'auto',
+  audioDownloadButton: {
+    flexShrink: 0,
+    minWidth: 92,
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 999,
+    borderRadius: 12,
     backgroundColor: ACCENT,
   },
-  autoScrollToggleText: {
+  audioDownloadButtonDone: {
+    backgroundColor: '#0d8e62',
+  },
+  audioDownloadButtonText: {
     color: '#fff',
     fontFamily: fontSemiBold(),
     fontSize: 12,
     lineHeight: 18,
+    textAlign: 'center',
+  },
+  audioDownloadErrorText: {
+    color: '#ef4444',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  audioNotice: {
+    fontFamily: fontRegular(),
+    fontSize: 13,
+    lineHeight: 22,
   },
   transcriptOuter: {
     height: 390,
@@ -2826,5 +2843,76 @@ const _s = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 28,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  modalIconCircle: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSpinner: {
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontFamily: fontBold(),
+    fontSize: 18,
+    lineHeight: 30,
+    marginBottom: 8,
+    includeFontPadding: false,
+  },
+  modalBody: {
+    fontFamily: fontRegular(),
+    fontSize: 14,
+    lineHeight: 24,
+    marginBottom: 18,
+    includeFontPadding: false,
+  },
+  modalActions: {
+    width: '100%',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  modalButtonPrimary: {
+    backgroundColor: ACCENT,
+  },
+  modalButtonSecondary: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  modalButtonText: {
+    fontFamily: fontSemiBold(),
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });

@@ -35,6 +35,7 @@ import {
   Music,
   MessageSquare,
   AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 
 // ==================== Error Boundary ====================
@@ -136,6 +137,7 @@ import OnboardingManager from './pages/OnboardingManager';
 import RouteGuide from './pages/RouteGuide';
 import AppContentManager from './pages/AppContentManager';
 import EngagementNotifications from './pages/EngagementNotifications';
+import CommentsModeration from './pages/CommentsModeration';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -216,6 +218,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Users,
     items: [
       { path: '/users', icon: Users, label: 'المستخدمين' },
+      { path: '/comments-moderation', icon: ShieldCheck, label: 'إشراف التعليقات' },
       { path: '/suggestions', icon: MessageSquare, label: 'الاقتراحات' },
       { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
       { path: '/purchase-history', icon: CreditCard, label: 'سجل المشتريات' },
@@ -541,6 +544,7 @@ const App: React.FC = () => {
               <Route path="/onboarding" element={<OnboardingManager />} />
               <Route path="/route-guide" element={<RouteGuide />} />
               <Route path="/app-content" element={<AppContentManager />} />
+              <Route path="/comments-moderation" element={<CommentsModeration />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

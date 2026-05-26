@@ -13,18 +13,13 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useQuran } from '@/contexts/QuranContext';
 import { t } from '@/lib/i18n';
 import { getSurahName } from '@/lib/quran-api';
+import { formatAudioTime } from '@/lib/audio-time';
 import { FONT_SIZES, BorderRadius, Spacing } from '@/constants/theme';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
-function formatTime(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec < 10 ? '0' : ''}${sec}`;
-}
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const ACCENT = '#0d8e62';
@@ -257,7 +252,7 @@ export function GlobalAudioBar() {
           {/* Progress slider (not for live radio) */}
           {currentDuration > 0 && !isLive && (
             <View style={[styles.sliderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[styles.time, { color: textSecondary }]}>{formatTime(currentPosition)}</Text>
+              <Text style={[styles.time, { color: textSecondary }]}>{formatAudioTime(currentPosition)}</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={0}
@@ -268,7 +263,7 @@ export function GlobalAudioBar() {
                 maximumTrackTintColor={colors.border}
                 thumbTintColor={ACCENT}
               />
-              <Text style={[styles.time, { color: textSecondary }]}>{formatTime(currentDuration)}</Text>
+              <Text style={[styles.time, { color: textSecondary }]}>{formatAudioTime(currentDuration)}</Text>
             </View>
           )}
 
@@ -414,7 +409,7 @@ const _styles = StyleSheet.create({
   time: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    width: 38,
+    width: 58,
     textAlign: 'center',
   },
   controls: {

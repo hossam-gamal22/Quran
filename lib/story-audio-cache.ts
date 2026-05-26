@@ -66,6 +66,25 @@ function isDirectAudioUrl(input: string): boolean {
   return AUDIO_FILE_EXTENSIONS.some(ext => lower.endsWith(ext));
 }
 
+function getArchiveAudioFileName(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (!url.hostname.endsWith('archive.org')) return null;
+    const parts = url.pathname.split('/').filter(Boolean);
+    if ((parts[0] === 'details' || parts[0] === 'download') && parts[1] && parts.length > 2) {
+      return parts.slice(2).map(part => decodeURIComponent(part)).join('/');
+    }
+    if (/^\d+$/.test(parts[0] || '') && parts[1] === 'items' && parts[2] && parts.length > 3) {
+      return parts.slice(3).map(part => decodeURIComponent(part)).join('/');
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function getArchiveIdentifier(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -90,6 +109,32 @@ function archiveDownloadUrl(identifier: string, fileName: string): string {
   return `https://archive.org/download/${encodeURIComponent(identifier)}/${encodedPath}`;
 }
 
+function stripAudioExtension(name: string): string {
+  const lower = name.toLowerCase();
+  const extension = AUDIO_FILE_EXTENSIONS.find(ext => lower.endsWith(ext));
+  return extension ? name.slice(0, -extension.length) : name;
+}
+
+function normalizeArchiveAudioName(name: string): string {
+  return stripAudioExtension(name)
+    .normalize('NFKC')
+    .replace(/\+/g, ' ')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g, '')
+    .replace(/[^0-9a-z\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function needsArchiveMetadataRepair(input: string): boolean {
+  return !!getArchiveIdentifier(input) && !!getArchiveAudioFileName(input)?.includes('+');
+}
+
 function archiveDirectFileUrl(identifier: string, metadata: ArchiveMetadata, fileName: string): string {
   const encodedPath = fileName.split('/').map(part => encodeURIComponent(part)).join('/');
   if (metadata.d1 && metadata.dir) {
@@ -105,12 +150,23 @@ function archiveDirectFileUrl(identifier: string, metadata: ArchiveMetadata, fil
   return archiveDownloadUrl(identifier, fileName);
 }
 
-function pickArchiveAudioFile(files: ArchiveAudioFile[]): ArchiveAudioFile | null {
+function pickArchiveAudioFile(files: ArchiveAudioFile[], requestedName?: string | null): ArchiveAudioFile | null {
   const audioFiles = files.filter(file => {
     const name = (file.name || '').toLowerCase();
     return AUDIO_FILE_EXTENSIONS.some(ext => name.endsWith(ext));
   });
   if (audioFiles.length === 0) return null;
+
+  if (requestedName) {
+    const requestedWithSpaces = requestedName.replace(/\+/g, ' ');
+    const exactMatch = audioFiles.find(file => file.name === requestedName || file.name === requestedWithSpaces);
+    if (exactMatch) return exactMatch;
+
+    const requestedNormalized = normalizeArchiveAudioName(requestedName);
+    const normalizedMatch = audioFiles.find(file => normalizeArchiveAudioName(file.name) === requestedNormalized);
+    if (normalizedMatch) return normalizedMatch;
+  }
+
   return [...audioFiles].sort((a, b) => {
     const aName = (a.name || '').toLowerCase();
     const bName = (b.name || '').toLowerCase();
@@ -132,6 +188,20 @@ function withResolveTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<
   ]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+async function resolveArchiveAudioFile(identifier: string, requestedName?: string | null): Promise<string> {
+  const res = await withResolveTimeout(
+    fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`),
+    ARCHIVE_AUDIO_RESOLVE_TIMEOUT_MS,
+  );
+  if (!res.ok) throw new Error('archive-metadata-error');
+
+  const metadata = await res.json() as ArchiveMetadata;
+  const audioFile = pickArchiveAudioFile(metadata.files || [], requestedName);
+  if (!audioFile) throw new Error('archive-audio-not-found');
+
+  return archiveDirectFileUrl(identifier, metadata, audioFile.name);
 }
 
 // ─── Persistent resolved-URL map ───────────────────────────────────────────────
@@ -202,59 +272,55 @@ async function getCachedLocalPath(storyId: string, originalUrl: string): Promise
 async function resolveDirectUrl(originalUrl: string): Promise<string> {
   const trimmed = originalUrl.trim();
   if (!trimmed) throw new Error('missing-audio-url');
+  const identifier = getArchiveIdentifier(trimmed);
 
   // Fast path: any URL that already points at an audio file is playable as-is.
   // The admin panel resolves archive.org items at upload time and stores the
   // direct mp3 URL, so the vast majority of stories hit this branch and skip
   // the metadata round-trip entirely.
-  if (isDirectAudioUrl(trimmed)) return trimmed;
+  if (isDirectAudioUrl(trimmed)) {
+    const archiveFileName = identifier ? getArchiveAudioFileName(trimmed) : null;
+    // Some older CMS rows stored archive file names with `+` in place of
+    // spaces. archive.org redirects those URLs to a 404 HTML page, which can
+    // leave expo-av buffering forever. Resolve that legacy shape against
+    // metadata once, persist the corrected media URL, then future plays are
+    // instant again.
+    if (identifier && needsArchiveMetadataRepair(trimmed)) {
+      return resolveArchiveAudioFile(identifier, archiveFileName);
+    }
+    return trimmed;
+  }
 
-  const identifier = getArchiveIdentifier(trimmed);
   if (!identifier) throw new Error('unsupported-audio-url');
 
-  const res = await withResolveTimeout(
-    fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`),
-    ARCHIVE_AUDIO_RESOLVE_TIMEOUT_MS,
-  );
-  if (!res.ok) throw new Error('archive-metadata-error');
-
-  const metadata = await res.json() as ArchiveMetadata;
-  const audioFile = pickArchiveAudioFile(metadata.files || []);
-  if (!audioFile) throw new Error('archive-audio-not-found');
-
-  return archiveDirectFileUrl(identifier, metadata, audioFile.name);
+  return resolveArchiveAudioFile(identifier, getArchiveAudioFileName(trimmed));
 }
 
-// ─── Background download ──────────────────────────────────────────────────────
+// ─── Explicit cache download ─────────────────────────────────────────────────
 
-function startBackgroundDownload(storyId: string, originalUrl: string, directUrl: string): Promise<void> {
-  // Coalesce concurrent calls for the same story.
+function downloadDirectUrlToCache(storyId: string, originalUrl: string, directUrl: string): Promise<void> {
+  // Coalesce concurrent downloads for the same story.
   const key = cacheKeyFor(storyId, originalUrl);
   const existing = _activeDownloads.get(key);
   if (existing) return existing;
 
   const promise = (async () => {
+    const localPath = getLocalPath(storyId, originalUrl);
+    const tmpPath = `${localPath}.part`;
     try {
       await ensureCacheDir();
-      const localPath = getLocalPath(storyId, originalUrl);
-      // Download into a temp path so a partial file can never be served as cached.
-      const tmpPath = `${localPath}.part`;
+      await FileSystem.deleteAsync(tmpPath, { idempotent: true }).catch(() => {});
       const result = await FileSystem.downloadAsync(directUrl, tmpPath);
-      if (result.status >= 200 && result.status < 300) {
-        try {
-          await FileSystem.moveAsync({ from: tmpPath, to: localPath });
-          _localPathCache.set(key, localPath);
-          console.log('[story-audio-cache] cached', storyId, '→', localPath);
-        } catch (moveErr) {
-          await FileSystem.deleteAsync(tmpPath, { idempotent: true }).catch(() => {});
-          console.warn('[story-audio-cache] move failed for', storyId, moveErr);
-        }
-      } else {
-        await FileSystem.deleteAsync(tmpPath, { idempotent: true }).catch(() => {});
-        console.warn('[story-audio-cache] download failed for', storyId, 'status=', result.status);
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(`download-failed-${result.status}`);
       }
-    } catch (e) {
-      console.warn('[story-audio-cache] download error for', storyId, e);
+      await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+      await FileSystem.moveAsync({ from: tmpPath, to: localPath });
+      _localPathCache.set(key, localPath);
+      console.log('[story-audio-cache] cached', storyId, '→', localPath);
+    } catch (error) {
+      await FileSystem.deleteAsync(tmpPath, { idempotent: true }).catch(() => {});
+      throw error;
     } finally {
       _activeDownloads.delete(key);
     }
@@ -272,13 +338,10 @@ function startBackgroundDownload(storyId: string, originalUrl: string, directUrl
  * Order of preference:
  *   1. If a cached local file exists → return `file://` URI (instant).
  *   2. Else, try to skip the archive.org `/metadata` step by reusing a
- *      previously resolved direct mp3 URL from AsyncStorage. Return it for
- *      streaming AND kick off a background download so the next play is local.
+ *      previously resolved direct mp3 URL from AsyncStorage and return it for
+ *      streaming.
  *   3. Else, resolve via archive.org `/metadata`, persist the resolved URL,
- *      return it for streaming AND kick off a background download.
- *
- * Never blocks on the download — playback always starts immediately with
- * whichever URI is available first.
+ *      and return it for streaming.
  */
 export async function prepareStoryAudio(storyId: string, originalUrl: string): Promise<PreparedStoryAudio> {
   if (!storyId || !originalUrl) throw new Error('missing-audio-url');
@@ -292,8 +355,11 @@ export async function prepareStoryAudio(storyId: string, originalUrl: string): P
   // 2. Reuse a previously resolved direct URL if we have one.
   const storedDirect = await getStoredResolvedUrl(storyId, originalUrl);
   if (storedDirect) {
-    // Kick off background download (fire-and-forget) so next play is local.
-    startBackgroundDownload(storyId, originalUrl, storedDirect).catch(() => {});
+    if (needsArchiveMetadataRepair(storedDirect)) {
+      const repairedDirect = await resolveDirectUrl(storedDirect);
+      saveResolvedUrl(storyId, originalUrl, repairedDirect).catch(() => {});
+      return { uri: repairedDirect, isLocal: false };
+    }
     return { uri: storedDirect, isLocal: false };
   }
 
@@ -302,13 +368,43 @@ export async function prepareStoryAudio(storyId: string, originalUrl: string): P
   const directUrl = await resolveDirectUrl(originalUrl);
   // Persist for next time (fire-and-forget).
   saveResolvedUrl(storyId, originalUrl, directUrl).catch(() => {});
-  startBackgroundDownload(storyId, originalUrl, directUrl).catch(() => {});
   return { uri: directUrl, isLocal: false };
 }
 
 /**
+ * Explicitly download a story's audio and return the local file URI. Unlike
+ * `prepareStoryAudio`, this waits for the file to land on disk so the caller
+ * can confidently mark the item as available offline.
+ */
+export async function downloadStoryAudio(storyId: string, originalUrl: string): Promise<PreparedStoryAudio> {
+  if (!storyId || !originalUrl) throw new Error('missing-audio-url');
+
+  const local = await getCachedLocalPath(storyId, originalUrl);
+  if (local) return { uri: local, isLocal: true };
+
+  const activeDownload = _activeDownloads.get(cacheKeyFor(storyId, originalUrl));
+  if (activeDownload) {
+    await activeDownload;
+    const activeLocal = await getCachedLocalPath(storyId, originalUrl);
+    if (activeLocal) return { uri: activeLocal, isLocal: true };
+  }
+
+  const storedDirect = await getStoredResolvedUrl(storyId, originalUrl);
+  let directUrl = storedDirect || await resolveDirectUrl(originalUrl);
+  if (needsArchiveMetadataRepair(directUrl)) {
+    directUrl = await resolveDirectUrl(directUrl);
+  }
+  saveResolvedUrl(storyId, originalUrl, directUrl).catch(() => {});
+
+  await downloadDirectUrlToCache(storyId, originalUrl, directUrl);
+  const downloadedLocal = await getCachedLocalPath(storyId, originalUrl);
+  if (!downloadedLocal) throw new Error('download-not-cached');
+  return { uri: downloadedLocal, isLocal: true };
+}
+
+/**
  * True when a usable local copy of this story's audio already exists on disk.
- * Used to short-circuit the offline-required notice in the UI.
+ * Used to mark audio as available for offline listening in the UI.
  */
 export async function isStoryAudioCached(storyId: string, originalUrl?: string): Promise<boolean> {
   if (!storyId || !originalUrl) return false;

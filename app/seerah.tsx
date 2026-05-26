@@ -8,24 +8,30 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Modal,
   Platform,
   LayoutAnimation,
   UIManager,
   ActivityIndicator,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import NetInfo from '@react-native-community/netinfo';
+import Slider from '@react-native-community/slider';
 
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
+import { useAudioSeekPreview } from '@/hooks/use-audio-seek-preview';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import { SourcesList } from '@/components/ui/SourcesList';
 import { showAdThenExport } from '@/lib/pdf-export';
 import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
 import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
@@ -35,8 +41,11 @@ import { t, getLanguage } from '@/lib/i18n';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useSeerahContent } from '@/lib/content-api';
-import { useAzkarAudio } from '@/hooks/use-azkar-audio';
+import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
+import { formatAudioTime } from '@/lib/audio-time';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
+import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
+import { seerahSectionId } from '@/lib/story-id';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
@@ -54,9 +63,53 @@ function sectionSlug(titleEn: string): string {
   return titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+function getSeerahAudioCopy() {
+  return getLanguage() === 'ar'
+    ? {
+        title: 'السيرة النبوية',
+        subtitle: 'الصوت',
+        loadingAudioTitle: 'جاري تحميل الصوت',
+        loadingAudioBody: 'انتظر لحظات، سيتم تشغيل السيرة تلقائيًا.',
+        noInternetTitle: 'لا يوجد اتصال بالإنترنت',
+        noInternetBody: 'صوت السيرة غير محمل على الجهاز. اتصل بالإنترنت للتشغيل أو حمّله مسبقًا للاستماع أوفلاين.',
+        audioErrorTitle: 'تعذر تشغيل الصوت',
+        audioErrorBody: 'استغرق تحميل الصوت وقتًا طويلًا. تحقق من الاتصال ثم حاول مرة أخرى.',
+        retry: 'حاول مرة أخرى',
+        close: 'إغلاق',
+        speed: 'السرعة',
+        download: 'تحميل',
+        downloading: 'جاري التحميل',
+        downloaded: 'محمل',
+        downloadFailed: 'تعذر تحميل الصوت. تحقق من الاتصال ثم حاول مرة أخرى.',
+      }
+    : {
+        title: 'The Prophetic Biography',
+        subtitle: 'Audio',
+        loadingAudioTitle: 'Loading audio',
+        loadingAudioBody: 'Please wait. The Seerah will start automatically.',
+        noInternetTitle: 'No internet connection',
+        noInternetBody: 'Seerah audio is not downloaded on this device. Connect to play it, or download it first for offline listening.',
+        audioErrorTitle: 'Audio could not be played',
+        audioErrorBody: 'Audio loading took too long. Check your connection and try again.',
+        retry: 'Try again',
+        close: 'Close',
+        speed: 'Speed',
+        download: 'Download',
+        downloading: 'Downloading',
+        downloaded: 'Downloaded',
+        downloadFailed: 'Audio could not be downloaded. Check your connection and try again.',
+      };
+}
+
 // ========================================
 // أنواع البيانات
 // ========================================
+
+interface SeerahSource {
+  reference: string;
+  url?: string;
+  note?: string;
+}
 
 interface SeerahSection {
   title: string;
@@ -66,7 +119,18 @@ interface SeerahSection {
   paragraphsEn: string[];
   videoUrl?: string;
   videoTitle?: string;
+  sources?: SeerahSource[];
 }
+
+// Core references for the whole Seerah. Shown after every section.
+const SEERAH_COMMON_SOURCES: SeerahSource[] = [
+  { reference: 'السيرة النبوية لابن هشام (تحقيق ابن إسحاق)' },
+  { reference: 'الرحيق المختوم للمباركفوري' },
+  { reference: 'البداية والنهاية لابن كثير — قسم السيرة' },
+  { reference: 'صحيح البخاري — كتاب المغازي', url: 'https://sunnah.com/bukhari/64' },
+  { reference: 'صحيح مسلم — كتاب الفضائل', url: 'https://sunnah.com/muslim/43' },
+  { reference: 'دلائل النبوة للبيهقي' },
+];
 
 // ========================================
 // محتوى السيرة النبوية
@@ -91,6 +155,12 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'He ﷺ grew up with the finest character and most noble traits. He was never known to lie or betray, until Quraysh gave him the title of "The Truthful and Trustworthy" (al-Sadiq al-Amin). He used to tend sheep for the people of Makkah for a few coins, then engaged in trade, always honest and trustworthy in his dealings.',
       'When he reached the age of twenty-five, news of his honesty and truthfulness reached Lady Khadijah bint Khuwaylid, a noble and wealthy woman. She offered him to lead a trade caravan to Syria on her behalf. He ﷺ set out with her servant Maysarah, and the trade was very profitable. Upon his return, Khadijah was impressed by his integrity and character, so he ﷺ married her. She was his first wife and the most beloved to him, and she bore him all his children except Ibrahim.',
     ],
+    sources: [
+      { reference: 'صحيح مسلم 162 — حادثة شق الصدر في بادية بني سعد', url: 'https://sunnah.com/muslim:162' },
+      { reference: 'صحيح البخاري 3437 — ولادته يوم الإثنين عام الفيل' },
+      { reference: 'السيرة النبوية لابن هشام — كفالة عبد المطلب ثم أبي طالب' },
+      { reference: 'مسند أحمد — رحلة الشام مع ميسرة وزواجه من خديجة في الخامسة والعشرين' },
+    ],
   },
   {
     title: 'البعثة والوحي',
@@ -109,6 +179,12 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'The Prophet ﷺ returned to Khadijah trembling with fear, saying: "Cover me, cover me!" They covered him until the fear subsided. He told Khadijah what had happened, and she spoke her immortal words: "By Allah, Allah will never disgrace you. You maintain ties of kinship, bear the burdens of others, earn for the destitute, honor your guests, and help those afflicted by calamities." She then took him to her cousin Waraqah ibn Nawfal, who gave him glad tidings that he was the prophet of this nation.',
       'Khadijah (may Allah be pleased with her) was the first woman to believe in him, Abu Bakr al-Siddiq was the first man, Ali ibn Abi Talib was the first youth, and Zayd ibn Harithah was the first freed slave. He ﷺ began calling to Islam secretly for three years, meeting with the believers in the house of al-Arqam ibn Abi al-Arqam.',
       'The prophetic mission was no ordinary event — it was a turning point in the history of all humanity. He ﷺ came with a religion that liberated minds from superstition, hearts from polytheism, and societies from oppression and ignorance. The light of Islam began to spread despite all obstacles and challenges.',
+    ],
+    sources: [
+      { reference: 'صحيح البخاري 3 / صحيح مسلم 160 — بدء الوحي وقصة غار حراء', url: 'https://sunnah.com/bukhari:3' },
+      { reference: 'سورة العلق 1-5 — أول ما نزل من القرآن', url: 'https://quran.com/96/1-5' },
+      { reference: 'صحيح البخاري 4953 — قول خديجة "كلا والله لا يخزيك الله أبدًا"' },
+      { reference: 'السيرة النبوية لابن هشام — أول من آمن من النساء والرجال والصبيان والموالي', note: 'في تحديد "أول من أسلم من الرجال" خلاف: قيل أبو بكر، وقيل علي (وهو صبي)، وقيل زيد بن حارثة. والجمهور على أبي بكر' },
     ],
   },
   {
@@ -131,6 +207,14 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'On the night of the 27th of Rajab, Allah honored His Prophet with the miracle of al-Isra wal-Mi\'raj. He ﷺ was taken on a night journey from the Sacred Mosque to al-Aqsa Mosque on the mount al-Buraq, then ascended through the heavens, where the five daily prayers were prescribed. He witnessed the great signs of his Lord and met the prophets (peace be upon them), leading them in prayer at al-Aqsa Mosque.',
       'The years of preaching in Makkah lasted thirteen years, during which the Muslims learned patience and steadfastness upon the truth no matter how severe the trials. During these years, most of the Makkan Quran was revealed, focusing on the oneness of Allah, affirming the resurrection and judgment, and telling the stories of previous prophets.',
     ],
+    sources: [
+      { reference: 'صحيح البخاري 4770 / صحيح مسلم 208 — "وأنذر عشيرتك الأقربين"', url: 'https://sunnah.com/bukhari:4770' },
+      { reference: 'سيرة ابن هشام — تعذيب بلال وآل ياسر وحصار الشعب' },
+      { reference: 'سورة المسد كاملة — في أبي لهب', url: 'https://quran.com/111' },
+      { reference: 'صحيح البخاري 349 / صحيح مسلم 162 — الإسراء والمعراج وفرض الصلوات', url: 'https://sunnah.com/bukhari:349' },
+      { reference: 'سورة الإسراء 1', url: 'https://quran.com/17/1' },
+      { reference: 'صحيح البخاري 3231 / صحيح مسلم 1795 — رحلة الطائف ولقاؤه ﷺ ملك الجبال' },
+    ],
   },
   {
     title: 'الهجرة إلى المدينة',
@@ -152,6 +236,14 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'The Prophet ﷺ arrived in Madinah on Monday, the 12th of Rabi al-Awwal. The people of Madinah received him with joy, singing: "The full moon has risen upon us, from the farewell passes." The first thing he ﷺ did was build the Prophet\'s Mosque, and he established brotherhood between the Muhajirun (emigrants) and the Ansar (helpers), a bond so strong that the Ansar would share their wealth and homes with the Muhajirun.',
       'The Prophet ﷺ issued the Charter of Madinah, which organized relations between Muslims and other residents of Madinah, and established the foundations of coexistence, justice, and shared responsibility in defending the city. This document was one of the earliest civil constitutions in history.',
     ],
+    sources: [
+      { reference: 'صحيح البخاري 3905 / صحيح مسلم 2381 — قصة الهجرة وغار ثور', url: 'https://sunnah.com/bukhari:3905' },
+      { reference: 'سورة التوبة 40 — "ثاني اثنين إذ هما في الغار"', url: 'https://quran.com/9/40' },
+      { reference: 'سيرة ابن هشام — هجرة الحبشة وبيعة العقبة' },
+      { reference: 'صحيح البخاري 3779 — مؤاخاة الأنصار والمهاجرين' },
+      { reference: 'صحيفة المدينة (وثيقة المدينة) — رواها ابن إسحاق' },
+      { reference: 'قصة العنكبوت والحمامة على باب الغار', note: 'مذكورة عند ابن سعد وغيره من المؤرخين، لكن إسنادها ضعيف ولم تثبت في الصحيحين' },
+    ],
   },
   {
     title: 'الغزوات',
@@ -171,6 +263,14 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'The Conquest of Makkah (Ramadan, 8 AH / 630 CE): The Prophet ﷺ marched with ten thousand Muslims to conquer Makkah after Quraysh violated the Treaty of Hudaybiyyah. He entered Makkah as a victorious conqueror, bowing his head in humility before Allah. He stood at the door of the Kaaba and said: "O people of Quraysh, what do you think I will do with you?" They said: "A noble brother and the son of a noble brother." He replied: "Go, for you are free." He then purified the Kaaba of its 360 idols, reciting: "And say: Truth has come and falsehood has vanished. Indeed, falsehood is bound to vanish."',
       'The Battle of Hunayn (Shawwal, 8 AH / 630 CE): After the conquest of Makkah, the tribes of Hawazin and Thaqif gathered to fight the Muslims. The Prophet ﷺ set out with twelve thousand fighters, and some Muslims were impressed by their large numbers. But the enemy ambushed them in the valley of Hunayn, and many Muslims initially fled. The Prophet ﷺ stood firm and called his companions until they returned and rallied around him, and Allah granted them victory. Regarding this, it was revealed: "And on the day of Hunayn, when your great numbers pleased you, but they availed you nothing."',
     ],
+    sources: [
+      { reference: 'سورة الأنفال — تفصيل غزوة بدر', url: 'https://quran.com/8' },
+      { reference: 'صحيح البخاري 3951-4080 — كتاب المغازي (بدر وأحد والخندق)', url: 'https://sunnah.com/bukhari/64' },
+      { reference: 'سورة آل عمران 121-179 — أحداث غزوة أحد', url: 'https://quran.com/3/121-179' },
+      { reference: 'سورة الأحزاب 9-27 — غزوة الأحزاب (الخندق)', url: 'https://quran.com/33/9-27' },
+      { reference: 'صحيح البخاري 4280 / صحيح مسلم 1780 — فتح مكة سنة 8هـ' },
+      { reference: 'سورة التوبة 25-26 — غزوة حنين', url: 'https://quran.com/9/25-26' },
+    ],
   },
   {
     title: 'الفتوحات وانتشار الإسلام',
@@ -187,6 +287,13 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'After the conquest of Makkah, Arab tribes began coming to Madinah in droves to declare their Islam. The ninth year after Hijrah was called the Year of Delegations, as delegations from tribes across the Arabian Peninsula came to pledge allegiance to the Prophet ﷺ. Regarding this, it was revealed: "When the victory of Allah has come and the conquest, and you see the people entering into the religion of Allah in multitudes."',
       'In the tenth year after Hijrah, the Prophet ﷺ performed the Farewell Pilgrimage with more than one hundred thousand Muslims. He delivered his famous sermon at Arafah, establishing the foundations of human rights: the sanctity of blood, wealth, and honor; equality among people; women\'s rights; and warnings against usury and blood vengeance. He ﷺ said: "All of you are from Adam, and Adam was from dust. There is no superiority of an Arab over a non-Arab except through piety."',
       'In the Farewell Sermon, he ﷺ also said: "I am leaving among you that which, if you hold fast to it, you will never go astray: the Book of Allah." Then he asked the people: "Have I conveyed the message?" They said: "Yes." He said: "O Allah, bear witness." He pointed his finger to the sky then to the people. On that day, it was revealed: "Today I have perfected for you your religion, completed My favor upon you, and have chosen for you Islam as your religion."',
+    ],
+    sources: [
+      { reference: 'صحيح البخاري 7 / صحيح مسلم 1773 — رسائل النبي ﷺ إلى هرقل وكسرى والمقوقس والنجاشي' },
+      { reference: 'سورة النصر — عام الوفود وفتح مكة', url: 'https://quran.com/110' },
+      { reference: 'صحيح مسلم 1218 — حديث جابر الطويل في حجة الوداع وخطبتها', url: 'https://sunnah.com/muslim:1218' },
+      { reference: 'سورة المائدة 3 — "اليوم أكملت لكم دينكم"', url: 'https://quran.com/5/3' },
+      { reference: 'صحيح البخاري 1739 / صحيح مسلم 1679 — خطبة حجة الوداع' },
     ],
   },
   {
@@ -209,8 +316,21 @@ const SEERAH_SECTIONS: SeerahSection[] = [
       'The Prophet ﷺ was washed and buried in the room of Aisha (may Allah be pleased with her) in the Prophet\'s Mosque, in the very place where he passed away. He left for the nation the Book of Allah and his purified Sunnah as light and guidance until the Day of Judgment. May Allah\'s peace and blessings be upon him, his family, and his companions.',
       'The Prophet ﷺ left behind neither a dinar nor a dirham, neither a slave nor a servant, nor anything except his white mule, his weapons, and a piece of land he designated as charity. He ﷺ lived his entire life for the call to Allah, worship, and service to people, leaving an eternal legacy that changed the face of history and human civilization forever. May the peace and blessings of Allah be upon him.',
     ],
+    sources: [
+      { reference: 'صحيح البخاري 4451-4466 / صحيح مسلم 2444 — وفاة النبي ﷺ في حجرة عائشة', url: 'https://sunnah.com/bukhari:4451' },
+      { reference: 'صحيح البخاري 4453 — أمر أبي بكر بالصلاة بالناس في مرض النبي ﷺ' },
+      { reference: 'صحيح البخاري 4435 — رفع الإصبع وقول "بل الرفيق الأعلى"' },
+      { reference: 'صحيح البخاري 4454 — خطبة أبي بكر "من كان يعبد محمدًا فإن محمدًا قد مات"' },
+      { reference: 'سورة آل عمران 144', url: 'https://quran.com/3/144' },
+      { reference: 'صحيح البخاري 2912 — لم يترك ﷺ دينارًا ولا درهمًا' },
+      { reference: 'تفاصيل التاريخ بين أكثر العلماء على 12 ربيع الأول سنة 11هـ', note: 'وردت روايات أخرى (2 ربيع الأول عند ابن الكلبي وأبي مخنف)، رجّحها بعض المتأخرين كابن حجر، لكن الجمهور على 12 ربيع الأول' },
+    ],
   },
 ];
+
+// Suppress unused-variable warning while keeping COMMON_SOURCES available for
+// future "show full source list" UI tweaks (admin panel can opt in later).
+void SEERAH_COMMON_SOURCES;
 
 // ========================================
 // مكوّن القسم القابل للطيّ
@@ -375,6 +495,9 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
                 </TranslatedText>
               );
             })}
+            {(section.sources && section.sources.length > 0) ? (
+              <SourcesList sources={section.sources} compact />
+            ) : null}
           </View>
         </View>
       )}
@@ -388,97 +511,427 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
 
 interface SeerahAudioCardProps {
   audioUrl: string;
-  audioTitle?: string;
   colors: ReturnType<typeof useColors>;
   isDarkMode: boolean;
 }
 
-function SeerahAudioCard({ audioUrl, audioTitle, colors, isDarkMode }: SeerahAudioCardProps) {
+function AudioStatusModal({
+  visible,
+  mode,
+  colors,
+  onRetry,
+  onClose,
+}: {
+  visible: boolean;
+  mode: 'loading' | 'offline' | 'error';
+  colors: ReturnType<typeof useColors>;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  const copy = getSeerahAudioCopy();
+  const s = useScaledStyles(_s, colors.fs);
+  const isRTL = useIsRTL();
+  const isLoading = mode === 'loading';
+  const title = isLoading ? copy.loadingAudioTitle : mode === 'offline' ? copy.noInternetTitle : copy.audioErrorTitle;
+  const body = isLoading ? copy.loadingAudioBody : mode === 'offline' ? copy.noInternetBody : copy.audioErrorBody;
+  const icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] = isLoading ? 'headphones' : mode === 'offline' ? 'wifi-off' : 'alert-circle-outline';
+  const tint = mode === 'offline' ? '#f59e0b' : mode === 'error' ? '#ef4444' : ACCENT;
+  const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
+  const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <View style={s.modalOverlay}>
+        <View
+          style={[
+            s.modalCard,
+            {
+              backgroundColor: cardBg,
+              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        >
+          <View style={[s.modalIconCircle, { backgroundColor: iconBg }]}>
+            <MaterialCommunityIcons name={icon} size={42} color={tint} />
+          </View>
+          {isLoading && <ActivityIndicator size="large" color={tint} style={s.modalSpinner} />}
+          <Text style={[s.modalTitle, { color: colors.text }]}>{title}</Text>
+          <Text style={[s.modalBody, { color: colors.textLight }]}>{body}</Text>
+          {isLoading ? (
+            <Pressable
+              onPress={onClose}
+              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, marginTop: 18, alignSelf: 'stretch' }]}
+            >
+              <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
+            </Pressable>
+          ) : (
+            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 18 }]}>
+              <Pressable onPress={onClose} style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight }]}>
+                <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
+              </Pressable>
+              <Pressable onPress={onRetry} style={[s.modalButton, s.modalButtonPrimary]}>
+                <Text style={[s.modalButtonText, { color: '#fff' }]}>{copy.retry}</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps) {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_s, colors.fs);
-  const adShownRef = useRef(false);
   const {
-    isPlaying,
-    isLoading,
-    error,
-    formattedPosition,
-    formattedDuration,
-    playbackRate,
-    setPlaybackRate,
-    togglePlayPause,
-  } = useAzkarAudio({ audioUrl });
+    state: globalAudioState,
+    playAzkarQueue,
+    togglePlayPause: toggleGlobalAudio,
+    seekTo: seekGlobalAudio,
+    playbackSpeed,
+    setPlaybackSpeed,
+  } = useGlobalAudio();
+  const finishAdShownRef = useRef(false);
+  const prePlayAdShownRef = useRef(false);
+  const prePlayAdDisplayedRef = useRef(false);
+  const [networkState, setNetworkState] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [audioResolveState, setAudioResolveState] = useState<'idle' | 'resolving' | 'ready' | 'error'>('idle');
+  const [audioAttempted, setAudioAttempted] = useState(false);
+  const [audioStartError, setAudioStartError] = useState(false);
+  const [audioModalDismissed, setAudioModalDismissed] = useState(false);
+  const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
+  const trackId = 'seerah-full-audio';
+  const isThisStoryAudio = globalAudioState.source === 'azkar' && globalAudioState.currentTrackId === trackId;
+  const isPlaying = isThisStoryAudio && globalAudioState.isPlaying;
+  const currentPosition = isThisStoryAudio ? globalAudioState.position : 0;
+  const duration = isThisStoryAudio ? globalAudioState.duration : 0;
+  const isResolvingAudio = audioResolveState === 'resolving'
+    || (isThisStoryAudio && globalAudioState.isLoading && !isPlaying && currentPosition === 0);
+  const copy = getSeerahAudioCopy();
+  const displayTitle = copy.title;
+  const canSeekAudio = isThisStoryAudio && duration > 0 && !isResolvingAudio;
+  const {
+    displayPosition,
+    sliderPosition,
+    handleSeekStart,
+    handleSeekChange,
+    handleSeekComplete,
+  } = useAudioSeekPreview({
+    currentPosition,
+    duration,
+    canSeek: canSeekAudio,
+    isCurrentTrack: isThisStoryAudio,
+    resetKey: `${trackId}:${audioUrl}`,
+    seekTo: seekGlobalAudio,
+  });
+  const formattedPosition = formatAudioTime(displayPosition);
+  const formattedDuration = formatAudioTime(duration);
+
+  const checkConnection = useCallback(async () => {
+    setAudioModalDismissed(false);
+    setNetworkState('checking');
+    const net = await NetInfo.fetch().catch(() => null);
+    const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+    setNetworkState(offline ? 'offline' : 'online');
+  }, []);
+
+  useEffect(() => {
+    checkConnection();
+    const unsubscribe = NetInfo.addEventListener((net) => {
+      const offline = net.isConnected === false || net.isInternetReachable === false;
+      setNetworkState(offline ? 'offline' : 'online');
+      if (!offline) setAudioModalDismissed(false);
+    });
+    return () => unsubscribe();
+  }, [checkConnection]);
+
+  useEffect(() => {
+    finishAdShownRef.current = false;
+    prePlayAdShownRef.current = false;
+    prePlayAdDisplayedRef.current = false;
+    setAudioResolveState('idle');
+    setAudioAttempted(false);
+    setAudioStartError(false);
+    setAudioModalDismissed(false);
+    setAudioDownloadState('idle');
+    setAudioDownloadError(null);
+    isStoryAudioCached(trackId, audioUrl)
+      .then((cached) => {
+        setAudioDownloadState(cached ? 'downloaded' : 'idle');
+      })
+      .catch(() => {});
+  }, [audioUrl]);
+
+  const handleTrackComplete = useCallback(() => {
+    if (finishAdShownRef.current) return;
+    if (prePlayAdDisplayedRef.current) return;
+    finishAdShownRef.current = true;
+    showInterstitial({
+      allowInSacredContext: false,
+      ignoreSmartFrequencyCaps: true,
+      ignoreSmartSessionDelay: true,
+      ignoreGlobalCooldown: true,
+      timeoutMs: 5000,
+    }).catch(() => {});
+  }, []);
+
+  const resolveAudioForPlayback = useCallback(async () => {
+    if (!audioUrl) throw new Error('missing-audio-url');
+    setAudioResolveState('resolving');
+    const prepared = await prepareStoryAudio(trackId, audioUrl);
+    setAudioResolveState('ready');
+    if (prepared.isLocal) {
+      setAudioDownloadState('downloaded');
+    }
+    return prepared;
+  }, [audioUrl]);
+
+  const hasAudioError = audioAttempted && (audioResolveState === 'error' || audioStartError || (isThisStoryAudio && !!globalAudioState.error));
+  const audioStillBuffering = isThisStoryAudio && globalAudioState.isLoading && !isPlaying && currentPosition === 0;
+  const isAudioPreparing = audioAttempted && (networkState === 'checking' || audioResolveState === 'resolving' || audioStillBuffering);
+  const audioModalMode = networkState === 'offline' ? 'offline' : hasAudioError ? 'error' : 'loading';
+  const showAudioModal = !audioModalDismissed && audioAttempted && (isAudioPreparing || networkState === 'offline' || hasAudioError);
+
+  useEffect(() => {
+    if (!audioAttempted) return;
+    if (isPlaying || currentPosition > 0 || duration > 0) {
+      setAudioModalDismissed(true);
+    }
+  }, [audioAttempted, currentPosition, duration, isPlaying]);
 
   const handlePress = useCallback(async () => {
-    if (isLoading) return;
-    if (!isPlaying && !adShownRef.current) {
-      adShownRef.current = true;
-      await showInterstitial({ allowInSacredContext: false, ignoreSmartSessionDelay: true }).catch(() => {});
-    }
-    await togglePlayPause();
-  }, [isLoading, isPlaying, togglePlayPause]);
+    setAudioAttempted(true);
+    setAudioModalDismissed(false);
+    setAudioStartError(false);
 
-  const lang = getLanguage();
-  const displayTitle = audioTitle?.trim() || (lang === 'ar' ? 'استماع للسيرة النبوية كاملة' : 'Listen to the full Seerah');
+    const hasStartedCurrentAudio = isThisStoryAudio && (isPlaying || currentPosition > 0 || duration > 0);
+    const cachedLocally = await isStoryAudioCached(trackId, audioUrl);
+    if (cachedLocally) {
+      setAudioDownloadState('downloaded');
+    }
+
+    if (!cachedLocally && !hasStartedCurrentAudio) {
+      const net = await NetInfo.fetch().catch(() => null);
+      const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+      setNetworkState(offline ? 'offline' : 'online');
+      if (offline) return;
+    } else {
+      setNetworkState('online');
+    }
+
+    if (hasStartedCurrentAudio && !globalAudioState.isLoading) {
+      await toggleGlobalAudio();
+      return;
+    }
+
+    try {
+      if (!prePlayAdShownRef.current && !hasStartedCurrentAudio) {
+        prePlayAdShownRef.current = true;
+        const didShowPrePlayAd = await showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
+      }
+
+      const prepared = await resolveAudioForPlayback();
+      await playAzkarQueue(
+        [{
+          id: trackId,
+          title: displayTitle,
+          subtitle: copy.subtitle,
+          url: prepared.uri,
+          forceExpoAv: true,
+        }],
+        0,
+        '/seerah',
+        { onTrackComplete: handleTrackComplete },
+      );
+    } catch (audioError) {
+      setAudioModalDismissed(false);
+      setAudioResolveState('error');
+      setAudioStartError(true);
+      console.log('Seerah audio playback failed', audioError);
+    }
+  }, [
+    audioUrl,
+    copy.subtitle,
+    currentPosition,
+    displayTitle,
+    duration,
+    globalAudioState.isLoading,
+    handleTrackComplete,
+    isPlaying,
+    isThisStoryAudio,
+    playAzkarQueue,
+    resolveAudioForPlayback,
+    toggleGlobalAudio,
+  ]);
+
+  const handleDownloadAudio = useCallback(async () => {
+    if (!audioUrl || audioDownloadState === 'downloading') return;
+
+    setAudioDownloadError(null);
+
+    const cachedLocally = await isStoryAudioCached(trackId, audioUrl);
+    if (cachedLocally) {
+      setAudioDownloadState('downloaded');
+      return;
+    }
+
+    const net = await NetInfo.fetch().catch(() => null);
+    const offline = !net || net.isConnected === false || net.isInternetReachable === false;
+    setNetworkState(offline ? 'offline' : 'online');
+    if (offline) {
+      setAudioAttempted(true);
+      setAudioModalDismissed(false);
+      return;
+    }
+
+    setAudioDownloadState('downloading');
+    const didShowPreDownloadAd = await showInterstitial({
+      allowInSacredContext: false,
+      ignoreSmartFrequencyCaps: true,
+      ignoreSmartSessionDelay: true,
+      ignoreGlobalCooldown: true,
+      timeoutMs: 5000,
+    }).catch(() => false);
+
+    try {
+      setAudioDownloadState('downloading');
+      await downloadStoryAudio(trackId, audioUrl);
+      setAudioDownloadState('downloaded');
+      if (didShowPreDownloadAd !== true) {
+        showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+      }
+    } catch (downloadError) {
+      setAudioDownloadState('error');
+      setAudioDownloadError(copy.downloadFailed);
+      console.log('Seerah audio download failed', downloadError);
+    }
+  }, [
+    audioDownloadState,
+    audioUrl,
+    copy.downloadFailed,
+  ]);
+
   return (
-    <View style={[s.seerahAudioOuter, isDarkMode ? { borderColor: 'rgba(255,255,255,0.08)' } : { borderColor: 'rgba(0,0,0,0.06)' }]}>
-      <BlurView
-        intensity={Platform.OS === 'ios' ? 25 : 10}
-        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[s.audioCard, { backgroundColor: 'transparent' }]}>
-        <View style={[s.audioHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={[s.audioIconWrap, { backgroundColor: ACCENT }]}>
-            <MaterialCommunityIcons name="headphones" size={22} color="#fff" />
+    <>
+      <View style={[s.seerahAudioOuter, isDarkMode ? { borderColor: 'rgba(255,255,255,0.08)' } : { borderColor: 'rgba(0,0,0,0.06)' }]}>
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 25 : 10}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[s.audioCard, { backgroundColor: 'transparent' }]}>
+          <View style={[s.audioHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[s.audioIconWrap, { backgroundColor: ACCENT }]}>
+              <MaterialCommunityIcons name="headphones" size={22} color="#fff" />
+            </View>
+            <View style={s.audioTitleWrap}>
+              <Text style={[s.audioTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+                {displayTitle}
+              </Text>
+              <Text style={[s.audioSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {copy.subtitle}
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleDownloadAudio}
+              disabled={audioDownloadState === 'downloading' || audioDownloadState === 'downloaded'}
+              style={[s.audioDownloadButton, audioDownloadState === 'downloaded' && s.audioDownloadButtonDone]}
+              accessibilityRole="button"
+              accessibilityLabel={copy.download}
+            >
+              {audioDownloadState === 'downloading' ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons name={audioDownloadState === 'downloaded' ? 'check' : 'download'} size={16} color="#fff" />
+              )}
+              <Text style={s.audioDownloadButtonText} numberOfLines={1}>
+                {audioDownloadState === 'downloading'
+                  ? copy.downloading
+                  : audioDownloadState === 'downloaded'
+                    ? copy.downloaded
+                    : copy.download}
+              </Text>
+            </Pressable>
           </View>
-          <View style={s.audioTitleWrap}>
-            <Text style={[s.audioTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
-              {displayTitle}
-            </Text>
-            <Text style={[s.audioSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {lang === 'ar' ? 'صوت واحد لكل السيرة' : 'Single audio for the whole Seerah'}
-            </Text>
+
+          <Slider
+            style={s.audioProgressSlider}
+            minimumValue={0}
+            maximumValue={duration > 0 ? duration : 1}
+            value={sliderPosition}
+            disabled={!canSeekAudio}
+            minimumTrackTintColor={ACCENT}
+            maximumTrackTintColor="rgba(6,79,47,0.18)"
+            thumbTintColor={canSeekAudio ? ACCENT : 'rgba(255,255,255,0.45)'}
+            onSlidingStart={handleSeekStart}
+            onValueChange={handleSeekChange}
+            onSlidingComplete={handleSeekComplete}
+          />
+
+          <View style={s.audioControlsRow}>
+            <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedPosition}</Text>
+            <Pressable
+              onPress={handlePress}
+              disabled={isResolvingAudio}
+              style={[s.audioPlayButton, isResolvingAudio && s.audioPlayButtonDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? 'pause' : 'play'}
+            >
+              {isResolvingAudio ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons name={isPlaying ? 'pause' : 'play'} size={25} color="#fff" />
+              )}
+            </Pressable>
+            <Text style={[s.audioTime, { color: colors.textLight }]}>{duration > 0 ? formattedDuration : '--:--'}</Text>
           </View>
+
+          <View style={[s.audioSpeedRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[s.audioSpeedLabel, { color: colors.textLight }]}>{copy.speed}</Text>
+            {AUDIO_SPEEDS.map((speed) => {
+              const active = Math.abs(playbackSpeed - speed) < 0.01;
+              return (
+                <Pressable
+                  key={speed}
+                  onPress={() => setPlaybackSpeed(speed)}
+                  style={[s.audioSpeedButton, active && s.audioSpeedButtonActive]}
+                >
+                  <Text style={[s.audioSpeedButtonText, active && s.audioSpeedButtonTextActive]}>{speed}x</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {!!audioDownloadError && (
+            <Text style={[s.audioDownloadErrorText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {audioDownloadError}
+            </Text>
+          )}
+
         </View>
-        <View style={s.audioControlsRow}>
-          <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedPosition}</Text>
-          <Pressable
-            onPress={handlePress}
-            disabled={isLoading}
-            style={[s.audioPlayButton, isLoading && s.audioPlayButtonDisabled]}
-            accessibilityRole="button"
-            accessibilityLabel={isPlaying ? 'pause' : 'play'}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <MaterialCommunityIcons name={isPlaying ? 'pause' : 'play'} size={25} color="#fff" />
-            )}
-          </Pressable>
-          <Text style={[s.audioTime, { color: colors.textLight }]}>{formattedDuration}</Text>
-        </View>
-        <View style={[s.audioSpeedRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <Text style={[s.audioSpeedLabel, { color: colors.textLight }]}>{lang === 'ar' ? 'السرعة' : 'Speed'}</Text>
-          {AUDIO_SPEEDS.map((speed) => {
-            const active = Math.abs(playbackRate - speed) < 0.01;
-            return (
-              <Pressable
-                key={speed}
-                onPress={() => setPlaybackRate(speed)}
-                style={[s.audioSpeedButton, active && s.audioSpeedButtonActive]}
-              >
-                <Text style={[s.audioSpeedButtonText, active && s.audioSpeedButtonTextActive]}>{speed}x</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        {!!error && (
-          <Text style={[s.audioError, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-            {lang === 'ar' ? 'تعذر تشغيل الصوت. تحقق من الاتصال ثم حاول مرة أخرى.' : 'Audio could not be played. Check your connection and try again.'}
-          </Text>
-        )}
       </View>
-    </View>
+      <AudioStatusModal
+        visible={showAudioModal}
+        mode={audioModalMode}
+        colors={colors}
+        onRetry={handlePress}
+        onClose={() => setAudioModalDismissed(true)}
+      />
+    </>
   );
 }
 
@@ -487,7 +940,6 @@ function SeerahAudioCard({ audioUrl, audioTitle, colors, isDarkMode }: SeerahAud
 // ========================================
 
 export default function SeerahScreen() {
-  const router = useRouter();
   const { section: sectionParam } = useLocalSearchParams<{ section?: string }>();
   const { isDarkMode, t } = useSettings();
   const isRTL = useIsRTL();
@@ -501,7 +953,7 @@ export default function SeerahScreen() {
   const handledSectionParamRef = useRef<string | null>(null);
 
   // CMS data with hardcoded fallback
-  const { sections: seerahSections, audioUrl: seerahAudioUrl, audioTitle: seerahAudioTitle } = useSeerahContent(SEERAH_SECTIONS);
+  const { sections: seerahSections, audioUrl: seerahAudioUrl } = useSeerahContent(SEERAH_SECTIONS);
 
   // Auto-open + scroll to a saved chapter when navigated via ?section=<slug>
   useEffect(() => {
@@ -626,12 +1078,20 @@ export default function SeerahScreen() {
 
         {/* Single audio for the whole Seerah (admin-managed) */}
         {!!seerahAudioUrl?.trim() && (
-          <SeerahAudioCard
-            audioUrl={seerahAudioUrl}
-            audioTitle={seerahAudioTitle}
-            colors={colors}
-            isDarkMode={isDarkMode}
-          />
+          <>
+            <SeerahAudioCard
+              audioUrl={seerahAudioUrl}
+              colors={colors}
+              isDarkMode={isDarkMode}
+            />
+            <View style={{ paddingHorizontal: Spacing.lg }}>
+              <StoryInteractionBar
+                storyId={seerahSectionId('full-audio')}
+                section="seerah"
+                storyTitle={t('seerah.title')}
+              />
+            </View>
+          </>
         )}
 
         {/* Timeline with sections */}
@@ -775,7 +1235,6 @@ const _s = StyleSheet.create({
     lineHeight: 22,
     includeFontPadding: false,
   },
-
   // Timeline
   timeline: {
     position: 'relative',
@@ -879,13 +1338,19 @@ const _s = StyleSheet.create({
     lineHeight: 18,
     marginTop: 1,
   },
+  audioProgressSlider: {
+    width: '100%',
+    height: 34,
+    marginBottom: 2,
+  },
   audioControlsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.md,
   },
   audioTime: {
-    width: 54,
+    width: 76,
     fontFamily: fontSemiBold(),
     fontSize: 13,
     lineHeight: 20,
@@ -915,8 +1380,8 @@ const _s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
   },
   audioSpeedButtonActive: {
-    backgroundColor: '#6D5DF6',
-    borderColor: '#6D5DF6',
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
   },
   audioSpeedButtonText: {
     color: 'rgba(255,255,255,0.78)',
@@ -927,13 +1392,42 @@ const _s = StyleSheet.create({
   audioSpeedButtonTextActive: {
     color: '#fff',
   },
+  audioDownloadButton: {
+    flexShrink: 0,
+    minWidth: 92,
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: ACCENT,
+  },
+  audioDownloadButtonDone: {
+    backgroundColor: '#0d8e62',
+  },
+  audioDownloadButtonText: {
+    color: '#fff',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  audioDownloadErrorText: {
+    color: '#ef4444',
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 10,
+  },
   audioPlayButton: {
     width: 54,
     height: 54,
     borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6D5DF6',
+    backgroundColor: ACCENT,
   },
   audioPlayButtonDisabled: {
     opacity: 0.65,
@@ -983,5 +1477,78 @@ const _s = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 28,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  modalIconCircle: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSpinner: {
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontFamily: fontBold(),
+    fontSize: 18,
+    lineHeight: 30,
+    marginBottom: 8,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  modalBody: {
+    fontFamily: fontRegular(),
+    fontSize: 14,
+    lineHeight: 24,
+    marginBottom: 18,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  modalActions: {
+    width: '100%',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  modalButtonPrimary: {
+    backgroundColor: ACCENT,
+  },
+  modalButtonSecondary: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  modalButtonText: {
+    fontFamily: fontSemiBold(),
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });

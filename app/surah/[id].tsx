@@ -79,8 +79,9 @@ function getTargetAyahBg(themeIndex: number): string {
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, 0.40)`;
+  return `rgba(${r}, ${g}, ${b}, 0.65)`;
 }
+
 import NetInfo from '@react-native-community/netinfo';
 import { setLastRead, addBookmark, removeBookmark, getBookmarks } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
@@ -270,7 +271,12 @@ interface MushafPageProps {
   useCdnImage?: boolean;
   bookmarkMap: Record<string, BookmarkColor>;
   playingAyahKey: string | null;
+  /** Single ayah to highlight (legacy / "scroll to" indicator). */
   highlightAyahKey: string | null;
+  /** Full set of ayah keys to render with the target-ayah background. Used
+   * when a citation links to a range (e.g. "سورة الأعراف 163-166"). When
+   * null we fall back to `highlightAyahKey` only. */
+  highlightAyahKeys?: Set<string> | null;
   onAyahLongPress?: (surah: number, ayah: number, page: number) => void;
   translationMap?: Record<string, string>;
   showTranslation?: boolean;
@@ -287,7 +293,7 @@ interface MushafPageProps {
 }
 
 const MushafPage = React.memo(function MushafPage({
-  page, themeIndex, width, fontSizeAdjust, forceLightText, forcePlainArabicForCapture, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
+  page, themeIndex, width, fontSizeAdjust, forceLightText, forcePlainArabicForCapture, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, highlightAyahKeys, onAyahLongPress,
   translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false, isActivePage = false, autoScrollActive = false, autoScrollControlsVisible = false, autoScrollContinuousMode = false, autoScrollDurationMs = DEFAULT_AUTO_SCROLL_MAX_SECONDS * 1000, onAutoScrollPageEnd, onAutoScrollTouch, onContinuousPageLayout,
 }: MushafPageProps) {
   const { isDarkMode, settings } = useSettings();
@@ -573,7 +579,9 @@ const MushafPage = React.memo(function MushafPage({
                   const ayahKey = `${group.surah}:${group.ayah}`;
                   const bcolor = bookmarkMap[ayahKey];
                   const isPlaying = playingAyahKey === ayahKey;
-                  const isHighlighted = highlightAyahKey === ayahKey;
+                  const isHighlighted = highlightAyahKeys
+                    ? highlightAyahKeys.has(ayahKey)
+                    : highlightAyahKey === ayahKey;
 
                   let bgColor: string | undefined;
                   if (bcolor) bgColor = BOOKMARK_BG_COLORS[bcolor];
@@ -920,10 +928,14 @@ const gh = StyleSheet.create({
 // ══════════════════════════════════════════════
 
 export default function SurahScreen() {
-  const { id, ayah: targetAyahParam, page: targetPageParam, autoShare: autoShareParam } =
-    useLocalSearchParams<{ id: string; ayah?: string; page?: string; autoShare?: string }>();
+  const { id, ayah: targetAyahParam, ayahEnd: targetAyahEndParam, page: targetPageParam, autoShare: autoShareParam } =
+    useLocalSearchParams<{ id: string; ayah?: string; ayahEnd?: string; page?: string; autoShare?: string }>();
   const surahNumber = parseInt(id || '1');
   const targetAyah = targetAyahParam ? parseInt(targetAyahParam) : undefined;
+  // Optional end of a range — used when a citation links to multiple verses
+  // (e.g. "سورة الأعراف 163-166"). The Mushaf highlights every ayah from
+  // targetAyah through targetAyahEnd inclusive. Falls back to a single ayah.
+  const targetAyahEnd = targetAyahEndParam ? parseInt(targetAyahEndParam) : undefined;
 
   const router = useRouter();
   const { settings, isDarkMode, updateDisplay, isLoading: settingsLoading, t } = useSettings();
@@ -1010,6 +1022,17 @@ export default function SurahScreen() {
   const [showLongPressHint, setShowLongPressHint] = useState(false);
   const [isPageFavorited, setIsPageFavorited] = useState(false);
   const [highlightAyahKey, setHighlightAyahKey] = useState<string | null>(null);
+  // Highlight set covering an ayah range. Derived from ?ayah & ?ayahEnd query
+  // params so a source citation like "سورة الأعراف 163-166" lights up every
+  // verse in the range, not just the first. Memoised so unrelated re-renders
+  // don't churn the Set identity (and force MushafPage to re-memo).
+  const highlightAyahKeys = useMemo<Set<string> | null>(() => {
+    if (!targetAyah) return null;
+    const end = targetAyahEnd && targetAyahEnd >= targetAyah ? targetAyahEnd : targetAyah;
+    const keys = new Set<string>();
+    for (let n = targetAyah; n <= end; n++) keys.add(`${surahNumber}:${n}`);
+    return keys;
+  }, [surahNumber, targetAyah, targetAyahEnd]);
   const [autoScrollActive, setAutoScrollActive] = useState(false);
   const [showAutoScrollControls, setShowAutoScrollControls] = useState(false);
   const [autoScrollMinimized, setAutoScrollMinimized] = useState(false);
@@ -1350,6 +1373,11 @@ export default function SurahScreen() {
     setHighlightAyahKey(`${surahNumber}:${targetAyah}`);
   }, [targetAyah, surahNumber]);
 
+  // The bottom "آية N" badge fades after 5s, but we intentionally do NOT clear
+  // the highlight state itself. Citation deep-links (e.g. "سورة الأعراف
+  // 163-166") need the verses to stay highlighted so the user can still see
+  // them after they finish reading the indicator. The Set-based render path
+  // already persists; this just keeps the legacy single-key behaviour aligned.
   useEffect(() => {
     if (!highlightAyahKey) return;
     targetIndicatorOpacity.setValue(1);
@@ -1360,10 +1388,8 @@ export default function SurahScreen() {
         useNativeDriver: true,
       }).start();
     }, 4200);
-    const clearTimer = setTimeout(() => setHighlightAyahKey(null), 5000);
     return () => {
       clearTimeout(fadeTimer);
-      clearTimeout(clearTimer);
     };
   }, [highlightAyahKey]);
 
@@ -1897,6 +1923,7 @@ export default function SurahScreen() {
           bookmarkMap={bookmarkMap}
           playingAyahKey={playingAyahKey}
           highlightAyahKey={highlightAyahKey}
+          highlightAyahKeys={highlightAyahKeys}
           onAyahLongPress={handleAyahLongPress}
           translationMap={showTranslation ? translationMap : undefined}
           showTranslation={showTranslation}
@@ -1911,7 +1938,7 @@ export default function SurahScreen() {
         />
       </TouchableOpacity>
     ),
-    [themeIndex, fontSizeAdjust, forceLightText, bookmarkMap, playingAyahKey, highlightAyahKey, handleAyahLongPress, showTranslation, translationMap, translationFontSize, translationIsRTL, currentPage, autoScrollActive, showAutoScrollControls, autoScrollDurationMs, handleAutoScrollPageEnd, pauseAutoScrollFromTouch, settings?.display?.focusMode],
+    [themeIndex, fontSizeAdjust, forceLightText, bookmarkMap, playingAyahKey, highlightAyahKey, highlightAyahKeys, handleAyahLongPress, showTranslation, translationMap, translationFontSize, translationIsRTL, currentPage, autoScrollActive, showAutoScrollControls, autoScrollDurationMs, handleAutoScrollPageEnd, pauseAutoScrollFromTouch, settings?.display?.focusMode],
   );
 
   // ══════════════════════════════════════════════
@@ -1957,6 +1984,7 @@ export default function SurahScreen() {
                     bookmarkMap={bookmarkMap}
                     playingAyahKey={playingAyahKey}
                     highlightAyahKey={highlightAyahKey}
+                    highlightAyahKeys={highlightAyahKeys}
                     onAyahLongPress={handleAyahLongPress}
                     translationMap={showTranslation ? translationMap : undefined}
                     showTranslation={showTranslation}
@@ -2370,7 +2398,9 @@ export default function SurahScreen() {
                     fontSize: surahColors.fs(14),
                     color: isLightBg ? '#1a1a2e' : '#fff',
                   }}>
-                    {t('quran.ayah')} {toArabicNumber(targetAyah)}
+                    {targetAyahEnd && targetAyahEnd > targetAyah
+                      ? `${t('quran.ayah')} ${toArabicNumber(targetAyah)}-${toArabicNumber(targetAyahEnd)}`
+                      : `${t('quran.ayah')} ${toArabicNumber(targetAyah)}`}
                   </Text>
                 </View>
               </BlurView>

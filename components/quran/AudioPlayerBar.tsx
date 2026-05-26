@@ -9,6 +9,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 import { useRouter, usePathname } from 'expo-router';
 import { useQuran } from '@/contexts/QuranContext';
 import { getSurahName } from '@/lib/quran-api';
+import { formatAudioTime } from '@/lib/audio-time';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Spacing, BorderRadius, FONT_SIZES } from '@/constants/theme';
 
@@ -16,12 +17,6 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontRegular, fontSemiBold } from '@/lib/fonts';
-function formatTime(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec < 10 ? '0' : ''}${sec}`;
-}
 
 interface AudioPlayerBarProps {
   /** If true, use global positioning (for root layout). Otherwise no absolute positioning. */
@@ -268,7 +263,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
           {duration > 0 && (
             <View style={[styles.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.timeText, { color: textSecondary }]}>
-                {formatTime(position)}
+                {formatAudioTime(position)}
               </Text>
               <Slider
                 style={styles.slider}
@@ -281,7 +276,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
                 thumbTintColor={primaryColor}
               />
               <Text style={[styles.timeText, { color: textSecondary }]}>
-                {formatTime(duration)}
+                {formatAudioTime(duration)}
               </Text>
             </View>
           )}
@@ -360,7 +355,7 @@ const _styles = StyleSheet.create({
   timeText: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    minWidth: 32,
+    minWidth: 58,
     textAlign: 'center',
   },
   // Mini pill (minimized state)

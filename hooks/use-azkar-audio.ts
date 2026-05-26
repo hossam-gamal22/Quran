@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { t } from '@/lib/i18n';
 import { audioCoordinator } from '@/lib/audio-coordinator';
+import { formatAudioTime } from '@/lib/audio-time';
 
 const AUDIO_LOAD_TIMEOUT_MS = 45000;
 
@@ -217,18 +218,11 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
     };
   }, []);
 
-  const formatTime = (milliseconds: number): string => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
   return {
     // الحالة
     ...state,
-    formattedPosition: formatTime(state.currentPosition),
-    formattedDuration: formatTime(state.duration),
+    formattedPosition: formatAudioTime(state.currentPosition),
+    formattedDuration: formatAudioTime(state.duration),
     playbackRate,
 
     // الدوال

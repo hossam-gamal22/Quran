@@ -312,8 +312,67 @@ export function getProphetEnglishStory(id: string): StoryEnglishFields | undefin
   return PROPHET_ENGLISH_STORIES[id];
 }
 
+function normalize(value?: string): string {
+  return (value || '')
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/[ًٌٍَُِّْ]/g, '')
+    .trim();
+}
+
+// Per-prophet canonical phrases that must appear in the title to be considered
+// an unambiguous match. Lone tokens like "آدم" are not used here — they appear
+// in many non-prophet titles (e.g. the Dajjal title mentions "خلق آدم") and
+// would leak this prophet's English fields into the wrong story.
+const PROPHET_TITLE_ANCHORS: Record<string, string[]> = {
+  'prophet-adam': ['آدم عليه السلام', 'قصة آدم'],
+  'prophet-idris': ['إدريس عليه السلام', 'قصة إدريس'],
+  'prophet-nuh': ['نوح عليه السلام', 'قصة نوح'],
+  'prophet-hud': ['هود عليه السلام', 'قصة هود'],
+  'prophet-salih': ['صالح عليه السلام', 'قصة صالح'],
+  'prophet-ibrahim': ['إبراهيم عليه السلام', 'قصة إبراهيم'],
+  'prophet-lut': ['لوط عليه السلام', 'قصة لوط'],
+  'prophet-ismail': ['إسماعيل عليه السلام', 'قصة إسماعيل'],
+  'prophet-yaqub': ['يعقوب عليه السلام', 'إسحاق ويعقوب', 'قصة يعقوب', 'قصة إسحاق'],
+  'prophet-yusuf': ['يوسف عليه السلام', 'قصة يوسف'],
+  'prophet-ayyub': ['أيوب عليه السلام', 'قصة أيوب'],
+  'prophet-shuayb': ['شعيب عليه السلام', 'قصة شعيب'],
+  'prophet-musa': ['موسى عليه السلام', 'قصة موسى'],
+  'prophet-harun': ['هارون عليه السلام', 'قصة هارون'],
+  'prophet-dhul-kifl': ['ذو الكفل عليه السلام', 'قصة ذو الكفل'],
+  'prophet-dawud': ['داود عليه السلام', 'قصة داود'],
+  'prophet-sulayman': ['سليمان عليه السلام', 'قصة سليمان'],
+  'prophet-ilyas': ['إلياس عليه السلام', 'قصة إلياس'],
+  'prophet-alyasa': ['اليسع عليه السلام', 'قصة اليسع'],
+  'prophet-yunus': ['يونس عليه السلام', 'قصة يونس'],
+  'prophet-zakariya': ['زكريا عليه السلام', 'قصة زكريا'],
+  'prophet-yahya': ['يحيى عليه السلام', 'قصة يحيى'],
+  'prophet-isa': ['عيسى عليه السلام', 'قصة عيسى'],
+  'prophet-muhammad': ['النبي محمد', 'قصة النبي محمد'],
+};
+
 export function findReligiousStoryEnglishFields(story: StoryLookupInput): StoryEnglishFields | undefined {
-  const haystack = `${story.id || ''} ${story.title || ''} ${story.titleEn || ''} ${story.brief || ''}`.toLowerCase();
-  const match = STORY_MATCHERS.find(({ terms }) => terms.some((term) => haystack.includes(term.toLowerCase())));
-  return match ? PROPHET_ENGLISH_STORIES[match.id] : undefined;
+  // 1) Exact id match — strongest signal for bundled/Firestore docs.
+  if (story.id && PROPHET_ENGLISH_STORIES[story.id]) {
+    return PROPHET_ENGLISH_STORIES[story.id];
+  }
+
+  // 2) Title anchor match — only return a prophet's English data when the
+  // title contains a canonical, unambiguous phrase like "آدم عليه السلام" or
+  // "قصة آدم". Bare prophet names are NOT enough: titles for non-prophet
+  // stories often mention prophets in passing (the Dajjal title contains
+  // "خلق آدم"; "وفاة الأنبياء من آدم إلى محمد" contains both آدم and محمد).
+  const titleNorm = normalize(`${story.title || ''} ${story.titleEn || ''}`);
+  if (!titleNorm) return undefined;
+  for (const [id, anchors] of Object.entries(PROPHET_TITLE_ANCHORS)) {
+    for (const anchor of anchors) {
+      if (titleNorm.includes(normalize(anchor))) {
+        return PROPHET_ENGLISH_STORIES[id];
+      }
+    }
+  }
+  return undefined;
 }

@@ -298,6 +298,89 @@ service cloud.firestore {
       allow read, update, delete: if true;
     }
 
+    // ─── Story Social Interactions ─────────────────────────────
+    // Likes + comments + reports on Prophet stories, Companions, Seerah.
+    // Follows the same open-trust model as the rest of the app (no Firebase
+    // Auth on the mobile client). Caps protect against doc bloat and abuse.
+    // Admin moderation (hide/delete/ban) goes through the same path; locking
+    // down to admin-only is deferred to Phase B0.5 alongside the rest of the
+    // admin write surface.
+    match /storyInteractions/{storyId} {
+      allow read: if true;
+      allow write: if request.resource.data.size() <= 12;
+    }
+
+    // Likes — one doc per (story, user). Keyed by userId for cheap toggle.
+    match /storyInteractions/{storyId}/likes/{userId} {
+      allow read: if true;
+      allow write: if request.resource == null
+        || request.resource.data.size() <= 5;
+    }
+
+    // Comments — text is bounded at 500 chars; we cap field count + raw size.
+    match /storyInteractions/{storyId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 500
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 80;
+      allow update, delete: if true;
+    }
+
+    // Collection-group read for the admin moderation queue. Firestore requires
+    // a {path=**}/comments/{id} wildcard rule for collectionGroup('comments')
+    // queries to be authorized — the nested rule above alone is not enough.
+    match /{path=**}/comments/{commentId} {
+      allow read: if true;
+    }
+
+    // Reports — one doc per (comment, reporting user).
+    match /storyInteractions/{storyId}/comments/{commentId}/reports/{userId} {
+      allow read: if true;
+      allow write: if request.resource == null
+        || request.resource.data.size() <= 5;
+    }
+
+    // Replies — threaded discussion under a comment. Same validation shape
+    // as top-level comments; replyCount on the parent is denormalized so the
+    // mobile UI can show "Show replies (N)" without scanning this collection.
+    match /storyInteractions/{storyId}/comments/{commentId}/replies/{replyId} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 500
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 80;
+      allow update, delete: if true;
+    }
+
+    // Collection-group read for admin moderation of replies.
+    match /{path=**}/replies/{replyId} {
+      allow read: if true;
+    }
+
+    // Reports on replies — one doc per (reply, reporting user).
+    match /storyInteractions/{storyId}/comments/{commentId}/replies/{replyId}/reports/{userId} {
+      allow read: if true;
+      allow write: if request.resource == null
+        || request.resource.data.size() <= 5;
+    }
+
+    // User bans — admin-controlled (writes happen from admin panel today,
+    // same trust model as the rest of admin writes).
+    match /userBans/{userId} {
+      allow read: if true;
+      allow write: if request.resource == null
+        || request.resource.data.size() <= 6;
+    }
+
     // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;

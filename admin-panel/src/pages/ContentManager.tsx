@@ -216,6 +216,35 @@ function archiveDownloadUrl(identifier: string, fileName: string): string {
   return `https://archive.org/download/${encodeURIComponent(identifier)}/${encodedPath}`;
 }
 
+function stripAudioExtension(name: string): string {
+  const lower = name.toLowerCase();
+  const extension = AUDIO_FILE_EXTENSIONS.find(ext => lower.endsWith(ext));
+  return extension ? name.slice(0, -extension.length) : name;
+}
+
+function audioFileNameToTitle(fileName: string): string {
+  return stripAudioExtension(fileName)
+    .replace(/\+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeArchiveAudioName(name: string): string {
+  return stripAudioExtension(name)
+    .normalize('NFKC')
+    .replace(/\+/g, ' ')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g, '')
+    .replace(/[^0-9a-z\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function archiveDirectFileUrl(identifier: string, metadata: ArchiveMetadata, fileName: string): string {
   const encodedPath = fileName
     .split('/')
@@ -234,12 +263,23 @@ function archiveDirectFileUrl(identifier: string, metadata: ArchiveMetadata, fil
   return archiveDownloadUrl(identifier, fileName);
 }
 
-function pickArchiveAudioFile(files: ArchiveAudioFile[]): ArchiveAudioFile | null {
+function pickArchiveAudioFile(files: ArchiveAudioFile[], requestedName?: string | null): ArchiveAudioFile | null {
   const audioFiles = files.filter(file => {
     const name = (file.name || '').toLowerCase();
     return AUDIO_FILE_EXTENSIONS.some(ext => name.endsWith(ext));
   });
   if (audioFiles.length === 0) return null;
+
+  if (requestedName) {
+    const requestedWithSpaces = requestedName.replace(/\+/g, ' ');
+    const exactMatch = audioFiles.find(file => file.name === requestedName || file.name === requestedWithSpaces);
+    if (exactMatch) return exactMatch;
+
+    const requestedNormalized = normalizeArchiveAudioName(requestedName);
+    const normalizedMatch = audioFiles.find(file => normalizeArchiveAudioName(file.name) === requestedNormalized);
+    if (normalizedMatch) return normalizedMatch;
+  }
+
   return [...audioFiles].sort((a, b) => {
     const aName = (a.name || '').toLowerCase();
     const bName = (b.name || '').toLowerCase();
@@ -258,10 +298,15 @@ async function resolveArchiveAudioUrl(input: string): Promise<{ audioUrl: string
   if (isDirectAudioUrl(trimmed)) {
     const archiveFileName = getArchiveAudioFileName(trimmed);
     if (identifier && archiveFileName) {
+      const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`);
+      if (!res.ok) throw new Error('metadata');
+      const metadata = await res.json() as ArchiveMetadata;
+      const audioFile = pickArchiveAudioFile(metadata.files || [], archiveFileName);
+      if (!audioFile) throw new Error('no-audio');
       return {
-        audioUrl: archiveDownloadUrl(identifier, archiveFileName),
+        audioUrl: archiveDirectFileUrl(identifier, metadata, audioFile.name),
         sourceUrl: `https://archive.org/details/${encodeURIComponent(identifier)}`,
-        fileName: archiveFileName,
+        fileName: audioFile.name,
       };
     }
     return {
@@ -274,7 +319,7 @@ async function resolveArchiveAudioUrl(input: string): Promise<{ audioUrl: string
   const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`);
   if (!res.ok) throw new Error('metadata');
   const metadata = await res.json() as ArchiveMetadata;
-  const audioFile = pickArchiveAudioFile(metadata.files || []);
+  const audioFile = pickArchiveAudioFile(metadata.files || [], getArchiveAudioFileName(trimmed));
   if (!audioFile) throw new Error('no-audio');
   return {
     audioUrl: archiveDirectFileUrl(identifier, metadata, audioFile.name),
@@ -308,7 +353,7 @@ function findReligiousStoryPreset(story: CMSReligiousStory): ReligiousStoryPrese
   const title = normalizeSearchText(story.title);
   const titleEn = normalizeSearchText(story.titleEn);
   if (!title && !titleEn) return undefined;
-  return RELIGIOUS_STORY_PRESETS.find((preset) => {
+  return ACTIVE_RELIGIOUS_STORY_PRESETS.find((preset) => {
     const presetTitle = normalizeSearchText(preset.title);
     const presetTitleEn = normalizeSearchText(preset.titleEn);
     const presetLabel = normalizeSearchText(preset.label);
@@ -323,14 +368,21 @@ function hydrateReligiousStoryFromPreset(story: CMSReligiousStory): CMSReligious
   const preset = findReligiousStoryPreset(story);
   const complete = findCompleteReligiousStory(story);
   if (!preset && !complete) return story;
+  // Canonical text comes from the preset (which already merges in the complete
+  // dataset for prophets). Stored transcripts are kept only when they look
+  // like admin-extended versions of the preset; otherwise (e.g. a previous
+  // hydration leak left Adam's text under the Dajjal record) we trust the
+  // canonical source.
+  const canonicalTranscript = preset?.transcript || complete?.transcript || '';
+  const canonicalTranscriptEn = preset?.transcriptEn || complete?.transcriptEn || '';
   return {
     ...story,
     title: complete?.title || story.title || preset?.title || '',
     titleEn: complete?.titleEn || story.titleEn || preset?.titleEn,
     brief: complete?.brief || story.brief || preset?.brief,
     briefEn: complete?.briefEn || story.briefEn || preset?.briefEn,
-    transcript: preferLongerText(story.transcript || preset?.transcript || '', complete?.transcript || ''),
-    transcriptEn: preferLongerText(story.transcriptEn || preset?.transcriptEn || '', complete?.transcriptEn || ''),
+    transcript: reconcilePresetTranscript(canonicalTranscript, story.transcript),
+    transcriptEn: reconcilePresetTranscript(canonicalTranscriptEn, story.transcriptEn),
     icon: '',
   };
 }
@@ -358,6 +410,23 @@ function normalizeCompanionForSave(companion: CMSCompanion): CMSCompanion {
     story: splitFullStoryText(fullStory),
     virtues: (companion.virtues || []).map(v => v.trim()).filter(Boolean),
   };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function sanitizeForFirestore<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => item === undefined ? null : sanitizeForFirestore(item)) as T;
+  }
+  if (!isPlainObject(value)) return value;
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, sanitizeForFirestore(item)])
+  ) as T;
 }
 
 // ─── Seasonal CMS types ────────────────────────────────────────────────
@@ -966,7 +1035,7 @@ function ArchiveAudioUrlField({
   const handleResolve = async () => {
     const input = value.trim();
     if (!input || disabled) return;
-    if (isDirectAudioUrl(input)) {
+    if (isDirectAudioUrl(input) && !getArchiveIdentifier(input)) {
       setMessage({ type: 'success', text: 'الرابط مباشر وجاهز للاستخدام.' });
       return;
     }
@@ -1791,15 +1860,15 @@ function CompanionEditor({
                 onResolve={(audioUrl, fileName) => onUpdate({
                   ...companion,
                   audioUrl,
-                  audioTitle: companion.audioTitle || fileName.replace(/\.[^.]+$/, ''),
+                  audioTitle: companion.audioTitle || audioFileNameToTitle(fileName),
                 })}
               />
             </div>
             <div>
               <label className="text-xs text-slate-400 mb-1 block">عنوان الاستماع (اختياري)</label>
               <input
-                value={companion.audioTitle || ''}
-                onChange={(e) => onUpdate({ ...companion, audioTitle: e.target.value })}
+                value={audioFileNameToTitle(companion.audioTitle || '')}
+                onChange={(e) => onUpdate({ ...companion, audioTitle: audioFileNameToTitle(e.target.value) })}
                 className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="عنوان الاستماع"
@@ -1901,7 +1970,7 @@ function ReligiousStoryEditor({
   const presetQuery = normalizeSearchText(presetSearch);
   const filteredPresets = useMemo(() => {
     if (!presetQuery) return [];
-    return RELIGIOUS_STORY_PRESETS.filter((preset) => presetSearchText(preset).includes(presetQuery));
+    return ACTIVE_RELIGIOUS_STORY_PRESETS.filter((preset) => presetSearchText(preset).includes(presetQuery));
   }, [presetQuery]);
 
   const commitOrder = () => {
@@ -1913,7 +1982,7 @@ function ReligiousStoryEditor({
   };
 
   const applyStoryPreset = (presetId: string) => {
-    const preset = RELIGIOUS_STORY_PRESETS.find(item => item.id === presetId);
+    const preset = ACTIVE_RELIGIOUS_STORY_PRESETS.find(item => item.id === presetId);
     if (!preset) return;
     const hasText = Boolean(story.title.trim() || story.brief?.trim() || (story.transcript || '').trim());
     if (hasText && !confirm('سيتم استبدال العنوان والوصف ونص القصة بالقصة الجاهزة، مع الحفاظ على رابط الصوت الحالي. هل تريد المتابعة؟')) {
@@ -2106,15 +2175,15 @@ function ReligiousStoryEditor({
                   ...story,
                   audioUrl,
                   sourceUrl,
-                  audioTitle: story.audioTitle || fileName.replace(/\.[^.]+$/, ''),
+                  audioTitle: story.audioTitle || audioFileNameToTitle(fileName),
                 })}
               />
             </div>
             <div>
               <label className="text-xs text-slate-400 mb-1 block">عنوان الاستماع (اختياري)</label>
               <input
-                value={story.audioTitle || ''}
-                onChange={(e) => onUpdate({ ...story, audioTitle: e.target.value })}
+                value={audioFileNameToTitle(story.audioTitle || '')}
+                onChange={(e) => onUpdate({ ...story, audioTitle: audioFileNameToTitle(e.target.value) })}
                 className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="عنوان الاستماع"
@@ -2176,14 +2245,16 @@ const REMOVED_STORY_IDS = new Set<string>([
   'religious-hajjaj',
   'religious-harun-rashid',
   'religious-fall-babylon',
-  // Three Sahaba biographies kept exclusively in the Companions page because
-  // they have no dedicated audio track in the religious-stories archive.
-  // Khadijah and Umm Sulaym remain here because their audio tracks DO exist
-  // in the archive collection.
+  // Sahaba biographies kept exclusively in the Companions page.
   'religious-handhalah',
   'religious-salman-farisi',
   'religious-hamza',
+  'religious-khadijah-jibreel-salam',
 ]);
+
+const ACTIVE_RELIGIOUS_STORY_PRESETS = RELIGIOUS_STORY_PRESETS.filter(
+  (preset) => !REMOVED_STORY_IDS.has(preset.id)
+);
 
 function presetToStory(preset: ReligiousStoryPreset): CMSReligiousStory {
   return {
@@ -2200,6 +2271,23 @@ function presetToStory(preset: ReligiousStoryPreset): CMSReligiousStory {
   };
 }
 
+// Picks the right transcript when the preset has canonical text and the stored
+// record may have either (a) admin-added extensions that build on the preset
+// or (b) corrupted content from a previous hydration leak. Rule: keep the
+// stored text only if it begins with the preset's canonical text (i.e. the
+// admin appended to it). Otherwise trust the preset, so a stored transcript
+// that belongs to a completely different story (e.g. Adam's text saved under
+// the Dajjal record) is replaced with the right content.
+function reconcilePresetTranscript(presetText = '', storedText = ''): string {
+  const preset = presetText.trim();
+  const stored = storedText.trim();
+  if (!preset) return stored;
+  if (!stored) return preset;
+  if (stored === preset) return stored;
+  if (stored.startsWith(preset)) return stored;
+  return preset;
+}
+
 function refreshStoryFromPreset(
   story: CMSReligiousStory,
   preset: ReligiousStoryPreset
@@ -2213,14 +2301,14 @@ function refreshStoryFromPreset(
     brief: preset.brief,
     briefEn: preset.briefEn || story.briefEn,
     icon: preset.icon || story.icon,
-    transcript: preferLongerText(preset.transcript, story.transcript || ''),
-    transcriptEn: preferLongerText(preset.transcriptEn || '', story.transcriptEn || ''),
+    transcript: reconcilePresetTranscript(preset.transcript, story.transcript),
+    transcriptEn: reconcilePresetTranscript(preset.transcriptEn, story.transcriptEn),
   };
 }
 
 function seedReligiousStoriesFromPresets(): ReligiousStoriesContent {
   return {
-    stories: RELIGIOUS_STORY_PRESETS.map(presetToStory),
+    stories: ACTIVE_RELIGIOUS_STORY_PRESETS.map(presetToStory),
     updateMode: 'manual',
     refreshIntervalMinutes: 60,
     contentVersion: 1,
@@ -2230,7 +2318,7 @@ function seedReligiousStoriesFromPresets(): ReligiousStoriesContent {
 function syncReligiousStoriesWithPresets(
   current: ReligiousStoriesContent
 ): { content: ReligiousStoriesContent; changed: boolean; summary: string } {
-  const presetById = new Map(RELIGIOUS_STORY_PRESETS.map((p) => [p.id, p]));
+  const presetById = new Map(ACTIVE_RELIGIOUS_STORY_PRESETS.map((p) => [p.id, p]));
   const incoming = current.stories || [];
 
   const removedIds: string[] = [];
@@ -2256,7 +2344,7 @@ function syncReligiousStoriesWithPresets(
   // Add any preset that isn't already represented (matched on id).
   const existingIds = new Set(refreshed.map((s) => s.id).filter(Boolean));
   const newlyAdded: CMSReligiousStory[] = [];
-  for (const preset of RELIGIOUS_STORY_PRESETS) {
+  for (const preset of ACTIVE_RELIGIOUS_STORY_PRESETS) {
     if (!existingIds.has(preset.id)) {
       const seeded = presetToStory(preset);
       refreshed.push(seeded);
@@ -2353,10 +2441,10 @@ export default function ContentManager() {
           // real — not just hidden in the UI.
           const cleaned = { ...companionsData, companions: dedupedCompanions };
           setCompanions(cleaned);
-          setDoc(doc(db, 'appContent', 'companionsContent'), {
+          setDoc(doc(db, 'appContent', 'companionsContent'), sanitizeForFirestore({
             ...cleaned,
             updatedAt: new Date().toISOString(),
-          }).then(() => {
+          })).then(() => {
             setStatus({ type: 'success', message: `تم حذف ${removedCompanionIds.length} نسخة مكررة من قصص الصحابة` });
           }).catch((err) => {
             console.warn('Companion dedup save failed', err);
@@ -2374,11 +2462,11 @@ export default function ContentManager() {
         if (synced.changed) {
           // Persist sync (removed IDs, refreshed text, added new presets, dedup)
           // back to Firestore so the cleanup is real, not just in-memory.
-          setDoc(doc(db, 'appContent', 'religiousStoriesContent'), {
+          setDoc(doc(db, 'appContent', 'religiousStoriesContent'), sanitizeForFirestore({
             ...synced.content,
             updatedAt: new Date().toISOString(),
             contentVersion: (storiesData.contentVersion || 0) + 1,
-          }).then(() => {
+          })).then(() => {
             setStatus({ type: 'success', message: synced.summary });
           }).catch((err) => {
             console.warn('Religious stories auto-sync save failed', err);
@@ -2389,10 +2477,10 @@ export default function ContentManager() {
         // admin sees the full catalog on first run.
         const seeded = seedReligiousStoriesFromPresets();
         setReligiousStories(seeded);
-        setDoc(doc(db, 'appContent', 'religiousStoriesContent'), {
+        setDoc(doc(db, 'appContent', 'religiousStoriesContent'), sanitizeForFirestore({
           ...seeded,
           updatedAt: new Date().toISOString(),
-        }).catch((err) => {
+        })).catch((err) => {
           console.warn('Religious stories initial seed failed', err);
         });
       }
@@ -2436,10 +2524,10 @@ export default function ContentManager() {
     if (!hajjUmrah) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'appContent', 'hajjUmrahContent'), {
+      await setDoc(doc(db, 'appContent', 'hajjUmrahContent'), sanitizeForFirestore({
         ...hajjUmrah,
         updatedAt: new Date().toISOString(),
-      });
+      }));
       setStatus({ type: 'success', message: 'تم حفظ محتوى الحج والعمرة' });
     } catch (err) {
       console.error('Save error:', err);
@@ -2460,16 +2548,16 @@ export default function ContentManager() {
           toSave = {
             ...seerah,
             audioUrl: resolved.audioUrl,
-            audioTitle: seerah.audioTitle || resolved.fileName.replace(/\.[^.]+$/, ''),
+            audioTitle: seerah.audioTitle || audioFileNameToTitle(resolved.fileName),
           };
         } catch {
           // keep the original URL if resolution fails
         }
       }
-      await setDoc(doc(db, 'appContent', 'seerahContent'), {
+      await setDoc(doc(db, 'appContent', 'seerahContent'), sanitizeForFirestore({
         ...toSave,
         updatedAt: new Date().toISOString(),
-      });
+      }));
       setStatus({ type: 'success', message: 'تم حفظ السيرة النبوية' });
     } catch (err) {
       console.error('Save error:', err);
@@ -2495,17 +2583,17 @@ export default function ContentManager() {
             ...normalized,
             audioUrl: resolved.audioUrl,
             videoUrl: normalized.videoUrl || resolved.sourceUrl,
-            audioTitle: normalized.audioTitle || normalized.videoTitle || resolved.fileName.replace(/\.[^.]+$/, ''),
+            audioTitle: normalized.audioTitle || normalized.videoTitle || audioFileNameToTitle(resolved.fileName),
           };
         } catch {
           return normalized;
         }
       }));
-      await setDoc(doc(db, 'appContent', 'companionsContent'), {
+      await setDoc(doc(db, 'appContent', 'companionsContent'), sanitizeForFirestore({
         ...companions,
         companions: hydratedCompanions,
         updatedAt: new Date().toISOString(),
-      });
+      }));
       setCompanions({ ...companions, companions: hydratedCompanions });
       const dupMsg = dupRemovedIds.length > 0 ? ` (أُزيلت ${dupRemovedIds.length} نسخة مكررة)` : '';
       setStatus({ type: 'success', message: `تم حفظ قصص الصحابة${dupMsg}` });
@@ -2523,7 +2611,9 @@ export default function ContentManager() {
     try {
       // Dedup by title before save so duplicates created during the edit
       // session don't get persisted back to Firestore.
-      const { deduped, removedIds } = dedupByName(religiousStories.stories, (s) => s.title);
+      const filteredStories = religiousStories.stories.filter((story) => !REMOVED_STORY_IDS.has(story.id || ''));
+      const removedByRuleCount = religiousStories.stories.length - filteredStories.length;
+      const { deduped, removedIds } = dedupByName(filteredStories, (s) => s.title);
       const hydratedStories = await Promise.all(deduped.map(async (story, idx) => {
         const hydrated = hydrateReligiousStoryFromPreset({ ...story, order: idx });
         if (!hydrated.audioUrl || !getArchiveIdentifier(hydrated.audioUrl)) return hydrated;
@@ -2533,21 +2623,21 @@ export default function ContentManager() {
             ...hydrated,
             audioUrl: resolved.audioUrl,
             sourceUrl: hydrated.sourceUrl || resolved.sourceUrl,
-            audioTitle: hydrated.audioTitle || resolved.fileName.replace(/\.[^.]+$/, ''),
+            audioTitle: hydrated.audioTitle || audioFileNameToTitle(resolved.fileName),
           };
         } catch {
           return hydrated;
         }
       }));
       const nextVersion = (religiousStories.contentVersion || 0) + 1;
-      await setDoc(doc(db, 'appContent', 'religiousStoriesContent'), {
+      await setDoc(doc(db, 'appContent', 'religiousStoriesContent'), sanitizeForFirestore({
         ...religiousStories,
         stories: hydratedStories,
         contentVersion: nextVersion,
         updateMode: religiousStories.updateMode || 'manual',
         refreshIntervalMinutes: Math.max(1, Number(religiousStories.refreshIntervalMinutes || 60)),
         updatedAt: new Date().toISOString(),
-      });
+      }));
       setReligiousStories({
         ...religiousStories,
         stories: hydratedStories,
@@ -2555,7 +2645,11 @@ export default function ContentManager() {
         updateMode: religiousStories.updateMode || 'manual',
         refreshIntervalMinutes: Math.max(1, Number(religiousStories.refreshIntervalMinutes || 60)),
       });
-      const dupMsg = removedIds.length > 0 ? ` (أُزيلت ${removedIds.length} نسخة مكررة)` : '';
+      const removedMsg = [
+        removedIds.length > 0 ? `أُزيلت ${removedIds.length} نسخة مكررة` : '',
+        removedByRuleCount > 0 ? `أُزيلت ${removedByRuleCount} قصة مستبعدة` : '',
+      ].filter(Boolean).join('، ');
+      const dupMsg = removedMsg ? ` (${removedMsg})` : '';
       setStatus({ type: 'success', message: `تم حفظ القصص الدينية${dupMsg}` });
     } catch (err) {
       console.error('Save error:', err);
@@ -2572,10 +2666,10 @@ export default function ContentManager() {
     try {
       const updatedAt = new Date().toISOString();
       await Promise.all(entries.map(([page, data]) => (
-        setDoc(doc(db, 'appContent', `seasonalContent_${page}`), {
+        setDoc(doc(db, 'appContent', `seasonalContent_${page}`), sanitizeForFirestore({
           ...data,
           updatedAt,
-        })
+        }))
       )));
       setStatus({ type: 'success', message: 'تم حفظ محتوى كل المواسم' });
     } catch (err) {
@@ -2590,10 +2684,10 @@ export default function ContentManager() {
     if (!seasonsMeta) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'appContent', 'seasonsMetadata'), {
+      await setDoc(doc(db, 'appContent', 'seasonsMetadata'), sanitizeForFirestore({
         ...seasonsMeta,
         updatedAt: new Date().toISOString(),
-      });
+      }));
       setStatus({ type: 'success', message: 'تم حفظ بيانات المواسم' });
     } catch (err) {
       console.error('Save error:', err);
@@ -2932,8 +3026,8 @@ export default function ContentManager() {
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">عنوان الصوت (اختياري)</label>
                   <input
-                    value={seerah.audioTitle || ''}
-                    onChange={(e) => setSeerah({ ...seerah, audioTitle: e.target.value })}
+                    value={audioFileNameToTitle(seerah.audioTitle || '')}
+                    onChange={(e) => setSeerah({ ...seerah, audioTitle: audioFileNameToTitle(e.target.value) })}
                     className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                     dir="rtl"
                     title="عنوان الصوت"
@@ -2950,7 +3044,7 @@ export default function ContentManager() {
                     ...seerah,
                     audioUrl,
                     audioStoragePath: undefined,
-                    audioTitle: seerah.audioTitle || fileName.replace(/\.[^.]+$/, ''),
+                    audioTitle: seerah.audioTitle || audioFileNameToTitle(fileName),
                   })}
                 />
                 <AudioUploadField
@@ -3167,7 +3261,7 @@ export default function ContentManager() {
                   <button
                     onClick={() => {
                       const existingIds = new Set(religiousStories.stories.map(s => s.id));
-                      const additions = RELIGIOUS_STORY_PRESETS
+                      const additions = ACTIVE_RELIGIOUS_STORY_PRESETS
                         .filter(p => !existingIds.has(p.id))
                         .map((preset, idx): CMSReligiousStory => ({
                           id: preset.id,

@@ -87,9 +87,31 @@ export function getCompleteReligiousStory(id: string): CompleteReligiousStoryFie
 }
 
 export function findCompleteReligiousStory(story: StoryLookupInput): CompleteReligiousStoryFields | undefined {
-  const haystack = normalize(`${story.id || ''} ${story.title || ''} ${story.titleEn || ''} ${story.brief || ''}`);
-  const match = ALL_STORY_MATCHERS.find(({ terms }) => terms.some((term) => haystack.includes(normalize(term))));
-  return match ? COMPLETE_RELIGIOUS_STORIES[match.id] : undefined;
+  // 1) Exact id match — the strongest signal. Both bundled seeds and Firestore
+  // docs preserve canonical ids like 'prophet-adam' / 'religious-dajjal'.
+  if (story.id && COMPLETE_RELIGIOUS_STORIES[story.id]) {
+    return COMPLETE_RELIGIOUS_STORIES[story.id];
+  }
+
+  // 2) Term match against title + titleEn only. `brief` is intentionally
+  // excluded because briefs often reference other prophets/topics (e.g. the
+  // Dajjal brief mentions Adam, Jesus, and Mary) and would cause cross-story
+  // leakage. Within the title we pick the LONGEST matching term so a specific
+  // match like "المسيح الدجال" beats a generic "آدم" that appears in the same
+  // title.
+  const haystack = normalize(`${story.title || ''} ${story.titleEn || ''}`);
+  if (!haystack) return undefined;
+  let best: { id: string; length: number } | undefined;
+  for (const { id, terms } of ALL_STORY_MATCHERS) {
+    for (const term of terms) {
+      const normalized = normalize(term);
+      if (!normalized || !haystack.includes(normalized)) continue;
+      if (!best || normalized.length > best.length) {
+        best = { id, length: normalized.length };
+      }
+    }
+  }
+  return best ? COMPLETE_RELIGIOUS_STORIES[best.id] : undefined;
 }
 
 export function preferLongerText(current = '', complete = ''): string {
@@ -1436,3 +1458,225 @@ COMPLETE_RELIGIOUS_STORIES['prophet-adam'] = {
     'The greatest lesson is that honour comes from obedience, not from lineage; that a fall can be the beginning of a rise if repentance is sincere; and that Allah\'s door is open to whoever knocks with a broken heart. This is how humanity began, and so it continues until the Day of Judgement.',
   ]),
 };
+
+// ─── Per-prophet sources ─────────────────────────────────────────────────────
+// Citations shown beneath each prophet's story in the mobile app. Mirrors the
+// shape used in religious-stories-extra.ts for the non-prophet stories so the
+// shared UI component can render either. References point to the most relevant
+// Qur'anic chapters, authentic hadith, and classical tafsir/sira works.
+
+export interface PropheticStorySource {
+  reference: string;
+  url?: string;
+  note?: string;
+}
+
+const COMMON_PROPHET_SOURCES: PropheticStorySource[] = [
+  { reference: 'القرآن الكريم — مواضع قصة كل نبي مفصّلة في سور البقرة وآل عمران والأعراف وهود ويوسف وإبراهيم والأنبياء والشعراء والصافات وغيرها' },
+  { reference: 'قصص الأنبياء لابن كثير' },
+  { reference: 'البداية والنهاية لابن كثير' },
+  { reference: 'تفسير الطبري (جامع البيان)' },
+];
+
+export const PROPHET_STORY_SOURCES: Record<string, PropheticStorySource[]> = {
+  'prophet-adam': [
+    { reference: 'سورة البقرة 30-39 — خلق آدم وسجود الملائكة والتوبة', url: 'https://quran.com/2/30-39' },
+    { reference: 'سورة الأعراف 11-25 — قصة إبليس وإغواء آدم', url: 'https://quran.com/7/11-25' },
+    { reference: 'سورة طه 115-123 — نسيان آدم وتوبته', url: 'https://quran.com/20/115-123' },
+    { reference: 'سورة الكهف 50 — "كان من الجن ففسق عن أمر ربه"', url: 'https://quran.com/18/50' },
+    { reference: 'صحيح البخاري 3326 / صحيح مسلم 2841 — خلق آدم على صورته طوله ستون ذراعًا' },
+    { reference: 'صحيح البخاري 6227 — حديث الشفاعة وذهاب الناس إلى آدم يوم القيامة' },
+  ],
+  'prophet-idris': [
+    { reference: 'سورة مريم 56-57 — "إنه كان صديقًا نبيًا ورفعناه مكانًا عليًا"', url: 'https://quran.com/19/56-57' },
+    { reference: 'سورة الأنبياء 85-86 — مع الصابرين', url: 'https://quran.com/21/85-86' },
+    { reference: 'صحيح البخاري 3342 / صحيح مسلم 162 — لقاؤه ﷺ بإدريس في السماء الرابعة ليلة الإسراء', url: 'https://sunnah.com/bukhari:3342' },
+    { reference: 'تفصيل سيرته من الإسرائيليات', note: 'تفاصيل حياته (كأول من خط بالقلم وخاط الثياب) من مرويات أهل الكتاب التي ينقلها المؤرخون بصيغة "قيل" دون قطع' },
+  ],
+  'prophet-nuh': [
+    { reference: 'سورة نوح كاملة — دعوته لقومه', url: 'https://quran.com/71' },
+    { reference: 'سورة هود 25-49 — قصة الطوفان والسفينة', url: 'https://quran.com/11/25-49' },
+    { reference: 'سورة العنكبوت 14 — "ألف سنة إلا خمسين عامًا"', url: 'https://quran.com/29/14' },
+    { reference: 'صحيح البخاري 3340 / صحيح مسلم 194 — أول الرسل إلى أهل الأرض' },
+    { reference: 'صحيح البخاري 4712 — حديث الشفاعة وذهاب الناس إلى نوح' },
+  ],
+  'prophet-hud': [
+    { reference: 'سورة هود 50-60 — قصة هود وعاد', url: 'https://quran.com/11/50-60' },
+    { reference: 'سورة الأعراف 65-72 — دعوته وهلاك عاد', url: 'https://quran.com/7/65-72' },
+    { reference: 'سورة الأحقاف 21-26 — هلاكهم بالريح', url: 'https://quran.com/46/21-26' },
+    { reference: 'سورة الحاقة 4-8 — وصف الريح الصرصر العاتية', url: 'https://quran.com/69/4-8' },
+  ],
+  'prophet-salih': [
+    { reference: 'سورة الأعراف 73-79 — قصة صالح وثمود والناقة', url: 'https://quran.com/7/73-79' },
+    { reference: 'سورة هود 61-68 — تفاصيل الدعوة', url: 'https://quran.com/11/61-68' },
+    { reference: 'سورة الشعراء 141-159 — تفصيل القصة', url: 'https://quran.com/26/141-159' },
+    { reference: 'صحيح البخاري 433 — مرور النبي ﷺ بديار ثمود (الحجر) في غزوة تبوك', url: 'https://sunnah.com/bukhari:433' },
+  ],
+  'prophet-ibrahim': [
+    { reference: 'سورة إبراهيم — كاملة', url: 'https://quran.com/14' },
+    { reference: 'سورة الأنبياء 51-73 — تحطيم الأصنام والنار', url: 'https://quran.com/21/51-73' },
+    { reference: 'سورة الصافات 83-113 — قصة الذبيح', url: 'https://quran.com/37/83-113' },
+    { reference: 'سورة البقرة 124-141 — رفع قواعد البيت', url: 'https://quran.com/2/124-141' },
+    { reference: 'صحيح البخاري 3364-3365 — قصة هاجر وإسماعيل في مكة وزمزم', url: 'https://sunnah.com/bukhari:3364' },
+    { reference: 'صحيح البخاري 3358 — ثلاث كذبات لإبراهيم', note: 'بمعنى المعاريض، لا الكذب الحقيقي' },
+  ],
+  'prophet-lut': [
+    { reference: 'سورة هود 77-83 — قصة قوم لوط والملائكة', url: 'https://quran.com/11/77-83' },
+    { reference: 'سورة الأعراف 80-84 — هلاك القوم', url: 'https://quran.com/7/80-84' },
+    { reference: 'سورة الحجر 57-77 — تفصيل قصة لوط مع الملائكة', url: 'https://quran.com/15/57-77' },
+    { reference: 'سورة الشعراء 160-175 — قصة لوط', url: 'https://quran.com/26/160-175' },
+  ],
+  'prophet-ismail': [
+    { reference: 'سورة الصافات 100-113 — قصة الذبح', url: 'https://quran.com/37/100-113' },
+    { reference: 'سورة البقرة 125-129 — بناء الكعبة ودعاء إبراهيم وإسماعيل', url: 'https://quran.com/2/125-129' },
+    { reference: 'سورة مريم 54-55 — "صادق الوعد وكان رسولًا نبيًا"', url: 'https://quran.com/19/54-55' },
+    { reference: 'صحيح البخاري 3364 — قصة زمزم وأمه هاجر', url: 'https://sunnah.com/bukhari:3364' },
+  ],
+  'prophet-yaqub': [
+    { reference: 'سورة هود 71-73 — البشارة بإسحاق ويعقوب', url: 'https://quran.com/11/71-73' },
+    { reference: 'سورة يوسف — كاملة، تتضمن قصة يعقوب مع أبنائه', url: 'https://quran.com/12' },
+    { reference: 'سورة البقرة 132-133 — وصية يعقوب لأبنائه', url: 'https://quran.com/2/132-133' },
+    { reference: 'سورة الأنعام 84 — في عداد الأنبياء', url: 'https://quran.com/6/84' },
+    { reference: 'تفصيل تنازع العيص ويعقوب على البركة', note: 'مأخوذ من الإسرائيليات والتفاسير الكلاسيكية، يُذكر إحالة لا قطعًا' },
+  ],
+  'prophet-yusuf': [
+    { reference: 'سورة يوسف كاملة — أحسن القصص', url: 'https://quran.com/12' },
+    { reference: 'سورة غافر 34 — ذكر يوسف ودلائله البيّنات', url: 'https://quran.com/40/34' },
+    { reference: 'صحيح البخاري 3387 — "الكريم بن الكريم بن الكريم: يوسف بن يعقوب بن إسحاق بن إبراهيم"', url: 'https://sunnah.com/bukhari:3387' },
+    { reference: 'تفسير ابن كثير لسورة يوسف', url: 'https://quran.com/12:1/tafsirs/en-tafisr-ibn-kathir' },
+  ],
+  'prophet-ayyub': [
+    { reference: 'سورة الأنبياء 83-84 — "وأيوب إذ نادى ربه أني مسني الضر"', url: 'https://quran.com/21/83-84' },
+    { reference: 'سورة ص 41-44 — "نعم العبد إنه أواب"', url: 'https://quran.com/38/41-44' },
+    { reference: 'سورة الأنعام 84 — ذكره في عداد الأنبياء', url: 'https://quran.com/6/84' },
+    { reference: 'تفصيل مدة بلائه وعدد سنواته', note: 'مذكور عند المفسرين من الإسرائيليات (18 سنة، 7 سنين، إلخ)، لا يصح فيه نص قاطع' },
+  ],
+  'prophet-shuayb': [
+    { reference: 'سورة الأعراف 85-93 — دعوة شعيب لأهل مدين', url: 'https://quran.com/7/85-93' },
+    { reference: 'سورة هود 84-95 — تفصيل القصة', url: 'https://quran.com/11/84-95' },
+    { reference: 'سورة الشعراء 176-191 — قصة أصحاب الأيكة', url: 'https://quran.com/26/176-191' },
+    { reference: 'سورة القصص 22-28 — قصة موسى مع شعيب وسقيه للمرأتين', url: 'https://quran.com/28/22-28' },
+  ],
+  'prophet-musa': [
+    { reference: 'سورة طه — كاملة، أكثر التفصيل لقصة موسى', url: 'https://quran.com/20' },
+    { reference: 'سورة القصص 1-46 — قصة الولادة ومدين والبعثة', url: 'https://quran.com/28/1-46' },
+    { reference: 'سورة الشعراء 10-68 — مواجهة فرعون والسحرة', url: 'https://quran.com/26/10-68' },
+    { reference: 'سورة الأعراف 103-156 — تفصيل الآيات', url: 'https://quran.com/7/103-156' },
+    { reference: 'سورة يونس 75-92 — انفلاق البحر وإغراق فرعون', url: 'https://quran.com/10/75-92' },
+    { reference: 'صحيح البخاري 1339 / صحيح مسلم 2372 — قصته مع ملك الموت', url: 'https://sunnah.com/bukhari:1339' },
+  ],
+  'prophet-harun': [
+    { reference: 'سورة طه 25-36 — دعاء موسى أن يجعل هارون وزيرًا', url: 'https://quran.com/20/25-36' },
+    { reference: 'سورة طه 90-94 — موقفه يوم العجل', url: 'https://quran.com/20/90-94' },
+    { reference: 'سورة الأعراف 142 — استخلافه على بني إسرائيل', url: 'https://quran.com/7/142' },
+    { reference: 'صحيح مسلم 2404 — حديث المنزلة "أنت مني بمنزلة هارون من موسى"' },
+  ],
+  'prophet-dhul-kifl': [
+    { reference: 'سورة الأنبياء 85-86 — ذكره مع الصابرين', url: 'https://quran.com/21/85-86' },
+    { reference: 'سورة ص 48 — "واذكر إسماعيل واليسع وذا الكفل وكل من الأخيار"', url: 'https://quran.com/38/48' },
+    { reference: 'الخلاف في كونه نبيًا أو رجلًا صالحًا', note: 'الجمهور على نبوّته، وذهب بعضهم إلى أنه عبد صالح، ولم يثبت في تفاصيل سيرته نصّ قاطع' },
+  ],
+  'prophet-dawud': [
+    { reference: 'سورة البقرة 251 — "وقتل داود جالوت وآتاه الله الملك والحكمة"', url: 'https://quran.com/2/251' },
+    { reference: 'سورة سبأ 10-11 — تسبيح الجبال والطير، إلانة الحديد', url: 'https://quran.com/34/10-11' },
+    { reference: 'سورة ص 17-26 — قصة الخصمين تسوّرا المحراب', url: 'https://quran.com/38/17-26' },
+    { reference: 'صحيح البخاري 3417 / صحيح مسلم 1159 — "أحب الصيام إلى الله صيام داود"' },
+  ],
+  'prophet-sulayman': [
+    { reference: 'سورة النمل 15-44 — قصته مع الهدهد وبلقيس', url: 'https://quran.com/27/15-44' },
+    { reference: 'سورة ص 30-40 — قصة الخيل والابتلاء', url: 'https://quran.com/38/30-40' },
+    { reference: 'سورة الأنبياء 78-82 — تسخير الجن والريح', url: 'https://quran.com/21/78-82' },
+    { reference: 'سورة سبأ 12-14 — موته متكئًا على عصاه', url: 'https://quran.com/34/12-14' },
+    { reference: 'صحيح البخاري 3424 — قصة طوافه على نسائه ليلدن فرسانًا' },
+  ],
+  'prophet-ilyas': [
+    { reference: 'سورة الأنعام 85 — ذكره في عداد الأنبياء', url: 'https://quran.com/6/85' },
+    { reference: 'سورة الصافات 123-132 — قصة إلياس وقومه عبدة البعل', url: 'https://quran.com/37/123-132' },
+    { reference: 'هل إلياس هو الخضر؟', note: 'قول لبعض المفسرين، ضعّفه ابن كثير والجمهور' },
+  ],
+  'prophet-alyasa': [
+    { reference: 'سورة الأنعام 86 — ذكره مع الأنبياء', url: 'https://quran.com/6/86' },
+    { reference: 'سورة ص 48 — "واذكر إسماعيل واليسع وذا الكفل"', url: 'https://quran.com/38/48' },
+    { reference: 'تفصيل سيرته من الإسرائيليات', note: 'لم يصح في تفاصيل قصته نص في الصحيحين' },
+  ],
+  'prophet-yunus': [
+    { reference: 'سورة يونس 98 — إيمان قوم يونس وكشف العذاب عنهم', url: 'https://quran.com/10/98' },
+    { reference: 'سورة الأنبياء 87-88 — "وذا النون إذ ذهب مغاضبًا"', url: 'https://quran.com/21/87-88' },
+    { reference: 'سورة الصافات 139-148 — قصة الحوت', url: 'https://quran.com/37/139-148' },
+    { reference: 'سورة القلم 48-50 — "ولا تكن كصاحب الحوت"', url: 'https://quran.com/68/48-50' },
+    { reference: 'سنن الترمذي 3505 — دعوة ذي النون "لا إله إلا أنت سبحانك إني كنت من الظالمين"' },
+  ],
+  'prophet-zakariya': [
+    { reference: 'سورة آل عمران 37-41 — قصة كفالته لمريم والبشارة بيحيى', url: 'https://quran.com/3/37-41' },
+    { reference: 'سورة مريم 1-15 — تفصيل دعائه وبشارته', url: 'https://quran.com/19/1-15' },
+    { reference: 'سورة الأنبياء 89-90 — دعاؤه بالولد الصالح', url: 'https://quran.com/21/89-90' },
+    { reference: 'قتل زكريا بالمنشار في الشجرة', note: 'رواية إسرائيلية لا يصح سندها، تذكر عند المؤرخين دون قطع' },
+  ],
+  'prophet-yahya': [
+    { reference: 'سورة مريم 12-15 — "وآتيناه الحكم صبيًا"', url: 'https://quran.com/19/12-15' },
+    { reference: 'سورة آل عمران 39 — بشارته بيحيى', url: 'https://quran.com/3/39' },
+    { reference: 'سورة الأنعام 85 — ذكره في عداد الأنبياء', url: 'https://quran.com/6/85' },
+    { reference: 'قتله بسبب رفضه إجازة نكاح محرم', note: 'رواية مشهورة عند المؤرخين، لم تثبت بسند صحيح في الصحيحين' },
+  ],
+  'prophet-isa': [
+    { reference: 'سورة آل عمران 33-63 — قصة مريم وميلاد عيسى وآياته', url: 'https://quran.com/3/33-63' },
+    { reference: 'سورة مريم 16-37 — تفصيل القصة', url: 'https://quran.com/19/16-37' },
+    { reference: 'سورة المائدة 110-118 — تذكير الله لعيسى بنعمه', url: 'https://quran.com/5/110-118' },
+    { reference: 'سورة النساء 157-159 — رفع عيسى وبراءته من الصلب', url: 'https://quran.com/4/157-159' },
+    { reference: 'صحيح البخاري 3448 / صحيح مسلم 155 — نزوله آخر الزمان وحكمه بشريعة محمد ﷺ' },
+    { reference: 'صحيح مسلم 169 — لقاء النبي ﷺ بعيسى في السماء الثانية ليلة الإسراء' },
+  ],
+  'prophet-muhammad': [
+    { reference: 'سورة آل عمران 144 — "وما محمد إلا رسول"', url: 'https://quran.com/3/144' },
+    { reference: 'سورة الأحزاب 40 — "خاتم النبيين"', url: 'https://quran.com/33/40' },
+    { reference: 'سورة الفتح كاملة — صلح الحديبية وفتح مكة', url: 'https://quran.com/48' },
+    { reference: 'صحيح البخاري 3 / صحيح مسلم 160 — بدء الوحي', url: 'https://sunnah.com/bukhari:3' },
+    { reference: 'صحيح البخاري 4451 / صحيح مسلم 2444 — وفاته ﷺ', url: 'https://sunnah.com/bukhari:4451' },
+    { reference: 'السيرة النبوية لابن هشام والرحيق المختوم للمباركفوري' },
+  ],
+};
+
+// Resolve a story's canonical id by matching the same way
+// findCompleteReligiousStory does. Lets the source lookup work even when a
+// Firestore record uses an arbitrary id like "religious-story-1779277142600"
+// but its title clearly identifies a specific prophet.
+function resolveStoryId(story: StoryLookupInput): string | undefined {
+  if (story.id && (PROPHET_STORY_SOURCES[story.id] || COMPLETE_RELIGIOUS_STORIES[story.id])) {
+    return story.id;
+  }
+  const haystack = normalize(`${story.title || ''} ${story.titleEn || ''}`);
+  if (!haystack) return undefined;
+  let best: { id: string; length: number } | undefined;
+  for (const { id, terms } of ALL_STORY_MATCHERS) {
+    for (const term of terms) {
+      const t = normalize(term);
+      if (!t || !haystack.includes(t)) continue;
+      if (!best || t.length > best.length) best = { id, length: t.length };
+    }
+  }
+  return best?.id;
+}
+
+// Public helper: returns the source list for a story (prophet or extra),
+// combining the specific list with the common references. Used by the mobile
+// religious-stories page as a fallback when the Firestore record itself has
+// no sources field populated.
+export function getStorySources(story: StoryLookupInput): PropheticStorySource[] | undefined {
+  const id = resolveStoryId(story);
+  if (!id) return undefined;
+  const specific = PROPHET_STORY_SOURCES[id];
+  if (specific && specific.length > 0) {
+    return [...specific, ...COMMON_PROPHET_SOURCES];
+  }
+  // For extra (non-prophet) religious stories: the bundled seed already
+  // carries sources via the StorySource field; if a Firestore record lacks
+  // them we read straight from the bundled extra entry as last-resort.
+  const extra = COMPLETE_RELIGIOUS_STORIES[id];
+  if (!extra) return undefined;
+  // Bundled extras include sources separately on their ExtraReligiousStory
+  // shape — but COMPLETE_RELIGIOUS_STORIES only stores the text fields. The
+  // extras module owns the sources, so we re-import lazily to avoid a cycle.
+  const { EXTRA_RELIGIOUS_STORIES_BY_ID } = require('./religious-stories-extra') as typeof import('./religious-stories-extra');
+  const extraEntry = EXTRA_RELIGIOUS_STORIES_BY_ID[id];
+  return extraEntry?.sources && extraEntry.sources.length > 0 ? extraEntry.sources : undefined;
+}
