@@ -168,6 +168,17 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Islamic event notification cron history. The Netlify cron writes these
+    // with a service account; the admin panel reads them from the browser.
+    match /eventNotificationRuns/{runId} {
+      allow read, write: if true;
+    }
+
+    // Per-user de-dupe log for Islamic event notifications.
+    match /eventNotificationLog/{logId} {
+      allow read, write: if true;
+    }
+
     // Hijri date overrides/corrections
     match /hijri_overrides/{overrideId} {
       allow read, write: if true;

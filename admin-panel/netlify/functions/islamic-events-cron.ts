@@ -96,6 +96,12 @@ interface RunStats {
   errors: string[];
 }
 
+interface NotificationHistoryContext {
+  eventCount: number;
+  translations: EventTranslations;
+  perLanguage: Record<string, number>;
+}
+
 const SUPPORTED_LANGS = new Set<SupportedLanguage>([
   'ar', 'en', 'fr', 'de', 'es', 'tr', 'ur', 'id', 'ms', 'hi', 'bn', 'ru',
 ]);
@@ -322,6 +328,80 @@ async function writeRunHistory(stats: RunStats, mode: 'scheduled' | 'manual'): P
   }
 }
 
+function buildGenericHistoryTranslations(eventCount: number): EventTranslations {
+  const arTitle = eventCount > 1 ? 'إشعارات المناسبات الإسلامية' : 'إشعار مناسبة إسلامية';
+  const enTitle = eventCount > 1 ? 'Islamic Event Notifications' : 'Islamic Event Notification';
+  return {
+    ar: {
+      title: arTitle,
+      body: 'تم إرسال إشعار تلقائي من نظام المناسبات الإسلامية حسب توقيت المستخدمين المحلي.',
+    },
+    en: {
+      title: enTitle,
+      body: 'An automatic Islamic event reminder was sent based on users local time.',
+    },
+  };
+}
+
+export function buildIslamicEventNotificationHistoryDoc(
+  stats: RunStats,
+  context: NotificationHistoryContext,
+): Record<string, any> {
+  const status = stats.sentCount > 0 ? 'sent' : 'failed';
+  const translations = context.eventCount === 1 && Object.keys(context.translations || {}).length > 0
+    ? context.translations
+    : buildGenericHistoryTranslations(context.eventCount);
+
+  return {
+    type: 'islamic_event',
+    status,
+    targetAudience: 'all',
+    translations,
+    sentCount: stats.sentCount,
+    failedCount: stats.failedCount,
+    deliveredCount: stats.sentCount,
+    openedCount: 0,
+    clickedCount: 0,
+    perLanguage: context.perLanguage,
+    eventCount: context.eventCount,
+    matchedUsers: stats.matchedUsers,
+    skippedAlreadySent: stats.skippedAlreadySent,
+    perEvent: stats.perEvent,
+    source: 'islamic-events-cron',
+    scheduledRunAt: stats.hourUtc,
+    ...(stats.errors.length > 0 ? { error: stats.errors[0] } : {}),
+  };
+}
+
+async function writeNotificationHistory(
+  stats: RunStats,
+  sends: PlannedSend[],
+): Promise<void> {
+  try {
+    const db = getDb();
+    const eventIds = new Set(sends.map((s) => s.event.id));
+    const perLanguage: Record<string, number> = {};
+    sends.forEach((send) => {
+      perLanguage[send.user.language] = (perLanguage[send.user.language] || 0) + 1;
+    });
+
+    const firstEvent = sends[0]?.event;
+    const doc = buildIslamicEventNotificationHistoryDoc(stats, {
+      eventCount: eventIds.size,
+      translations: firstEvent ? resolveTranslations(firstEvent) : {},
+      perLanguage,
+    });
+
+    await db.createDoc('notifications', {
+      ...doc,
+      createdAt: SERVER_TIMESTAMP,
+      sentAt: SERVER_TIMESTAMP,
+    });
+  } catch (e) {
+    console.warn('Could not write notification history:', (e as Error).message);
+  }
+}
+
 function jsonResponse(statusCode: number, body: unknown) {
   return {
     statusCode,
@@ -446,6 +526,7 @@ const handler: Handler = async (event: HandlerEvent) => {
     const successFlags = result.tickets.map((t) => t.status === 'ok');
     await logSends(toSend, successFlags);
 
+    await writeNotificationHistory(stats, toSend);
     await writeRunHistory(stats, forceEventId ? 'manual' : 'scheduled');
     return jsonResponse(200, { ok: true, stats });
   } catch (err) {

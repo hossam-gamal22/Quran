@@ -120,6 +120,13 @@ export interface PlaybackState {
   playingFullSurah?: boolean;
   /** Latest playback error — cleared when a new ayah starts playing successfully. */
   error?: PlaybackError | null;
+  /**
+   * Timestamp (ms) bumped each time the active playback range refused a
+   * prev/next request. Screens that pin a range (citation passage view)
+   * watch this value to surface a soft "use the Mushaf for full browsing"
+   * toast — undefined when no block has ever happened in this session.
+   */
+  playbackRangeBlockedAt?: number;
 }
 
 type PlaybackCallback = (state: PlaybackState) => void;
@@ -154,6 +161,11 @@ class AudioPlayerManager {
   private listenersSetup: boolean = false;
   private listeningTimer: ReturnType<typeof setInterval> | null = null;
   private listeningAccumulator: number = 0; // seconds accumulated since last save
+  // Optional confinement. When set, playPrev/playNext (and the continuous
+  // auto-advance) refuse to step outside this surah+ayah window. The
+  // citation passage page (app/quran-passage.tsx) sets this on mount and
+  // clears it on unmount so listening stays inside the cited verses.
+  private playbackRange: { surah: number; start: number; end: number } | null = null;
 
   constructor() {
     this.initAudio();
@@ -901,14 +913,20 @@ class AudioPlayerManager {
   }
 
   async stop(skipReleaseFocus = false): Promise<void> {
-    if (this.playingFullSurah && !this.sound && this.canUseTrackPlayer() && TrackPlayer) {
+    // Always tear down TrackPlayer when we're on a platform that uses it,
+    // regardless of playingFullSurah. The original guard
+    // `playingFullSurah && !this.sound` left per-ayah TrackPlayer streams
+    // playing through stop(), which then collided with the next playAyah()
+    // — audible as two ayat playing at once after a deep-link redirect or
+    // a manual prev/next that crossed a citation boundary.
+    if (this.canUseTrackPlayer() && TrackPlayer) {
       try {
         await TrackPlayer.stop();
         await TrackPlayer.reset();
       } catch {}
     }
-    
-    // Also stop expo-av sound if exists (fallback)
+
+    // Also stop expo-av sound if exists (web / fallback).
     if (this.sound) {
       try {
         await this.sound.stopAsync();
@@ -936,45 +954,82 @@ class AudioPlayerManager {
     }
   }
 
+  /**
+   * Pin playback to a surah+ayah window. While set, playNextAyah(),
+   * playPreviousAyah() and the continuous auto-advance refuse to step
+   * outside [start, end] in `surah`. Pass null to release the constraint.
+   */
+  setPlaybackRange(range: { surah: number; start: number; end: number } | null): void {
+    this.playbackRange = range;
+  }
+
+  /**
+   * Whether stepping to (`surah`, `ayah`) is allowed under the current
+   * range constraint. Returns true when no range is set.
+   */
+  private isAyahInRange(surah: number, ayah: number): boolean {
+    const r = this.playbackRange;
+    if (!r) return true;
+    return surah === r.surah && ayah >= r.start && ayah <= r.end;
+  }
+
   async playNextAyah(suppressLoading: boolean = false): Promise<void> {
     const { currentSurah, currentAyah, reciterIdentifier } = this.state;
-    // Step one ayah forward regardless of full-surah mode. Only cross into the
-    // next surah when we're at the last ayah of the current one. playAyah()
-    // preserves full-surah mode via the `continuous` flag and seeks via the
-    // cached surahOffsets when ayah > 1.
-    if (currentAyah < this.surahAyahsCount) {
-      await this.playAyah(
-        currentSurah,
-        currentAyah + 1,
-        reciterIdentifier,
-        this.continuousPlay,
-        suppressLoading,
-        this.playingFullSurah,
-      );
-    } else if (currentSurah < 114) {
-      await this.playAyah(
-        currentSurah + 1,
-        1,
-        reciterIdentifier,
-        this.continuousPlay,
-        suppressLoading,
-        this.playingFullSurah,
-      );
-    } else {
-      await this.stop();
+    // Compute the candidate next position the same way the unrestricted
+    // logic below did, then refuse it if the citation range would forbid
+    // crossing out. Refusal = stop, not silently no-op, so the listener
+    // hears a clear endpoint and the UI mini-bar parks on the last ayah.
+    let nextSurah = currentSurah;
+    let nextAyah = currentAyah + 1;
+    if (currentAyah >= this.surahAyahsCount) {
+      if (currentSurah >= 114) {
+        await this.stop();
+        return;
+      }
+      nextSurah = currentSurah + 1;
+      nextAyah = 1;
     }
+    if (!this.isAyahInRange(nextSurah, nextAyah)) {
+      this.updateState({ playbackRangeBlockedAt: Date.now() });
+      await this.stop();
+      return;
+    }
+    await this.playAyah(
+      nextSurah,
+      nextAyah,
+      reciterIdentifier,
+      this.continuousPlay,
+      suppressLoading,
+      this.playingFullSurah,
+    );
   }
 
   async playPreviousAyah(): Promise<void> {
     const { currentSurah, currentAyah, reciterIdentifier } = this.state;
-    if (currentAyah > 1) {
-      await this.playAyah(currentSurah, currentAyah - 1, reciterIdentifier, this.continuousPlay, false, this.playingFullSurah);
-    } else if (currentSurah > 1) {
-      const prevSurah = await getCachedSurah(currentSurah - 1);
-      if (prevSurah) {
-        await this.playAyah(currentSurah - 1, prevSurah.numberOfAyahs, reciterIdentifier, this.continuousPlay, false, this.playingFullSurah);
-      }
+    let prevSurah = currentSurah;
+    let prevAyah = currentAyah - 1;
+    if (currentAyah <= 1) {
+      if (currentSurah <= 1) return;
+      const previous = await getCachedSurah(currentSurah - 1);
+      if (!previous) return;
+      prevSurah = currentSurah - 1;
+      prevAyah = previous.numberOfAyahs;
     }
+    // Refuse to step before the citation start — the user stays on the
+    // current (first) ayah of the citation rather than briefly hearing
+    // (or even loading) an out-of-range verse.
+    if (!this.isAyahInRange(prevSurah, prevAyah)) {
+      this.updateState({ playbackRangeBlockedAt: Date.now() });
+      return;
+    }
+    await this.playAyah(
+      prevSurah,
+      prevAyah,
+      reciterIdentifier,
+      this.continuousPlay,
+      false,
+      this.playingFullSurah,
+    );
   }
 
   async seekTo(positionMillis: number): Promise<void> {

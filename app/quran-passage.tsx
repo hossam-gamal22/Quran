@@ -13,7 +13,7 @@
  * a built-in companion to the existing Quran experience.
  */
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import {
   ImageBackground,
   Platform,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -60,7 +62,7 @@ export default function QuranPassageScreen() {
   const { isDarkMode } = colors;
   const { t, settings } = useSettings();
   const isRTL = useIsRTL();
-  const { playAyah, playbackState, togglePlayPause } = useQuran();
+  const { playAyah, playbackState, togglePlayPause, stopPlayback, setPlaybackRange } = useQuran();
 
   const surahNum = Math.max(1, Math.min(114, parseInt(surahParam || '1') || 1));
   const ayahStart = Math.max(1, parseInt(ayahParam || '1') || 1);
@@ -111,7 +113,30 @@ export default function QuranPassageScreen() {
     return `${t('quran.ayah')} ${toArabicDigits(ayahStart)}`;
   }, [ayahStart, ayahEnd, t]);
 
+  // Pin the audio player's prev/next/auto-advance to the cited range while
+  // this page is mounted. The player now refuses to step outside the range
+  // at the source, so the prev/next buttons on the global mini bar never
+  // even briefly load an out-of-range ayah. Released on unmount so other
+  // screens get unconstrained playback again.
+  useEffect(() => {
+    setPlaybackRange({ surah: surahNum, start: ayahStart, end: ayahEnd });
+    return () => setPlaybackRange(null);
+  }, [setPlaybackRange, surahNum, ayahStart, ayahEnd]);
+
   const [currentlyPlayingAyah, setCurrentlyPlayingAyah] = useState<number | null>(null);
+
+  // Centred modal surfaced whenever the player refuses a prev/next request
+  // because it would leave the cited range. We watch the audio-player's
+  // playbackRangeBlockedAt timestamp (bumped inside playPrev/playNext when
+  // the range constraint denies the step) and open the dialog until the
+  // user dismisses it. Unlike a transient toast it never covers a verse —
+  // the backdrop is dimmed and only the modal card sits on top.
+  const [rangeBlockVisible, setRangeBlockVisible] = useState(false);
+  useEffect(() => {
+    const stamp = playbackState.playbackRangeBlockedAt;
+    if (!stamp) return;
+    setRangeBlockVisible(true);
+  }, [playbackState.playbackRangeBlockedAt]);
 
   // Keep the local "now playing" pointer in sync with the global audio
   // playback state, so when the user uses transport controls outside this
@@ -124,96 +149,19 @@ export default function QuranPassageScreen() {
     }
   }, [playbackState.isPlaying, playbackState.currentSurah, playbackState.currentAyah, surahNum]);
 
-  // Auto-advance: when the audio for the current ayah finishes, queue the
-  // next ayah in the range. We can't rely on "position ≈ duration while
-  // playing" because the player flips isPlaying → false right when the
-  // track ends and we miss the window. Instead we watch for two signals:
-  //   (a) snapshot the latest known duration & position for each ayah while
-  //       it's still playing, and
-  //   (b) when isPlaying transitions true → false on the same ayah at
-  //       position >= duration - 0.5s, treat it as a natural end and play
-  //       the next ayah.
-  // The lastEndedAyah guard prevents re-triggering when playAyah() emits
-  // multiple intermediate state updates.
-  const lastEndedAyah = useRef<number | null>(null);
-  const playingSnapshotRef = useRef<{
-    ayah: number;
-    surah: number;
-    duration: number;
-    position: number;
-    wasPlaying: boolean;
-  }>({ ayah: 0, surah: 0, duration: 0, position: 0, wasPlaying: false });
-  useEffect(() => {
-    const { isPlaying, currentSurah, currentAyah, position, duration } = playbackState;
-    const snap = playingSnapshotRef.current;
-
-    // Detect the playing → stopped transition for the same ayah.
-    const stoppedNaturally =
-      snap.wasPlaying &&
-      !isPlaying &&
-      snap.surah === currentSurah &&
-      snap.ayah === currentAyah &&
-      snap.duration > 0 &&
-      // Either the snapshot was close to the end, or the player reported
-      // position ≈ duration right at the transition. We're lenient here
-      // because the underlying audio backend may emit one final update at
-      // 0:30 / 0:30 before flipping isPlaying false.
-      (snap.duration - snap.position < 1.2 || (duration > 0 && duration - position < 1.2));
-
-    if (
-      stoppedNaturally &&
-      currentSurah === surahNum &&
-      currentAyah >= ayahStart &&
-      currentAyah < ayahEnd && // not at last cited ayah
-      lastEndedAyah.current !== currentAyah
-    ) {
-      lastEndedAyah.current = currentAyah;
-      playAyah(surahNum, currentAyah + 1);
-      // Reset the guard a tick later so subsequent natural ends still fire.
-      setTimeout(() => {
-        if (lastEndedAyah.current === currentAyah) lastEndedAyah.current = null;
-      }, 600);
-    }
-
-    // Update the snapshot. Only overwrite duration when we actually have
-    // one — some intermediate updates report 0 momentarily.
-    playingSnapshotRef.current = {
-      ayah: currentAyah,
-      surah: currentSurah,
-      duration: duration > 0 ? duration : snap.duration,
-      position: position > 0 ? position : snap.position,
-      wasPlaying: isPlaying,
-    };
-  }, [playbackState, surahNum, ayahStart, ayahEnd, playAyah]);
-
-  // Confinement: the global mini audio bar exposes prev/next skip buttons
-  // that walk through the whole Mushaf. While the user is on this citation
-  // page, playback must stay inside the cited range — if they skip out of
-  // it (different surah, or ayah before / after the range), we redirect to
-  // the nearest in-range ayah so they bounce back into the citation rather
-  // than getting stuck silently. The guard ref prevents an infinite loop
-  // when our redirect call itself triggers another playbackState update.
-  const lastClampedAyah = useRef<number | null>(null);
+  // Safety net: if anything outside our control (a saved-state restore on
+  // app launch, a notification action) does land us on an out-of-range
+  // ayah, stop playback. The primary confinement happens at the audio
+  // player level via setPlaybackRange above — this useEffect just catches
+  // edge cases where the range constraint can't pre-empt the transition.
   useEffect(() => {
     const { isPlaying, currentSurah, currentAyah } = playbackState;
-    if (!isPlaying && playbackState.currentSurah === 0) return; // idle, nothing to do
+    if (!isPlaying) return;
+    if (currentSurah === 0 || currentAyah === 0) return;
     const inRange =
       currentSurah === surahNum && currentAyah >= ayahStart && currentAyah <= ayahEnd;
-    if (inRange) {
-      lastClampedAyah.current = null;
-      return;
-    }
-    // Different surah → snap to the start of the range.
-    // Before range → snap to ayahStart.
-    // After range → snap to ayahEnd.
-    let target: number;
-    if (currentSurah !== surahNum) target = ayahStart;
-    else if (currentAyah < ayahStart) target = ayahStart;
-    else target = ayahEnd;
-    if (lastClampedAyah.current === target) return;
-    lastClampedAyah.current = target;
-    playAyah(surahNum, target);
-  }, [playbackState, surahNum, ayahStart, ayahEnd, playAyah]);
+    if (!inRange) stopPlayback();
+  }, [playbackState, surahNum, ayahStart, ayahEnd, stopPlayback]);
 
   const handlePlayAll = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -221,7 +169,13 @@ export default function QuranPassageScreen() {
       togglePlayPause();
       return;
     }
-    playAyah(surahNum, ayahStart);
+    // continuous=true tells the underlying audio player to auto-advance
+    // to the next ayah when the current one finishes. We must pass
+    // playFullSurah=false explicitly — otherwise the player defaults
+    // playFullSurah to `continuous`, which puts it into whole-surah-file
+    // mode and makes the end-of-file handler advance to the NEXT SURAH
+    // instead of the next ayah inside this surah.
+    playAyah(surahNum, ayahStart, true, false);
   };
 
   const handleOpenMushaf = () => {
@@ -278,6 +232,84 @@ export default function QuranPassageScreen() {
       textAlign: 'center',
       lineHeight: 28,
       color: ornamentColor,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 360,
+      backgroundColor: isDarkMode ? '#1c1d22' : '#ffffff',
+      borderRadius: 20,
+      padding: 22,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      elevation: 16,
+    },
+    modalIconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+    },
+    modalTitle: {
+      fontSize: 17,
+      fontFamily: fontBold(),
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 8,
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    modalBody: {
+      fontSize: 14,
+      lineHeight: 22,
+      color: colors.text,
+      fontFamily: fontRegular(),
+      textAlign: 'center',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+      marginBottom: 18,
+    },
+    modalLink: {
+      color: getGoldenColor(themeIndex),
+      fontFamily: fontSemiBold(),
+    },
+    modalActions: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      gap: 10,
+      alignSelf: 'stretch',
+    },
+    modalBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalBtnPrimary: {
+      backgroundColor: quranTheme?.primary || '#0d8e62',
+    },
+    modalBtnSecondary: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    },
+    modalBtnTextPrimary: {
+      color: '#fff',
+      fontFamily: fontSemiBold(),
+      fontSize: 15,
+    },
+    modalBtnTextSecondary: {
+      color: colors.text,
+      fontFamily: fontSemiBold(),
+      fontSize: 15,
     },
     verseCard: {
       borderRadius: 20,
@@ -408,7 +440,10 @@ export default function QuranPassageScreen() {
                       activeOpacity={0.85}
                       onPress={() => {
                         if (Platform.OS !== 'web') Haptics.selectionAsync();
-                        playAyah(surahNum, v.ns);
+                        // continuous=true + playFullSurah=false → auto-advance
+                        // by ayah, not by surah. See handlePlayAll() for the
+                        // rationale behind passing playFullSurah explicitly.
+                        playAyah(surahNum, v.ns, true, false);
                       }}
                     >
                       <View style={styles.verseInner}>
@@ -462,6 +497,63 @@ export default function QuranPassageScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
+
+          <Modal
+            transparent
+            visible={rangeBlockVisible}
+            animationType="fade"
+            onRequestClose={() => setRangeBlockVisible(false)}
+          >
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={() => setRangeBlockVisible(false)}
+            >
+              <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.modalIconWrap}>
+                  <MaterialCommunityIcons
+                    name="information-outline"
+                    size={28}
+                    color={getGoldenColor(themeIndex)}
+                  />
+                </View>
+                <Text style={styles.modalTitle}>
+                  {langIsRTL ? 'تصفح خارج المصدر' : 'Outside the source'}
+                </Text>
+                <Text style={styles.modalBody}>
+                  {langIsRTL
+                    ? 'هذه الصفحة تعرض فقط الآيات المرتبطة بالمصدر. للتصفح الكامل للقرآن، '
+                    : 'This screen plays only the verses cited by the source. To browse the full Qur\'an, '}
+                  <Text style={styles.modalLink}>
+                    {langIsRTL ? 'افتح المصحف' : 'open the Mushaf'}
+                  </Text>
+                  .
+                </Text>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={[styles.modalBtn, styles.modalBtnSecondary]}
+                    onPress={() => setRangeBlockVisible(false)}
+                  >
+                    <Text style={styles.modalBtnTextSecondary}>
+                      {langIsRTL ? 'حسناً' : 'OK'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={[styles.modalBtn, styles.modalBtnPrimary]}
+                    onPress={() => {
+                      setRangeBlockVisible(false);
+                      handleOpenMushaf();
+                    }}
+                  >
+                    <Text style={styles.modalBtnTextPrimary}>
+                      {langIsRTL ? 'افتح المصحف' : 'Open Mushaf'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
         </View>
       </BackgroundWrapper>
     </ScreenContainer>

@@ -110,10 +110,15 @@ export function GlobalAudioBar() {
     if (isQuran && playbackState.currentSurah > 0) {
       // Don't navigate if already in Mushaf page
       if (pathname.startsWith('/surah/')) return;
-      
+
       // Don't navigate if already in surah-reading page for same surah
       if (pathname.startsWith('/surah-reading/')) return;
-      
+
+      // Don't navigate when the user is on the citation passage page —
+      // that page pins playback to the cited ayah range, so jumping to
+      // /surah/N would dump them at ayah 1 outside the citation context.
+      if (pathname.startsWith('/quran-passage')) return;
+
       // Don't navigate if already in dedicated surah reading page for same surah
       const dedicatedPages: Record<string, number> = {
         '/surah-kahf': 18,
@@ -122,7 +127,7 @@ export function GlobalAudioBar() {
       };
       const currentPageSurah = dedicatedPages[pathname];
       if (currentPageSurah && currentPageSurah === playbackState.currentSurah) return;
-      
+
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push(`/surah/${playbackState.currentSurah}`);
     }

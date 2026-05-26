@@ -26,6 +26,7 @@ interface ShowInterstitialOptions {
   ignoreSmartSessionDelay?: boolean;
   ignoreGlobalCooldown?: boolean;
   allowInSacredContext?: boolean;
+  force?: boolean;
   onShown?: () => void | Promise<void>;
   timeoutMs?: number;
 }
@@ -109,19 +110,21 @@ export const showInterstitial = async (options: ShowInterstitialOptions = {}): P
     if (!config.enabled || config.showInterstitials === false || sub.isPremium) return false;
 
     // Global cooldown: enforce ≥2 minutes between any two ads (shared with App Open / hook interstitials).
-    if (!options.ignoreGlobalCooldown && !canShowGlobalAd()) return false;
+    if (!options.force && !options.ignoreGlobalCooldown && !canShowGlobalAd()) return false;
 
     // Smart ad manager checks
-    try {
-      const { canShowInterstitial: smartCheck, isInSacredContext } = require('@/lib/smart-ad-manager');
-      if (!options.allowInSacredContext && isInSacredContext()) return false;
-      if (!(await smartCheck({
-        ignoreFrequencyCaps: options.ignoreSmartFrequencyCaps,
-        ignoreSessionDelay: options.ignoreSmartSessionDelay,
-        allowInSacredContext: options.allowInSacredContext,
-      }))) return false;
-      if (hasTimedOut()) return false;
-    } catch {}
+    if (!options.force) {
+      try {
+        const { canShowInterstitial: smartCheck, isInSacredContext } = require('@/lib/smart-ad-manager');
+        if (!options.allowInSacredContext && isInSacredContext()) return false;
+        if (!(await smartCheck({
+          ignoreFrequencyCaps: options.ignoreSmartFrequencyCaps,
+          ignoreSessionDelay: options.ignoreSmartSessionDelay,
+          allowInSacredContext: options.allowInSacredContext,
+        }))) return false;
+        if (hasTimedOut()) return false;
+      } catch {}
+    }
 
     const adUnitId = getAdUnitId('INTERSTITIAL', config);
     if (!adUnitId) return false;

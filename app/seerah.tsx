@@ -794,11 +794,12 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
 
     setAudioDownloadState('downloading');
     const didShowPreDownloadAd = await showInterstitial({
-      allowInSacredContext: false,
+      force: true,
+      allowInSacredContext: true,
       ignoreSmartFrequencyCaps: true,
       ignoreSmartSessionDelay: true,
       ignoreGlobalCooldown: true,
-      timeoutMs: 5000,
+      timeoutMs: 12000,
     }).catch(() => false);
 
     try {
@@ -807,11 +808,12 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
       setAudioDownloadState('downloaded');
       if (didShowPreDownloadAd !== true) {
         showInterstitial({
-          allowInSacredContext: false,
+          force: true,
+          allowInSacredContext: true,
           ignoreSmartFrequencyCaps: true,
           ignoreSmartSessionDelay: true,
           ignoreGlobalCooldown: true,
-          timeoutMs: 5000,
+          timeoutMs: 12000,
         }).catch(() => {});
       }
     } catch (downloadError) {

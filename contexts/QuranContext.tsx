@@ -40,6 +40,12 @@ interface QuranContextType {
   resumePlayback: () => Promise<boolean>;
   setReciter: (identifier: string) => void;
   setContinuousPlay: (enabled: boolean) => void;
+  /**
+   * Constrain prev/next/auto-advance to a surah+ayah window. Used by the
+   * citation passage page so listening can't drift outside the cited
+   * verses. Pass null to lift the constraint.
+   */
+  setPlaybackRange: (range: { surah: number; start: number; end: number } | null) => void;
   seekTo: (positionMillis: number) => Promise<void>;
   
   // البيانات
@@ -182,6 +188,7 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
         resumePlayback,
         setReciter,
         setContinuousPlay,
+        setPlaybackRange: (range) => audioPlayer.setPlaybackRange(range),
         seekTo,
         getSurah,
         currentReciter,

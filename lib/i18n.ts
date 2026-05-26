@@ -68,11 +68,12 @@ const isValidLanguage = (lang: string): lang is Language => {
 export const setLanguage = async (lang: Language): Promise<void> => {
   currentLanguage = lang;
   await saveLanguage(lang);
-  // Fire-and-forget sync to Firestore. Lazy import avoids a circular dep
-  // (firebase-user.ts → firebase-config; i18n is imported by many leaf files).
-  import('@/lib/firebase-user')
-    .then(({ updateUserLanguage }) => updateUserLanguage(lang))
-    .catch(() => {});
+  // Persist before callers reload the app, otherwise Firestore can stay on the
+  // old device locale and server-side notifications pick the wrong language.
+  try {
+    const { updateUserLanguage } = await import('@/lib/firebase-user');
+    await updateUserLanguage(lang);
+  } catch {}
 };
 
 /**
