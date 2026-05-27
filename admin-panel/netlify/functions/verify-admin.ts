@@ -12,6 +12,7 @@
 
 import type { Handler } from '@netlify/functions';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { createFirebaseAdminCustomToken } from './_lib/firebase-admin';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +50,15 @@ function verifyToken(token: string, secret: string): boolean {
   if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
   const expected = sign(`${expiresAtStr}.${nonce}`, secret);
   return safeEqual(expected, signature);
+}
+
+function issueFirebaseCustomToken(): string | null {
+  try {
+    return createFirebaseAdminCustomToken();
+  } catch (error) {
+    console.error('Failed to issue Firebase admin custom token:', error);
+    return null;
+  }
 }
 
 export const handler: Handler = async (event) => {
@@ -93,10 +103,14 @@ export const handler: Handler = async (event) => {
     if (!token) {
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ valid: false }) };
     }
+    const valid = verifyToken(token, secret);
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ valid: verifyToken(token, secret) }),
+      body: JSON.stringify({
+        valid,
+        ...(valid ? { firebaseCustomToken: issueFirebaseCustomToken() } : {}),
+      }),
     };
   }
 
@@ -116,6 +130,10 @@ export const handler: Handler = async (event) => {
   return {
     statusCode: 200,
     headers: corsHeaders,
-    body: JSON.stringify({ sessionToken, expiresInHours: ttlHours }),
+    body: JSON.stringify({
+      sessionToken,
+      firebaseCustomToken: issueFirebaseCustomToken(),
+      expiresInHours: ttlHours,
+    }),
   };
 };

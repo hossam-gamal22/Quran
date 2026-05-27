@@ -1,5 +1,7 @@
 import React, { useState, useEffect, ReactNode } from 'react';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { AuthContext } from './auth-context';
+import { auth } from '../firebase';
 
 const SESSION_KEY = 'rooh_admin_session';
 const USE_DIRECT_NETLIFY_FUNCTIONS =
@@ -43,6 +45,7 @@ async function hashPassword(password: string): Promise<string> {
 interface VerifyAdminResponse {
   valid?: boolean;
   sessionToken?: string;
+  firebaseCustomToken?: string;
   expiresInHours?: number;
   error?: string;
   detail?: string;
@@ -63,6 +66,16 @@ async function callVerifyAdmin(payload: object): Promise<{ ok: boolean; data: Ve
   return { ok: res.ok, data, status: res.status };
 }
 
+async function signInFirebaseAdmin(customToken?: string | null): Promise<void> {
+  if (!customToken) {
+    if (import.meta.env.PROD) {
+      throw new Error('firebase-admin-token-missing');
+    }
+    return;
+  }
+  await signInWithCustomToken(auth, customToken);
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -79,15 +92,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
     callVerifyAdmin({ mode: 'validate', sessionToken: session })
-      .then(({ ok, data }) => {
+      .then(async ({ ok, data }) => {
         if (ok && data?.valid) {
+          await signInFirebaseAdmin(data.firebaseCustomToken);
           setAuthenticated(true);
         } else {
           localStorage.removeItem(SESSION_KEY);
         }
       })
-      .catch(() => {
-        // Network/offline — trust local session for offline editing
+      .catch((error) => {
+        if ((error as Error)?.message === 'firebase-admin-token-missing') {
+          localStorage.removeItem(SESSION_KEY);
+          setAuthenticated(false);
+          return;
+        }
+        // Network/offline — trust local session for read-only/offline viewing.
+        // Firestore/Storage admin writes still require Firebase admin auth.
         setAuthenticated(true);
       })
       .finally(() => setLoading(false));
@@ -107,6 +127,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('network-error');
     }
     if (result.ok && result.data?.sessionToken) {
+      await signInFirebaseAdmin(result.data.firebaseCustomToken);
       localStorage.setItem(SESSION_KEY, result.data.sessionToken);
       setAuthenticated(true);
       return;
@@ -137,6 +158,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     localStorage.removeItem(SESSION_KEY);
+    signOut(auth).catch(() => {});
     setAuthenticated(false);
   };
 

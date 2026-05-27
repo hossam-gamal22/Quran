@@ -6,8 +6,14 @@ import { getAuth } from 'firebase/auth';
 import { getFunctions } from 'firebase/functions';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
+const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY_WEB;
+
+if (!firebaseApiKey) {
+  throw new Error('VITE_FIREBASE_API_KEY_WEB is required');
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
+  apiKey: firebaseApiKey,
   authDomain: "rooh-almuslim.firebaseapp.com",
   projectId: "rooh-almuslim",
   storageBucket: "rooh-almuslim.firebasestorage.app",

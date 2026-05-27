@@ -61,6 +61,29 @@ function parseServiceAccount(): ServiceAccount {
 
 // ─── Auth ──────────────────────────────────────────────────────────────
 
+export function createFirebaseAdminCustomToken(uid = 'rooh-admin-panel'): string {
+  const sa = parseServiceAccount();
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const claims = {
+    iss: sa.clientEmail,
+    sub: sa.clientEmail,
+    aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+    iat: now,
+    exp: now + 3600,
+    uid,
+    claims: {
+      admin: true,
+    },
+  };
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const data = `${header}.${payload}`;
+  const signer = createSign('RSA-SHA256');
+  signer.update(data);
+  const signature = signer.sign(sa.privateKey).toString('base64url');
+  return `${data}.${signature}`;
+}
+
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 async function getAccessToken(sa: ServiceAccount): Promise<string> {
