@@ -2,6 +2,7 @@
 // إدارة المحتوى الموسمي - روح المسلم
 
 import { getHijriDate, HijriDate } from './hijri-date';
+import { getArabicSeasonalBannerCopy } from './seasonal-banner-copy';
 
 // ========================================
 // الأنواع
@@ -80,8 +81,8 @@ const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
   'mawlid',
   'ashura',
   'ramadan',
-  'hajj',
   'dhul_hijjah',
+  'hajj',
   'muharram',
   'rajab',
   'shaban',
@@ -201,7 +202,7 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
     nameEn: 'First Ten Days of Dhul Hijjah',
     description: 'أفضل أيام الدنيا',
     startDate: { month: 12, day: 1 },
-    endDate: { month: 12, day: 10 },
+    endDate: { month: 12, day: 9 },
     color: '#DAA520',
     icon: 'star-crescent',
     specialDays: [
@@ -351,14 +352,24 @@ export const applySeasonsMetadataOverrides = (
   for (const [key, override] of Object.entries(overrides)) {
     if (key in SEASONS_DATA) {
       const seasonKey = key as SeasonType;
+      const curatedCopy = getArabicSeasonalBannerCopy(seasonKey);
+      const normalizedOverride = curatedCopy
+        ? {
+            ...override,
+            nameAr: curatedCopy.title || override.nameAr,
+            description: curatedCopy.subtitle,
+            greetings: [curatedCopy.subtitle],
+          }
+        : override;
+
       SEASONS_DATA[seasonKey] = {
         ...SEASONS_DATA[seasonKey],
-        ...override,
+        ...normalizedOverride,
         type: seasonKey, // never override type
       };
       // Apply greetings override
-      if (override.greetings?.length) {
-        SEASONAL_GREETINGS[seasonKey] = override.greetings;
+      if (normalizedOverride.greetings?.length) {
+        SEASONAL_GREETINGS[seasonKey] = normalizedOverride.greetings;
       }
     }
   }
@@ -522,64 +533,50 @@ export const getAllSeasons = (hijriDate: SeasonDate = getHijriDate()): SeasonInf
 
 let SEASONAL_GREETINGS: Record<SeasonType, string[]> = {
   ramadan: [
-    'رمضان كريم! 🌙',
-    'مبارك عليكم الشهر',
-    'أعاده الله علينا وعليكم باليمن والبركات',
-    'شهر مبارك وصيام مقبول',
+    'شهر الصيام والقيام وتلاوة القرآن',
   ],
   hajj: [
-    'حج مبرور وسعي مشكور',
-    'تقبل الله طاعتكم',
-    'لبيك اللهم لبيك',
+    'الركن الخامس من أركان الإسلام',
   ],
   dhul_hijjah: [
-    'أيام مباركة',
-    'أكثروا من العمل الصالح في هذه الأيام',
-    'العمل الصالح فيها أحب إلى الله',
+    'أفضل أيام الدنيا — فأكثروا من العمل الصالح',
   ],
   ashura: [
-    'صيام مقبول',
-    'تقبل الله صيامكم',
+    'صيامه يكفر سنة ماضية',
   ],
   mawlid: [
-    'ذكرى مولد خير الأنام ﷺ',
-    'اللهم صلِّ وسلم على نبينا محمد',
+    'صلوا على النبي ﷺ',
   ],
   eid_fitr: [
-    'عيد مبارك! 🎉',
-    'تقبل الله منا ومنكم',
-    'كل عام وأنتم بخير',
-    'عيد سعيد',
+    'كل عام وأنتم بخير — تقبل الله طاعتكم',
   ],
   eid_adha: [
-    'عيد أضحى مبارك! 🐑',
     'تقبل الله منا ومنكم صالح الأعمال',
-    'كل عام وأنتم بخير',
   ],
   muharram: [
-    'عام هجري جديد مبارك',
-    'كل عام وأنتم بخير',
+    'أول شهور السنة الهجرية',
   ],
   rajab: [
-    'رجب من الأشهر الحرم',
-    'شهر حرام فاعظموا فيه الطاعة',
+    'من الأشهر الحرم — أعظِم فيه الطاعة',
   ],
   shaban: [
-    'اللهم بلغنا رمضان',
-    'شعبان شهر الاستعداد',
+    'اللهم بلِّغنا رمضان',
   ],
   none: [''],
 };
 
 /**
- * الحصول على تحية موسمية عشوائية
+ * الحصول على تحية موسمية موحدة.
+ * لا نستخدم اختياراً عشوائياً هنا حتى لا تتغير رسالة الصفحة الرئيسية عند كل فتح للتطبيق.
  */
 export const getSeasonalGreeting = (seasonType: SeasonType): string => {
+  const curatedCopy = getArabicSeasonalBannerCopy(seasonType);
+  if (curatedCopy?.subtitle) return curatedCopy.subtitle;
+
   const greetings = SEASONAL_GREETINGS[seasonType];
   if (!greetings || greetings.length === 0) return '';
 
-  const randomIndex = Math.floor(Math.random() * greetings.length);
-  return greetings[randomIndex];
+  return greetings[0] || '';
 };
 
 // ========================================

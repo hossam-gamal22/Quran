@@ -18,6 +18,8 @@ import {
   Pressable,
   Alert,
   Switch,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -31,11 +33,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllSurahs, type QuranV4Surah } from '@/lib/qcf-page-data';
-import { getLocalizedHijriDate, subscribeToHijriOffsetChanges } from '@/lib/hijri-date';
+import { getLocalizedFullDate, getLocalizedHijriDate, subscribeToHijriOffsetChanges } from '@/lib/hijri-date';
 import { getCategoryById, type AzkarCategoryType, resolveCategoryId } from '@/lib/azkar-api';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useSeasonal } from '@/contexts/SeasonalContext';
+import { getUpcomingEid } from '@/lib/eid-prayer';
 import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useColors } from '@/hooks/use-colors';
@@ -57,11 +60,14 @@ import { schedulePrayerNotification, requestNotificationPermission, cancelNotifi
 import * as Notifications from 'expo-notifications';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { safeIcon } from '@/lib/safe-icon';
+import { isWelcomeBannerActive, selectHomeBanner } from '@/lib/home-banner-priority';
+import { detectArabicSeasonalBannerKey, getArabicSeasonalBannerCopy } from '@/lib/seasonal-banner-copy';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { PermissionBanner } from '@/components/notifications/PermissionBanner';
 import { getUserId } from '@/lib/firebase-user';
 import { getMonthlyLeaderboard, getUserMonthlyInfo, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import { localDateKey, msUntilNextLocalDay } from '@/lib/local-date';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -600,6 +606,9 @@ const collapsibleStyles = StyleSheet.create({
 });
 
 // ========================================
+// Curated Arabic banner text is centralized in lib/seasonal-banner-copy.ts.
+
+// ========================================
 // المكون الرئيسي
 // ========================================
 
@@ -611,22 +620,54 @@ export default function HomeScreen() {
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const quickAccessScrollRef = useRef<ScrollView>(null);
-  const { currentSeason, dailyData, adminBanner: adminSeasonalBanner } = useSeasonal();
+  const { currentSeason, dailyData, adminBanner: adminSeasonalBanner, refreshSeasonalData } = useSeasonal();
   const features = useFeatures();
   const { isPremium, showUpgradeBanner, isSubscriptionEnabled } = useSubscription();
 
   // Date display
-  const [homeHijriDate, setHomeHijriDate] = useState(() => getLocalizedHijriDate());
+  const [homeDateNow, setHomeDateNow] = useState(() => new Date());
+  const [homeHijriDate, setHomeHijriDate] = useState(() => getLocalizedHijriDate(homeDateNow));
   const refreshHomeHijriDate = useCallback(() => {
-    setHomeHijriDate(getLocalizedHijriDate());
-  }, [settings.prayer.calculationMethod, settings.prayer.asrJuristic, settings.prayer.adjustments]);
+    const now = new Date();
+    setHomeDateNow(now);
+    setHomeHijriDate(getLocalizedHijriDate(now));
+  }, []);
 
   useEffect(() => subscribeToHijriOffsetChanges(refreshHomeHijriDate), [refreshHomeHijriDate]);
+  useEffect(() => {
+    setHomeHijriDate(getLocalizedHijriDate(homeDateNow));
+  }, [homeDateNow, settings.language]);
+
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNextLocalDayRefresh = () => {
+      if (midnightTimer) clearTimeout(midnightTimer);
+      midnightTimer = setTimeout(() => {
+        refreshHomeHijriDate();
+        scheduleNextLocalDayRefresh();
+      }, msUntilNextLocalDay(new Date(), 250));
+    };
+
+    scheduleNextLocalDayRefresh();
+    const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') {
+        refreshHomeHijriDate();
+        scheduleNextLocalDayRefresh();
+      }
+    });
+
+    return () => {
+      if (midnightTimer) clearTimeout(midnightTimer);
+      subscription.remove();
+    };
+  }, [refreshHomeHijriDate]);
+
   const gregorianDateStr = useMemo(() => {
-    const { getLocalizedFullDate } = require('@/lib/hijri-date');
-    const full = getLocalizedFullDate();
+    const full = getLocalizedFullDate(homeDateNow);
     return full.formatted.gregorian;
-  }, []);
+  }, [homeDateNow, settings.language]);
+  const homeDateKey = useMemo(() => localDateKey(homeDateNow), [homeDateNow]);
 
   // User rank for honor board
   const [userRank, setUserRank] = useState<number | null>(null);
@@ -854,7 +895,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadPrayerTimes = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = homeDateKey;
         const cached = await getCachedPrayerTimes(today, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
         if (cached) {
           setCachedPrayerTimes(cached);
@@ -915,7 +956,7 @@ export default function HomeScreen() {
       }
     };
     loadPrayerTimes();
-  }, []);
+  }, [homeDateKey, settings.prayer.calculationMethod, settings.prayer.asrJuristic, settings.prayer.adjustments]);
 
   // Countdown timer for next prayer modal
   useEffect(() => {
@@ -1369,20 +1410,40 @@ export default function HomeScreen() {
 
   // Helper: check if banner is within its scheduled date range
   const isBannerActive = useCallback((banner: WelcomeBannerConfig | null): boolean => {
-    if (!banner || !banner.enabled) return false;
-    const now = new Date();
-    if ((banner as any).scheduledFrom) {
-      const from = new Date((banner as any).scheduledFrom);
-      if (from > now) return false;
-    }
-    if ((banner as any).scheduledUntil) {
-      const until = new Date((banner as any).scheduledUntil);
-      if (until < now) return false;
-    }
-    return true;
+    return isWelcomeBannerActive(banner);
   }, []);
 
-  // Auto-generate seasonal banner when no Firebase banner is active
+  // Eid prayer countdown — shown 3 days before Eid through ~11am Eid day.
+  // Rendered as a small inline chip below the welcome banner (NOT as the
+  // welcome banner itself), so the normal Eid greeting banner stays visible.
+  const eidCountdownChip = useMemo(() => {
+    const upcoming = getUpcomingEid();
+    if (!upcoming) return null;
+    const title = upcoming.type === 'fitr' ? t('eidPrayer.fitrTitle') : t('eidPrayer.adhaTitle');
+    let when: string;
+    if (upcoming.isToday) when = t('eidPrayer.today');
+    else if (upcoming.daysUntil === 1) when = t('eidPrayer.tomorrow');
+    else when = t('eidPrayer.afterDays').replace('{n}', String(upcoming.daysUntil));
+    // Calculate prayer time from cached sunrise — purely visual hint
+    const sunrise = cachedPrayerTimes?.sunrise;
+    let prayerTime: string | null = null;
+    if (sunrise) {
+      try {
+        const { calculateEidPrayerTime } = require('@/lib/eid-prayer');
+        const raw = calculateEidPrayerTime(sunrise, upcoming.type);
+        if (raw) {
+          const [h, m] = raw.split(':').map(Number);
+          if (Number.isFinite(h) && Number.isFinite(m)) {
+            const period = settings.language === 'ar' ? (h < 12 ? 'ص' : 'م') : (h < 12 ? 'AM' : 'PM');
+            const h12 = h % 12 === 0 ? 12 : h % 12;
+            prayerTime = `${h12}:${String(m).padStart(2, '0')} ${period}`;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    return { title, when, type: upcoming.type, prayerTime };
+  }, [t, cachedPrayerTimes?.sunrise, settings.language]);
+
   const autoSeasonalBanner = useMemo((): WelcomeBannerConfig | null => {
     if (!currentSeason?.isActive) return null;
     
@@ -1414,8 +1475,41 @@ export default function HomeScreen() {
     
     const route = seasonRoutes[currentSeason.type] || '/seasonal';
     const translationKey = seasonTranslationKeys[currentSeason.type];
-    const title = currentSeason.nameAr || (translationKey ? t(translationKey.title) : '');
-    const subtitle = dailyData.greeting || currentSeason.description || (translationKey ? t(translationKey.subtitle) : '');
+    // Only fall back to t() when the key is known to exist for this season.
+    // i18n humanizes missing keys (e.g. "subtitle" → "Subtitle"), which leaks
+    // placeholder text into the banner. Gate per-field by what actually exists
+    // in constants/translations.ts under seasonal.*:
+    //  - title:    ramadan, hajj, mawlid, ashura, eid (eid_fitr maps to "eid")
+    //  - subtitle: ramadan, ashura, eid (eid_fitr)
+    const TITLE_KEYS_PRESENT = new Set(['ramadan', 'hajj', 'mawlid', 'ashura', 'eid_fitr']);
+    const SUBTITLE_KEYS_PRESENT = new Set(['ramadan', 'ashura', 'eid_fitr']);
+    const fallbackTitle = TITLE_KEYS_PRESENT.has(currentSeason.type) && translationKey
+      ? t(translationKey.title)
+      : '';
+    const fallbackSubtitle = SUBTITLE_KEYS_PRESENT.has(currentSeason.type) && translationKey
+      ? t(translationKey.subtitle)
+      : '';
+    const title = currentSeason.nameAr || fallbackTitle;
+
+    // Curated subtitle per season — chosen to NEVER mirror the title. Prefer
+    // this over `currentSeason.description` (which duplicates nameAr for
+    // eid_adha) or `dailyData.greeting` (which can match the title verbatim).
+    // Normalize for similarity check: strip tashkeel, "ال", whitespace, punctuation.
+    const normalizeForCompare = (s: string) =>
+      s
+        .replace(/[ً-ْٰ]/g, '')
+        .replace(/\bال/g, '')
+        .replace(/[!؟?.…\s🐑🌙🎉🤝]/g, '')
+        .trim();
+    const titleNorm = normalizeForCompare(title);
+    const isTooSimilarToTitle = (candidate: string) =>
+      !candidate || normalizeForCompare(candidate) === titleNorm;
+
+    const curatedCopy = getArabicSeasonalBannerCopy(currentSeason.type);
+    const curatedSubtitle = curatedCopy?.subtitle || '';
+    const greetingCandidate = isTooSimilarToTitle(dailyData.greeting) ? '' : dailyData.greeting;
+    const descriptionCandidate = isTooSimilarToTitle(currentSeason.description) ? '' : currentSeason.description;
+    const subtitle = curatedSubtitle || greetingCandidate || descriptionCandidate || fallbackSubtitle;
     
     return {
       enabled: true,
@@ -1450,14 +1544,17 @@ export default function HomeScreen() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // تحديث البيانات
     try {
-      const cfg = await fetchAppConfig();
-      if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
+      const [cfg] = await Promise.all([
+        fetchAppConfig(),
+        refreshSeasonalData(),
+      ]);
+      setWelcomeBanner(cfg.welcomeBanner ?? null);
+      refreshHomeHijriDate();
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 500));
     setIsRefreshing(false);
-  }, []);
+  }, [refreshHomeHijriDate, refreshSeasonalData]);
 
   const navigateToCategory = (categoryId: string) => {
     if (categoryId === 'ruqya' || categoryId === '34') {
@@ -1629,10 +1726,41 @@ export default function HomeScreen() {
           ) : null;
 
           // Priority 1: Firebase / Admin / Auto-seasonal banner
-          const activeBanner = isBannerActive(welcomeBanner) && welcomeBanner 
-            ? welcomeBanner 
-            : (adminSeasonalBanner || autoSeasonalBanner);
-          
+          const selectedBanner = selectHomeBanner({
+            welcomeBanner,
+            adminSeasonalBanner,
+            autoSeasonalBanner,
+            currentSeasonType: currentSeason?.type,
+          });
+          const activeBanner = selectedBanner?.banner ?? null;
+          const isWelcomeBannerSource = selectedBanner?.source === 'welcome';
+
+          // Compute final title/subtitle once. The curated Arabic season copy
+          // ALWAYS wins for known Arabic seasons — guarantees consistency
+          // across devices and prevents Firestore-saved banners from producing
+          // divergent Eid wording.
+          const rawTitle = activeBanner
+            ? (isWelcomeBannerSource ? resolveBannerText(activeBanner, 'title') : cleanBannerPlaceholder(activeBanner.title, 'title'))
+            : '';
+          const rawSubtitle = activeBanner
+            ? (isWelcomeBannerSource ? resolveBannerText(activeBanner, 'subtitle') : cleanBannerPlaceholder(activeBanner.subtitle, 'subtitle'))
+            : '';
+          const isArabicLang = settings.language === 'ar';
+          const bannerSeasonKey = detectArabicSeasonalBannerKey([
+            rawTitle,
+            rawSubtitle,
+            activeBanner?.title,
+            activeBanner?.subtitle,
+            ...Object.values(activeBanner?.titles ?? {}),
+            ...Object.values(activeBanner?.subtitles ?? {}),
+          ].filter((value): value is string => typeof value === 'string').join(' '));
+          const seasonKey = (bannerSeasonKey === 'eid_adha' || bannerSeasonKey === 'eid_fitr')
+            ? bannerSeasonKey
+            : (currentSeason?.type || bannerSeasonKey);
+          const curatedSeasonCopy = isArabicLang ? getArabicSeasonalBannerCopy(seasonKey) : null;
+          const resolvedTitle = curatedSeasonCopy?.title || rawTitle;
+          const resolvedSubtitle = curatedSeasonCopy?.subtitle || rawSubtitle;
+
           if (activeBanner) {
             return (
             <Animated.View entering={FadeIn.duration(600)}>
@@ -1662,8 +1790,8 @@ export default function HomeScreen() {
                       <View style={styles.seasonCardOverlay}>
                         <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <View style={styles.seasonInfo}>
-                            <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
-                            <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
+                            <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolvedTitle}</Text>
+                            <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolvedSubtitle}</Text>
                               {countdownLine?.()}
                           </View>
                           {activeBanner.customIconUrl ? (
@@ -1685,8 +1813,8 @@ export default function HomeScreen() {
                           return (
                       <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={styles.seasonInfo}>
-                            <Text style={[styles.seasonName, { color: bannerFg, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
-                              <Text style={[styles.seasonGreeting, { color: bannerFgSub, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
+                            <Text style={[styles.seasonName, { color: bannerFg, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolvedTitle}</Text>
+                              <Text style={[styles.seasonGreeting, { color: bannerFgSub, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolvedSubtitle}</Text>
                             {countdownLine?.(bannerFgCount)}
                         </View>
                         {activeBanner.customIconUrl ? (
@@ -1801,6 +1929,42 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
         </Animated.View>
+
+        {/* Eid prayer countdown chip — supplements (does not replace) the welcome banner */}
+        {eidCountdownChip && (
+          <Animated.View entering={FadeInDown.duration(400)} style={{ marginTop: 12 }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push('/seasonal/eid')}
+              style={[styles.eidChip, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            >
+              <View style={styles.eidChipIcon}>
+                <MaterialCommunityIcons name="mosque" size={28} color="#0d8e62" />
+              </View>
+              <View style={[styles.eidChipText, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                <Text
+                  style={[styles.eidChipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                  numberOfLines={1}
+                >
+                  {eidCountdownChip.title}
+                </Text>
+                <Text
+                  style={[styles.eidChipSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                  numberOfLines={1}
+                >
+                  {eidCountdownChip.prayerTime
+                    ? `${eidCountdownChip.when} · ${eidCountdownChip.prayerTime}`
+                    : eidCountdownChip.when}
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name={isRTL ? 'chevron-left' : 'chevron-right'}
+                size={20}
+                color={colors.textLight}
+              />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
         {/* Premium Upgrade Banner — fallback only when no other banner is active.
             Wait for hydration so async banners get a chance to render first. */}
@@ -2684,6 +2848,41 @@ const _styles = StyleSheet.create({
     borderRadius: 20,
     padding: 14,
     borderWidth: 1,
+  },
+  eidChip: {
+    marginBottom: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(13,142,98,0.14)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(13,142,98,0.30)',
+    alignItems: 'center',
+    gap: 14,
+  },
+  eidChipIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(13,142,98,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eidChipText: {
+    flex: 1,
+    gap: 4,
+  },
+  eidChipTitle: {
+    fontSize: 18,
+    fontFamily: fontBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
+  },
+  eidChipSubtitle: {
+    fontSize: 14,
+    fontFamily: fontMedium(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   premiumBannerRow: {
     alignItems: 'center',

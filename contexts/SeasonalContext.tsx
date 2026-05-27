@@ -19,13 +19,14 @@ import {
   getSeasonProgress,
   applySeasonsMetadataOverrides,
 } from '@/lib/seasonal-content';
-import { loadSeasonsMetadata } from '@/lib/content-api';
+import { loadSeasonalBannerCopy, loadSeasonsMetadata } from '@/lib/content-api';
 import { getHijriDate as getLocalHijriDate, type HijriDate } from '@/lib/hijri-date';
 import { getHijriDate as getAuthoritativeHijriDate } from '@/services/hijriCalendarService';
 import { collection, getDocs, query, where, orderBy, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { getLanguage } from '@/lib/i18n';
 import type { WelcomeBannerConfig } from '@/lib/app-config-api';
+import { getArabicSeasonalBannerCopy, setArabicSeasonalBannerCopyOverrides } from '@/lib/seasonal-banner-copy';
 
 const FIRESTORE_TIMEOUT_MS = 8000;
 
@@ -163,6 +164,28 @@ const STORAGE_KEYS = {
   LAST_UPDATE: 'seasonal_last_update',
 };
 
+const buildUnifiedSeasonalBannerText = (
+  seasonType: string,
+  lang: string,
+  data: any,
+): Pick<WelcomeBannerConfig, 'title' | 'subtitle'> => {
+  const translations = data.translations || {};
+  const title = translations[`title_${lang}`]
+    || (lang === 'ar' ? data.titleAr : data.titleEn)
+    || data.titleAr || data.titleEn || '';
+  const subtitle = translations[`content_${lang}`]
+    || (lang === 'ar' ? data.contentAr : data.contentEn)
+    || data.contentAr || data.contentEn || '';
+
+  if (lang !== 'ar') return { title, subtitle };
+
+  const curatedCopy = getArabicSeasonalBannerCopy(seasonType);
+  return {
+    title: curatedCopy?.title || title,
+    subtitle: curatedCopy?.subtitle || subtitle,
+  };
+};
+
 // ========================================
 // السياق
 // ========================================
@@ -196,6 +219,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
   const [featuredContent, setFeaturedContent] = useState<SeasonalContent | null>(null);
   const [adminBanner, setAdminBanner] = useState<WelcomeBannerConfig | null>(null);
   const seasonalContentSnapshotReady = useRef(false);
+  const seasonalBannerCopySnapshotReady = useRef(false);
 
   // ========================================
   // تحميل البيانات
@@ -316,6 +340,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       const seasonHijriRanges: Record<string, { month: number; startDay: number; endDay: number }> = {
         ramadan:   { month: 9,  startDay: 1,  endDay: 30 },
         eid_fitr:  { month: 10, startDay: 1,  endDay: 3 },
+        dhul_hijjah:{ month: 12, startDay: 1,  endDay: 9 },
         eid_adha:  { month: 12, startDay: 10, endDay: 13 },
         hajj:      { month: 12, startDay: 8,  endDay: 13 },
         mawlid:    { month: 3,  startDay: 12, endDay: 12 },
@@ -363,6 +388,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       const seasonRoutes: Record<string, string> = {
         ramadan: '/seasonal/ramadan',
         hajj: '/seasonal/hajj',
+        dhul_hijjah: '/seasonal/hajj',
         eid_fitr: '/seasonal/ramadan',
         eid_adha: '/seasonal/hajj',
         mawlid: '/seasonal/mawlid',
@@ -372,20 +398,19 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
         custom: '/(tabs)',
       };
 
-      // البحث عن أول محتوى يطابق اليوم (مرتب حسب الأولوية)
+      // البحث عن أفضل محتوى يطابق اليوم. نرتب محلياً كذلك حتى لا يعتمد
+      // الاختيار على ترتيب Firestore عند تساوي الأولوية.
       let bestMatch: WelcomeBannerConfig | null = null;
+      let bestMatchSortKey = '';
       snapshot.forEach(doc => {
-        if (bestMatch) return; // خذ أول مطابقة فقط (أعلى أولوية)
         const data = doc.data();
         if (isActiveToday(data)) {
-          // استخدام الترجمات المحفوظة أولاً، ثم العربي/الإنجليزي كـ fallback
-          const translations = data.translations || {};
-          const title = translations[`title_${lang}`]
-            || (lang === 'ar' ? data.titleAr : data.titleEn)
-            || data.titleAr || data.titleEn || '';
-          const subtitle = translations[`content_${lang}`]
-            || (lang === 'ar' ? data.contentAr : data.contentEn)
-            || data.contentAr || data.contentEn || '';
+          const priority = Number.isFinite(Number(data.priority)) ? Number(data.priority) : 999;
+          const sortKey = `${String(priority).padStart(6, '0')}|${String(data.seasonType || '')}|${doc.id}`;
+          if (bestMatch && sortKey >= bestMatchSortKey) return;
+
+          const { title, subtitle } = buildUnifiedSeasonalBannerText(data.seasonType, lang, data);
+          bestMatchSortKey = sortKey;
           bestMatch = {
             enabled: true,
             title,
@@ -416,6 +441,11 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
     try {
       // تحميل الإعدادات
       await loadSettings();
+
+      try {
+        const bannerCopy = await loadSeasonalBannerCopy();
+        setArabicSeasonalBannerCopyOverrides(bannerCopy?.copies);
+      } catch { /* CMS unavailable — use bundled seasonal banner copy */ }
 
       // Apply CMS metadata overrides before reading seasons
       try {
@@ -580,6 +610,27 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
 
     return unsubscribe;
   }, [currentSeason?.type, isLoading]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, 'appContent', 'seasonalBannerCopy'),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setArabicSeasonalBannerCopyOverrides((snapshot.data() as any).copies);
+        }
+        if (!seasonalBannerCopySnapshotReady.current) {
+          seasonalBannerCopySnapshotReady.current = true;
+          return;
+        }
+        refreshSeasonalData();
+      },
+      (error) => {
+        if (__DEV__) console.log('Realtime seasonal banner copy listener unavailable:', error);
+      }
+    );
+
+    return unsubscribe;
+  }, [refreshSeasonalData]);
 
   useEffect(() => {
     const seasonalContentQuery = query(
