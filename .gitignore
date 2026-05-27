@@ -54,6 +54,11 @@ app-example
 /ios
 /android
 
+# Native module build artifacts (Gradle/Kotlin caches)
+modules/*/android/build/
+modules/*/android/.gradle/
+modules/*/android/.cxx/
+
 # IDE
 .vscode/
 .idea/
