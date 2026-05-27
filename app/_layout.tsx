@@ -98,6 +98,8 @@ import { maybeUploadTelemetry } from '@/lib/notification-telemetry';
 // Import at module scope to register the background task definition (required by expo-task-manager)
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
+import '@/lib/app-icon-background-task';
+import { registerAppIconBackgroundTask } from '@/lib/app-icon-background-task';
 import '@/lib/hijri-push-sync';
 import { applyHijriOverridePushPayload, registerHijriOverridePushTask } from '@/lib/hijri-push-sync';
 import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
@@ -1089,6 +1091,17 @@ export default function RootLayout() {
       5000
     );
 
+    // Schedule Eid prayer reminder (8 PM the day before Eid).
+    // Safe to call on every launch — duplicates are skipped via AsyncStorage marker.
+    initWithTimeout(
+      async () => {
+        const { scheduleEidNotification } = require('@/lib/eid-notifications');
+        await scheduleEidNotification();
+      },
+      'Eid notification schedule',
+      5000,
+    );
+
     // Live-subscribe to admin Hijri overrides for the user's country. When
     // the admin publishes a new moon-sighting decision (e.g. "Egypt's
     // Ramadan starts on May 17"), the widget refreshes within seconds — no
@@ -1160,6 +1173,16 @@ export default function RootLayout() {
     initWithTimeout(
       () => checkForIconUpdate(),
       'App icon update check',
+      5000
+    );
+
+    // Register the periodic icon-refresh task so seasonal icons still swap
+    // even when the user doesn't open the app during a short window (Eid,
+    // Mawlid). On Android the task kills the process after toggling so OEM
+    // launchers (MIUI, EMUI, One UI) re-query the icon on next launch.
+    initWithTimeout(
+      () => registerAppIconBackgroundTask(),
+      'App icon background task registration',
       5000
     );
     

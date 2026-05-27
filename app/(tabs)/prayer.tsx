@@ -96,6 +96,7 @@ import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
+import EidPrayerCard from '@/components/ui/prayer/EidPrayerCard';
 import RectangleWidgetView from '@/components/ui/prayer/RectangleWidgetView';
 import AnalogClockView from '@/components/ui/prayer/AnalogClockView';
 import DigitalTypographyView from '@/components/ui/prayer/DigitalTypographyView';
@@ -1312,6 +1313,9 @@ export default function PrayerScreen() {
               <Animated.View entering={FadeInDown.delay(300).duration(500)}>
                 <PrayerList prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} notificationSettings={prayerSettings?.notifications} onToggleNotification={handleToggleNotification} showNotificationToggle showSunrise={settings.prayer.showSunrise} show24Hour={settings.prayer.show24Hour} prayerStatuses={(todayPrayer || undefined) as any} onPrayerLongPress={openPrayerStatusModal} />
               </Animated.View>
+
+              {/* Eid prayer card — shown 3 days before Eid through ~11am Eid day */}
+              <EidPrayerCard prayerTimes={prayerTimes} show24Hour={settings.prayer.show24Hour} />
 
               {/* Long-press hint banner */}
               <Animated.View entering={FadeInDown.delay(350).duration(500)} style={[styles.longPressHint, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
