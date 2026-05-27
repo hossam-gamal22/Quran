@@ -1,121 +1,140 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Public read for all files (app downloads sounds, images, etc.)
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function validImage(maxBytes) {
+      return request.resource != null
+        && request.resource.size < maxBytes
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    function validAudio(maxBytes) {
+      return request.resource != null
+        && request.resource.size < maxBytes
+        && request.resource.contentType.matches('audio/.*');
+    }
+
+    function validVideo(maxBytes) {
+      return request.resource != null
+        && request.resource.size < maxBytes
+        && request.resource.contentType.matches('video/.*');
+    }
+
+    function validPdf(maxBytes) {
+      return request.resource != null
+        && request.resource.size < maxBytes
+        && request.resource.contentType == 'application/pdf';
+    }
+
+    // Public reads are granted only on known asset paths below. User backups
+    // must never inherit a global public read rule.
     match /{allPaths=**} {
-      allow read: if true;
+      allow read: if false;
+      allow write: if false;
     }
 
-    // Sound uploads — admin only (requires Firebase Auth)
     match /sounds/{fileName} {
-      allow write: if request.auth != null
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('audio/.*');
+      allow read: if true;
+      allow write: if isAdmin() && validAudio(10 * 1024 * 1024);
     }
 
-    // Pending sounds for next build — admin only
     match /pending-sounds/{category}/{fileName} {
-      allow write: if request.auth != null
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('audio/.*');
+      allow read: if true;
+      allow write: if isAdmin() && validAudio(10 * 1024 * 1024);
     }
 
-    // App content images (icons, backgrounds) — admin panel writes
-    // (no Firebase Auth on admin; same trust model as Firestore admin
-    // collections — open write, will be locked down via Netlify proxy
-    // in Phase B0.5).
     match /appContent/{fileName} {
-      allow write: if request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+      allow read: if true;
+      allow write: if isAdmin() && validImage(10 * 1024 * 1024);
     }
 
-    // General admin uploads (welcome banner backgrounds, etc.)
     match /uploads/{allPaths=**} {
-      allow write: if request.resource != null
-                   && request.resource.size < 10 * 1024 * 1024
-                   && (request.resource.contentType.matches('image/.*')
-                       || request.resource.contentType.matches('audio/.*'));
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('audio/.*')
+        );
+      allow delete: if isAdmin();
     }
 
-    // Adhkar audio files uploaded from AzkarManager admin page.
-    // Same trust model as other admin uploads.
     match /adhkar-audio/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 15 * 1024 * 1024
-                   && request.resource.contentType.matches('audio/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validAudio(15 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
-    // Admin-managed image uploads used by the dashboard editors.
     match /category-icons/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 2 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validImage(2 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /theme-icons/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validImage(5 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /backgrounds/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validImage(10 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /content-icons/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validImage(5 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /content-videos/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 200 * 1024 * 1024
-                   && request.resource.contentType.matches('video/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validVideo(200 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /app-content/icons/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validImage(5 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
-    // Admin-managed audio/PDF uploads.
     match /duas-audio/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 15 * 1024 * 1024
-                   && request.resource.contentType.matches('audio/.*');
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validAudio(15 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /pdf-uploads/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 25 * 1024 * 1024
-                   && request.resource.contentType == 'application/pdf';
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validPdf(25 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
     match /theme-pdfs/{fileName} {
-      allow write: if request.resource != null
-                   && request.resource.size < 25 * 1024 * 1024
-                   && request.resource.contentType == 'application/pdf';
-      allow delete: if true;
+      allow read: if true;
+      allow write: if isAdmin() && validPdf(25 * 1024 * 1024);
+      allow delete: if isAdmin();
     }
 
-    // User cloud backups — per-user JSON blobs keyed by OAuth openId.
-    // Users can only read/write their own backup files.
     match /userBackups/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'application/json'
+        && request.resource.metadata.openId == userId;
+      allow delete: if signedIn();
     }
   }
 }

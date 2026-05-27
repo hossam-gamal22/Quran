@@ -31,7 +31,19 @@ yarn-error.*
 
 # local env files
 .env
+.env.*
 .env*.local
+!.env.example
+
+# Firebase local/generated state
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Netlify local state
+.netlify/
+admin-panel/.netlify/
 
 # typescript
 *.tsbuildinfo

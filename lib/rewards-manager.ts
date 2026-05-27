@@ -117,7 +117,7 @@ export const mergeCurrentUserIntoLeaderboard = (
 };
 
 const getVisibleDisplayName = (data: Record<string, any>): string => {
-  return String(data.displayName || '').trim();
+  return String(data.displayName || data.name || '').trim();
 };
 
 const isEligibleForLeaderboard = (data: Record<string, any>): boolean => {
@@ -186,6 +186,14 @@ const mergeMonthlyActivities = (
   }
 
   return activities;
+};
+
+const getCloudScoreFloor = (
+  engagement: MonthlyEngagement | undefined,
+  month: string,
+): number => {
+  if (!engagement || engagement.month !== month) return 0;
+  return Math.max(0, Number(engagement.score) || 0);
 };
 
 /**
@@ -270,31 +278,6 @@ export function subscribeToRewardsConfig(
     return () => {};
   }
 }
-
-/**
- * Overwrite monthly engagement in Firestore with recalculated values.
- * Used to correct stale leaderboard scores by setting the absolute truth
- * from worship storage instead of incrementing.
- */
-export const setMonthlyEngagement = async (
-  userId: string,
-  activities: Record<string, number>,
-  totalScore: number
-): Promise<void> => {
-  try {
-    const currentMonth = getCurrentMonth();
-    const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, {
-      monthlyEngagement: {
-        month: currentMonth,
-        score: totalScore,
-        activities,
-      },
-    }, { merge: true });
-  } catch (error) {
-    console.log('📴 Failed to set monthly engagement:', error);
-  }
-};
 
 /**
  * Update monthly engagement score for a user.
@@ -488,7 +471,8 @@ export const syncMonthlyEngagementFromLocalWorship = async (
       mergeBonus,
     );
 
-    const score = calculateMonthlyScore(activities, config.scoreWeights || DEFAULT_WEIGHTS);
+    const calculatedScore = calculateMonthlyScore(activities, config.scoreWeights || DEFAULT_WEIGHTS);
+    const score = Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
 
     const engagementUpdate: Record<string, any> = {
       monthlyEngagement: {
@@ -593,7 +577,8 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
 
     // Recalculate score from merged activities × weights for consistency
     const weights = config.scoreWeights || DEFAULT_WEIGHTS;
-    const score = calculateMonthlyScore(activities, weights);
+    const calculatedScore = calculateMonthlyScore(activities, weights);
+    const score = Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
 
     return { score, month: currentMonth, activities, mergeBonus };
   } catch {

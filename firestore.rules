@@ -1,103 +1,146 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ─── Admin Authentication (HARDENED) ─────────────────────────
-    // Password hash + active session token live here.
-    // Reading/writing this document is FORBIDDEN from clients.
-    // The admin panel verifies passwords ONLY via the Netlify
-    // function `verify-admin`, which uses a server-side env var hash.
-    // NOTE: Firestore rules use OR-combination, so the wildcard rule
-    // below MUST also explicitly exclude `adminAuth`.
-    match /appConfig/adminAuth {
-      allow read, write: if false;
+    function signedIn() {
+      return request.auth != null;
     }
 
-    // Website pages - public read/write for admin panel + dynamic pages
-    match /websitePages/{pageId} {
-      allow read, write: if true;
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
     }
 
-    // App config - public read, authenticated write
-    // Mobile app reads sound settings, notification defaults, etc.
-    // Admin panel writes assignments and config (requires login)
-    // EXPLICITLY excludes `adminAuth` (rules combine via OR).
-    match /appConfig/{docId} {
-      allow read: if docId != 'adminAuth';
-      allow write: if docId != 'adminAuth';
+    function adminWrite() {
+      return isAdmin();
     }
 
-    // Config collection - app settings, subscriptions, feature gating, rewards, ads
-    match /config/{docId} {
-      allow read, write: if true;
+    function boundedDoc(maxKeys) {
+      return request.resource != null && request.resource.data.size() <= maxKeys;
     }
 
-    // Temp pages - public read/write for dynamic pages
-    match /tempPages/{pageId} {
-      allow read, write: if true;
+    function noUserPrivilegeEscalation() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'adminPremium',
+        'role',
+        'disabled',
+        'hiddenFromLeaderboard',
+        'isPremium',
+        'iapPremium'
+      ]);
     }
 
-    // Stats - public read/write for analytics
-    match /stats/{docId} {
-      allow read, write: if true;
+    function safeUserCreate() {
+      return signedIn()
+        && boundedDoc(80)
+        && !request.resource.data.keys().hasAny([
+          'adminPremium',
+          'role',
+          'disabled',
+          'hiddenFromLeaderboard',
+          'iapPremium'
+        ])
+        && (
+          !request.resource.data.keys().hasAny(['isPremium'])
+          || request.resource.data.isPremium == false
+        );
     }
 
-    // Activity - public write for usage tracking
-    match /activity/{docId} {
-      allow read, write: if true;
+    // Server-side defense-in-depth: prevent the monthly score from being
+    // overwritten with a smaller value within the same month. The app uses
+    // firestoreIncrement(...) for same-month bumps and Math.max(local, cloud)
+    // for recalcs, so legitimate writes never need to decrease.
+    function monthlyEngagementHasScore(data) {
+      return data.keys().hasAny(['monthlyEngagement'])
+        && data.monthlyEngagement is map
+        && data.monthlyEngagement.keys().hasAny(['score'])
+        && data.monthlyEngagement.score is number;
     }
 
-    // Users - public read/write for device-based registration
-    //
-    // ⚠️ KNOWN ATTACK VECTOR (deferred to Phase B0.5):
-    //   This collection accepts unauthenticated writes because:
-    //     1. The mobile app has no Firebase Auth — users are identified by
-    //        a device-generated `userId` stored in AsyncStorage.
-    //     2. The admin panel writes `adminPremium` directly from the browser
-    //        (Subscriptions.tsx + Rewards.tsx) using a Netlify session token
-    //        that Firestore cannot verify.
-    //
-    //   Consequence: a malicious client can grant itself premium by writing
-    //   `adminPremium: { granted: true, plan: 'lifetime' }` to its own user
-    //   doc. Risk is bounded (no PII leak, no destructive action).
-    //
-    //   Fix in Phase B0.5: route ALL admin writes through a Netlify function
-    //   that validates the session token + uses Firebase Admin SDK
-    //   (which bypasses these rules). Then we can lock this down to:
-    //     allow update: if !affectedKeys.hasAny(['adminPremium', 'role', ...])
-    //
-    // For now: keep open, accept the risk (matches current production behavior).
-    match /users/{userId} {
-      allow read, write: if true;
+    function sameMonthlyEngagementMonth() {
+      return resource.data.monthlyEngagement.keys().hasAny(['month'])
+        && request.resource.data.monthlyEngagement.keys().hasAny(['month'])
+        && resource.data.monthlyEngagement.month == request.resource.data.monthlyEngagement.month;
     }
 
-    // Premium automatic backup snapshots. These mirror the current open users
-    // trust model until Firebase Auth ownership rules are introduced.
-    match /users/{userId}/premiumBackups/{backupId} {
-      allow read, write: if true;
+    function noMonthlyScoreDecrease() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['monthlyEngagement'])
+        || !monthlyEngagementHasScore(resource.data)
+        || (
+          monthlyEngagementHasScore(request.resource.data)
+          && (
+            !sameMonthlyEngagementMonth()
+            || request.resource.data.monthlyEngagement.score >= resource.data.monthlyEngagement.score
+          )
+        );
     }
 
-    // Phase 2: FCM Prayer Push Fallback
-    // الـ app يكتب موقع وإعدادات الصلاة، Cloud Function تقرأ
-    //
-    // Phase A3 (security): schema validation — only known fields allowed,
-    // hard cap on key count to prevent doc bloat / abuse.
-    match /userPrayerSettings/{userId} {
-      allow read: if true;
-      allow write: if
-        request.resource.data.keys().hasOnly([
-          // location & calc
+    function safeUserUpdate() {
+      return signedIn()
+        && boundedDoc(100)
+        && noUserPrivilegeEscalation()
+        && noMonthlyScoreDecrease();
+    }
+
+    // User self-delete: allow if the doc's stored authUid matches the
+    // currently-signed-in Firebase Auth uid, or if the legacy doc has no
+    // authUid yet (older installs).
+    function userOwnsDoc() {
+      return signedIn() && (
+        !resource.data.keys().hasAny(['authUid'])
+        || resource.data.authUid == request.auth.uid
+      );
+    }
+
+    // Notification open-tracking write from the client. Only `openedCount`,
+    // `openedAt`, and `updatedAt` may be touched — nothing else.
+    function notificationOpenWriteOnly() {
+      return signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'openedCount', 'openedAt', 'updatedAt'
+        ]);
+    }
+
+    function safeQuestionPayload() {
+      return request.resource.data.keys().hasOnly([
+          'userName',
+          'userEmail',
+          'question',
+          'status',
+          'createdAt',
+          'userId',
+          'registeredName',
+          'platform',
+          'language',
+          'requestMode',
+          'fcmToken'
+        ])
+        && request.resource.data.question is string
+        && request.resource.data.question.size() <= 4000
+        && request.resource.data.userEmail is string
+        && request.resource.data.userEmail.size() <= 320
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 120;
+    }
+
+    function safeQuestionCreate() {
+      return signedIn() && safeQuestionPayload();
+    }
+
+    function safeSuggestionCreate() {
+      return signedIn()
+        && boundedDoc(20);
+    }
+
+    function safeUserPrayerSettings() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
           'latitude', 'longitude', 'city', 'timezone',
           'timezoneOffsetMinutes', 'calculationMethod', 'madhab',
           'asrJuristic', 'adjustments',
-          // adjustments
           'fajrAdjust', 'sunriseAdjust', 'dhuhrAdjust',
           'asrAdjust', 'maghribAdjust', 'ishaAdjust',
-          // toggles
           'enabled', 'disabled', 'notifyFajr', 'notifySunrise', 'notifyDhuhr',
           'notifyAsr', 'notifyMaghrib', 'notifyIsha',
-          // sounds (per-prayer)
           'soundFajr', 'soundDhuhr', 'soundAsr', 'soundMaghrib', 'soundIsha',
-          // metadata
           'fcmToken', 'language', 'country', 'updatedAt', 'localNotificationsActiveAt',
           'localScheduleDays', 'localScheduleExpiresAt', 'refreshReminderAt',
           'nextPrayerAt', 'nextPrayerKey', 'fallbackEnabled',
@@ -107,292 +150,338 @@ service cloud.firestore {
         ])
         && request.resource.data.size() <= 32;
     }
-    // dedupe records — Cloud Function only
+
+    function safeCommentCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 500
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 80;
+    }
+
+    // Admin auth material is server-only.
+    match /appConfig/adminAuth {
+      allow read, write: if false;
+    }
+
+    // Public read, admin/server write content.
+    match /websitePages/{pageId} {
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
+    match /appConfig/{docId} {
+      allow read: if docId != 'adminAuth';
+      allow write: if docId != 'adminAuth' && adminWrite();
+    }
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
+    match /tempPages/{pageId} {
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
+    match /stats/{docId} {
+      allow read: if isAdmin();
+      allow create, update: if signedIn() && boundedDoc(40);
+      allow delete: if adminWrite();
+    }
+
+    match /activity/{docId} {
+      allow read: if isAdmin();
+      allow create, update: if signedIn() && boundedDoc(40);
+      allow delete: if adminWrite();
+    }
+
+    // Legacy mobile builds read the leaderboard directly from `users` before
+    // Firebase Auth is guaranteed to be ready. Keep reads public until the app
+    // moves to a sanitized public leaderboard collection; writes stay locked.
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if safeUserCreate() || adminWrite();
+      allow update: if safeUserUpdate() || adminWrite();
+      allow delete: if userOwnsDoc() || adminWrite();
+    }
+
+    match /users/{userId}/premiumBackups/{backupId} {
+      allow read, create, update: if signedIn() || adminWrite();
+      allow delete: if adminWrite();
+    }
+
+    match /userPrayerSettings/{userId} {
+      allow read: if isAdmin();
+      allow create, update: if safeUserPrayerSettings() || adminWrite();
+      allow delete: if adminWrite();
+    }
+
     match /fcmPrayerSent/{docId} {
       allow read, write: if false;
     }
 
-    // Phase 9: Notification telemetry — app writes its own report (no PII)
-    //
-    // Phase A3 (security): cap keys to prevent abuse / billing impact.
-    // Allowed top-level fields are loose because telemetry stores nested
-    // counters per channel + per category, but the overall key count
-    // must stay sane.
     match /notificationTelemetry/{userId} {
-      allow read: if true;
-      allow write: if request.resource.data.size() <= 50;
+      allow read: if isAdmin();
+      allow create, update: if signedIn() && request.resource.data.size() <= 50;
+      allow delete: if adminWrite();
     }
 
-    // Notifications - history and tracking from admin panel
-    //
-    // Phase A3: app should NEVER write to this collection (only the admin
-    // panel does, via direct Firestore writes from the browser session).
-    // We can't enforce admin-only without Firebase Auth on the admin side,
-    // so this stays open for now and will be locked down in B0.5 once the
-    // admin write proxy lands. App reads are safe (history viewing).
     match /notifications/{docId} {
-      allow read, write: if true;
+      allow read: if signedIn() || isAdmin();
+      // Admin writes everything; clients may only bump open-tracking fields
+      // on existing notification docs (no create, no delete).
+      allow create, delete: if adminWrite();
+      allow update: if adminWrite() || notificationOpenWriteOnly();
     }
 
-    // Radio stations - public read, admin write
     match /admin_radio_stations/{stationId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── Sound System ────────────────────────────────────────────
-    // Custom uploaded sounds (library) — admin uploads, app reads URLs
     match /sounds/{soundId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // Pending uploaded sounds for next build — admin only
     match /uploadedSounds/{soundId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── Seasonal Content ────────────────────────────────────────
-    // Seasonal banners, Ramadan/Hajj content — admin writes, app reads
     match /seasonalContent/{contentId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── Calendar & Events ───────────────────────────────────────
-    // Islamic events (Eid, Ramadan start, etc.)
-    // Admin panel writes from browser (no Firebase Auth) — same trust
-    // model as azkar/duas/dailyDhikr (locked down later via Netlify proxy).
     match /islamicEvents/{eventId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // Islamic event notification cron history. The Netlify cron writes these
-    // with a service account; the admin panel reads them from the browser.
     match /eventNotificationRuns/{runId} {
-      allow read, write: if true;
+      allow read: if isAdmin();
+      allow write: if adminWrite();
     }
 
-    // Per-user de-dupe log for Islamic event notifications.
     match /eventNotificationLog/{logId} {
-      allow read, write: if true;
+      allow read: if isAdmin();
+      allow write: if adminWrite();
     }
 
-    // Hijri date overrides/corrections
     match /hijri_overrides/{overrideId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── Admin Content Collections ───────────────────────────────
-    // PDF templates - admin managed
     match /pdfTemplates/{templateId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // PDF uploads
     match /pdfUploads/{uploadId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // Theme PDFs config
     match /themePdfs/{docId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // App content and daily content editors
     match /appContent/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
     match /dailyContent/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // Theme background editor
     match /backgrounds/{backgroundId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // Translation overrides and SDUI screens
     match /translationOverrides/{overrideId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // Remote UI translation packs (per language) — app reads, admin writes
     match /translations/{lang} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
     match /sdui_screens/{screenId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // Daily Dhikr - admin managed content
     match /dailyDhikr/{dhikrId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // Tasbih presets - admin managed
+    match /dailyWisdomStories/{storyId} {
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
+    match /splashScreens/{screenId} {
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
     match /tasbihPresets/{presetId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── Azkar & Duas (admin-managed content) ───────────────────
-    // Adhkar content — app reads, admin panel writes (no Firebase Auth on admin).
-    // Same trust model as other admin-content collections (open write, will be
-    // locked down in Phase B0.5 via Netlify proxy).
     match /azkar/{zikrId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
+    match /azkar_categories/{categoryId} {
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
     match /duas/{duaId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
     match /selectedDuas/{duaId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── User Cloud Backups ─────────────────────────────────
-    // Per-user backup metadata, keyed by OAuth openId.
-    // Users can only read/write their own backup document.
     match /userBackups/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn() && (
+        request.auth.uid == userId
+        || resource.data.openId == userId
+      );
+      allow create, update: if signedIn()
+        && request.resource.data.openId == userId
+        && request.resource.data.size() <= 12;
+      allow delete: if signedIn() && (
+        request.auth.uid == userId
+        || resource.data.openId == userId
+      );
     }
 
-    // Suggestions — anyone can create, anyone can read (admin panel uses custom auth)
     match /suggestions/{docId} {
-      allow read, create: if true;
-      allow delete: if true;
+      allow create: if safeSuggestionCreate();
+      allow read, update, delete: if isAdmin();
     }
 
-    // ─── Photo Backgrounds ──────────────────────────────────────
-    // Photo backgrounds for app wallpapers — admin writes, app reads
     match /photoBackgrounds/{photoId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // Photo background categories config
     match /photoBackgroundCategories/{catId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // ─── Purchase History ────────────────────────────────────────
-    // User purchases subcollection — app writes, admin reads.
-    // Collection group queries require a recursive rule for every `purchases`
-    // subcollection, not only the direct `users/{userId}/purchases` path.
     match /{path=**}/purchases/{purchaseId} {
-      allow read, write: if true;
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
-    // Direct user purchases path kept for clarity and backwards-compatible
-    // direct reads/writes from older clients.
     match /users/{userId}/purchases/{purchaseId} {
-      allow read, write: if true;
+      allow read: if signedIn() || isAdmin();
+      allow create: if signedIn() && boundedDoc(40);
+      allow update, delete: if adminWrite();
     }
 
-    // Q&A Content (read by app, managed by admin SDK)
     match /qaContent/{docId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if adminWrite();
     }
 
-    // User-submitted questions (app creates, admin reads/updates)
     match /userQuestions/{docId} {
-      allow create: if true;
-      allow read, update, delete: if true;
+      // App listens to the single created question doc for the answer. Do not
+      // allow public list queries, which would expose all user questions.
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if safeQuestionCreate() || safeQuestionPayload();
+      allow update, delete: if isAdmin();
     }
 
-    // ─── Story Social Interactions ─────────────────────────────
-    // Likes + comments + reports on Prophet stories, Companions, Seerah.
-    // Follows the same open-trust model as the rest of the app (no Firebase
-    // Auth on the mobile client). Caps protect against doc bloat and abuse.
-    // Admin moderation (hide/delete/ban) goes through the same path; locking
-    // down to admin-only is deferred to Phase B0.5 alongside the rest of the
-    // admin write surface.
     match /storyInteractions/{storyId} {
       allow read: if true;
-      allow write: if request.resource.data.size() <= 12;
+      allow create, update: if signedIn() && request.resource.data.size() <= 12;
+      allow delete: if adminWrite();
     }
 
-    // Likes — one doc per (story, user). Keyed by userId for cheap toggle.
     match /storyInteractions/{storyId}/likes/{userId} {
       allow read: if true;
-      allow write: if request.resource == null
-        || request.resource.data.size() <= 5;
+      allow create: if signedIn() && request.resource.data.size() <= 5;
+      allow delete: if signedIn() || adminWrite();
+      allow update: if false;
     }
 
-    // Comments — text is bounded at 500 chars; we cap field count + raw size.
     match /storyInteractions/{storyId}/comments/{commentId} {
       allow read: if true;
-      allow create: if
-        request.resource.data.keys().hasOnly([
-          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount'
-        ])
-        && request.resource.data.text is string
-        && request.resource.data.text.size() <= 500
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 80;
-      allow update, delete: if true;
+      allow create: if safeCommentCreate();
+      // Admin moderates; users can delete their own (client checks ownership
+      // via stored userId before deleting — Firestore can't verify because
+      // the doc's userId is the device-generated id, not the Firebase Auth uid).
+      allow delete: if signedIn() || adminWrite();
+      // Updates: admin moderation OR client incrementing `reportCount` only.
+      allow update: if adminWrite() || (
+        signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'replyCount'])
+      );
     }
 
-    // Collection-group read for the admin moderation queue. Firestore requires
-    // a {path=**}/comments/{id} wildcard rule for collectionGroup('comments')
-    // queries to be authorized — the nested rule above alone is not enough.
     match /{path=**}/comments/{commentId} {
-      allow read: if true;
+      allow read: if isAdmin();
     }
 
-    // Reports — one doc per (comment, reporting user).
     match /storyInteractions/{storyId}/comments/{commentId}/reports/{userId} {
-      allow read: if true;
-      allow write: if request.resource == null
-        || request.resource.data.size() <= 5;
+      allow read: if isAdmin();
+      allow create: if signedIn() && request.resource.data.size() <= 5;
+      allow delete: if signedIn() || adminWrite();
+      allow update: if false;
     }
 
-    // Replies — threaded discussion under a comment. Same validation shape
-    // as top-level comments; replyCount on the parent is denormalized so the
-    // mobile UI can show "Show replies (N)" without scanning this collection.
     match /storyInteractions/{storyId}/comments/{commentId}/replies/{replyId} {
       allow read: if true;
-      allow create: if
-        request.resource.data.keys().hasOnly([
-          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount'
-        ])
-        && request.resource.data.text is string
-        && request.resource.data.text.size() <= 500
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 80;
-      allow update, delete: if true;
+      allow create: if safeCommentCreate();
+      allow delete: if signedIn() || adminWrite();
+      allow update: if adminWrite() || (
+        signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount'])
+      );
     }
 
-    // Collection-group read for admin moderation of replies.
     match /{path=**}/replies/{replyId} {
-      allow read: if true;
+      allow read: if isAdmin();
     }
 
-    // Reports on replies — one doc per (reply, reporting user).
     match /storyInteractions/{storyId}/comments/{commentId}/replies/{replyId}/reports/{userId} {
-      allow read: if true;
-      allow write: if request.resource == null
-        || request.resource.data.size() <= 5;
+      allow read: if isAdmin();
+      allow create: if signedIn() && request.resource.data.size() <= 5;
+      allow delete: if signedIn() || adminWrite();
+      allow update: if false;
     }
 
-    // User bans — admin-controlled (writes happen from admin panel today,
-    // same trust model as the rest of admin writes).
     match /userBans/{userId} {
-      allow read: if true;
-      allow write: if request.resource == null
-        || request.resource.data.size() <= 6;
+      allow read: if signedIn();
+      allow write: if adminWrite();
     }
 
-    // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;
     }
