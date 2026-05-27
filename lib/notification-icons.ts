@@ -1,7 +1,8 @@
 /**
  * Notification Icons — أيقونات الإشعارات
  *
- * Maps iconType strings (used in notification data) to bundled icon assets.
+ * Resolves notification icon requests to bundled icon assets.
+ * The current policy keeps notifications on the primary app icon.
  * On iOS, resolves them to local file URIs for use as notification attachments.
  * On Android, icons are handled natively via the with-notification-icons plugin.
  */
@@ -9,9 +10,11 @@
 import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 import type { NotificationContentAttachmentIos } from 'expo-notifications';
+import { resolveNotificationIconType } from './notification-icon-policy';
 
 // ─── Icon Type → Asset Map ───────────────────────────────────────────────────
 const NOTIFICATION_ICON_MAP: Record<string, number> = {
+  app_primary: require('../assets/images/icons/icon.png'),
   morning: require('../assets/images/notification-icons/notif_icon_morning.png'),
   evening: require('../assets/images/notification-icons/notif_icon_evening.png'),
   moon: require('../assets/images/notification-icons/notif_icon_moon.png'),
@@ -50,21 +53,23 @@ export async function ensureNotificationIconsCached(): Promise<void> {
 }
 
 /**
- * Get local file URI for a notification icon type.
+ * Get local file URI for the effective notification icon type.
  * Returns null if the icon isn't found or isn't cached yet.
  */
 async function getIconLocalUri(iconType: string): Promise<string | null> {
-  // Return from cache if available
-  if (_uriCache[iconType]) return _uriCache[iconType];
+  const effectiveIconType = resolveNotificationIconType(iconType);
 
-  const module = NOTIFICATION_ICON_MAP[iconType];
+  // Return from cache if available
+  if (_uriCache[effectiveIconType]) return _uriCache[effectiveIconType];
+
+  const module = NOTIFICATION_ICON_MAP[effectiveIconType];
   if (!module) return null;
 
   try {
     const asset = Asset.fromModule(module);
     await asset.downloadAsync();
     if (asset.localUri) {
-      _uriCache[iconType] = asset.localUri;
+      _uriCache[effectiveIconType] = asset.localUri;
       return asset.localUri;
     }
   } catch {}
@@ -72,20 +77,21 @@ async function getIconLocalUri(iconType: string): Promise<string | null> {
 }
 
 /**
- * Build iOS notification attachments for the given iconType.
+ * Build iOS notification attachments using the primary app icon.
  * Returns undefined on Android (handled natively) or if icon resolution fails.
  */
 export async function getNotificationIconAttachment(
   iconType?: string
 ): Promise<NotificationContentAttachmentIos[] | undefined> {
-  if (Platform.OS !== 'ios' || !iconType) return undefined;
+  if (Platform.OS !== 'ios') return undefined;
 
-  const localUri = await getIconLocalUri(iconType);
+  const effectiveIconType = resolveNotificationIconType(iconType);
+  const localUri = await getIconLocalUri(effectiveIconType);
   if (!localUri) return undefined;
 
   return [
     {
-      identifier: `notif_icon_${iconType}`,
+      identifier: `notif_icon_${effectiveIconType}`,
       url: localUri,
       type: 'public.png',
     },

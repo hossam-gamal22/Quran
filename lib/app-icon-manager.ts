@@ -3,13 +3,15 @@
 // NOTE: expo-dynamic-app-icon is only available in EAS dev/production builds, NOT Expo Go.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
+import { Alert, AppState, type AppStateStatus, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { isRTL, getLanguage } from '@/lib/i18n';
 import type { Language } from '@/constants/translations';
 import type { SeasonType } from '@/lib/seasonal-content';
+import { buildAndroidLauncherIconRequest } from '@/lib/android-launcher-icon-request';
+import { RoohLauncherIcon } from '@/modules/rooh-launcher-icon';
 
 // True when running inside Expo Go (no compiled native modules).
 // SDK 54: `Constants.appOwnership` is deprecated and may be null even in Expo Go,
@@ -20,6 +22,7 @@ const IS_EXPO_GO =
 
 const ICON_STORAGE_KEY = '@app_icon_variant';
 const ICON_VERSION_KEY = '@app_icon_version';
+const ICON_PENDING_KEY = '@app_icon_pending';
 const ENGLISH_ICON = 'app_icon_english';
 
 // ─── Types ──────────────────────────────────────────────
@@ -179,8 +182,8 @@ const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
   'mawlid',
   'ashura',
   'ramadan',
-  'hajj',
   'dhul_hijjah',
+  'hajj',
   'muharram',
   'rajab',
   'shaban',
@@ -192,231 +195,6 @@ interface DynamicIconModule {
   setAppIcon?: (name: string | null) => string | false;
   getAppIcon?: () => string;
 }
-
-type IconExplanationText = {
-  title: string;
-  languageMessage: string;
-  seasonMessage: string;
-  ok: string;
-};
-
-const ICON_EXPLANATION_TEXT: Record<Language, IconExplanationText> = {
-  ar: {
-    title: 'تحديث أيقونة التطبيق',
-    languageMessage: 'تم تغيير أيقونة التطبيق لتناسب لغة التطبيق الحالية.',
-    seasonMessage: 'تم تغيير أيقونة التطبيق بمناسبة {season} حتى تعكس هذه المناسبة.',
-    ok: 'حسناً',
-  },
-  en: {
-    title: 'App Icon Updated',
-    languageMessage: 'The app icon was changed to match your current app language.',
-    seasonMessage: 'The app icon was changed for {season}, so it reflects this occasion.',
-    ok: 'OK',
-  },
-  fr: {
-    title: "Icône de l'app mise à jour",
-    languageMessage: "L'icône de l'app a été changée pour correspondre à la langue actuelle.",
-    seasonMessage: "L'icône de l'app a été changée pour {season}, afin de refléter cette occasion.",
-    ok: "D'accord",
-  },
-  de: {
-    title: 'App-Symbol aktualisiert',
-    languageMessage: 'Das App-Symbol wurde an die aktuelle App-Sprache angepasst.',
-    seasonMessage: 'Das App-Symbol wurde zu {season} geändert, damit es zu diesem Anlass passt.',
-    ok: 'OK',
-  },
-  es: {
-    title: 'Icono actualizado',
-    languageMessage: 'El icono de la app se cambió para coincidir con el idioma actual.',
-    seasonMessage: 'El icono de la app se cambió por {season}, para reflejar esta ocasión.',
-    ok: 'OK',
-  },
-  tr: {
-    title: 'Uygulama simgesi güncellendi',
-    languageMessage: 'Uygulama simgesi, mevcut uygulama diline uyacak şekilde değiştirildi.',
-    seasonMessage: 'Uygulama simgesi {season} için değiştirildi, böylece bu dönemi yansıtır.',
-    ok: 'Tamam',
-  },
-  ur: {
-    title: 'ایپ آئیکن اپ ڈیٹ ہو گیا',
-    languageMessage: 'ایپ آئیکن موجودہ ایپ زبان کے مطابق تبدیل کیا گیا ہے۔',
-    seasonMessage: 'ایپ آئیکن {season} کی مناسبت سے تبدیل کیا گیا ہے۔',
-    ok: 'ٹھیک ہے',
-  },
-  id: {
-    title: 'Ikon aplikasi diperbarui',
-    languageMessage: 'Ikon aplikasi diubah agar sesuai dengan bahasa aplikasi saat ini.',
-    seasonMessage: 'Ikon aplikasi diubah untuk {season}, agar mencerminkan momen ini.',
-    ok: 'OK',
-  },
-  ms: {
-    title: 'Ikon app dikemas kini',
-    languageMessage: 'Ikon app ditukar supaya sepadan dengan bahasa app semasa.',
-    seasonMessage: 'Ikon app ditukar untuk {season}, supaya mencerminkan peristiwa ini.',
-    ok: 'OK',
-  },
-  hi: {
-    title: 'ऐप आइकन अपडेट हुआ',
-    languageMessage: 'ऐप आइकन को वर्तमान ऐप भाषा से मिलाने के लिए बदला गया है।',
-    seasonMessage: '{season} के अवसर पर ऐप आइकन बदला गया है।',
-    ok: 'ठीक है',
-  },
-  bn: {
-    title: 'অ্যাপ আইকন আপডেট হয়েছে',
-    languageMessage: 'বর্তমান অ্যাপ ভাষার সাথে মিল রাখতে অ্যাপ আইকন পরিবর্তন করা হয়েছে।',
-    seasonMessage: '{season} উপলক্ষে অ্যাপ আইকন পরিবর্তন করা হয়েছে।',
-    ok: 'ঠিক আছে',
-  },
-  ru: {
-    title: 'Значок приложения обновлен',
-    languageMessage: 'Значок приложения изменен в соответствии с текущим языком приложения.',
-    seasonMessage: 'Значок приложения изменен к {season}, чтобы отразить этот период.',
-    ok: 'OK',
-  },
-};
-
-const SEASON_NAMES: Record<Exclude<SeasonType, 'none'>, Partial<Record<Language, string>>> = {
-  ramadan: {
-    ar: 'رمضان',
-    en: 'Ramadan',
-    fr: 'Ramadan',
-    de: 'Ramadan',
-    es: 'Ramadán',
-    tr: 'Ramazan',
-    ur: 'رمضان',
-    id: 'Ramadhan',
-    ms: 'Ramadan',
-    hi: 'रमज़ान',
-    bn: 'রমজান',
-    ru: 'Рамадан',
-  },
-  hajj: {
-    ar: 'موسم الحج',
-    en: 'Hajj season',
-    fr: 'la saison du Hajj',
-    de: 'die Hadsch-Saison',
-    es: 'la temporada del Hajj',
-    tr: 'Hac mevsimi',
-    ur: 'حج کے موسم',
-    id: 'musim Haji',
-    ms: 'musim Haji',
-    hi: 'हज के मौसम',
-    bn: 'হজ মৌসুম',
-    ru: 'сезону хаджа',
-  },
-  mawlid: {
-    ar: 'ذكرى المولد النبوي',
-    en: 'Mawlid an-Nabi',
-    fr: 'Mawlid an-Nabi',
-    de: 'Mawlid an-Nabi',
-    es: 'Mawlid an-Nabi',
-    tr: 'Mevlid-i Nebi',
-    ur: 'میلاد النبی',
-    id: 'Maulid Nabi',
-    ms: 'Maulidur Rasul',
-    hi: 'मीलाद उन-नबी',
-    bn: 'ঈদে মিলাদুন্নবী',
-    ru: 'Маулиду ан-Наби',
-  },
-  eid_fitr: {
-    ar: 'عيد الفطر',
-    en: 'Eid al-Fitr',
-    fr: "l'Aid al-Fitr",
-    de: 'Eid al-Fitr',
-    es: 'Eid al-Fitr',
-    tr: 'Ramazan Bayrami',
-    ur: 'عید الفطر',
-    id: 'Idul Fitri',
-    ms: 'Aidilfitri',
-    hi: 'ईद-उल-फ़ित्र',
-    bn: 'ঈদুল ফিতর',
-    ru: 'Ид аль-Фитру',
-  },
-  eid_adha: {
-    ar: 'عيد الأضحى',
-    en: 'Eid al-Adha',
-    fr: "l'Aid al-Adha",
-    de: 'Eid al-Adha',
-    es: 'Eid al-Adha',
-    tr: 'Kurban Bayrami',
-    ur: 'عید الاضحیٰ',
-    id: 'Idul Adha',
-    ms: 'Aidiladha',
-    hi: 'ईद-उल-अज़हा',
-    bn: 'ঈদুল আজহা',
-    ru: 'Ид аль-Адхе',
-  },
-  dhul_hijjah: {
-    ar: 'العشر الأوائل من ذي الحجة',
-    en: 'the first ten days of Dhul Hijjah',
-    fr: 'les dix premiers jours de Dhul Hijjah',
-    de: 'die ersten zehn Tage von Dhul-Hidscha',
-    es: 'los diez primeros días de Dhul Hijjah',
-    tr: "Zilhicce'nin ilk on günü",
-    ur: 'ذوالحجہ کے پہلے دس دن',
-    id: 'sepuluh hari pertama Dzulhijjah',
-    ms: 'sepuluh hari pertama Zulhijjah',
-    hi: 'ज़ुल हिज्जा के पहले दस दिन',
-    bn: 'যিলহজ্জের প্রথম দশ দিন',
-    ru: 'первым десяти дням Зуль-хиджи',
-  },
-  ashura: {
-    ar: 'عاشوراء',
-    en: 'Ashura',
-    fr: 'Achoura',
-    de: 'Aschura',
-    es: 'Ashura',
-    tr: 'Aşure',
-    ur: 'عاشورہ',
-    id: 'Asyura',
-    ms: 'Asyura',
-    hi: 'आशूरा',
-    bn: 'আশুরা',
-    ru: 'Ашуре',
-  },
-  muharram: {
-    ar: 'بداية العام الهجري',
-    en: 'the Hijri new year',
-    fr: "le nouvel an de l'Hégire",
-    de: 'das islamische Neujahr',
-    es: 'el nuevo año hijri',
-    tr: 'Hicri yeni yıl',
-    ur: 'ہجری نئے سال',
-    id: 'tahun baru Hijriah',
-    ms: 'tahun baru Hijrah',
-    hi: 'हिजरी नए साल',
-    bn: 'হিজরি নববর্ষ',
-    ru: 'новому году хиджры',
-  },
-  rajab: {
-    ar: 'شهر رجب',
-    en: 'Rajab',
-    fr: 'Rajab',
-    de: 'Radschab',
-    es: 'Rajab',
-    tr: 'Recep ayı',
-    ur: 'رجب',
-    id: 'Rajab',
-    ms: 'Rejab',
-    hi: 'रजब',
-    bn: 'রজব',
-    ru: 'Раджабу',
-  },
-  shaban: {
-    ar: 'شهر شعبان',
-    en: 'Shaban',
-    fr: 'Chaabane',
-    de: 'Schaban',
-    es: 'Shaban',
-    tr: 'Şaban ayı',
-    ur: 'شعبان',
-    id: 'Syaban',
-    ms: 'Syaaban',
-    hi: 'शाबान',
-    bn: 'শাবান',
-    ru: 'Шаабану',
-  },
-};
 
 // Probe the underlying native module via expo-modules-core BEFORE requiring the
 // JS wrapper. `requireOptionalNativeModule` returns null without throwing or
@@ -454,95 +232,25 @@ function loadIconModule(): DynamicIconModule | null {
   }
 }
 
-function getIconExplanationText(lang: Language): IconExplanationText {
-  return ICON_EXPLANATION_TEXT[lang] ?? ICON_EXPLANATION_TEXT.en;
-}
-
-function getSeasonName(seasonType: Exclude<SeasonType, 'none'>, lang: Language): string {
-  const names = SEASON_NAMES[seasonType];
-  return names?.[lang] || (isRTL(lang) ? names?.ar : names?.en) || seasonType;
-}
-
-function buildIconChangeExplanation(
-  key: SeasonalIconKey,
-  lang: Language,
-  seasonType: Exclude<SeasonType, 'none'> | null
-): { title: string; message: string; ok: string } {
-  const text = getIconExplanationText(lang);
-  const usesSeasonalIcon = key !== 'default_ar' && key !== 'default_en';
-  const seasonName = usesSeasonalIcon && seasonType ? getSeasonName(seasonType, lang) : null;
-  const message = seasonName
-    ? text.seasonMessage.replace('{season}', seasonName)
-    : text.languageMessage;
-
-  return {
-    title: text.title,
-    message,
-    ok: text.ok,
-  };
-}
-
 async function isIconAlreadyActive(key: SeasonalIconKey): Promise<boolean> {
   const stored = await AsyncStorage.getItem(ICON_STORAGE_KEY);
-  if (stored === key) return true;
+  if (stored !== key) return false;
 
+  // Android: AsyncStorage is the source of truth (the native helper has no
+  // reliable "current alias" introspection — we set it ourselves on toggle).
+  if (Platform.OS === 'android') return true;
+
+  // iOS: verify against the live native state in case the user reset it via
+  // system settings or a previous switch silently failed.
   const mod = loadIconModule();
   if (!mod?.getAppIcon) return true;
-
   try {
     const nativeCurrent = mod.getAppIcon();
     const expectedNative = toNativeIconName(key) ?? 'DEFAULT';
-    if (nativeCurrent === expectedNative) {
-      await AsyncStorage.setItem(ICON_STORAGE_KEY, key);
-      return true;
-    }
-  } catch (e) {
-    if (__DEV__) console.log('📱 getAppIcon failed while checking active icon:', e);
+    return nativeCurrent === expectedNative;
+  } catch {
     return true;
   }
-
-  return false;
-}
-
-let iconChangeAlertInFlight: Promise<void> | null = null;
-
-async function setIconWithExplanation(
-  key: SeasonalIconKey,
-  language: Language,
-  seasonType: Exclude<SeasonType, 'none'> | null,
-  versionToMark?: number
-): Promise<void> {
-  if (await isIconAlreadyActive(key)) return;
-
-  if (iconChangeAlertInFlight) {
-    await iconChangeAlertInFlight;
-    return;
-  }
-
-  const explanation = buildIconChangeExplanation(key, language, seasonType);
-  iconChangeAlertInFlight = new Promise<void>((resolve) => {
-    Alert.alert(
-      explanation.title,
-      explanation.message,
-      [
-        {
-          text: explanation.ok,
-          onPress: async () => {
-            await setSeasonalIcon(key);
-            if (versionToMark) {
-              await AsyncStorage.setItem(ICON_VERSION_KEY, String(versionToMark));
-            }
-            resolve();
-          },
-        },
-      ],
-      { cancelable: false }
-    );
-  }).finally(() => {
-    iconChangeAlertInFlight = null;
-  });
-
-  await iconChangeAlertInFlight;
 }
 
 /**
@@ -601,15 +309,56 @@ export function pickPrioritySeason(activeSeasons: SeasonType[]): SeasonType | nu
   return null;
 }
 
+// ─── Core switch ────────────────────────────────────────
+
 /**
- * Apply a seasonal icon. Skips the native call (and the iOS system dialog)
- * if the desired icon is already active.
+ * Perform the native icon switch immediately.
+ *
+ * killAppOnAndroid:
+ *   - false (default): toggles activity-aliases with DONT_KILL_APP — smooth in
+ *     the current session but OEM launchers (MIUI, EMUI, One UI) often cache
+ *     the icon and won't refresh until reboot. Suitable when we want to update
+ *     AsyncStorage state without disturbing the user.
+ *   - true: omits DONT_KILL_APP — Android terminates the process after the
+ *     alias toggle, forcing the launcher to re-query on next launch. Required
+ *     for OEM launchers to actually pick up the new icon. Caller MUST ensure
+ *     the app is in background, otherwise it'll kill an active user session.
  */
-export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
+async function applyAppIconNow(
+  key: SeasonalIconKey,
+  killAppOnAndroid: boolean
+): Promise<void> {
   try {
     const stored = await AsyncStorage.getItem(ICON_STORAGE_KEY);
-    if (stored === key) return; // nothing to do
 
+    if (Platform.OS === 'android') {
+      const request = buildAndroidLauncherIconRequest(key);
+      if (RoohLauncherIcon?.setLauncherIcon) {
+        try {
+          const result = RoohLauncherIcon.setLauncherIcon(
+            request.targetIconName,
+            request.aliases,
+            killAppOnAndroid
+          );
+          if (result !== false) {
+            await AsyncStorage.setItem(ICON_STORAGE_KEY, key);
+            await AsyncStorage.removeItem(ICON_PENDING_KEY);
+            if (__DEV__) {
+              console.log(
+                `📱 Android launcher icon → ${key} (killApp=${killAppOnAndroid})`
+              );
+            }
+            return;
+          }
+        } catch (e) {
+          if (__DEV__) console.log('📱 Android launcher icon toggle failed:', e);
+        }
+      }
+    } else if (stored === key) {
+      return; // iOS: nothing to do
+    }
+
+    // iOS path (and Android fallback if RoohLauncherIcon is unavailable).
     const mod = loadIconModule();
     if (!mod?.setAppIcon || !mod.getAppIcon) return;
 
@@ -626,6 +375,7 @@ export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
     const expectedNative = nativeName ?? 'DEFAULT';
     if (nativeCurrent === expectedNative) {
       await AsyncStorage.setItem(ICON_STORAGE_KEY, key);
+      await AsyncStorage.removeItem(ICON_PENDING_KEY);
       return;
     }
 
@@ -639,16 +389,98 @@ export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
 
     if (result !== false) {
       await AsyncStorage.setItem(ICON_STORAGE_KEY, key);
+      await AsyncStorage.removeItem(ICON_PENDING_KEY);
       if (__DEV__) console.log(`📱 App icon switched to: ${key}`);
     }
   } catch (e) {
-    if (__DEV__) console.log('📱 setSeasonalIcon failed:', e);
+    if (__DEV__) console.log('📱 applyAppIconNow failed:', e);
   }
+}
+
+// ─── Android AppState deferral ─────────────────────────
+//
+// On Android with OEM launchers (MIUI, EMUI, One UI), the only reliable way to
+// make the launcher pick up the new icon is to kill the app process after the
+// alias toggle (so the launcher re-queries on next launch). We can't kill while
+// the user is actively in the app, so we register a one-shot AppState listener
+// that performs the toggle the moment the app goes to background or inactive.
+//
+// In the same session we coalesce: the last requested key wins, and we never
+// register more than one listener.
+
+let pendingDeferredKey: SeasonalIconKey | null = null;
+let deferredListenerSub: { remove: () => void } | null = null;
+
+function scheduleAndroidDeferredSwitch(key: SeasonalIconKey): void {
+  pendingDeferredKey = key;
+  // Persist so we can recover on the next cold start if the AppState event
+  // never fires (process gets force-killed by user / OOM / OEM cleanup).
+  void AsyncStorage.setItem(ICON_PENDING_KEY, key);
+
+  if (deferredListenerSub) return; // already armed
+
+  const handler = (state: AppStateStatus) => {
+    if (state !== 'background' && state !== 'inactive') return;
+    const sub = deferredListenerSub;
+    deferredListenerSub = null;
+    sub?.remove();
+    const target = pendingDeferredKey;
+    pendingDeferredKey = null;
+    if (!target) return;
+    // Fire-and-forget — process is about to die anyway.
+    void applyAppIconNow(target, /* killApp */ true);
+  };
+  deferredListenerSub = AppState.addEventListener('change', handler);
+}
+
+/**
+ * Public entry point used by SettingsContext and SeasonalContext.
+ *
+ * Foreground-safe:
+ *   - iOS: applies immediately (iOS will show its own system confirmation dialog).
+ *   - Android: applies the AsyncStorage normalization immediately (alias state)
+ *     and arms a deferred kill-toggle that fires when the app goes to background.
+ *     This guarantees OEM launchers refresh on next launch without killing the
+ *     user's current session.
+ */
+export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
+  if (await isIconAlreadyActive(key)) {
+    // Clear any stale pending switch from a prior session.
+    if (Platform.OS === 'android') {
+      pendingDeferredKey = null;
+      await AsyncStorage.removeItem(ICON_PENDING_KEY);
+    }
+    return;
+  }
+
+  if (Platform.OS === 'android') {
+    // 1) Toggle aliases without killing — keeps AsyncStorage in sync and
+    //    handles the (rare) launcher that picks up changes live.
+    await applyAppIconNow(key, /* killApp */ false);
+    // 2) Arm a deferred kill-toggle for OEM launchers that cache.
+    scheduleAndroidDeferredSwitch(key);
+    return;
+  }
+
+  // iOS: single immediate switch (system dialog appears).
+  await applyAppIconNow(key, /* killApp */ false);
+}
+
+/**
+ * Background-task entry point. Must NOT be called from foreground — it kills
+ * the app process on Android. Safe because the OS only invokes background
+ * tasks while the app is suspended.
+ */
+export async function setSeasonalIconForBackgroundTask(
+  key: SeasonalIconKey
+): Promise<void> {
+  if (await isIconAlreadyActive(key)) return;
+  await applyAppIconNow(key, /* killApp */ Platform.OS === 'android');
 }
 
 /**
  * Legacy: switch icon based purely on language. Still used by SettingsContext
- * when the user changes language. Internally now delegates to setSeasonalIcon.
+ * when the user changes language.
  */
 export async function switchAppIcon(language: Language): Promise<void> {
   try {
@@ -680,6 +512,10 @@ export async function loadAppIconsConfig(force = false): Promise<AppIconsConfig 
 /**
  * Sync the app icon on startup.
  * Reads remote config, current season, and language to pick the right icon.
+ *
+ * On Android, if a previous session armed a deferred kill-toggle that never
+ * fired (e.g. user force-killed the app), we drain it here before the new
+ * resolution — preventing two switches in a row.
  */
 export async function syncAppIconOnStartup(
   language: Language,
@@ -688,10 +524,27 @@ export async function syncAppIconOnStartup(
 ): Promise<void> {
   const config = await loadAppIconsConfig(forceConfigRefresh);
   const target = resolveActiveIcon(config, currentSeason, language);
-  const seasonalType = currentSeason && currentSeason !== 'none'
-    ? (currentSeason as Exclude<SeasonType, 'none'>)
-    : null;
-  await setIconWithExplanation(target, language, seasonalType, config?.version);
+  await setSeasonalIcon(target);
+  if (config?.version) {
+    await AsyncStorage.setItem(ICON_VERSION_KEY, String(config.version));
+  }
+}
+
+/**
+ * Background-task variant of the startup sync. Resolves the desired icon and
+ * applies it immediately (killing the process on Android). The OS invokes this
+ * only while the app is suspended, so killing is safe.
+ */
+export async function syncAppIconForBackgroundTask(
+  language: Language,
+  currentSeason: SeasonType | null = null
+): Promise<void> {
+  const config = await loadAppIconsConfig(true);
+  const target = resolveActiveIcon(config, currentSeason, language);
+  await setSeasonalIconForBackgroundTask(target);
+  if (config?.version) {
+    await AsyncStorage.setItem(ICON_VERSION_KEY, String(config.version));
+  }
 }
 
 // ─── Update notification (multilingual) ─────────────────
@@ -733,8 +586,9 @@ function pickSeasonalLocalizedText(
 }
 
 /**
- * Check Firestore for app icon updates.
- * If a new version is detected and alerting is enabled, show a localized alert.
+ * Check Firestore for app icon updates pushed from the admin panel.
+ * Shows a single localized alert (admin-driven announcement) and applies the
+ * resolved icon. Idempotent across launches via ICON_VERSION_KEY.
  */
 export async function checkForIconUpdate(): Promise<void> {
   try {
@@ -752,10 +606,9 @@ export async function checkForIconUpdate(): Promise<void> {
       ? (currentSeason as Exclude<SeasonType, 'none'>)
       : null;
     const targetIcon = resolveActiveIcon(data, seasonalType, lang);
-    if (!(await isIconAlreadyActive(targetIcon))) {
-      await setIconWithExplanation(targetIcon, lang, seasonalType, data.version);
-      return;
-    }
+
+    // Always trigger the switch — setSeasonalIcon will no-op if already active.
+    await setSeasonalIcon(targetIcon);
 
     const usesSeasonalIcon = targetIcon !== 'default_ar' && targetIcon !== 'default_en';
     const seasonalTitle = usesSeasonalIcon
