@@ -31,6 +31,7 @@ import {
   getDefaultSeasonalPageContent,
   getDefaultSeasonsMetadata,
 } from '../data/seasonal-defaults';
+import { getArabicSeasonalBannerCopy } from '@app-lib/seasonal-banner-copy';
 
 // ─── Types (mirror lib/content-api.ts) ──────────────────────────────────
 
@@ -557,6 +558,28 @@ const hasUsableDate = (date?: { month: number; day: number }) => (
   Boolean(date && date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 30)
 );
 
+const withUnifiedSeasonMetaCopy = (key: string, meta: AdminSeasonMeta): AdminSeasonMeta => {
+  const copy = getArabicSeasonalBannerCopy(key);
+  if (!copy) return meta;
+
+  return {
+    ...meta,
+    nameAr: copy.title || meta.nameAr,
+    description: copy.subtitle,
+    greetings: [copy.subtitle],
+  };
+};
+
+const withUnifiedSeasonsMetadataCopy = (data: SeasonsMetadata): SeasonsMetadata => ({
+  ...data,
+  seasons: Object.fromEntries(
+    Object.entries(data.seasons || {}).map(([key, season]) => [
+      key,
+      withUnifiedSeasonMetaCopy(key, season),
+    ])
+  ),
+});
+
 const withDefaultSeasonsMetadata = (data: SeasonsMetadata | null): SeasonsMetadata => {
   const defaults = getDefaultSeasonsMetadata() as SeasonsMetadata;
   if (!data?.seasons) return defaults;
@@ -604,7 +627,7 @@ const withDefaultSeasonsMetadata = (data: SeasonsMetadata | null): SeasonsMetada
     const hasPlaceholderIcon = current.icon === 'calendar' && fallback.icon !== 'calendar';
     const hasPlaceholderColor = current.color === '#2f7659' && fallback.color !== '#2f7659';
 
-    seasons[key] = {
+    seasons[key] = withUnifiedSeasonMetaCopy(key, {
       ...fallback,
       ...current,
       nameAr: current.nameAr || fallback.nameAr,
@@ -616,7 +639,7 @@ const withDefaultSeasonsMetadata = (data: SeasonsMetadata | null): SeasonsMetada
       icon: !hasPlaceholderIcon && current.icon ? current.icon : fallback.icon,
       specialDays: key === 'shaban' ? fallback.specialDays : mergeSpecialDays(current.specialDays, fallback.specialDays),
       greetings: ['rajab', 'shaban'].includes(key) ? fallback.greetings : (current.greetings?.length ? current.greetings : fallback.greetings),
-    };
+    });
   });
 
   return {
@@ -2684,10 +2707,12 @@ export default function ContentManager() {
     if (!seasonsMeta) return;
     setSaving(true);
     try {
+      const normalizedSeasonsMeta = withUnifiedSeasonsMetadataCopy(seasonsMeta);
       await setDoc(doc(db, 'appContent', 'seasonsMetadata'), sanitizeForFirestore({
-        ...seasonsMeta,
+        ...normalizedSeasonsMeta,
         updatedAt: new Date().toISOString(),
       }));
+      setSeasonsMeta(normalizedSeasonsMeta);
       setStatus({ type: 'success', message: 'تم حفظ بيانات المواسم' });
     } catch (err) {
       console.error('Save error:', err);
@@ -3567,6 +3592,7 @@ export default function ContentManager() {
 
               {seasonsMeta.seasons[activeSeasonKey] && (() => {
                 const season = seasonsMeta.seasons[activeSeasonKey];
+                const unifiedSeasonCopy = getArabicSeasonalBannerCopy(activeSeasonKey);
                 return (
                   <div className="space-y-4">
                     {/* Basic info */}
@@ -3673,18 +3699,45 @@ export default function ContentManager() {
                     {/* Greetings */}
                     <div className="border border-admin-border rounded-lg p-4 bg-admin-bg/50">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-slate-300">التحيات الموسمية ({season.greetings?.length || 0})</h3>
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-300">التحيات الموسمية ({season.greetings?.length || 0})</h3>
+                          {unifiedSeasonCopy && (
+                            <p className="text-xs text-emerald-300 mt-1">
+                              هذه التحية موحدة مع بانر الصفحة الرئيسية وسيتم حفظها كنص واحد.
+                            </p>
+                          )}
+                        </div>
                         <button
+                          disabled={Boolean(unifiedSeasonCopy)}
                           onClick={() => updateSeasonMeta(activeSeasonKey, 'greetings', [...(season.greetings || []), ''])}
-                          className="flex items-center gap-1 px-2 py-1 bg-accent-dark/20 text-accent-light rounded text-xs hover:bg-accent-dark/30"
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                            unifiedSeasonCopy
+                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                              : 'bg-accent-dark/20 text-accent-light hover:bg-accent-dark/30'
+                          }`}
                         >
                           <Plus size={12} /> إضافة
                         </button>
                       </div>
                       {(season.greetings || []).map((g, gi) => (
                         <div key={gi} className="flex items-center gap-2 mb-2">
-                          <input value={g} onChange={e => { const greetings = [...(season.greetings || [])]; greetings[gi] = e.target.value; updateSeasonMeta(activeSeasonKey, 'greetings', greetings); }} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm text-right" dir="rtl" title="نص التحية" aria-label="نص التحية" />
-                          <button onClick={() => updateSeasonMeta(activeSeasonKey, 'greetings', (season.greetings || []).filter((_, idx) => idx !== gi))} className="p-1 hover:bg-red-900/30 rounded" title="حذف التحية">
+                          <input
+                            value={unifiedSeasonCopy ? unifiedSeasonCopy.subtitle : g}
+                            readOnly={Boolean(unifiedSeasonCopy)}
+                            onChange={e => { const greetings = [...(season.greetings || [])]; greetings[gi] = e.target.value; updateSeasonMeta(activeSeasonKey, 'greetings', greetings); }}
+                            className={`flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-sm text-right ${
+                              unifiedSeasonCopy ? 'text-emerald-200' : 'text-white'
+                            }`}
+                            dir="rtl"
+                            title="نص التحية"
+                            aria-label="نص التحية"
+                          />
+                          <button
+                            disabled={Boolean(unifiedSeasonCopy)}
+                            onClick={() => updateSeasonMeta(activeSeasonKey, 'greetings', (season.greetings || []).filter((_, idx) => idx !== gi))}
+                            className={`p-1 rounded ${unifiedSeasonCopy ? 'cursor-not-allowed opacity-40' : 'hover:bg-red-900/30'}`}
+                            title="حذف التحية"
+                          >
                             <Trash2 size={14} className="text-red-400" />
                           </button>
                         </div>

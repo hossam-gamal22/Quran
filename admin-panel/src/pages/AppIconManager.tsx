@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { getArabicSeasonalBannerCopy } from '@app-lib/seasonal-banner-copy';
 import defaultArIcon from '../../../assets/images/icons/icon.png';
 import defaultEnIcon from '../../../assets/images/icons/icon_en.png';
 import ramadanIcon from '../../../assets/images/icons/seasonal/ramadan.png';
@@ -96,6 +97,11 @@ const LANGUAGES: { code: LangCode; nameAr: string; nameEn: string; rtl: boolean 
   { code: 'ru', nameAr: 'الروسية', nameEn: 'Russian', rtl: false },
 ];
 
+const seasonTitleAr = (season: SeasonName, fallback: string) =>
+  getArabicSeasonalBannerCopy(season)?.title || fallback;
+const seasonSubtitleAr = (season: SeasonName, fallback: string) =>
+  getArabicSeasonalBannerCopy(season)?.subtitle || fallback;
+
 const ICONS: { key: SeasonalIconKey; nameAr: string; nameEn: string; color: string; image: string }[] = [
   { key: 'default_ar', nameAr: 'الافتراضية (عربي)', nameEn: 'Default (AR)', color: '#0d8e62', image: defaultArIcon },
   { key: 'default_en', nameAr: 'الافتراضية (إنجليزي)', nameEn: 'Default (EN)', color: '#0d8e62', image: defaultEnIcon },
@@ -135,86 +141,86 @@ const DEFAULT_SEASONAL_MAP: Record<SeasonName, SeasonalIconKey> = {
 
 const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
   ramadan: {
-    ar: 'رمضان مبارك',
+    ar: seasonTitleAr('ramadan', 'رمضان المبارك'),
     en: 'Ramadan Mubarak',
   },
   hajj: {
-    ar: 'موسم حج مبارك',
+    ar: seasonTitleAr('hajj', 'موسم الحج'),
     en: 'Blessed Hajj Season',
   },
   dhul_hijjah: {
-    ar: 'أيام مباركة',
+    ar: seasonTitleAr('dhul_hijjah', 'العشر الأوائل من ذي الحجة'),
     en: 'Blessed Days',
   },
   eid_fitr: {
-    ar: 'عيد فطر مبارك',
+    ar: seasonTitleAr('eid_fitr', 'عيد الفطر المبارك'),
     en: 'Eid al-Fitr Mubarak',
   },
   eid_adha: {
-    ar: 'عيد أضحى مبارك',
+    ar: seasonTitleAr('eid_adha', 'عيد الأضحى المبارك'),
     en: 'Eid al-Adha Mubarak',
   },
   mawlid: {
-    ar: 'ذكرى المولد النبوي',
+    ar: seasonTitleAr('mawlid', 'ذكرى المولد النبوي'),
     en: 'Mawlid Reminder',
   },
   ashura: {
-    ar: 'يوم عاشوراء',
+    ar: seasonTitleAr('ashura', 'عاشوراء'),
     en: 'Day of Ashura',
   },
   muharram: {
-    ar: 'عام هجري مبارك',
+    ar: seasonTitleAr('muharram', 'شهر محرم'),
     en: 'Blessed Hijri Year',
   },
   rajab: {
-    ar: 'شهر رجب',
+    ar: seasonTitleAr('rajab', 'شهر رجب'),
     en: 'Rajab',
   },
   shaban: {
-    ar: 'شعبان مبارك',
+    ar: seasonTitleAr('shaban', 'شهر شعبان'),
     en: 'Blessed Shaban',
   },
 };
 
 const DEFAULT_SEASONAL_ALERT_MESSAGES: SeasonalLocalizedText = {
   ramadan: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة رمضان. كل عام وأنتم بخير، وتقبل الله منا ومنكم الصيام والقيام.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('ramadan', 'رمضان المبارك')}. ${seasonSubtitleAr('ramadan', 'شهر الصيام والقيام وتلاوة القرآن')}.`,
     en: 'The app icon has been updated for Ramadan. Ramadan Mubarak, and may Allah accept your fasting and prayers.',
   },
   hajj: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة موسم الحج. تقبل الله من الحجاج حجهم، ومنكم صالح الأعمال.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('hajj', 'موسم الحج')}. ${seasonSubtitleAr('hajj', 'الركن الخامس من أركان الإسلام')}.`,
     en: 'The app icon has been updated for Hajj season. May Allah accept the pilgrims Hajj and your good deeds.',
   },
   dhul_hijjah: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة العشر الأوائل من ذي الحجة. أكثروا فيها من الذكر والعمل الصالح.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('dhul_hijjah', 'العشر الأوائل من ذي الحجة')}. ${seasonSubtitleAr('dhul_hijjah', 'أفضل أيام الدنيا — فأكثروا من العمل الصالح')}.`,
     en: 'The app icon has been updated for the first ten days of Dhul Hijjah. May these blessed days be filled with remembrance and good deeds.',
   },
   eid_fitr: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة عيد الفطر. كل عام وأنتم بخير، وتقبل الله منا ومنكم.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('eid_fitr', 'عيد الفطر المبارك')}. ${seasonSubtitleAr('eid_fitr', 'كل عام وأنتم بخير — تقبل الله طاعتكم')}.`,
     en: 'The app icon has been updated for Eid al-Fitr. Eid Mubarak, and may Allah accept from us and from you.',
   },
   eid_adha: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة عيد الأضحى. كل عام وأنتم بخير، وتقبل الله طاعتكم.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('eid_adha', 'عيد الأضحى المبارك')}. ${seasonSubtitleAr('eid_adha', 'تقبل الله منا ومنكم صالح الأعمال')}.`,
     en: 'The app icon has been updated for Eid al-Adha. Eid Mubarak, and may Allah accept your worship.',
   },
   mawlid: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة ذكرى المولد النبوي. اللهم صل وسلم وبارك على نبينا محمد.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('mawlid', 'ذكرى المولد النبوي')}. ${seasonSubtitleAr('mawlid', 'صلوا على النبي ﷺ')}.`,
     en: 'The app icon has been updated for the Mawlid reminder. Peace and blessings be upon Prophet Muhammad.',
   },
   ashura: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة عاشوراء. تقبل الله صيامكم وصالح أعمالكم.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('ashura', 'عاشوراء')}. ${seasonSubtitleAr('ashura', 'صيامه يكفر سنة ماضية')}.`,
     en: 'The app icon has been updated for Ashura. May Allah accept your fasting and good deeds.',
   },
   muharram: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة بداية العام الهجري. نسأل الله أن يجعله عام خير وبركة.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('muharram', 'شهر محرم')}. ${seasonSubtitleAr('muharram', 'أول شهور السنة الهجرية')}.`,
     en: 'The app icon has been updated for the Hijri new year. May Allah make it a year of goodness and blessings.',
   },
   rajab: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة شهر رجب، أحد الأشهر الحرم. نسأل الله أن يبارك لنا فيه.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('rajab', 'شهر رجب')}. ${seasonSubtitleAr('rajab', 'من الأشهر الحرم — أعظِم فيه الطاعة')}.`,
     en: 'The app icon has been updated for Rajab, one of the sacred months. May Allah bless it for us.',
   },
   shaban: {
-    ar: 'تم تحديث أيقونة التطبيق بمناسبة شهر شعبان. اللهم بارك لنا فيه وبلغنا رمضان.',
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('shaban', 'شهر شعبان')}. ${seasonSubtitleAr('shaban', 'اللهم بلِّغنا رمضان')}.`,
     en: 'The app icon has been updated for Shaban. May Allah bless it for us and let us reach Ramadan.',
   },
 };
@@ -251,8 +257,8 @@ const SEASON_PRIORITY: SeasonName[] = [
   'mawlid',
   'ashura',
   'ramadan',
-  'hajj',
   'dhul_hijjah',
+  'hajj',
   'muharram',
   'rajab',
   'shaban',
@@ -264,7 +270,7 @@ const SEASON_RANGES: Record<SeasonName, { start: { month: number; day: number };
   mawlid: { start: { month: 3, day: 12 }, end: { month: 3, day: 12 } },
   eid_fitr: { start: { month: 10, day: 1 }, end: { month: 10, day: 3 } },
   eid_adha: { start: { month: 12, day: 10 }, end: { month: 12, day: 13 } },
-  dhul_hijjah: { start: { month: 12, day: 1 }, end: { month: 12, day: 10 } },
+  dhul_hijjah: { start: { month: 12, day: 1 }, end: { month: 12, day: 9 } },
   ashura: { start: { month: 1, day: 9 }, end: { month: 1, day: 10 } },
   muharram: { start: { month: 1, day: 1 }, end: { month: 1, day: 30 } },
   rajab: { start: { month: 7, day: 1 }, end: { month: 7, day: 30 } },

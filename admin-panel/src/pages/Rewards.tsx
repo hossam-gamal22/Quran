@@ -2,9 +2,9 @@
 // صفحة إدارة المكافآت الشهرية — أفضل المستخدمين نشاطاً
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, updateDoc, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Trophy, Save, Loader2, Settings, History, Users, Gift, AlertTriangle } from 'lucide-react';
+import { Trophy, Save, Loader2, Settings, History, Users, Gift, AlertTriangle, Search, X } from 'lucide-react';
 import { sendPrizeNotification } from '../services/pushNotifications';
 
 interface ScoreWeights {
@@ -59,6 +59,7 @@ interface LeaderboardUser {
   deviceBrand?: string;
   installSource?: string;
   fcmToken?: string;
+  rank?: number;
 }
 
 const DEFAULT_CONFIG: RewardsConfig = {
@@ -114,6 +115,23 @@ const isWinnerEligible = (user: LeaderboardUser): boolean => {
   return !user.hidden && !!user.displayName?.trim();
 };
 
+const matchesLeaderboardSearch = (user: LeaderboardUser, rawTerm: string): boolean => {
+  const term = rawTerm.trim().toLowerCase();
+  if (!term) return true;
+  const fields = [
+    user.displayName,
+    user.email,
+    user.id,
+    user.platform,
+    user.deviceName,
+    user.deviceBrand,
+    user.installSource,
+    user.score,
+    user.rank,
+  ];
+  return fields.some(value => String(value || '').toLowerCase().includes(term));
+};
+
 const buildLeaderboardUsers = (
   docs: Array<{ id: string; data: () => Record<string, any> }>,
   selectedIds = new Set<string>(),
@@ -145,7 +163,13 @@ const buildLeaderboardUsers = (
     }
   });
 
-  return users;
+  users.sort((a, b) => b.score - a.score);
+
+  let visibleRank = 0;
+  return users.map(user => {
+    const rank = isWinnerEligible(user) ? ++visibleRank : undefined;
+    return { ...user, rank };
+  });
 };
 
 export default function Rewards() {
@@ -161,6 +185,7 @@ export default function Rewards() {
   const [merging, setMerging] = useState(false);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState('');
+  const [leaderboardSearch, setLeaderboardSearch] = useState('');
 
   useEffect(() => {
     const unsubscribeConfig = onSnapshot(
@@ -182,8 +207,7 @@ export default function Rewards() {
     const leaderboardQuery = query(
       usersRef,
       where('monthlyEngagement.month', '==', currentMonth),
-      orderBy('monthlyEngagement.score', 'desc'),
-      limit(50)
+      orderBy('monthlyEngagement.score', 'desc')
     );
 
     setLoadingBoard(true);
@@ -249,8 +273,7 @@ export default function Rewards() {
       const q = query(
         usersRef,
         where('monthlyEngagement.month', '==', currentMonth),
-        orderBy('monthlyEngagement.score', 'desc'),
-        limit(50)
+        orderBy('monthlyEngagement.score', 'desc')
       );
       const snapshot = await getDocs(q);
 
@@ -461,6 +484,9 @@ export default function Rewards() {
     setSaved(false);
   };
 
+  const visibleLeaderboard = leaderboard.filter(user => showHidden || !user.hidden);
+  const filteredLeaderboard = visibleLeaderboard.filter(user => matchesLeaderboardSearch(user, leaderboardSearch));
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -531,7 +557,7 @@ export default function Rewards() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-700">
-              شهر {getCurrentMonth()} — أفضل {config.winnersCount} مستخدمين
+              شهر {getCurrentMonth()} — {visibleLeaderboard.length} متسابق ظاهر
             </h2>
             <div className="flex gap-2">
               <button
@@ -563,10 +589,45 @@ export default function Rewards() {
             </div>
           </div>
 
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                type="search"
+                value={leaderboardSearch}
+                onChange={(e) => setLeaderboardSearch(e.target.value)}
+                className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                placeholder="ابحث بالاسم، ID، الجهاز، المنصة، أو النقاط..."
+                aria-label="بحث في متسابقي الشهر"
+                dir="auto"
+              />
+              {leaderboardSearch && (
+                <button
+                  onClick={() => setLeaderboardSearch('')}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  aria-label="مسح البحث"
+                  title="مسح البحث"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="mt-2 text-xs text-slate-400">
+              {leaderboardSearch.trim()
+                ? `نتائج البحث: ${filteredLeaderboard.length} من ${visibleLeaderboard.length}`
+                : `البحث يعمل على كل متسابقي الشهر الحالي، وليس أول 50 فقط.`}
+            </div>
+          </div>
+
           {leaderboard.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>لا توجد بيانات للشهر الحالي</p>
+            </div>
+          ) : filteredLeaderboard.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 bg-white rounded-xl border">
+              <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>لا توجد نتائج مطابقة للبحث</p>
             </div>
           ) : (
             <>
@@ -601,17 +662,15 @@ export default function Rewards() {
                     </tr>
                   </thead>
                   <tbody>
-                    {leaderboard
-                      .filter(u => showHidden || !u.hidden)
-                      .map((user, i) => (
+                    {filteredLeaderboard.map((user) => (
                       <tr
                         key={user.id}
                         className={`border-t ${user.selected ? 'bg-amber-50' : ''} ${user.hidden ? 'opacity-50' : ''} ${
-                          i < 3 ? 'font-medium' : ''
+                          user.rank && user.rank <= 3 ? 'font-medium' : ''
                         }`}
                       >
                         <td className="px-4 py-3">
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                          {user.rank === 1 ? '🥇' : user.rank === 2 ? '🥈' : user.rank === 3 ? '🥉' : user.rank || '-'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium flex items-center gap-1">

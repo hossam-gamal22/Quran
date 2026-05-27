@@ -1,3 +1,5 @@
+import { getArabicSeasonalBannerCopy } from '@app-lib/seasonal-banner-copy';
+
 type SeasonalPageKey = 'ramadan' | 'hajj' | 'mawlid' | 'ashura';
 
 interface CMSSeasonalDua {
@@ -68,6 +70,10 @@ interface SeasonalBannerContent {
 }
 
 const now = () => new Date().toISOString();
+const seasonTitleAr = (seasonType: string, fallback: string) =>
+  getArabicSeasonalBannerCopy(seasonType)?.title || fallback;
+const seasonSubtitleAr = (seasonType: string, fallback: string) =>
+  getArabicSeasonalBannerCopy(seasonType)?.subtitle || fallback;
 
 export function getDefaultSeasonalPageContent(page: SeasonalPageKey): SeasonalPageContent {
   const content: Record<SeasonalPageKey, SeasonalPageContent> = {
@@ -364,14 +370,14 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
     seasons: {
       ramadan: {
         type: 'ramadan',
-        nameAr: 'رمضان المبارك',
+        nameAr: seasonTitleAr('ramadan', 'رمضان المبارك'),
         nameEn: 'Ramadan',
-        description: 'شهر الصيام والقيام وتلاوة القرآن ومضاعفة الطاعات.',
+        description: seasonSubtitleAr('ramadan', 'شهر الصيام والقيام وتلاوة القرآن ومضاعفة الطاعات.'),
         startDate: { month: 9, day: 1 },
         endDate: { month: 9, day: 30 },
         color: '#0d8e62',
         icon: 'moon-waning-crescent',
-        greetings: ['رمضان مبارك', 'مبارك عليكم الشهر', 'تقبل الله صيامكم وقيامكم'],
+        greetings: [seasonSubtitleAr('ramadan', 'شهر الصيام والقيام وتلاوة القرآن')],
         specialDays: [
           {
             day: 1,
@@ -408,7 +414,7 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         endDate: { month: 12, day: 13 },
         color: '#5D4037',
         icon: 'star-crescent',
-        greetings: ['حج مبرور وسعي مشكور', 'لبيك اللهم لبيك', 'تقبل الله من الحجاج والمسلمين'],
+        greetings: [seasonSubtitleAr('hajj', 'الركن الخامس من أركان الإسلام')],
         specialDays: [
           {
             day: 8,
@@ -438,14 +444,14 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
       },
       dhul_hijjah: {
         type: 'dhul_hijjah',
-        nameAr: 'العشر الأوائل من ذي الحجة',
+        nameAr: seasonTitleAr('dhul_hijjah', 'العشر الأوائل من ذي الحجة'),
         nameEn: 'First Ten Days of Dhul Hijjah',
-        description: 'أيام فاضلة يجتمع فيها الذكر والصيام والصدقة والحج.',
+        description: seasonSubtitleAr('dhul_hijjah', 'أفضل أيام الدنيا — فأكثروا من العمل الصالح'),
         startDate: { month: 12, day: 1 },
-        endDate: { month: 12, day: 10 },
+        endDate: { month: 12, day: 9 },
         color: '#2f7659',
         icon: 'calendar-star',
-        greetings: ['أيام مباركة', 'أكثروا من التهليل والتكبير والتحميد', 'تقبل الله صالح أعمالكم'],
+        greetings: [seasonSubtitleAr('dhul_hijjah', 'أفضل أيام الدنيا — فأكثروا من العمل الصالح')],
         specialDays: [
           {
             day: 1,
@@ -474,7 +480,7 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         endDate: { month: 1, day: 10 },
         color: '#4A4A4A',
         icon: 'calendar-star',
-        greetings: ['تقبل الله صيامكم', 'يوم شكر وذكر', 'اللهم اجعلنا من الشاكرين'],
+        greetings: [seasonSubtitleAr('ashura', 'صيامه يكفر سنة ماضية')],
         specialDays: [
           {
             day: 9,
@@ -503,7 +509,7 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         endDate: { month: 3, day: 12 },
         color: '#2E8B57',
         icon: 'star-four-points',
-        greetings: ['اللهم صل وسلم على نبينا محمد', 'يوم تذكير بالسيرة والاتباع', 'صلوا عليه وسلموا تسليما'],
+        greetings: [seasonSubtitleAr('mawlid', 'صلوا على النبي ﷺ')],
         specialDays: [
           {
             day: 12,
@@ -517,14 +523,14 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
       },
       eid_fitr: {
         type: 'eid_fitr',
-        nameAr: 'عيد الفطر المبارك',
+        nameAr: seasonTitleAr('eid_fitr', 'عيد الفطر المبارك'),
         nameEn: 'Eid al-Fitr',
-        description: 'فرحة تمام الصيام وشكر الله بعد رمضان.',
+        description: seasonSubtitleAr('eid_fitr', 'كل عام وأنتم بخير — تقبل الله طاعتكم'),
         startDate: { month: 10, day: 1 },
         endDate: { month: 10, day: 3 },
         color: '#0D9488',
         icon: 'party-popper',
-        greetings: ['عيدكم مبارك', 'تقبل الله منا ومنكم', 'كل عام وأنتم بخير'],
+        greetings: [seasonSubtitleAr('eid_fitr', 'كل عام وأنتم بخير — تقبل الله طاعتكم')],
         specialDays: [
           {
             day: 1,
@@ -538,14 +544,14 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
       },
       eid_adha: {
         type: 'eid_adha',
-        nameAr: 'عيد الأضحى المبارك',
+        nameAr: seasonTitleAr('eid_adha', 'عيد الأضحى المبارك'),
         nameEn: 'Eid al-Adha',
-        description: 'عيد الحج والتكبير وأيام التشريق.',
+        description: seasonSubtitleAr('eid_adha', 'تقبل الله منا ومنكم صالح الأعمال'),
         startDate: { month: 12, day: 10 },
         endDate: { month: 12, day: 13 },
         color: '#8B5E34',
         icon: 'mosque',
-        greetings: ['عيد أضحى مبارك', 'تقبل الله طاعتكم', 'كل عام وأنتم بخير'],
+        greetings: [seasonSubtitleAr('eid_adha', 'تقبل الله منا ومنكم صالح الأعمال')],
         specialDays: [
           {
             day: 10,
@@ -566,7 +572,7 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         endDate: { month: 1, day: 30 },
         color: '#607D8B',
         icon: 'calendar-month',
-        greetings: ['عام هجري مبارك', 'اللهم اجعله عام خير وطاعة', 'بداية جديدة مع الله'],
+        greetings: [seasonSubtitleAr('muharram', 'أول شهور السنة الهجرية')],
         specialDays: [
           {
             day: 1,
@@ -595,7 +601,7 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         endDate: { month: 7, day: 30 },
         color: '#4169E1',
         icon: 'calendar-month',
-        greetings: ['رجب من الأشهر الحرم', 'شهر حرام فاعظموا فيه الطاعة'],
+        greetings: [seasonSubtitleAr('rajab', 'من الأشهر الحرم — أعظِم فيه الطاعة')],
         specialDays: [
           {
             day: 1,
@@ -616,7 +622,7 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         endDate: { month: 8, day: 30 },
         color: '#7C3AED',
         icon: 'calendar-month',
-        greetings: ['اللهم بلغنا رمضان', 'شعبان شهر الاستعداد', 'أكثر فيه النبي ﷺ من الصيام'],
+        greetings: [seasonSubtitleAr('shaban', 'اللهم بلِّغنا رمضان')],
         specialDays: [
           {
             day: 1,
@@ -639,9 +645,9 @@ export function getDefaultSeasonalBannerContent(): SeasonalBannerContent[] {
       id: 'seasonal_ramadan_default',
       seasonType: 'ramadan',
       contentType: 'greeting',
-      titleAr: 'رمضان مبارك',
+      titleAr: seasonTitleAr('ramadan', 'رمضان المبارك'),
       titleEn: 'Ramadan Mubarak',
-      contentAr: 'شهر الصيام والقرآن، اغتنم أيامه بالطاعة والدعاء.',
+      contentAr: seasonSubtitleAr('ramadan', 'شهر الصيام والقيام وتلاوة القرآن'),
       contentEn: 'A month of fasting and Quran. Make its days count with worship and dua.',
       icon: 'moon-waning-crescent',
       backgroundColor: '#0d8e62',
@@ -658,20 +664,62 @@ export function getDefaultSeasonalBannerContent(): SeasonalBannerContent[] {
     },
     {
       id: 'seasonal_dhul_hijjah_default',
-      seasonType: 'hajj',
+      seasonType: 'dhul_hijjah',
       contentType: 'reminder',
-      titleAr: 'أيام الحج المباركة',
+      titleAr: seasonTitleAr('dhul_hijjah', 'العشر الأوائل من ذي الحجة'),
       titleEn: 'Blessed Hajj Days',
-      contentAr: 'أكثر من التلبية والتكبير والدعاء في هذه الأيام العظيمة.',
+      contentAr: seasonSubtitleAr('dhul_hijjah', 'أفضل أيام الدنيا — فأكثروا من العمل الصالح'),
       contentEn: 'Increase talbiyah, takbir, and dua during these blessed days.',
       icon: 'star-crescent',
       backgroundColor: '#5D4037',
       textColor: '#ffffff',
       accentColor: '#f6d7a7',
-      startDate: '12-8',
-      endDate: '12-13',
+      startDate: '12-1',
+      endDate: '12-9',
       isHijriDate: true,
       priority: 2,
+      isActive: true,
+      targetScreen: 'seasonal/hajj',
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: 'seasonal_eid_fitr_default',
+      seasonType: 'eid_fitr',
+      contentType: 'greeting',
+      titleAr: seasonTitleAr('eid_fitr', 'عيد الفطر المبارك'),
+      titleEn: 'Eid al-Fitr Mubarak',
+      contentAr: seasonSubtitleAr('eid_fitr', 'كل عام وأنتم بخير — تقبل الله طاعتكم'),
+      contentEn: 'May Allah accept from us and from you.',
+      icon: 'party-popper',
+      backgroundColor: '#0D9488',
+      textColor: '#ffffff',
+      accentColor: '#d1fae5',
+      startDate: '10-1',
+      endDate: '10-3',
+      isHijriDate: true,
+      priority: 1,
+      isActive: true,
+      targetScreen: 'seasonal/ramadan',
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: 'seasonal_eid_adha_default',
+      seasonType: 'eid_adha',
+      contentType: 'greeting',
+      titleAr: seasonTitleAr('eid_adha', 'عيد الأضحى المبارك'),
+      titleEn: 'Eid al-Adha Mubarak',
+      contentAr: seasonSubtitleAr('eid_adha', 'تقبل الله منا ومنكم صالح الأعمال'),
+      contentEn: 'May Allah accept our good deeds and yours.',
+      icon: 'mosque',
+      backgroundColor: '#8B5E34',
+      textColor: '#ffffff',
+      accentColor: '#f6d7a7',
+      startDate: '12-10',
+      endDate: '12-13',
+      isHijriDate: true,
+      priority: 1,
       isActive: true,
       targetScreen: 'seasonal/hajj',
       createdAt,
@@ -681,9 +729,9 @@ export function getDefaultSeasonalBannerContent(): SeasonalBannerContent[] {
       id: 'seasonal_ashura_default',
       seasonType: 'ashura',
       contentType: 'reminder',
-      titleAr: 'يوم عاشوراء',
+      titleAr: seasonTitleAr('ashura', 'عاشوراء'),
       titleEn: 'Ashura',
-      contentAr: 'صيام عاشوراء سنة عظيمة، ومعه تاسوعاء لمن استطاع.',
+      contentAr: seasonSubtitleAr('ashura', 'صيامه يكفر سنة ماضية'),
       contentEn: 'Fasting Ashura is a great Sunnah; add Tasua if you can.',
       icon: 'calendar-star',
       backgroundColor: '#4A4A4A',
@@ -702,9 +750,9 @@ export function getDefaultSeasonalBannerContent(): SeasonalBannerContent[] {
       id: 'seasonal_mawlid_default',
       seasonType: 'mawlid',
       contentType: 'quote',
-      titleAr: 'صلوا عليه وسلموا تسليمًا',
+      titleAr: seasonTitleAr('mawlid', 'ذكرى المولد النبوي'),
       titleEn: 'Send Salawat Upon Him',
-      contentAr: 'اقرأ من السيرة وأكثر من الصلاة والسلام على النبي ﷺ.',
+      contentAr: seasonSubtitleAr('mawlid', 'صلوا على النبي ﷺ'),
       contentEn: 'Read from the Seerah and increase prayers upon the Prophet ﷺ.',
       icon: 'star-four-points',
       backgroundColor: '#2E8B57',
