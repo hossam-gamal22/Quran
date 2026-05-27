@@ -12,13 +12,63 @@ import {
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const DEFAULT_PUBLIC_FIREBASE_CONFIG = {
+  android: {
+    apiKey: 'AIzaSyB9DnDJnqTzy7L86W-cpZCyBr9Z7fTDsxo',
+    appId: '1:328160076358:android:5cddcc506f5bfb15c06047',
+  },
+  ios: {
+    apiKey: 'AIzaSyCy3pkmrqQz3lWYPr0b6NVoca1j5huU0Oo',
+    appId: '1:328160076358:ios:db9a9b5e809ff250c06047',
+  },
+  web: {
+    apiKey: 'AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A',
+    appId: '1:328160076358:web:fe5ec8e8b07355f1c06047',
+  },
+} as const;
+
+const getFirebaseApiKey = (): string => {
+  if (Platform.OS === 'android') {
+    return process.env.EXPO_PUBLIC_FIREBASE_API_KEY_ANDROID
+      || process.env.EXPO_PUBLIC_FIREBASE_API_KEY
+      || DEFAULT_PUBLIC_FIREBASE_CONFIG.android.apiKey;
+  }
+  if (Platform.OS === 'ios') {
+    return process.env.EXPO_PUBLIC_FIREBASE_API_KEY_IOS
+      || process.env.EXPO_PUBLIC_FIREBASE_API_KEY
+      || DEFAULT_PUBLIC_FIREBASE_CONFIG.ios.apiKey;
+  }
+  return process.env.EXPO_PUBLIC_FIREBASE_API_KEY_WEB
+    || process.env.EXPO_PUBLIC_FIREBASE_API_KEY
+    || DEFAULT_PUBLIC_FIREBASE_CONFIG.web.apiKey;
+};
+
+const getFirebaseAppId = (): string => {
+  if (Platform.OS === 'android') {
+    return process.env.EXPO_PUBLIC_FIREBASE_APP_ID_ANDROID
+      || process.env.EXPO_PUBLIC_FIREBASE_APP_ID
+      || DEFAULT_PUBLIC_FIREBASE_CONFIG.android.appId;
+  }
+  if (Platform.OS === 'ios') {
+    return process.env.EXPO_PUBLIC_FIREBASE_APP_ID_IOS
+      || process.env.EXPO_PUBLIC_FIREBASE_APP_ID
+      || DEFAULT_PUBLIC_FIREBASE_CONFIG.ios.appId;
+  }
+  return process.env.EXPO_PUBLIC_FIREBASE_APP_ID_WEB
+    || process.env.EXPO_PUBLIC_FIREBASE_APP_ID
+    || DEFAULT_PUBLIC_FIREBASE_CONFIG.web.appId;
+};
+
+const firebaseApiKey = getFirebaseApiKey();
+const firebaseAppId = getFirebaseAppId();
+
 const firebaseConfig = {
-  apiKey: 'AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A',
+  apiKey: firebaseApiKey,
   authDomain: 'rooh-almuslim.firebaseapp.com',
   projectId: 'rooh-almuslim',
   storageBucket: 'rooh-almuslim.firebasestorage.app',
   messagingSenderId: '328160076358',
-  appId: '1:328160076358:web:fe5ec8e8b07355f1c06047',
+  appId: firebaseAppId,
 };
 
 // Initialize app once

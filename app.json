@@ -307,7 +307,8 @@
           }
         }
       ],
-      "./modules/proximity-sensor/plugin"
+      "./modules/proximity-sensor/plugin",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true

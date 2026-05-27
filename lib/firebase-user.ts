@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Localization from 'expo-localization';
 import Constants from 'expo-constants';
+import { ensureFirebaseUser } from '@/config/firebase';
 
 // ==================== الثوابت ====================
 
@@ -90,6 +91,7 @@ const secureSetItem = async (key: string, value: string): Promise<void> => {
 
 export interface UserData {
   id: string;
+  authUid?: string;
   platform: 'ios' | 'android' | 'web';
   nativeDeviceId?: string;
   originalDeviceUserId?: string;
@@ -323,6 +325,10 @@ const detectInstallSource = async (): Promise<string> => {
 
 export const registerUser = async (): Promise<{ success: boolean; userId: string }> => {
   try {
+    const firebaseUser = await ensureFirebaseUser();
+    if (!firebaseUser) {
+      throw new Error('Firebase anonymous auth is required before user registration');
+    }
     const userId = await getUserId();
     const originalDeviceUserId = await getOriginalDeviceUserId();
     const nativeDeviceId = await getNativeDeviceId();
@@ -348,6 +354,7 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
       .toLowerCase();
     const userData: Partial<UserData> = {
       id: userId,
+      authUid: firebaseUser.uid,
       platform: Platform.OS as 'ios' | 'android' | 'web',
       nativeDeviceId: nativeDeviceId || originalDeviceUserId,
       originalDeviceUserId,
