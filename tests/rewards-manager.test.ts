@@ -153,6 +153,7 @@ import {
   autoSelectMonthlyWinners,
   getCurrentMonth,
   getMonthlyLeaderboard,
+  getUserMonthlyInfo,
   mergeCurrentUserIntoLeaderboard,
   syncMonthlyEngagementFromLocalWorship,
   syncPendingScores,
@@ -197,7 +198,7 @@ describe('rewards-manager monthly sync', () => {
     expect(asyncStorage.get('@pending_monthly_scores')).toBeUndefined();
   });
 
-  it('preserves higher cloud worship activity while keeping app_open and merge bonuses', async () => {
+  it('preserves higher cloud score while keeping app_open and merge bonuses', async () => {
     const month = getCurrentMonth();
     Object.assign(monthlyStats, {
       prayers: 3,
@@ -232,9 +233,9 @@ describe('rewards-manager monthly sync', () => {
       tasbih: 5,
       fasting: 1,
     });
-    expect(result?.score).toBe(631);
+    expect(result?.score).toBe(999);
     expect(result?.mergeBonus?.mergedFrom).toBe('old-user');
-    expect(firestoreState.users.get('u1')?.monthlyEngagement.score).toBe(631);
+    expect(firestoreState.users.get('u1')?.monthlyEngagement.score).toBe(999);
   });
 
   it('uploads higher local worship activity when it exceeds the cloud copy', async () => {
@@ -268,11 +269,55 @@ describe('rewards-manager monthly sync', () => {
     expect(firestoreState.users.get('u1')?.monthlyEngagement.score).toBe(148);
   });
 
+  it('does not reset existing cloud points when legacy users have no activity breakdown', async () => {
+    const month = getCurrentMonth();
+    firestoreState.users.set('legacy-points', {
+      displayName: 'Legacy Points',
+      monthlyEngagement: {
+        month,
+        score: 432,
+      },
+    });
+
+    const result = await syncMonthlyEngagementFromLocalWorship('legacy-points');
+
+    expect(result?.score).toBe(432);
+    expect(firestoreState.users.get('legacy-points')?.monthlyEngagement.score).toBe(432);
+  });
+
+  it('uses the cloud score floor for current user info when local device history is lower', async () => {
+    const month = getCurrentMonth();
+    Object.assign(monthlyStats, {
+      prayers: 0,
+      quranPages: 0,
+      khatmas: 0,
+      azkar: 1,
+      tasbih: 0,
+      fasting: 0,
+    });
+    firestoreState.users.set('me', {
+      displayName: 'Me',
+      monthlyEngagement: {
+        month,
+        score: 5357,
+        activities: { azkar: 1 },
+      },
+    });
+
+    const result = await getUserMonthlyInfo('me');
+
+    expect(result?.score).toBe(5357);
+  });
+
   it('uses month-scoped leaderboard queries and filters hidden, placeholder, and nameless users', async () => {
     const month = getCurrentMonth();
     firestoreState.users.set('visible', {
       displayName: 'Visible',
       monthlyEngagement: { month, score: 10, activities: { app_open: 10 } },
+    });
+    firestoreState.users.set('legacy-name', {
+      name: 'Legacy Name',
+      monthlyEngagement: { month, score: 8, activities: { app_open: 8 } },
     });
     firestoreState.users.set('hidden', {
       displayName: 'Hidden',
@@ -295,6 +340,7 @@ describe('rewards-manager monthly sync', () => {
 
     await expect(getMonthlyLeaderboard(20)).resolves.toEqual([
       { userId: 'visible', displayName: 'Visible', score: 10 },
+      { userId: 'legacy-name', displayName: 'Legacy Name', score: 8 },
     ]);
   });
 

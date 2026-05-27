@@ -13,6 +13,7 @@ import {
 import { db } from '@/config/firebase';
 import { EXTRA_RELIGIOUS_STORIES } from '@/data/religious-stories-extra';
 import { dedupByName } from '@/lib/dedup-by-name';
+import type { SeasonalBannerCopy } from '@/lib/seasonal-banner-copy';
 
 // ========================================
 // Types for Hajj & Umrah content
@@ -697,6 +698,11 @@ export interface SeasonsMetadataContent {
   updatedAt?: string;
 }
 
+export interface SeasonalBannerCopyContent {
+  copies: Record<string, SeasonalBannerCopy>;
+  updatedAt?: string;
+}
+
 export async function fetchSeasonsMetadata(): Promise<SeasonsMetadataContent | null> {
   return fetchContent<SeasonsMetadataContent>('seasonsMetadata', 'seasons_metadata');
 }
@@ -714,6 +720,14 @@ export function subscribeToSeasonsMetadata(
 export async function loadSeasonsMetadata(): Promise<SeasonsMetadataContent | null> {
   try {
     return await fetchSeasonsMetadata();
+  } catch {
+    return null;
+  }
+}
+
+export async function loadSeasonalBannerCopy(): Promise<SeasonalBannerCopyContent | null> {
+  try {
+    return await fetchContent<SeasonalBannerCopyContent>('seasonalBannerCopy', 'seasonal_banner_copy');
   } catch {
     return null;
   }

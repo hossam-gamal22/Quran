@@ -112,20 +112,7 @@ function divider(className = 'divider'): string {
 }
 
 function coverPatternGrid(): string {
-  const xs = [48, 160, 272, 384, 496, 608, 720];
-  const ys = [54, 162, 270, 378, 486, 594, 702, 810, 918, 1026];
-  const cells = ys.flatMap(y => xs.map(x => `
-    <g transform="translate(${x - 48} ${y - 48})">
-      <path d="M48 8 L58 38 L88 48 L58 58 L48 88 L38 58 L8 48 L38 38 Z"/>
-      <circle cx="48" cy="48" r="21"/>
-      <path d="M48 25 L71 48 L48 71 L25 48 Z"/>
-    </g>`)).join('');
-
-  return `<svg class="cover-pattern-grid" viewBox="0 0 794 1123" aria-hidden="true">
-    <g fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.22">
-      ${cells}
-    </g>
-  </svg>`;
+  return '';
 }
 
 function buildParagraphs(body: string | string[]): string {
@@ -439,10 +426,15 @@ body{font-family:"Rubik",Arial,sans-serif;}
 }
 .pdf-page:last-child{min-height:1123px;page-break-after:auto!important;break-after:auto!important;}
 .cover-page{
+  height:1600px;
   background-color:#033322;
-  background-image:none !important;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='108' viewBox='0 0 112 108'%3E%3Cg fill='none' stroke='%23d8bc68' stroke-width='1.8' opacity='0.22'%3E%3Cpath d='M56 14 L66 44 L96 54 L66 64 L56 94 L46 64 L16 54 L46 44 Z'/%3E%3Ccircle cx='56' cy='54' r='21'/%3E%3Cpath d='M56 31 L79 54 L56 77 L33 54 Z'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat:repeat;
+  background-size:64px 62px;
+  background-position:0 0;
+  page-break-inside:avoid;
 }
-.cover-pattern-grid{position:absolute;inset:0;z-index:0;width:794px;height:1123px;color:#d8bc68;pointer-events:none;}
+.cover-pattern-grid{display:none;}
 .page-arc{display:none;}
 .arc-top{width:118mm;height:118mm;top:-44mm;left:118mm;}
 .arc-bottom{width:126mm;height:126mm;bottom:-74mm;right:-18mm;}
@@ -458,7 +450,7 @@ body{font-family:"Rubik",Arial,sans-serif;}
 .cover-side-line:after{bottom:44mm;}
 .cover-side-line i{position:absolute;top:50%;left:50%;width:6mm;height:6mm;border:0.35mm solid rgba(220,192,103,.9);transform:translate(-50%,-50%) rotate(45deg);}
 .cover-side-line i:before{content:"";position:absolute;inset:1.7mm;border:0.25mm solid rgba(220,192,103,.7);}
-.cover-box{position:absolute;inset:45mm 23mm 18mm;border:0.75mm solid #d8bc68;border-radius:18mm;background:#064632;
+.cover-box{position:absolute;top:50%;left:23mm;right:23mm;transform:translateY(-50%);border:0.75mm solid #d8bc68;border-radius:18mm;background:#064632;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23d8bc68' stroke-width='1' opacity='.045'%3E%3Cpath d='M80 18 L92 68 L142 80 L92 92 L80 142 L68 92 L18 80 L68 68 Z'/%3E%3Ccircle cx='80' cy='80' r='34'/%3E%3Cpath d='M80 46 L114 80 L80 114 L46 80 Z'/%3E%3C/g%3E%3C/svg%3E"),linear-gradient(155deg,#07583e 0%,#05412f 56%,#032d22 100%);
   background-repeat:repeat,no-repeat;
   background-size:150px 150px,cover;

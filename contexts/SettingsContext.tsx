@@ -540,6 +540,7 @@ const NOTIFICATION_DEFAULTS_VERSION = 10;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 const QURAN_ISTIGHFAR_COLLISION_MIGRATION_KEY = '@quran_istighfar_collision_migration_v1';
 const MAKKAH_FALLBACK_MIGRATION_KEY = '@prayer_makkah_fallback_migration_v1';
+const APP_BACKGROUND_DEFAULT_MIGRATION_KEY = '@app_background_default_migration_v1';
 
 async function clearPrayerTimeFallbackCaches(): Promise<void> {
   const keys = await AsyncStorage.getAllKeys();
@@ -835,12 +836,29 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
           console.warn('⚠️ Makkah prayer fallback migration failed:', migrationErr);
         }
 
+        try {
+          const migrated = await AsyncStorage.getItem(APP_BACKGROUND_DEFAULT_MIGRATION_KEY);
+          if (migrated !== 'true') {
+            if (loadedSettings.display.appBackground === 'none') {
+              loadedSettings.display = {
+                ...loadedSettings.display,
+                appBackground: defaultDisplay.appBackground,
+              };
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
+              console.log('🎨 Migrated appBackground from "none" to', defaultDisplay.appBackground);
+            }
+            await AsyncStorage.setItem(APP_BACKGROUND_DEFAULT_MIGRATION_KEY, 'true');
+          }
+        } catch (migrationErr) {
+          console.warn('⚠️ App background default migration failed:', migrationErr);
+        }
+
         setSettings(loadedSettings);
         
         // Cache theme snapshot for next cold start
         const snapshot: ThemeCacheSnapshot = {
           theme: loadedSettings.theme,
-          appBackground: loadedSettings.display.appBackground ?? 'none',
+          appBackground: loadedSettings.display.appBackground ?? defaultDisplay.appBackground,
           appBackgroundTextColor: loadedSettings.display.appBackgroundTextColor,
         };
         _cachedThemeSnapshot = snapshot;
@@ -1077,7 +1095,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       // Cache theme snapshot for next cold start — eliminates theme flash
       const snapshot: ThemeCacheSnapshot = {
         theme: settingsToSave.theme,
-        appBackground: settingsToSave.display.appBackground ?? 'none',
+        appBackground: settingsToSave.display.appBackground ?? defaultDisplay.appBackground,
         appBackgroundTextColor: settingsToSave.display.appBackgroundTextColor,
       };
       _cachedThemeSnapshot = snapshot;

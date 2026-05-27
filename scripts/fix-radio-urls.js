@@ -6,8 +6,14 @@
 const { initializeApp, getApps, getApp } = require('firebase/app');
 const { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc } = require('firebase/firestore');
 
+const firebaseApiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY_WEB || process.env.EXPO_PUBLIC_FIREBASE_API_KEY;
+
+if (!firebaseApiKey) {
+  throw new Error('Missing EXPO_PUBLIC_FIREBASE_API_KEY_WEB or EXPO_PUBLIC_FIREBASE_API_KEY');
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
+  apiKey: firebaseApiKey,
   authDomain: "rooh-almuslim.firebaseapp.com",
   projectId: "rooh-almuslim",
   storageBucket: "rooh-almuslim.firebasestorage.app",

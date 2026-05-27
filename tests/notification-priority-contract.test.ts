@@ -35,7 +35,7 @@ describe('notification priority and sound contract', () => {
     const channels = read('services/notifications/channels.ts');
     const installer = read('lib/notification-sound-installer.ts');
 
-    expect(channels).toContain("const CURRENT_CHANNELS_VERSION = '24'");
+    expect(channels).toContain("const CURRENT_CHANNELS_VERSION = '27'");
     expect(channels).toMatch(/reminder_\$\{key\}[\s\S]*?importance:\s*Notifications\.AndroidImportance\.MAX/);
     expect(channels).toMatch(/setNotificationChannelAsync\('general'[\s\S]*?importance:\s*Notifications\.AndroidImportance\.MAX/);
     expect(installer).toContain('importance: Notifications.AndroidImportance.MAX');

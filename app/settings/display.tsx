@@ -108,14 +108,11 @@ export default function DisplaySettingsScreen() {
 
   const handleThemeChange = (mode: ThemeMode) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (mode !== 'custom') {
-      // Set theme + background='none' atomically
-      updateThemeAndDisplay(mode, { appBackground: 'none' } as any);
-    } else {
-      // Set theme + default background atomically
-      const bg = settings.display.appBackground === 'none' ? 'background1' : settings.display.appBackground;
-      updateThemeAndDisplay(mode, { appBackground: bg } as any);
-    }
+    // Always preserve a background image — fall back to default if missing.
+    const bg = !settings.display.appBackground || settings.display.appBackground === 'none'
+      ? 'background3'
+      : settings.display.appBackground;
+    updateThemeAndDisplay(mode, { appBackground: bg } as any);
   };
 
   const handleFontSize = (size: FontSize) => {
@@ -129,29 +126,16 @@ export default function DisplaySettingsScreen() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // Use updateThemeAndDisplay to ensure both theme and background update atomically
-    if (key === 'none') {
-      // When selecting "no background", switch to dark theme
-      updateThemeAndDisplay('dark', {
-        appBackground: 'none',
-        appBackgroundUrl: undefined,
-        appBackgroundTextColor: undefined,
-        dynamicBgColor: undefined,
-        blurEnabled: false,
-        dimEnabled: false,
-      } as any);
-    } else {
-      // When selecting a background, ensure theme is 'custom'
-      updateThemeAndDisplay('custom', {
-        appBackground: key,
-        appBackgroundUrl: undefined,
-        appBackgroundTextColor: undefined,
-        dynamicBgColor: undefined,
-        blurEnabled: false,
-        dimEnabled: false,
-      } as any);
-    }
+
+    // Selecting any background switches theme to 'custom' atomically.
+    updateThemeAndDisplay('custom', {
+      appBackground: key,
+      appBackgroundUrl: undefined,
+      appBackgroundTextColor: undefined,
+      dynamicBgColor: undefined,
+      blurEnabled: false,
+      dimEnabled: false,
+    } as any);
   };
 
   const handleSelectPexelsPhoto = async (photo: PexelsBackground) => {
@@ -396,26 +380,6 @@ export default function DisplaySettingsScreen() {
                   )}
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                   <View style={styles.bgGrid}>
-                    {/* بدون خلفية — None */}
-                    <TouchableOpacity
-                      onPress={() => handleSelectBackground('none' as AppBackgroundKey)}
-                      style={[
-                        styles.bgGridThumb,
-                        { width: THUMB_SIZE, height: THUMB_SIZE * 1.4, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' },
-                        settings.display.appBackground === 'none' && styles.bgThumbSelected,
-                      ]}
-                    >
-                      <MaterialCommunityIcons name="cancel" size={28} color={colors.textLight} />
-                      <Text style={{ fontSize: 10, fontFamily: fontMedium(), color: colors.textLight, marginTop: 4 }}>
-                        {t('settings.noBackground')}
-                      </Text>
-                      {settings.display.appBackground === 'none' && (
-                        <View style={[styles.bgCheck, { [isRTL ? 'left' : 'right']: 4 }]}>
-                          <MaterialCommunityIcons name="check-circle" size={20} color="#0d8e62" />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-
                     {/* Built-in color backgrounds — free */}
                     {mergedBuiltIn.filter(bg => !bg.is_premium).map((bg) => {
                       const isSelected = settings.display.appBackground === bg.id;

@@ -46,6 +46,23 @@ type SelectedPointInfo = {
   icon: MaterialIconName;
 };
 
+const getScoreTextSize = (score: number, fs: (size: number) => number) => {
+  const digits = String(Math.max(0, Math.trunc(score))).length;
+  const baseSize =
+    digits <= 4 ? 42 :
+    digits === 5 ? 34 :
+    digits === 6 ? 30 :
+    digits === 7 ? 26 :
+    digits === 8 ? 23 :
+    20;
+  const fontSize = fs(baseSize);
+
+  return {
+    fontSize,
+    lineHeight: Math.round(fontSize * 1.2),
+  };
+};
+
 export default function HonorBoard() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -176,6 +193,7 @@ export default function HonorBoard() {
 
   const bgColor = settings.display.appBackground !== 'none' ? 'transparent' : colors.background;
   const displayedLeaderboard = leaderboard.slice(0, LEADERBOARD_PREVIEW_COUNT);
+  const scoreTextSize = getScoreTextSize(userScore, colors.fs);
 
   if (loading) {
     return (
@@ -301,10 +319,27 @@ export default function HonorBoard() {
         </GlassCard>
 
         {/* Your Score */}
-        <GlassCard style={styles.scoreCard}>
+        <View
+          style={[
+            styles.scoreCard,
+            {
+              backgroundColor: isDarkMode ? 'rgba(15,26,20,0.82)' : 'rgba(255,255,255,0.82)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        >
           <Text style={[styles.sectionTitle, { color: colors.text, textAlign: 'center' }]}>{t('honor.yourMonthlyPoints')}</Text>
           <View style={[styles.scoreRing, { borderColor: isDarkMode ? 'rgba(245,158,11,0.2)' : 'rgba(181,114,0,0.15)' }]}>
-            <Text style={[styles.scoreNumber, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>{userScore}</Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.scoreNumber,
+                scoreTextSize,
+                { color: isDarkMode ? '#f59e0b' : '#B57200' },
+              ]}
+            >
+              {userScore}
+            </Text>
             <Text style={[styles.scoreLabel, { color: colors.muted }]}>{t('honor.points')}</Text>
           </View>
           {userRank ? (
@@ -322,7 +357,7 @@ export default function HonorBoard() {
               </Text>
             </View>
           ) : null}
-        </GlassCard>
+        </View>
 
         {/* Activity Breakdown — Monthly */}
         <View style={styles.section}>
@@ -540,19 +575,21 @@ export default function HonorBoard() {
                       )}
                       {/* Name */}
                       <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={[styles.leaderboardName, { color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexShrink: 1, width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                          <Text
+                            style={[styles.leaderboardName, { flexShrink: 1, color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                          >
                             {user.displayName}
                           </Text>
                           {isCurrentUser && isPremium && (
                             <MaterialCommunityIcons name="crown" size={16} color={isDarkMode ? '#FFD700' : '#B8860B'} />
                           )}
-                          {isCurrentUser && (
-                            <Text style={[styles.youBadge, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
-                              {isArabic ? '(أنت)' : '(You)'}
-                            </Text>
-                          )}
                         </View>
+                        {isCurrentUser && (
+                          <Text style={[styles.youBadge, { color: isDarkMode ? '#f59e0b' : '#B57200', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 2 }]}>
+                            {isArabic ? '(أنت)' : '(You)'}
+                          </Text>
+                        )}
                       </View>
                       {/* Score */}
                       <View style={[styles.activityPointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
@@ -699,19 +736,21 @@ export default function HonorBoard() {
                       </View>
                     )}
                     <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[styles.leaderboardName, { color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexShrink: 1, width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                        <Text
+                          style={[styles.leaderboardName, { flexShrink: 1, color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                        >
                           {user.displayName}
                         </Text>
                         {isCurrentUser && isPremium && (
                           <MaterialCommunityIcons name="crown" size={16} color={isDarkMode ? '#FFD700' : '#B8860B'} />
                         )}
-                        {isCurrentUser && (
-                          <Text style={[styles.youBadge, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
-                            {isArabic ? '(أنت)' : '(You)'}
-                          </Text>
-                        )}
                       </View>
+                      {isCurrentUser && (
+                        <Text style={[styles.youBadge, { color: isDarkMode ? '#f59e0b' : '#B57200', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 2 }]}>
+                          {isArabic ? '(أنت)' : '(You)'}
+                        </Text>
+                      )}
                     </View>
                     <View style={[styles.activityPointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
                       <Text style={[styles.activityPointsText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
@@ -906,6 +945,13 @@ const _styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     marginBottom: 20,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 4,
   },
   scoreRing: {
     width: 120,
@@ -922,6 +968,9 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
     lineHeight: 52,
     includeFontPadding: false,
+    width: 106,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   scoreLabel: {
     fontSize: 14,

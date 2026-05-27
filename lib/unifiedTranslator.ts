@@ -89,7 +89,13 @@ const QURANCOM_IDS: Record<string, number | null> = {
   ru: 79,     // Elmir Kuliev
 };
 
-const SUNNAH_API_KEY = process.env.EXPO_PUBLIC_SUNNAH_API_KEY || '';
+const readPublicEnv = (key: string): string => {
+  const maybeProcess = (globalThis as any).process;
+  const env = maybeProcess && typeof maybeProcess === 'object' ? maybeProcess.env : undefined;
+  return typeof env?.[key] === 'string' ? env[key] : '';
+};
+
+const SUNNAH_API_KEY = readPublicEnv('EXPO_PUBLIC_SUNNAH_API_KEY');
 
 /** Sunnah.com language codes differ from ours */
 const SUNNAH_LANG_MAP: Partial<Record<string, string>> = {
