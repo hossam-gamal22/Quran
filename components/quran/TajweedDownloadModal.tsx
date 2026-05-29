@@ -21,6 +21,7 @@ import {
   type DownloadSignal,
 } from '@/lib/qcf-color-font-cache';
 import { useSettings } from '@/contexts/SettingsContext';
+import { ModalColors } from '@/constants/theme';
 
 interface Props {
   visible: boolean;
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: 'rgba(30,30,32,0.95)',
+    backgroundColor: ModalColors.cardDark,
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',

@@ -53,7 +53,7 @@ import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
 import { companionStoryId } from '@/lib/story-id';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
-import { Spacing } from '@/constants/theme';
+import { Spacing, ModalColors } from '@/constants/theme';
 
 // ========================================
 // الألوان
@@ -1412,7 +1412,7 @@ function AudioStatusModal({
   const body = isLoading ? copy.loadingAudioBody : mode === 'offline' ? copy.noInternetBody : copy.audioErrorBody;
   const icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] = isLoading ? 'headphones' : mode === 'offline' ? 'wifi-off' : 'alert-circle-outline';
   const tint = mode === 'offline' ? '#f59e0b' : mode === 'error' ? '#ef4444' : ACCENT;
-  const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
+  const cardBg = colors.isDarkMode ? ModalColors.cardDark : ModalColors.cardLight;
   const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (

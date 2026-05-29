@@ -4,7 +4,7 @@
 //   - Android home-screen AppWidget providers,
 //   - iOS/Android lock-screen provider lists.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +21,7 @@ const ANDROID_MANIFEST = resolve(ROOT, 'android/app/src/main/AndroidManifest.xml
 const ANDROID_XML_DIR = resolve(ROOT, 'android/app/src/main/res/xml');
 const ANDROID_JAVA_DIR = resolve(ROOT, 'android/app/src/main/java/com/rooh/almuslim/widget');
 const ANDROID_DRAWABLE_DIR = resolve(ROOT, 'android/app/src/main/res/drawable');
+const ANDROID_PREVIEW_DIR = resolve(ROOT, 'android/app/src/main/res/drawable-nodpi');
 const REGISTRY_TS = resolve(ROOT, 'lib/widgets/registry.ts');
 const ANDROID_TASK = resolve(ROOT, 'lib/android-widget-task-handler.tsx');
 const ANDROID_SNAPSHOT = resolve(ROOT, 'components/widgets/android/SnapshotWidget.tsx');
@@ -46,6 +47,20 @@ const FORBIDDEN_GALLERY_WIDGETS = [
     xmlRes: 'widgetprovider_roohmonthelegantenmedium',
     titleAr: 'الشهر - أنيق',
   },
+];
+
+const LEGACY_PROVIDER_LABELS = [
+  { className: 'RoohSmall', label: 'الويدجت الصغيرة' },
+  { className: 'RoohMedium', label: 'الويدجت المتوسطة' },
+  { className: 'RoohLarge', label: 'الويدجت الكبيرة' },
+];
+
+const STALE_ANDROID_VARIANT_PROVIDERS = [
+  'RoohVerseOfDaySmall',
+  'RoohVerseOfDayLarge',
+  'RoohAzkarMorningSmall',
+  'RoohAzkarEveningSmall',
+  'RoohDailyDhikrSmall',
 ];
 
 function cap(value) {
@@ -139,8 +154,13 @@ function main() {
   if (androidSnapshot.includes("backgroundColor: '#E3E0DB'") || androidSnapshot.includes('backgroundColor: "#E3E0DB"')) {
     fail(errors, 'Android PNG shell: hard-coded light/cream background would leak around dark themed widgets');
   }
-  assertContains(errors, androidSnapshot, 'imageWidth={width}', 'Android exact ImageWidget width');
-  assertContains(errors, androidSnapshot, 'imageHeight={height}', 'Android exact ImageWidget height');
+  assertContains(errors, androidSnapshot, 'widgetWidth?: number', 'Android launcher widget width input');
+  assertContains(errors, androidSnapshot, 'widgetHeight?: number', 'Android launcher widget height input');
+  assertContains(errors, androidSnapshot, 'renderScale = Math.min(targetWidth / width, targetHeight / height)', 'Android preserves full gallery snapshot');
+  assertContains(errors, androidSnapshot, 'imageWidth={renderedImageWidth}', 'Android scaled ImageWidget width');
+  assertContains(errors, androidSnapshot, 'imageHeight={renderedImageHeight}', 'Android scaled ImageWidget height');
+  assertContains(errors, androidTask, 'widgetWidth={widgetBounds?.width}', 'Android task passes launcher width');
+  assertContains(errors, androidTask, 'widgetHeight={widgetBounds?.height}', 'Android task passes launcher height');
   assertContains(errors, androidSnapshot, 'loading snapshot route=', 'Android loaded snapshot logging');
   assertContains(errors, androidSnapshot, 'fallback reason=', 'Android fallback snapshot logging');
   assertContains(errors, snapshotTs, 'snapshotVersion', 'Snapshot version/hash key');
@@ -154,6 +174,38 @@ function main() {
   }
   if (!packageJson.scripts?.['widgets:generate']) {
     fail(errors, 'package.json: missing widgets:generate script');
+  }
+  const densityScaledPreviewPngs = readdirSync(ANDROID_DRAWABLE_DIR)
+    .filter((name) => /^widget_preview_.*\.png$/.test(name));
+  if (densityScaledPreviewPngs.length > 0) {
+    fail(errors, `Android picker previews: PNGs must live in drawable-nodpi only (${densityScaledPreviewPngs.join(', ')})`);
+  }
+  const expectedPreviewPngs = new Set();
+  for (const def of registry) {
+    for (const size of def.sizes ?? []) {
+      expectedPreviewPngs.add(`${previewDrawableName(def.id, size)}.png`);
+    }
+  }
+  const stalePreviewPngs = readdirSync(ANDROID_PREVIEW_DIR)
+    .filter((name) => /^widget_preview_.*\.png$/.test(name) && !expectedPreviewPngs.has(name));
+  if (stalePreviewPngs.length > 0) {
+    fail(errors, `Android picker previews: stale drawable-nodpi PNGs are still present (${stalePreviewPngs.join(', ')})`);
+  }
+  for (const provider of LEGACY_PROVIDER_LABELS) {
+    assertContains(
+      errors,
+      androidManifest,
+      `android:name=".widget.${provider.className}" android:exported="false" android:label="${provider.label}"`,
+      `Android legacy provider label:${provider.className}`,
+    );
+  }
+  for (const className of STALE_ANDROID_VARIANT_PROVIDERS) {
+    if (androidManifest.includes(`android:name=".widget.${className}"`)) {
+      fail(errors, `Android manifest:${className}: stale provider is still visible in the Launcher picker`);
+    }
+    if (registryTs.includes(`${className}:`)) {
+      fail(errors, `Android provider route:${className}: stale gallery route is still registered`);
+    }
   }
 
   for (const forbidden of FORBIDDEN_GALLERY_WIDGETS) {
@@ -202,7 +254,7 @@ function main() {
         const preview = expectedHomePreviewDrawable(def, size);
         const basePreview = previewDrawableName(def.id, size);
         assertContains(errors, xml, `android:previewImage="@drawable/${preview}"`, `Android XML:${className}`);
-        assertFile(errors, resolve(ANDROID_DRAWABLE_DIR, `${basePreview}.png`), `Android preview:${className}`);
+        assertFile(errors, resolve(ANDROID_PREVIEW_DIR, `${basePreview}.png`), `Android preview:${className}`);
         if (premiumRequiredForSize(def, size)) {
           const lockedPreviewPath = resolve(ANDROID_DRAWABLE_DIR, `${preview}.xml`);
           assertFile(errors, lockedPreviewPath, `Android locked preview:${className}`);
@@ -232,7 +284,7 @@ function main() {
       const xml = readFileSync(xmlPath, 'utf8');
       const preview = previewDrawableName(base.id, base.size);
       assertContains(errors, xml, `android:previewImage="@drawable/${preview}"`, `Android legacy XML:${base.className}`);
-      assertFile(errors, resolve(ANDROID_DRAWABLE_DIR, `${preview}.png`), `Android legacy preview:${base.className}`);
+      assertFile(errors, resolve(ANDROID_PREVIEW_DIR, `${preview}.png`), `Android legacy preview:${base.className}`);
       if (xml.includes('roohsmall_preview') || xml.includes('roohmedium_preview') || xml.includes('roohlarge_preview')) {
         fail(errors, `Android legacy XML:${base.className}: launcher preview still uses generic app logo`);
       }
@@ -254,7 +306,7 @@ function main() {
       assertContains(errors, xml, 'android:initialKeyguardLayout="@layout/rn_widget"', `Android lock XML:${provider.android}`);
       const preview = previewDrawableName(provider.id, provider.size);
       assertContains(errors, xml, `android:previewImage="@drawable/${preview}"`, `Android lock XML:${provider.android}`);
-      assertFile(errors, resolve(ANDROID_DRAWABLE_DIR, `${preview}.png`), `Android lock preview:${provider.android}`);
+      assertFile(errors, resolve(ANDROID_PREVIEW_DIR, `${preview}.png`), `Android lock preview:${provider.android}`);
       if (xml.includes('roohsmall_preview') || xml.includes('roohmedium_preview') || xml.includes('roohlarge_preview')) {
         fail(errors, `Android lock XML:${provider.android}: launcher preview still uses generic app logo`);
       }

@@ -5,7 +5,9 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Save, Trash2, Edit2, X, Copy, Download, Wand2, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { getDefaultTasbihPresets } from '../data/adhkar-defaults';
+import { reconcileAdminTasbihPresets, type AdminTasbihPreset } from '../../../lib/tasbih-presets';
 
 function isGeneratedPlaceholderTranslation(value: string | undefined): boolean {
   if (!value) return false;
@@ -38,6 +40,12 @@ const DEPRECATED_SUBHAN_WABIHAMDIH_TEXT = 'سبحان الله وبحمده';
 
 function sortPresets(items: TasbihPreset[]): TasbihPreset[] {
   return [...items].sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+function normalizeTasbihPresetsForAdmin(items: TasbihPreset[]): TasbihPreset[] {
+  // The local TasbihPreset keeps transliteration/source optional (the UI fills defaults),
+  // while reconcileAdminTasbihPresets requires them — the runtime objects always satisfy it.
+  return sortPresets(reconcileAdminTasbihPresets(items as AdminTasbihPreset[]));
 }
 
 function stripArabicTashkeel(text: string): string {
@@ -97,7 +105,7 @@ const TasbihPresetsManager: React.FC = () => {
     try {
       const snap = await getDocs(collection(db, 'tasbihPresets'));
       const items = snap.docs.map(d => normalizeDeprecatedTasbihPreset({ ...d.data(), id: d.id } as TasbihPreset));
-      setPresets(sortPresets(items));
+      setPresets(normalizeTasbihPresetsForAdmin(items));
     } catch { /* empty */ }
     setIsLoading(false);
   };
@@ -107,7 +115,7 @@ const TasbihPresetsManager: React.FC = () => {
       collection(db, 'tasbihPresets'),
       (snap) => {
         const items = snap.docs.map(d => normalizeDeprecatedTasbihPreset({ ...d.data(), id: d.id } as TasbihPreset));
-        setPresets(sortPresets(items));
+        setPresets(normalizeTasbihPresetsForAdmin(items));
         setIsLoading(false);
       },
       () => {
@@ -222,6 +230,7 @@ const TasbihPresetsManager: React.FC = () => {
     if (!confirm('هل تريد حذف هذا التسبيح؟')) return;
     try {
       await deleteDoc(doc(db, 'tasbihPresets', id));
+      await bumpContentVersion('tasbihPresets');
     } catch (e) {
       alert(`فشل الحذف: ${(e as Error).message}`);
     }
@@ -236,6 +245,7 @@ const TasbihPresetsManager: React.FC = () => {
       batch.set(doc(db, 'tasbihPresets', preset.id), serializePresetForFirestore(preset, preset.id));
     });
     await batch.commit();
+    await bumpContentVersion('tasbihPresets');
     setSaveMsg('✅ تم تحديث الترتيب');
   };
 
@@ -307,12 +317,12 @@ const TasbihPresetsManager: React.FC = () => {
         <button
           className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
           onClick={async () => {
+            const defaults = getDefaultTasbihPresets();
             const msg = presets.length === 0
-              ? 'هل تريد استيراد التسبيحات الافتراضية من التطبيق (15 تسبيح)؟'
+              ? `هل تريد استيراد التسبيحات الافتراضية من التطبيق (${defaults.length} تسبيح)؟`
               : `يوجد ${presets.length} تسبيح بالفعل. هل تريد إضافة الافتراضي أيضاً؟`;
             if (!confirm(msg)) return;
             try {
-              const defaults = getDefaultTasbihPresets();
               for (const p of defaults) {
                 await setDoc(doc(db, 'tasbihPresets', p.id), serializePresetForFirestore(p as TasbihPreset, p.id));
               }

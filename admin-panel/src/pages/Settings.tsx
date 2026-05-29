@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, RefreshCw, AlertTriangle, Smartphone, ExternalLink, Mail, Bell, Clock } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { db } from '../firebase';
 import { sendUpdatePushNotification, UPDATE_NOTIFICATION_TRANSLATIONS } from '../services/pushNotifications';
 
@@ -176,6 +177,7 @@ const SettingsPage: React.FC = () => {
         },
         updatedAt: new Date().toISOString(),
       }, { merge: true });
+      await bumpContentVersion('appSettings');
       setHasChanges(false);
     } catch (error) {
       console.error('Error saving settings:', error);

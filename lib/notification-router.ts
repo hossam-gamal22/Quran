@@ -67,6 +67,19 @@ export function handleNotificationNavigation(
       router.push('/(tabs)/prayer');
       return { navigated: true };
 
+    // ─── Smart Fajr/Suhoor Alarm ───
+    case 'smart_alarm': {
+      const kind = data.kind === 'suhoor' ? 'suhoor' : 'fajr';
+      router.push({ pathname: '/smart-alarm/ring', params: { kind } } as any);
+      return { navigated: true };
+    }
+
+    // ─── Global maintenance nudge — just opening the app re-arms everything
+    // (prayers, adhkar, smart alarm all reschedule on launch/foreground).
+    case 'app_maintenance':
+      router.push('/(tabs)/prayer' as any);
+      return { navigated: true };
+
     // ─── Full Adhan Player ───
     // Fired when the user taps a prayer notification that was scheduled with
     // `useFullAdhan` enabled, OR taps the test notification while the toggle

@@ -22,8 +22,9 @@ import {
 import { loadSeasonalBannerCopy, loadSeasonsMetadata } from '@/lib/content-api';
 import { getHijriDate as getLocalHijriDate, type HijriDate } from '@/lib/hijri-date';
 import { getHijriDate as getAuthoritativeHijriDate } from '@/services/hijriCalendarService';
-import { collection, getDocs, query, where, orderBy, doc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { shouldRefetchContent, markContentFetched } from '@/lib/content-manifest';
 import { getLanguage } from '@/lib/i18n';
 import type { WelcomeBannerConfig } from '@/lib/app-config-api';
 import { getArabicSeasonalBannerCopy, setArabicSeasonalBannerCopyOverrides } from '@/lib/seasonal-banner-copy';
@@ -590,70 +591,73 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
     })();
   }, [currentSeason?.type, isLoading]);
 
+  // Manifest-gated: re-sync the app icon only when the admin actually changed
+  // it (otherwise the cached icon stays). Replaces a live single-doc listener.
   useEffect(() => {
     if (isLoading) return;
-
-    const unsubscribe = onSnapshot(
-      doc(db, 'appConfig', 'appIcons'),
-      async () => {
-        try {
-          const { syncAppIconOnStartup } = await import('@/lib/app-icon-manager');
-          await syncAppIconOnStartup(getLanguage() as any, currentSeason?.type ?? null, true);
-        } catch (e) {
-          if (__DEV__) console.log('Realtime app icon sync skipped:', e);
-        }
-      },
-      (error) => {
-        if (__DEV__) console.log('Realtime app icon listener unavailable:', error);
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await shouldRefetchContent('appIcons'))) return;
+        // The icon manager reads `appConfig/appIcons` itself; we just mark
+        // that we revalidated so we don't keep re-syncing every launch.
+        await markContentFetched('appIcons');
+        if (cancelled) return;
+        const { syncAppIconOnStartup } = await import('@/lib/app-icon-manager');
+        await syncAppIconOnStartup(getLanguage() as any, currentSeason?.type ?? null, true);
+      } catch (e) {
+        if (__DEV__) console.log('App icon sync skipped:', e);
       }
-    );
-
-    return unsubscribe;
+    })();
+    return () => { cancelled = true; };
   }, [currentSeason?.type, isLoading]);
 
+  // Manifest-gated: re-read banner copy only on actual admin changes.
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      doc(db, 'appContent', 'seasonalBannerCopy'),
-      (snapshot) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await shouldRefetchContent('seasonalBannerCopy'))) return;
+        const snapshot = await getDoc(doc(db, 'appContent', 'seasonalBannerCopy'));
+        await markContentFetched('seasonalBannerCopy');
+        if (cancelled) return;
         if (snapshot.exists()) {
           setArabicSeasonalBannerCopyOverrides((snapshot.data() as any).copies);
         }
+        // First mount on a device — the initial-suppress flag mirrors the
+        // previous onSnapshot semantics (don't refresh on the initial read).
         if (!seasonalBannerCopySnapshotReady.current) {
           seasonalBannerCopySnapshotReady.current = true;
           return;
         }
         refreshSeasonalData();
-      },
-      (error) => {
-        if (__DEV__) console.log('Realtime seasonal banner copy listener unavailable:', error);
+      } catch (e) {
+        if (__DEV__) console.log('Seasonal banner copy fetch unavailable:', e);
       }
-    );
-
-    return unsubscribe;
+    })();
+    return () => { cancelled = true; };
   }, [refreshSeasonalData]);
 
+  // Manifest-gated: refresh seasonal content only when the admin actually
+  // bumps it. The old listener used a 1-doc-query just to detect changes;
+  // the manifest version does that with zero collection reads.
   useEffect(() => {
-    const seasonalContentQuery = query(
-      collection(db, 'seasonalContent'),
-      where('isActive', '==', true),
-      orderBy('priority', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(
-      seasonalContentQuery,
-      () => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await shouldRefetchContent('seasonalContent'))) return;
+        await markContentFetched('seasonalContent');
+        if (cancelled) return;
         if (!seasonalContentSnapshotReady.current) {
           seasonalContentSnapshotReady.current = true;
           return;
         }
         refreshSeasonalData();
-      },
-      (error) => {
-        if (__DEV__) console.log('Realtime seasonal content listener unavailable:', error);
+      } catch (e) {
+        if (__DEV__) console.log('Seasonal content refresh skipped:', e);
       }
-    );
-
-    return unsubscribe;
+    })();
+    return () => { cancelled = true; };
   }, [refreshSeasonalData]);
 
   // ========================================

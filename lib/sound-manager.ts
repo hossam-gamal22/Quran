@@ -278,45 +278,38 @@ export async function refreshSoundSettings(): Promise<SoundSettings | null> {
 }
 
 /**
- * Real-time listener for sound settings changes from admin panel.
- * Returns an unsubscribe function.
+ * Manifest-gated one-shot read of sound settings (replaces a live single-doc
+ * listener). Returns a no-op unsubscribe.
  */
 export function subscribeToSoundSettings(
   onUpdate?: (settings: SoundSettings) => void,
 ): () => void {
-  let unsubscribe = () => {};
   (async () => {
     try {
-      const { onSnapshot } = await import('firebase/firestore');
-      unsubscribe = onSnapshot(
-        doc(db, 'appConfig', 'soundSettings'),
-        (snap) => {
-          if (!snap.exists()) return;
-          const data = snap.data() as SoundSettings;
-          _settingsCache = data;
-          AsyncStorage.setItem(
-            SETTINGS_CACHE_KEY,
-            JSON.stringify({ data, timestamp: Date.now() } as CachedSettings),
-          ).catch(() => {});
-          // Also refresh disabled bundled sounds cache
-          const bundled: BundledSoundConfig[] = (data as { bundledSounds?: BundledSoundConfig[] }).bundledSounds || [];
-          const disabledIds = bundled.filter((s) => s.enabled === false).map((s) => s.id);
-          _disabledSoundsCache = new Set(disabledIds);
-          AsyncStorage.setItem(
-            DISABLED_SOUNDS_CACHE_KEY,
-            JSON.stringify({ ids: disabledIds, timestamp: Date.now() }),
-          ).catch(() => {});
-          onUpdate?.(data);
-        },
-        (error) => {
-          if (__DEV__) console.warn('[sound-manager] subscribe error:', error);
-        },
-      );
+      const { shouldRefetchContent, markContentFetched } = await import('./content-manifest');
+      if (!(await shouldRefetchContent('soundSettings'))) return;
+      const snap = await getDoc(doc(db, 'appConfig', 'soundSettings'));
+      await markContentFetched('soundSettings');
+      if (!snap.exists()) return;
+      const data = snap.data() as SoundSettings;
+      _settingsCache = data;
+      AsyncStorage.setItem(
+        SETTINGS_CACHE_KEY,
+        JSON.stringify({ data, timestamp: Date.now() } as CachedSettings),
+      ).catch(() => {});
+      const bundled: BundledSoundConfig[] = (data as { bundledSounds?: BundledSoundConfig[] }).bundledSounds || [];
+      const disabledIds = bundled.filter((s) => s.enabled === false).map((s) => s.id);
+      _disabledSoundsCache = new Set(disabledIds);
+      AsyncStorage.setItem(
+        DISABLED_SOUNDS_CACHE_KEY,
+        JSON.stringify({ ids: disabledIds, timestamp: Date.now() }),
+      ).catch(() => {});
+      onUpdate?.(data);
     } catch (e) {
-      if (__DEV__) console.warn('[sound-manager] failed to subscribe:', e);
+      if (__DEV__) console.warn('[sound-manager] failed to fetch sound settings:', e);
     }
   })();
-  return () => unsubscribe();
+  return () => {};
 }
 
 // ─── Bundled Sound Enable/Disable from Admin ─────────────────────────────────

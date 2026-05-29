@@ -13,6 +13,7 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Linking, NativeModules, PermissionsAndroid } from 'react-native';
+import { markPermissionRequested } from '@/lib/permission-recovery';
 
 /**
  * Check if exact alarms can be scheduled.
@@ -72,6 +73,10 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   // Already denied permanently — don't re-prompt or show an Alert here.
   // The PermissionBanner inside the app guides the user to Settings.
   if (existingStatus === 'denied' && !canAskAgain) return false;
+
+  if (Platform.OS === 'android') {
+    await markPermissionRequested('notifications');
+  }
 
   const { status } = await Notifications.requestPermissionsAsync({
     ios: {

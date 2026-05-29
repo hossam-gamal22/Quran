@@ -8,6 +8,7 @@ import categoriesData from '@/data/json/categories.json';
 import shortNamesData from '@/data/json/azkar-short-names.json';
 import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { shouldRefetchContent, markContentFetched } from '@/lib/content-manifest';
 import { translateBenefit } from '@/lib/benefit-translations';
 import { getEffectiveZikrRepeatCount } from '@/lib/azkar-repeat';
 import { dedupeAzkarByDisplayedText, removeLowerCountGlobalDuplicateAzkar } from '@/lib/azkar-dedupe';
@@ -86,6 +87,12 @@ const DEFAULT_LANGUAGE: Language = 'ar';
 
 const AZKAR_CACHE_KEY = '@azkar_firestore_cache';
 const AZKAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h (used as a soft TTL — we always background-revalidate)
+// Cost gate: the `azkar` collection (~247 docs) was previously re-read on
+// every cold launch AND kept live via onSnapshot. At 25k–50k DAU that single
+// listener dominated the Firestore read bill. We now revalidate change-driven
+// via the shared content manifest (one tiny doc) — the full collection is
+// only re-read when the admin actually edits adhkar. See refreshAzkarFromFirestore.
+const AZKAR_MANIFEST_KEY = 'azkar';
 let _azkarOverride: Zikr[] | null = null;
 const _azkarChangeListeners = new Set<() => void>();
 
@@ -96,6 +103,7 @@ const _azkarChangeListeners = new Set<() => void>();
 // immutable; only custom ones can be edited/deleted from admin.
 // ===================================================
 const CUSTOM_CATEGORIES_CACHE_KEY = '@azkar_categories_cache';
+const CATEGORIES_MANIFEST_KEY = 'azkar_categories';
 let _customCategoriesOverride: AzkarCategory[] = [];
 
 const getSortOrder = (zikr: Zikr): number => {
@@ -159,9 +167,9 @@ export const hydrateAzkarFromFirestore = async (): Promise<void> => {
     // AsyncStorage unavailable — ignore
   }
 
-  // 2) ALWAYS refresh from Firestore in background so admin edits show on
-  //    next launch (even if soft TTL hasn't elapsed). Don't await — let
-  //    it run while UI shows cached data.
+  // 2) Revalidate from Firestore in the background (TTL-gated to once/hour).
+  //    Skips the network entirely when the cache is fresh, so repeated opens
+  //    within the window cost zero reads. Don't await — UI shows cached data.
   refreshAzkarFromFirestore().catch(() => {});
 };
 
@@ -186,10 +194,24 @@ export const computeAzkarSignature = (items: Zikr[]): string => {
   );
 };
 
-/** Force-refresh the azkar override from Firestore. Used on app foreground. */
-export const refreshAzkarFromFirestore = async (): Promise<void> => {
+/**
+ * Refresh the azkar override from Firestore, gated by the content manifest so
+ * the whole collection is only re-read when the admin actually edits adhkar
+ * (with a 24h safety refetch). Pass `{ force: true }` for an explicit
+ * user-initiated refresh (e.g. pull-to-refresh). Used on startup and foreground.
+ */
+export const refreshAzkarFromFirestore = async (
+  options?: { force?: boolean },
+): Promise<void> => {
+  // Skip the whole-collection read when the manifest says nothing changed.
+  if (!options?.force && !(await shouldRefetchContent(AZKAR_MANIFEST_KEY))) {
+    return;
+  }
   try {
     const snap = await getDocs(collection(db, 'azkar'));
+    // Record the fetch (at the current manifest version) even on empty/no-op
+    // so we don't re-read until the admin bumps the version again.
+    await markContentFetched(AZKAR_MANIFEST_KEY);
     if (snap.empty) return; // collection empty — keep bundled fallback
     const items: Zikr[] = snap.docs
       .map((d) => d.data() as Zikr)
@@ -221,40 +243,19 @@ export const refreshAzkarFromFirestore = async (): Promise<void> => {
 };
 
 /**
- * Subscribe to live Firestore updates of the azkar collection.
- * Returns an unsubscribe function. Call once at app startup.
+ * Revalidate azkar from Firestore once at app startup, then stop.
+ *
+ * Previously this attached a permanent `onSnapshot` on the whole `azkar`
+ * collection (~247 docs), which re-read every doc on every cold launch and
+ * again on every admin edit pushed to every connected client — the single
+ * largest Firestore read cost at scale. We now do a manifest-gated one-shot
+ * refresh instead: the full collection is read only after the admin edits
+ * adhkar (or every 24h as a safety net). Returns a no-op unsubscribe so
+ * existing call sites (and their cleanup) keep working unchanged.
  */
 export const subscribeToAzkarFromFirestore = (): (() => void) => {
-  try {
-    const unsub = onSnapshot(
-      collection(db, 'azkar'),
-      (snap) => {
-        if (snap.empty) return;
-        const items: Zikr[] = snap.docs
-          .map((d) => d.data() as Zikr)
-          .filter((z) => z && typeof z.id === 'number')
-          // Same canonical admin-order sort as refreshAzkarFromFirestore.
-          .sort(compareAzkarItems);
-        if (!items.length) return;
-        const newSig = computeAzkarSignature(items);
-        const oldSig = _azkarOverride ? computeAzkarSignature(_azkarOverride) : '';
-        const changed = newSig !== oldSig;
-        _azkarOverride = items;
-        AsyncStorage.setItem(
-          AZKAR_CACHE_KEY,
-          JSON.stringify({ ts: Date.now(), data: items } as AzkarCacheEnvelope),
-        ).catch(() => {});
-        if (changed) notifyAzkarChanged();
-      },
-      (err) => {
-        console.warn('[azkar-api] subscribeToAzkarFromFirestore error:', err);
-      },
-    );
-    return unsub;
-  } catch (err) {
-    console.warn('[azkar-api] subscribeToAzkarFromFirestore failed:', err);
-    return () => {};
-  }
+  refreshAzkarFromFirestore().catch(() => {});
+  return () => {};
 };
 
 // ===================================================
@@ -317,10 +318,19 @@ export const hydrateCustomCategoriesFromFirestore = async (): Promise<void> => {
   refreshCustomCategoriesFromFirestore().catch(() => {});
 };
 
-/** Force refresh custom categories from Firestore. */
-export const refreshCustomCategoriesFromFirestore = async (): Promise<void> => {
+/**
+ * Refresh custom categories from Firestore, gated by the content manifest.
+ * Pass `{ force: true }` to bypass the gate (explicit user refresh).
+ */
+export const refreshCustomCategoriesFromFirestore = async (
+  options?: { force?: boolean },
+): Promise<void> => {
+  if (!options?.force && !(await shouldRefetchContent(CATEGORIES_MANIFEST_KEY))) {
+    return;
+  }
   try {
     const snap = await getDocs(collection(db, 'azkar_categories'));
+    await markContentFetched(CATEGORIES_MANIFEST_KEY);
     const items: AzkarCategory[] = snap.docs
       .map((d) => d.data() as AzkarCategory)
       .filter((c) => c && typeof c.id === 'string');
@@ -336,34 +346,14 @@ export const refreshCustomCategoriesFromFirestore = async (): Promise<void> => {
   }
 };
 
-/** Live subscribe to custom categories changes. Returns unsubscribe. */
+/**
+ * Manifest-gated one-shot refresh of custom categories at startup (replaces a
+ * permanent collection onSnapshot). Returns a no-op unsubscribe so existing
+ * call sites and their cleanup keep working unchanged.
+ */
 export const subscribeToCustomCategoriesFromFirestore = (): (() => void) => {
-  try {
-    const unsub = onSnapshot(
-      collection(db, 'azkar_categories'),
-      async (snap) => {
-        try {
-          const items: AzkarCategory[] = snap.docs
-            .map((d) => d.data() as AzkarCategory)
-            .filter((c) => c && typeof c.id === 'string');
-          _customCategoriesOverride = items;
-          try {
-            await AsyncStorage.setItem(CUSTOM_CATEGORIES_CACHE_KEY, JSON.stringify(items));
-          } catch {
-            // ignore cache write failure
-          }
-          notifyAzkarChanged();
-        } catch (err) {
-          console.warn('[azkar-api] custom categories snapshot handler error:', err);
-        }
-      },
-      (err) => console.warn('[azkar-api] subscribeToCustomCategoriesFromFirestore error:', err),
-    );
-    return unsub;
-  } catch (err) {
-    console.warn('[azkar-api] subscribeToCustomCategoriesFromFirestore failed:', err);
-    return () => {};
-  }
+  refreshCustomCategoriesFromFirestore().catch(() => {});
+  return () => {};
 };
 
 /**

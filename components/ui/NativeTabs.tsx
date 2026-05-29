@@ -182,9 +182,6 @@ function ScrollableChipTabs({
       ]}
       style={[
         chipStyles.container,
-        !transparent && {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-        },
         style,
       ]}
     >
@@ -248,6 +245,9 @@ function ScrollableChipTabs({
 
 const _chipStyles = StyleSheet.create({
   container: {
+    height: 48,
+    flexGrow: 0,
+    flexShrink: 0,
     borderRadius: 12,
   },
   row: {
@@ -273,7 +273,10 @@ const _chipStyles = StyleSheet.create({
 // ========================================
 
 export function NativeTabs(props: NativeTabsProps) {
-  if (props.scrollable) {
+  // On iOS, always prefer the native UISegmentedControl regardless of `scrollable`.
+  // On Android the JS segmented fallback truncates long Arabic labels, so honor
+  // `scrollable` there and fall back to chips so every tab stays fully readable.
+  if (props.scrollable && Platform.OS === 'android') {
     return <ScrollableChipTabs {...props} />;
   }
   return <SegmentedTabs {...props} />;

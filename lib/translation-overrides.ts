@@ -14,7 +14,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,7 +29,9 @@ interface TranslationOverride {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = '@translation_overrides_cache';
+const STORAGE_TS_KEY = '@translation_overrides_cached_at';
 const COLLECTION_NAME = 'translationOverrides';
+const REFRESH_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 // ─── In-Memory Store ─────────────────────────────────────────────────────────
 
@@ -41,8 +43,15 @@ let unsubscribeSnapshot: (() => void) | null = null;
 // ─── Core Functions ──────────────────────────────────────────────────────────
 
 /**
- * Load overrides from AsyncStorage cache first (instant),
- * then subscribe to Firestore for real-time updates.
+ * Load overrides from AsyncStorage cache first (instant), then refresh
+ * from Firestore at most once per TTL window.
+ *
+ * Previously this opened a persistent collection-wide onSnapshot for
+ * every user, which re-read every override doc on each app session. For
+ * rarely-changing admin text corrections that is wasteful at scale, so
+ * we now do a single TTL-gated getDocs instead. Admin edits propagate
+ * within the TTL (6h) rather than in real time — acceptable for
+ * translation text.
  */
 export async function loadTranslationOverrides(): Promise<void> {
   if (loaded) return;
@@ -64,31 +73,44 @@ export async function loadTranslationOverrides(): Promise<void> {
 
   loaded = true;
 
-  // 2. Subscribe to Firestore for real-time updates
+  // 2. Refresh from Firestore only if the cache is stale or missing.
   try {
-    const colRef = collection(db, COLLECTION_NAME);
+    let cacheAge = Infinity;
+    try {
+      const ts = await AsyncStorage.getItem(STORAGE_TS_KEY);
+      if (ts) cacheAge = Date.now() - Number(ts);
+    } catch {}
+    if (overridesMap.size > 0 && cacheAge < REFRESH_TTL_MS) return;
 
-    unsubscribeSnapshot = onSnapshot(colRef, (snapshot) => {
-      overridesMap.clear();
-      const entries: TranslationOverride[] = [];
-
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data() as TranslationOverride;
-        if (data.sourceText && data.overrides) {
-          const trimmed = data.sourceText.trim();
-          overridesMap.set(trimmed, data.overrides);
-          entries.push({ sourceText: trimmed, overrides: data.overrides });
-        }
-      }
-
-      // Persist to AsyncStorage for next app start
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries)).catch(() => {});
-    }, () => {
-      // Snapshot error — cache already loaded, so we're fine
-    });
+    await refreshTranslationOverridesFromFirestore();
   } catch {
     // Firestore unavailable — using cache only
   }
+}
+
+/**
+ * One-shot refresh of the in-memory + persisted overrides from Firestore.
+ * Exposed so callers (e.g. admin preview, manual refresh) can force an
+ * immediate update without waiting for the TTL.
+ */
+export async function refreshTranslationOverridesFromFirestore(): Promise<void> {
+  const colRef = collection(db, COLLECTION_NAME);
+  const snapshot = await getDocs(colRef);
+
+  overridesMap.clear();
+  const entries: TranslationOverride[] = [];
+
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data() as TranslationOverride;
+    if (data.sourceText && data.overrides) {
+      const trimmed = data.sourceText.trim();
+      overridesMap.set(trimmed, data.overrides);
+      entries.push({ sourceText: trimmed, overrides: data.overrides });
+    }
+  }
+
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries)).catch(() => {});
+  AsyncStorage.setItem(STORAGE_TS_KEY, String(Date.now())).catch(() => {});
 }
 
 /**

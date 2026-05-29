@@ -22,7 +22,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -49,7 +49,8 @@ import { getSurahName } from '@/lib/quran-api';
 import { fetchDownloadableSounds, getDownloadedSounds, downloadSound, isSoundDownloaded, type DownloadableSound, type DownloadedSound } from '@/lib/downloadable-sounds';
 import { sendTestNotification } from '@/lib/notifications-manager';
 import { checkExactAlarmPermission, openExactAlarmSettings } from '@/services/notifications/permissions';
-import { checkAllPermissions, openBatteryOptimizationSettings } from '@/lib/permission-recovery';
+import { useSmartAlarm } from '@/contexts/SmartAlarmContext';
+import { checkAllPermissions, markPermissionRequested, openBatteryOptimizationSettings } from '@/lib/permission-recovery';
 
 
 // Removed: interstitial ads on sound download to reduce user frustration
@@ -265,8 +266,310 @@ const springLayoutAnimation = () => {
 
 
 // ========================================
+// Dropdown picker for chip-style options
+// ========================================
+
+interface InlineDropdownProps<T extends string | number> {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  disabled?: boolean;
+}
+
+function InlineDropdown<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+  disabled,
+}: InlineDropdownProps<T>) {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const [open, setOpen] = useState(false);
+  const isDarkMode = (colors as any).isDarkMode as boolean;
+  const borderColor = (colors as any).divider ?? 'rgba(127,127,127,0.25)';
+  // force dropdown/panel background to the requested color
+  const triggerBg = '#091f1d';
+  const current = options.find((o) => o.value === value);
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpen((p) => !p);
+  };
+
+  return (
+    // keep spacing vertical but let parent container control horizontal padding so width matches time picker
+    <View style={{ paddingHorizontal: 0, paddingVertical: 8, gap: 6 }}>
+      <Text
+        style={{
+          fontSize: 13,
+          fontFamily: fontMedium(),
+          color: colors.textLight,
+          textAlign: isRTL ? 'right' : 'left',
+          writingDirection: isRTL ? 'rtl' : 'ltr',
+        }}
+      >
+        {label}
+      </Text>
+      <TouchableOpacity
+        onPress={toggleOpen}
+        activeOpacity={0.8}
+        disabled={disabled}
+        style={{
+          width: '100%', // stretch to parent's content width (parent has horizontal padding)
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor,
+          backgroundColor: triggerBg,
+          opacity: disabled ? 0.5 : 1,
+          gap: 8,
+        }}
+      >
+        <Text
+          style={{
+            flex: 1,
+            fontSize: 13,
+            fontFamily: fontSemiBold(),
+            color: '#ffffff',
+            textAlign: isRTL ? 'right' : 'left',
+            writingDirection: isRTL ? 'rtl' : 'ltr',
+          }}
+        >
+          {current ? current.label : ''}
+        </Text>
+        <MaterialCommunityIcons
+          name={open ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={colors.textLight}
+        />
+      </TouchableOpacity>
+      {open && (
+        <View
+          style={{
+            marginTop: 4,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor,
+            backgroundColor: triggerBg,
+            overflow: 'hidden',
+            width: '100%',
+          }}
+        >
+          {options.map((option, idx) => {
+            const active = option.value === value;
+            return (
+              <TouchableOpacity
+                key={String(option.value)}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onChange(option.value);
+                  LayoutAnimation.configureNext(
+                    LayoutAnimation.Presets.easeInEaseOut,
+                  );
+                  setOpen(false);
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+                  borderTopColor: borderColor,
+                  gap: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    fontFamily: active ? fontSemiBold() : fontMedium(),
+                    color: active ? '#0d8e62' : '#ffffff',
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                  }}
+                >
+                  {option.label}
+                </Text>
+                {active && (
+                  <MaterialCommunityIcons
+                    name="check"
+                    size={18}
+                    color="#0d8e62"
+                  />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ========================================
 // المكون الرئيسي
 // ========================================
+
+/**
+ * Inline mode picker that appears under the Fajr row when expanded.
+ * Two mutually-exclusive modes: regular notification OR smart alarm.
+ */
+function FajrModePicker() {
+  const router = useRouter();
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const { config, setFajrConfig } = useSmartAlarm();
+  const smartOn = config.fajr.enabled;
+  const isDarkMode = (colors as any).isDarkMode as boolean;
+  const panelBg = isDarkMode ? 'rgba(20,24,32,0.55)' : 'rgba(245,245,247,0.6)';
+  const divider = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+  const setMode = (mode: 'regular' | 'smart') => {
+    Haptics.selectionAsync().catch(() => {});
+    setFajrConfig({ enabled: mode === 'smart' }).catch(() => {});
+  };
+
+  const openSettings = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/smart-alarm' as any);
+  };
+
+  const Option = ({
+    selected,
+    title,
+    description,
+    onSelect,
+    showSettingsBtn,
+    isLast,
+  }: {
+    selected: boolean;
+    title: string;
+    description: string;
+    onSelect: () => void;
+    showSettingsBtn?: boolean;
+    isLast?: boolean;
+  }) => (
+    <TouchableOpacity
+      onPress={onSelect}
+      activeOpacity={0.75}
+      style={{
+        flexDirection: isRTL ? 'row-reverse' : 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: divider,
+      }}
+    >
+      <View
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: selected ? '#0d8e62' : colors.textLight,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: 2,
+        }}
+      >
+        {selected && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#0d8e62' }} />}
+      </View>
+      <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: fontSemiBold(),
+            color: selected ? '#0d8e62' : colors.text,
+            textAlign: isRTL ? 'right' : 'left',
+            writingDirection: isRTL ? 'rtl' : 'ltr',
+          }}
+        >
+          {title}
+        </Text>
+        <Text
+          style={{
+            marginTop: 3,
+            fontSize: 12,
+            fontFamily: fontRegular(),
+            lineHeight: 18,
+            color: colors.textLight,
+            textAlign: isRTL ? 'right' : 'left',
+            writingDirection: isRTL ? 'rtl' : 'ltr',
+          }}
+        >
+          {description}
+        </Text>
+        {showSettingsBtn && selected && (
+          <TouchableOpacity
+            onPress={openSettings}
+            activeOpacity={0.8}
+            style={{
+              marginTop: 10,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 999,
+              backgroundColor: '#0d8e62',
+              alignSelf: isRTL ? 'flex-end' : 'flex-start',
+            }}
+          >
+            <MaterialCommunityIcons name="cog-outline" size={14} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: fontSemiBold() }}>
+              {uiText({ ar: 'ضبط المنبه الذكي', en: 'Configure smart alarm' })}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View
+      style={{
+        marginHorizontal: 4,
+        marginBottom: 4,
+        borderRadius: 12,
+        overflow: 'hidden',
+        backgroundColor: panelBg,
+      }}
+    >
+      <Option
+        selected={!smartOn}
+        title={uiText({ ar: 'التنبيه العادي', en: 'Regular notification' })}
+        description={uiText({
+          ar: 'إشعار واحد بصوت الأذان عند وقت الفجر',
+          en: 'A single notification with the adhan sound at Fajr',
+        })}
+        onSelect={() => setMode('regular')}
+      />
+      <Option
+        selected={smartOn}
+        title={uiText({ ar: 'التنبيه الذكي', en: 'Smart alarm' })}
+        description={uiText({
+          ar: 'إشعارات متتالية بصوت رنين مع تحدي لإيقاف المنبه — يضمن استيقاظك للفجر',
+          en: 'Persistent ringing notifications with a wake-up challenge — ensures you wake for Fajr',
+        })}
+        onSelect={() => setMode('smart')}
+        showSettingsBtn
+        isLast
+      />
+    </View>
+  );
+}
 
 export default function NotificationsScreen() {
   const isRTL = useIsRTL();
@@ -277,7 +580,15 @@ export default function NotificationsScreen() {
   const styles = useScaledStyles(_styles, colors.fs);
   const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
   const [permissionChecked, setPermissionChecked] = useState(false);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const searchParams = useLocalSearchParams<{ expand?: string }>();
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(
+    searchParams.expand === 'prayer' ? 'prayer' : null,
+  );
+  // When the user lands here from the Smart Alarm card on the prayer screen,
+  // pre-expand the Fajr mode picker so they immediately see the regular vs smart choice.
+  const [fajrModeExpanded, setFajrModeExpanded] = useState<boolean>(
+    searchParams.expand === 'prayer',
+  );
   const [prayerNotifications, setPrayerNotifications] = useState<{ [key: string]: boolean }>({
     fajr: true,
     sunrise: false,
@@ -292,6 +603,11 @@ export default function NotificationsScreen() {
 
   // Adhan sound list expanded state
   const [adhanListExpanded, setAdhanListExpanded] = useState(false);
+
+  // Day picker per-category open state
+  const [dayPickerOpen, setDayPickerOpen] = useState<Record<string, boolean>>({});
+  // Day selection mode per-category: 'everyday' | 'weekdays' | 'weekends' | 'custom'
+  const [daySelectionMode, setDaySelectionMode] = useState<Record<string, string>>({});
 
   // Sound preview state
   const [previewPlaying, setPreviewPlaying] = useState<string | null>(null);
@@ -408,6 +724,12 @@ export default function NotificationsScreen() {
     checkPermissions();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      checkPermissions();
+    }, [settings.notifications.enabled]),
+  );
+
 
 
   // Load downloadable sounds from Firebase
@@ -450,6 +772,16 @@ export default function NotificationsScreen() {
     const { status } = await Notifications.getPermissionsAsync();
     setPermissionStatus(status);
     setPermissionChecked(true);
+    if (status !== 'granted' && settings.notifications.enabled) {
+      Alert.alert(
+        t('notificationSounds.notificationsDisabled'),
+        t('notificationSounds.systemNotificationsBlockedMsg'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('notificationSounds.openSettings'), onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
   };
 
   const refreshBatteryOptimizationTip = useCallback(async () => {
@@ -478,6 +810,9 @@ export default function NotificationsScreen() {
   const requestPermissions = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    if (Platform.OS === 'android') {
+      await markPermissionRequested('notifications');
+    }
     const { status } = await Notifications.requestPermissionsAsync();
     setPermissionStatus(status);
 
@@ -787,6 +1122,37 @@ export default function NotificationsScreen() {
   ];
   const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7]; // Sun-Sat
 
+  const arraysEqual = (a: number[], b: number[]) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  };
+
+  const detectDayMode = (days: number[]) => {
+    const s = [...days].sort((a, b) => a - b);
+    if (s.length === 7) return 'everyday';
+    const weekdays = [1, 2, 3, 4, 5];
+    const weekends = [6, 7];
+    if (arraysEqual(s, weekdays)) return 'weekdays';
+    if (arraysEqual(s, weekends)) return 'weekends';
+    return 'custom';
+  };
+
+  // initialize daySelectionMode from current settings when settings change
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    NOTIFICATION_CATEGORIES.forEach((c) => {
+      if (c.id === 'prayer') return;
+      try {
+        const days = getCategoryDays(c.id);
+        map[c.id] = detectDayMode(days);
+      } catch {
+        map[c.id] = 'everyday';
+      }
+    });
+    setDaySelectionMode(map);
+  }, [settings.notifications]);
+
   const getCategoryDays = (categoryId: string): number[] => {
     switch (categoryId) {
       case 'salawat': return settings.notifications.salawatDays ?? ALL_DAYS;
@@ -821,6 +1187,11 @@ export default function NotificationsScreen() {
     if (newDays.length > 0) {
       updateCategoryDays(categoryId, newDays);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // update derived selection mode
+      try {
+        const mode = detectDayMode(newDays);
+        setDaySelectionMode(prev => ({ ...prev, [categoryId]: mode }));
+      } catch {}
     }
   };
 
@@ -828,51 +1199,131 @@ export default function NotificationsScreen() {
     if (categoryId === 'prayer') return null; // prayer has its own schedule
     const selectedDays = getCategoryDays(categoryId);
     const allSelected = selectedDays.length === 7;
+    const open = !!dayPickerOpen[categoryId];
+    const summary = allSelected
+      ? t('notificationSounds.allDays')
+      : selectedDays
+          .slice()
+          .sort((a, b) => a - b)
+          .map((d) => DAY_LABELS[d - 1])
+          .join('، ');
+    const borderColor = (colors as any).divider ?? 'rgba(127,127,127,0.25)';
+    const triggerBg = '#091f1d';
+    const toggleOpen = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setDayPickerOpen((prev) => ({ ...prev, [categoryId]: !prev[categoryId] }));
+    };
+
+    const weekdaysLabel = DAY_LABELS.slice(0, 5).join('، ');
+    const weekendsLabel = DAY_LABELS.slice(5).join('، ');
+    const MODE_OPTIONS = [
+      { value: 'everyday', label: t('notificationSounds.allDays') },
+      { value: 'weekdays', label: weekdaysLabel },
+      { value: 'weekends', label: weekendsLabel },
+      { value: 'custom', label: t('notificationSounds.customSelection') },
+    ];
+
+    const currentMode = daySelectionMode[categoryId] || detectDayMode(selectedDays);
+
+    const onModeChange = (v: string) => {
+      if (v === 'everyday') {
+        updateCategoryDays(categoryId, ALL_DAYS);
+        setDaySelectionMode(prev => ({ ...prev, [categoryId]: 'everyday' }));
+        setDayPickerOpen(prev => ({ ...prev, [categoryId]: false }));
+      } else if (v === 'weekdays') {
+        updateCategoryDays(categoryId, [1, 2, 3, 4, 5]);
+        setDaySelectionMode(prev => ({ ...prev, [categoryId]: 'weekdays' }));
+        setDayPickerOpen(prev => ({ ...prev, [categoryId]: false }));
+      } else if (v === 'weekends') {
+        updateCategoryDays(categoryId, [6, 7]);
+        setDaySelectionMode(prev => ({ ...prev, [categoryId]: 'weekends' }));
+        setDayPickerOpen(prev => ({ ...prev, [categoryId]: false }));
+      } else {
+        // custom
+        setDaySelectionMode(prev => ({ ...prev, [categoryId]: 'custom' }));
+        setDayPickerOpen(prev => ({ ...prev, [categoryId]: true }));
+      }
+    };
 
     return (
-      <View style={[styles.dayPickerContainer, { borderTopColor: colors.divider }]}>
-        <View style={[styles.dayPickerHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <MaterialCommunityIcons name="calendar-week" size={18} color={colors.textLight} />
-          <Text style={[styles.dayPickerLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-            {t('notificationSounds.reminderDays')}
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              updateCategoryDays(categoryId, allSelected ? [6] : ALL_DAYS); // 6 = Friday default if deselecting all
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      <View style={[styles.dayPickerContainer, { borderTopColor: colors.divider }]}> 
+          <InlineDropdown
+            label={t('notificationSounds.reminderDays')}
+            options={MODE_OPTIONS}
+            value={currentMode as any}
+            onChange={(v) => onModeChange(String(v))}
+            disabled={!isEnabled}
+          />
+
+        {(currentMode === 'custom' || open) && (
+          <View
+            style={{
+              marginTop: 8,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor,
+              backgroundColor: triggerBg,
+              padding: 12,
+              gap: 10,
             }}
           >
-            <Text style={[styles.dayPickerToggleAll, { color: '#0d8e62', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {allSelected ? t('notificationSounds.customSelection') : t('notificationSounds.allDays')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.dayChipsRow}>
-          {(isRTL ? [...ALL_DAYS].reverse() : ALL_DAYS).map((day) => {
-            const index = day - 1; // 1-based day to 0-based label index
-            const isSelected = selectedDays.includes(day);
-            return (
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                justifyContent: 'flex-end',
+              }}
+            >
               <TouchableOpacity
-                key={day}
-                style={[
-                  styles.dayChip,
-                  isSelected && styles.dayChipSelected,
-                  !isSelected && { backgroundColor: colors.surface },
-                ]}
-                onPress={() => toggleDay(categoryId, day)}
-                activeOpacity={0.7}
+                onPress={() => {
+                  updateCategoryDays(categoryId, allSelected ? [6] : ALL_DAYS);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
               >
-                <Text style={[
-                  styles.dayChipText,
-                  isSelected && styles.dayChipTextSelected,
-                  !isSelected && { color: colors.textLight },
-                ]}>
-                  {DAY_LABELS[index]}
+                <Text
+                  style={[
+                    styles.dayPickerToggleAll,
+                    {
+                      color: '#0d8e62',
+                      textAlign: isRTL ? 'right' : 'left',
+                      writingDirection: isRTL ? 'rtl' : 'ltr',
+                    },
+                  ]}
+                >
+                  {allSelected ? t('notificationSounds.customSelection') : t('notificationSounds.allDays')}
                 </Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
+            </View>
+            <View style={styles.dayChipsRow}>
+              {(isRTL ? [...ALL_DAYS].reverse() : ALL_DAYS).map((day) => {
+                const index = day - 1;
+                const isSelected = selectedDays.includes(day);
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[
+                      styles.dayChip,
+                      isSelected && styles.dayChipSelected,
+                      !isSelected && { backgroundColor: colors.surface },
+                    ]}
+                    onPress={() => toggleDay(categoryId, day)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.dayChipText,
+                        isSelected && styles.dayChipTextSelected,
+                        !isSelected && { color: colors.textLight },
+                      ]}
+                    >
+                      {DAY_LABELS[index]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </View>
     );
   };
@@ -906,47 +1357,13 @@ export default function NotificationsScreen() {
 
       {/* Reminder minutes selector */}
       {settings.notifications.prayerReminder && (
-        <View style={[styles.reminderMinutesContainer, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-          <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 4 }]}>
-            {t('notificationSounds.reminderBeforeAdhanBy')}
-          </Text>
-          <ScrollView
-            ref={reminderScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row' }}
-            style={styles.reminderScroll}
-            onContentSizeChange={(w) => {
-              if (isRTL) reminderScrollRef.current?.scrollTo({ x: w, y: 0, animated: false });
-            }}
-          >
-            {REMINDER_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.chipOption,
-                  isDarkMode && { backgroundColor: colors.surface },
-                  settings.notifications.reminderMinutes === option.value && styles.chipOptionSelected,
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  updateNotifications({ reminderMinutes: option.value });
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.chipOptionText,
-                    { color: colors.textLight },
-                    settings.notifications.reminderMinutes === option.value && styles.chipOptionTextSelected,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        <InlineDropdown
+          label={t('notificationSounds.reminderBeforeAdhanBy')}
+          options={REMINDER_OPTIONS}
+          value={settings.notifications.reminderMinutes ?? 10}
+          onChange={(v) => updateNotifications({ reminderMinutes: v })}
+          disabled={!isEnabled}
+        />
       )}
 
       {/* Individual prayer toggles */}
@@ -954,36 +1371,62 @@ export default function NotificationsScreen() {
         <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {t('notificationSounds.selectPrayers')}
         </Text>
-        {PRAYER_NAMES.map((prayer) => (
-          <View key={prayer.key} style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons
-                name={prayer.icon as any}
-                size={18}
-                color={prayer.key === 'fajr' ? '#4a3d73' : prayer.key === 'isha' ? '#3a7ca5' : '#c17f59'}
-              />
-              <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {prayer.name}
-              </Text>
-            </View>
-            <Switch
-              value={prayerNotifications[prayer.key]}
-              onValueChange={(val) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleTogglePrayerNotification(prayer.key, val);
-              }}
-              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
-              thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-              ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
-              disabled={!isEnabled}
-            />
-          </View>
-        ))}
+        {PRAYER_NAMES.map((prayer) => {
+          const isFajr = prayer.key === 'fajr';
+          const fajrExpanded = isFajr && fajrModeExpanded && prayerNotifications.fajr && isEnabled;
+          const onRowTap = isFajr && prayerNotifications.fajr && isEnabled
+            ? () => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setFajrModeExpanded((v) => !v);
+              }
+            : undefined;
+          return (
+            <React.Fragment key={prayer.key}>
+              <View style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <TouchableOpacity
+                  style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1 }]}
+                  onPress={onRowTap}
+                  disabled={!onRowTap}
+                  activeOpacity={onRowTap ? 0.7 : 1}
+                >
+                  <MaterialCommunityIcons
+                    name={prayer.icon as any}
+                    size={18}
+                    color={prayer.key === 'fajr' ? '#4a3d73' : prayer.key === 'isha' ? '#3a7ca5' : '#c17f59'}
+                  />
+                  <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                    {prayer.name}
+                  </Text>
+                  {isFajr && prayerNotifications.fajr && isEnabled && (
+                    <MaterialCommunityIcons
+                      name={fajrExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={18}
+                      color={colors.textLight}
+                    />
+                  )}
+                </TouchableOpacity>
+                <Switch
+                  value={prayerNotifications[prayer.key]}
+                  onValueChange={(val) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleTogglePrayerNotification(prayer.key, val);
+                    if (isFajr && !val) setFajrModeExpanded(false);
+                  }}
+                  trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+                  disabled={!isEnabled}
+                />
+              </View>
+              {fajrExpanded && <FajrModePicker />}
+            </React.Fragment>
+          );
+        })}
       </View>
 
       {/* "هل صليت؟" reminder controls */}
       <View style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.innerSettingInfo, { flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <MaterialCommunityIcons name="help-circle-outline" size={20} color="#0d8e62" />
           <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
             <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
@@ -1009,85 +1452,27 @@ export default function NotificationsScreen() {
 
       {settings.notifications.didYouPrayReminder !== false && (
         <>
-          <View style={styles.reminderMinutesContainer}>
-            <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 16 }]}>
-              {t('notificationSounds.didYouPrayDelayLabel')}
-            </Text>
-            <ScrollView
-              ref={didYouPrayDelayScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row' }}
-              style={styles.reminderScroll}
-              onContentSizeChange={(w) => {
-                if (isRTL) didYouPrayDelayScrollRef.current?.scrollTo({ x: w, y: 0, animated: false });
-              }}
-            >
-              {DID_YOU_PRAY_DELAY_OPTIONS.map((value) => {
-                const selected = (settings.notifications.didYouPrayDelayMinutes ?? 30) === value;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    style={[
-                      styles.chipOption,
-                      isDarkMode && { backgroundColor: colors.surface },
-                      selected && styles.chipOptionSelected,
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      updateNotifications({ didYouPrayDelayMinutes: value });
-                    }}
-                    activeOpacity={0.7}
-                    disabled={!isEnabled}
-                  >
-                    <Text style={[styles.chipOptionText, { color: colors.textLight }, selected && styles.chipOptionTextSelected]}>
-                      {`${value} ${t('prayer.minutes')}`}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+          <InlineDropdown
+            label={t('notificationSounds.didYouPrayDelayLabel')}
+            options={DID_YOU_PRAY_DELAY_OPTIONS.map((v) => ({
+              value: v,
+              label: `${v} ${t('prayer.minutes')}`,
+            }))}
+            value={settings.notifications.didYouPrayDelayMinutes ?? 30}
+            onChange={(v) => updateNotifications({ didYouPrayDelayMinutes: v })}
+            disabled={!isEnabled}
+          />
 
-          <View style={styles.reminderMinutesContainer}>
-            <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 16 }]}>
-              {t('notificationSounds.didYouPraySnoozeLabel')}
-            </Text>
-            <ScrollView
-              ref={didYouPraySnoozeScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row' }}
-              style={styles.reminderScroll}
-              onContentSizeChange={(w) => {
-                if (isRTL) didYouPraySnoozeScrollRef.current?.scrollTo({ x: w, y: 0, animated: false });
-              }}
-            >
-              {DID_YOU_PRAY_SNOOZE_OPTIONS.map((value) => {
-                const selected = (settings.notifications.didYouPraySnoozeMinutes ?? 15) === value;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    style={[
-                      styles.chipOption,
-                      isDarkMode && { backgroundColor: colors.surface },
-                      selected && styles.chipOptionSelected,
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      updateNotifications({ didYouPraySnoozeMinutes: value });
-                    }}
-                    activeOpacity={0.7}
-                    disabled={!isEnabled}
-                  >
-                    <Text style={[styles.chipOptionText, { color: colors.textLight }, selected && styles.chipOptionTextSelected]}>
-                      {`${value} ${t('prayer.minutes')}`}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+          <InlineDropdown
+            label={t('notificationSounds.didYouPraySnoozeLabel')}
+            options={DID_YOU_PRAY_SNOOZE_OPTIONS.map((v) => ({
+              value: v,
+              label: `${v} ${t('prayer.minutes')}`,
+            }))}
+            value={settings.notifications.didYouPraySnoozeMinutes ?? 15}
+            onChange={(v) => updateNotifications({ didYouPraySnoozeMinutes: v })}
+            disabled={!isEnabled}
+          />
         </>
       )}
 
@@ -1660,7 +2045,7 @@ export default function NotificationsScreen() {
       <TouchableOpacity
         style={[
           styles.testNotifButton,
-          { backgroundColor: colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row', opacity: isEnabled ? 1 : 0.5 },
+          { backgroundColor: '#091f1d', flexDirection: isRTL ? 'row-reverse' : 'row', opacity: isEnabled ? 1 : 0.5 },
         ]}
         onPress={() => handleTestNotification(categoryId)}
         disabled={!isEnabled || isSending}
@@ -1673,7 +2058,7 @@ export default function NotificationsScreen() {
         ) : (
           <MaterialCommunityIcons name="bell-ring-outline" size={18} color="#0d8e62" />
         )}
-        <Text style={[styles.testNotifText, { color: wasSent ? '#0d8e62' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+        <Text style={[styles.testNotifText, { color: wasSent ? '#0d8e62' : '#ffffff', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {wasSent ? t('notificationSounds.testSuccess') : t('notificationSounds.testNotification')}
         </Text>
       </TouchableOpacity>
@@ -2044,24 +2429,32 @@ export default function NotificationsScreen() {
 
         {/* Notification Categories */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('notificationSounds.notificationTypes')}
           </Text>
 
-          <View style={[styles.categoriesContainer, { backgroundColor: colors.card }]}>
+          <View style={[styles.categoriesContainer, { backgroundColor: 'transparent' }]}>
             {NOTIFICATION_CATEGORIES.map((category, index) => {
               const categoryEnabled = getCategoryEnabled(category.id);
               const isExpanded = expandedCategory === category.id;
               const isLast = index === NOTIFICATION_CATEGORIES.length - 1;
 
               return (
-                <View key={category.id}>
+                <View
+                  key={category.id}
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(15,25,30,0.55)' : 'rgba(255,255,255,0.85)',
+                    marginHorizontal: 12,
+                    marginBottom: 8,
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                  }}
+                >
                   {/* Category header row */}
                   <TouchableOpacity
                     style={[
                       styles.categoryRow,
-                      !isLast && !isExpanded && styles.categoryRowBorder,
-                      !isLast && !isExpanded && { borderBottomColor: colors.divider },
+                      { backgroundColor: 'transparent', marginHorizontal: 0, marginBottom: 0, borderRadius: 0 },
                       !isEnabled && styles.disabledOpacity,
                       { flexDirection: isRTL ? 'row-reverse' : 'row' },
                     ]}
@@ -2117,13 +2510,11 @@ export default function NotificationsScreen() {
                     </TouchableOpacity>
                   </TouchableOpacity>
 
-                  {/* Expanded content */}
+                  {/* Expanded content (lives inside the category card so it shares the same surface) */}
                   {isExpanded && categoryEnabled && isEnabled && (
                     <View style={[
                       styles.expandedWrapper,
-                      { backgroundColor: colors.surface },
-                      !isLast && styles.categoryRowBorder,
-                      !isLast && { borderBottomColor: colors.divider },
+                      { backgroundColor: 'transparent', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                     ]}>
                       {renderExpandedContent(category.id)}
                     </View>
@@ -2136,50 +2527,67 @@ export default function NotificationsScreen() {
 
         {/* Sound & Vibration global settings */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight }]}>{t('settings.sound')}</Text>
-          <View style={[styles.categoriesContainer, { backgroundColor: colors.card }]}>
-            <View style={[styles.innerSettingRow, styles.globalSettingRow, { borderBottomColor: colors.divider }, styles.categoryRowBorder, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          {/* Visual separator between the notification list and the sound block */}
+          <View
+            style={{
+              height: StyleSheet.hairlineWidth,
+              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
+              marginHorizontal: 16,
+              marginTop: 24,
+              marginBottom: 4,
+            }}
+          />
+          <Text style={[styles.sectionTitle, { color: colors.textLight, marginTop: 8, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.sound')}</Text>
+          <View style={[styles.categoriesContainer, { backgroundColor: 'transparent' }]}>
+            <View
+              style={{
+                backgroundColor: isDarkMode ? 'rgba(15,25,30,0.55)' : 'rgba(255,255,255,0.85)',
+                marginHorizontal: 12,
+                borderRadius: 14,
+                overflow: 'hidden',
+              }}
+            >
+              <View style={[styles.innerSettingRow, styles.globalSettingRow, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }]}>
                 <View style={[styles.categoryIconBg, { backgroundColor: '#c17f5918' }]}>
                   <MaterialCommunityIcons name="volume-high" size={20} color="#c17f59" />
                 </View>
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>
+                <Text style={[styles.categoryTitle, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                   {t('notificationSounds.notificationSound')}
                 </Text>
+                <Switch
+                  value={settings.notifications.sound !== false}
+                  onValueChange={(val) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updateNotifications({ sound: val });
+                  }}
+                  trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+                  disabled={!isEnabled}
+                />
               </View>
-              <Switch
-                value={settings.notifications.sound !== false}
-                onValueChange={(val) => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  updateNotifications({ sound: val });
-                }}
-                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
-                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-                ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
-                disabled={!isEnabled}
-              />
-            </View>
 
-            <View style={[styles.innerSettingRow, styles.globalSettingRow, { borderBottomColor: colors.divider }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', marginHorizontal: 16 }} />
+
+              <View style={[styles.innerSettingRow, styles.globalSettingRow, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }]}>
                 <View style={[styles.categoryIconBg, { backgroundColor: '#ef535018' }]}>
                   <MaterialCommunityIcons name="vibrate" size={20} color="#ef5350" />
                 </View>
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>
+                <Text style={[styles.categoryTitle, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                   {t('notificationSounds.vibration')}
                 </Text>
+                <Switch
+                  value={settings.notifications.vibration !== false}
+                  onValueChange={(val) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updateNotifications({ vibration: val });
+                  }}
+                  trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+                  disabled={!isEnabled}
+                />
               </View>
-              <Switch
-                value={settings.notifications.vibration !== false}
-                onValueChange={(val) => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  updateNotifications({ vibration: val });
-                }}
-                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
-                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-                ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
-                disabled={!isEnabled}
-              />
             </View>
           </View>
         </Animated.View>
@@ -2200,7 +2608,7 @@ export default function NotificationsScreen() {
                   <MaterialCommunityIcons name="download" size={22} color="#ab47bc" />
                 </View>
                 <View>
-                  <Text style={[styles.categoryTitle, { color: colors.text }]}>
+                  <Text style={[styles.categoryTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('notificationSounds.additionalSounds')}
                   </Text>
                   <Text style={[styles.categorySubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
@@ -2216,7 +2624,7 @@ export default function NotificationsScreen() {
             </TouchableOpacity>
 
             {showDownloadSection && (
-              <View style={[styles.categoriesContainer, { backgroundColor: colors.card, marginTop: 8 }]}>
+              <View style={[styles.categoriesContainer, { backgroundColor: 'transparent', marginTop: 8 }]}>
                 {downloadableSounds.map((sound, index) => {
                   const isDownloaded = downloadedSounds.some(d => d.id === sound.id);
                   const isDownloading = downloadingId === sound.id;
@@ -2416,11 +2824,10 @@ const _styles = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // Categories container
+  // Categories container — kept transparent so each row's own card style shows
   categoriesContainer: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
+    marginHorizontal: 4,
+    overflow: 'visible',
   },
 
   // Category row
@@ -2430,9 +2837,12 @@ const _styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     gap: 12,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 14,
   },
   categoryRowBorder: {
-    borderBottomWidth: 1,
+    // Divider replaced by card spacing; keep style for compatibility
   },
   categoryRowBorderDark: {
     borderBottomColor: '#2d3740',
@@ -2492,7 +2902,6 @@ const _styles = StyleSheet.create({
   innerSettingInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     gap: 10,
   },
   innerSettingTitle: {
@@ -2792,7 +3201,8 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 10,
     gap: 8,
-    marginHorizontal: 14,
+    width: '100%',
+    marginHorizontal: 0,
     marginTop: 10,
   },
   testNotifText: {
@@ -3119,7 +3529,7 @@ const _styles = StyleSheet.create({
   },
   // Day picker styles
   dayPickerContainer: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 0,
     paddingTop: 10,
     paddingBottom: 6,
     borderTopWidth: 1,

@@ -315,7 +315,7 @@ const SidebarGroupItem: React.FC<{
         className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm ${
           isActive && !isOpen
             ? 'bg-accent/20 text-accent-light'
-            : 'text-admin-muted hover:bg-admin-surface hover:text-white'
+            : 'text-slate-200 hover:bg-admin-surface hover:text-white'
         }`}
       >
         <div className="flex items-center gap-3">
@@ -335,7 +335,7 @@ const SidebarGroupItem: React.FC<{
                 `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs ${
                   active
                     ? 'bg-accent text-white'
-                    : 'text-admin-muted hover:bg-admin-surface hover:text-white'
+                    : 'text-slate-300 hover:bg-admin-surface hover:text-white'
                 }`
               }
             >

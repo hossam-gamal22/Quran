@@ -3,8 +3,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { shouldRefetchContent, markContentFetched } from '@/lib/content-manifest';
 
 const CACHE_KEY = '@theme_config';
 
@@ -76,22 +77,24 @@ export const ThemeConfigProvider = ({ children }: { children: ReactNode }) => {
       setIsLoaded(true);
     }).catch(() => setIsLoaded(true));
 
-    // Subscribe to Firestore for live updates
-    const unsubscribe = onSnapshot(
-      doc(db, 'appConfig', 'themeConfig'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as ThemeConfigData;
-          setThemeConfig(data);
-          AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(() => {});
-        }
-      },
-      () => {
-        // Firestore error — use cached data
+    // Manifest-gated one-shot read — skips Firestore entirely when the admin
+    // hasn't bumped 'themeConfig' since the last fetch (24h safety TTL).
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await shouldRefetchContent('themeConfig'))) return;
+        const snap = await getDoc(doc(db, 'appConfig', 'themeConfig'));
+        await markContentFetched('themeConfig');
+        if (cancelled || !snap.exists()) return;
+        const data = snap.data() as ThemeConfigData;
+        setThemeConfig(data);
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(() => {});
+      } catch {
+        // Firestore error — keep showing cached data
       }
-    );
+    })();
 
-    return () => unsubscribe();
+    return () => { cancelled = true; };
   }, []);
 
   return (

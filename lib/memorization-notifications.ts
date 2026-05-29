@@ -10,6 +10,7 @@ import {
   NOTIFICATION_SOUND_FILES,
   resolveSoundFile,
 } from '@/services/notifications/channels';
+import { markPermissionRequested } from '@/lib/permission-recovery';
 
 const STORAGE_KEY = '@rooh_memorization_notif_ids';
 const MEMORIZATION_REMINDER_SOUND = 'notif_verse';
@@ -57,6 +58,9 @@ export async function scheduleMemorizationReminder(
   try {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) {
+      if (Platform.OS === 'android') {
+        await markPermissionRequested('notifications');
+      }
       const req = await Notifications.requestPermissionsAsync();
       if (!req.granted) return null;
     }

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, Platform } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontBold, fontRegular, arabicBodyStyle } from '@/lib/fonts';
+import { ModalColors } from '@/constants/theme';
 
 interface SectionInfoButtonProps {
   sectionKey: string;
@@ -55,10 +55,7 @@ export const SectionInfoButton: React.FC<SectionInfoButtonProps> = ({
             style={[infoStyles.card]}
             onPress={(e) => e.stopPropagation()}
           >
-            {Platform.OS === 'ios' && (
-              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-            )}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight }]} />
             <View style={infoStyles.iconWrap}>
               <MaterialCommunityIcons name="information" size={40} color="#0d8e62" />
             </View>

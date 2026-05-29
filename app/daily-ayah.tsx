@@ -36,12 +36,6 @@ import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import { Spacing } from '@/constants/theme';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { DAILY_AYAHS } from '@/data/daily-ayahs';
-import { getSeasonalAyahForDate } from '@/lib/seasonal-ayah';
-import { ensureVersePool, daysSinceSeed, type VersePoolEntry } from '@/lib/verse-pool';
-import { useQuran } from '@/contexts/QuranContext';
-import { getAyahAudioUrl } from '@/lib/quran-cache';
-import { getGlobalAyahNumber } from '@/lib/azkar-quran-audio';
-import { shareAudio } from '@/lib/share-service';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Background image categories ────────────────────────────────────────────
@@ -124,16 +118,6 @@ interface AyahCardProps {
 }
 
 const toArabicNumeral = (n: number) => localizeNumber(n);
-
-function poolEntryToDailyAyah(entry: VersePoolEntry): typeof DAILY_AYAHS[0] {
-  return {
-    arabic: entry.arabic,
-    ref: `${entry.surahName} ${entry.ayahNumber}`,
-    trans: entry.translation || '',
-    surah: entry.surahNumber,
-    ayah: entry.ayahNumber,
-  };
-}
 
 const TEXT_SHADOW = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -230,7 +214,6 @@ export default function DailyAyahVideoScreen() {
   const pageBgUrl = natureCat.images[dayOfYear % natureCat.images.length];
   const [showTranslation, setShowTranslation] = useState(!isArabic);
   const isEnglish = language === 'en';
-  const { currentReciter } = useQuran();
   const [showTafsir, setShowTafsir] = useState(false);
   const [tafsirText, setTafsirText] = useState<string | null>(null);
   const [tafsirLoading, setTafsirLoading] = useState(false);
@@ -239,12 +222,10 @@ export default function DailyAyahVideoScreen() {
   const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
   const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
   const [overrideAyah, setOverrideAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
-  const [seasonalAyah, setSeasonalAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
-  const [poolAyah, setPoolAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
   const [randomAyah, setRandomAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
 
-  const currentAyah = randomAyah || overrideAyah || seasonalAyah || poolAyah || DAILY_AYAHS[ayahIdx];
+  const currentAyah = randomAyah || overrideAyah || DAILY_AYAHS[ayahIdx];
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
@@ -274,23 +255,6 @@ export default function DailyAyahVideoScreen() {
         });
       }
     });
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    setSeasonalAyah(getSeasonalAyahForDate(today));
-    ensureVersePool()
-      .then((pool) => {
-        if (cancelled || !pool.entries.length) return;
-        const elapsed = Math.max(0, daysSinceSeed(pool));
-        const idx = ((elapsed % pool.entries.length) + pool.entries.length) % pool.entries.length;
-        const entry = pool.entries[idx];
-        if (entry) setPoolAyah(poolEntryToDailyAyah(entry));
-      })
-      .catch((e) => {
-        if (__DEV__) console.warn('[daily-ayah] verse pool failed:', e);
-      });
-    return () => { cancelled = true; };
   }, []);
   const currentBg = selectedCat.images[selectedBgIdx];
 
@@ -411,22 +375,14 @@ export default function DailyAyahVideoScreen() {
     }
   }, []);
 
-  const shareAsText = useCallback(async () => {
-    try {
-      await Share.share({
-        message: `${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${verseTranslation || currentAyah.trans}\n\n— ${t('common.appName')}`,
-      });
-    } catch {
-      Alert.alert(t('common.error'), t('common.shareError'));
-    }
-  }, [currentAyah, verseTranslation]);
-
-  const shareAsImage = useCallback(async () => {
+  const handleShare = useCallback(async () => {
     if (!cardRef.current) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       if (Platform.OS === 'web') {
-        await shareAsText();
+        await Share.share({
+          message: `${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}\n\n— ${t('common.appName')}`,
+        });
         return;
       }
       const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
@@ -439,39 +395,7 @@ export default function DailyAyahVideoScreen() {
     } catch {
       Alert.alert(t('common.error'), t('common.shareError'));
     }
-  }, [currentAyah, shareAsText]);
-
-  const shareAsAudio = useCallback(async () => {
-    try {
-      const globalAyah = getGlobalAyahNumber(currentAyah.surah, currentAyah.ayah);
-      if (!globalAyah) {
-        Alert.alert(t('common.error'), t('common.noAudioFile'));
-        return;
-      }
-      const audioUrl = getAyahAudioUrl(currentReciter, globalAyah, currentAyah.surah, currentAyah.ayah);
-      await shareAudio(
-        audioUrl,
-        currentAyah.ref,
-        `quran-${currentAyah.surah}-${currentAyah.ayah}.mp3`,
-      );
-    } catch {
-      Alert.alert(t('common.error'), t('common.shareError'));
-    }
-  }, [currentAyah, currentReciter]);
-
-  const handleShare = useCallback(() => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      t('common.share'),
-      '',
-      [
-        { text: t('common.shareText'), onPress: shareAsText },
-        { text: t('common.shareImage'), onPress: shareAsImage },
-        { text: t('common.shareAudio'), onPress: shareAsAudio },
-        { text: t('common.cancel'), style: 'cancel' },
-      ],
-    );
-  }, [shareAsAudio, shareAsImage, shareAsText]);
+  }, [currentAyah]);
 
   const s = StyleSheet.create({
     title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2 },

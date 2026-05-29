@@ -2,7 +2,7 @@
 // سياق الاشتراكات - روح المسلم
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, AppState } from 'react-native';
 import Constants from 'expo-constants';
 
 import {
@@ -21,7 +21,7 @@ import {
 import { fetchFeatureGatingConfig, subscribeToFeatureGating, isFeaturePremium, DEFAULT_FEATURE_GATING } from '@/lib/feature-gating';
 import type { PremiumFeatureKey, PremiumSource, FeatureGatingConfig, AdminGrantedPremium } from '@/types/premium';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { t } from '@/lib/i18n';
 import * as Notifications from 'expo-notifications';
@@ -260,15 +260,19 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setPremiumSource(savedSource);
         premiumSourceRef.current = savedSource;
 
-        // Check admin-granted premium
+        // Check admin-granted premium.
+        // Poll on app open + foreground resume instead of a persistent
+        // onSnapshot listener. The user doc is written to frequently
+        // (engagement sync, prayer sync, lastActive) and a live listener
+        // would bill an extra read on every one of those writes. Admin
+        // premium grants are rare and monthly, so refreshing on each
+        // foreground is more than responsive enough.
         try {
           const userId = await getUserId();
           if (userId) {
             const userRef = doc(db, 'users', userId);
-            // Real-time listener for admin premium changes (grant/revoke/expiry)
-            adminPremiumUnsub.current = onSnapshot(userRef, async (snap) => {
+            const applyAdminPremium = async (data: any) => {
               if (!mounted) return;
-              const data = snap.data();
               const adminPremium = data?.adminPremium as AdminGrantedPremium | undefined;
               const currentState = stateRef.current;
               const currentSource = premiumSourceRef.current;
@@ -374,9 +378,23 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   setSubscriptionState(clearedState).catch(() => {});
                 }
               }
-            }, (err) => {
-              console.log('⚠️ Admin premium listener error:', err);
+            };
+
+            const refreshAdminPremium = async () => {
+              try {
+                const snap = await getDoc(userRef);
+                await applyAdminPremium(snap.data());
+              } catch (err) {
+                console.log('⚠️ Admin premium refresh failed:', err);
+              }
+            };
+
+            await refreshAdminPremium();
+
+            const appStateSub = AppState.addEventListener('change', (next) => {
+              if (next === 'active') refreshAdminPremium();
             });
+            adminPremiumUnsub.current = () => appStateSub.remove();
           }
         } catch (e) {
           console.log('⚠️ Admin premium check failed:', e);

@@ -99,6 +99,24 @@ export function GlassCard({
     );
   }
 
+  if (Platform.OS === 'android') {
+    return (
+      <View
+        style={[
+          {
+            borderRadius,
+            backgroundColor: isDarkMode
+              ? 'rgba(15, 25, 30, 0.55)'
+              : 'rgba(255, 255, 255, 0.75)',
+          },
+          outerStyle,
+        ]}
+      >
+        <View style={[styles.content, innerContentStyle]}>{children}</View>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -109,7 +127,7 @@ export function GlassCard({
     >
       <View style={{ borderRadius, overflow: 'hidden', flex: 1 }}>
         <BlurView
-         
+
           intensity={intensity}
           tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={[StyleSheet.absoluteFill, { borderRadius }]}
@@ -121,14 +139,25 @@ export function GlassCard({
               backgroundColor: isDarkMode
                 ? 'rgba(30, 30, 30, 0.40)'
                 : 'rgba(255, 255, 255, 0.60)',
-              borderRadius,
-              borderWidth: noBorder ? 0 : StyleSheet.hairlineWidth,
-              borderColor: isDarkMode
-                ? 'rgba(255, 255, 255, 0.50)'
-                : 'rgba(0, 0, 0, 0.12)',
             },
           ]}
+          pointerEvents="none"
         />
+        {!noBorder && (
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderRadius,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: isDarkMode
+                  ? 'rgba(255, 255, 255, 0.08)'
+                  : 'rgba(0, 0, 0, 0.10)',
+              },
+            ]}
+          />
+        )}
         <View style={[styles.content, innerContentStyle]}>{children}</View>
       </View>
     </View>
@@ -350,10 +379,26 @@ export function GlassToggle({
     );
   }
 
+  if (Platform.OS === 'android') {
+    return (
+      <View
+        style={{
+          borderRadius: 14,
+          marginBottom: 8,
+          backgroundColor: isDarkMode
+            ? 'rgba(15, 25, 30, 0.55)'
+            : 'rgba(255, 255, 255, 0.75)',
+        }}
+      >
+        {toggleContent}
+      </View>
+    );
+  }
+
   return (
     <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8 }}>
       <BlurView
-       
+
         intensity={80}
         tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={StyleSheet.absoluteFill}
@@ -367,11 +412,12 @@ export function GlassToggle({
               : 'rgba(255, 255, 255, 0.60)',
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.60)'
+              ? 'rgba(255,255,255,0.08)'
               : 'rgba(0,0,0,0.06)',
             borderRadius: 14,
           },
         ]}
+        pointerEvents="none"
       />
       {toggleContent}
     </View>
@@ -489,10 +535,26 @@ export function GlassListItem({
     );
   }
 
+  if (Platform.OS === 'android') {
+    return (
+      <View
+        style={{
+          borderRadius: 14,
+          marginBottom: 4,
+          backgroundColor: isDarkMode
+            ? 'rgba(15, 25, 30, 0.55)'
+            : 'rgba(255, 255, 255, 0.75)',
+        }}
+      >
+        {itemContent}
+      </View>
+    );
+  }
+
   return (
     <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 4 }}>
       <BlurView
-       
+
         intensity={80}
         tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={StyleSheet.absoluteFill}
@@ -506,11 +568,12 @@ export function GlassListItem({
               : 'rgba(255, 255, 255, 0.60)',
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.60)'
+              ? 'rgba(255,255,255,0.08)'
               : 'rgba(0,0,0,0.06)',
             borderRadius: 14,
           },
         ]}
+        pointerEvents="none"
       />
       {itemContent}
     </View>
@@ -533,6 +596,31 @@ export function GlassSection({ title, children, style }: GlassSectionProps) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
 
+  if (Platform.OS === 'android') {
+    return (
+      <View style={[styles.section, style]}>
+        {title && (
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            {title}
+          </Text>
+        )}
+        <View
+          style={[
+            styles.sectionContent,
+            {
+              backgroundColor: isDarkMode
+                ? 'rgba(15, 25, 30, 0.55)'
+                : 'rgba(255, 255, 255, 0.75)',
+              borderWidth: 0,
+            },
+          ]}
+        >
+          <View>{children}</View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.section, style]}>
       {title && (
@@ -545,7 +633,7 @@ export function GlassSection({ title, children, style }: GlassSectionProps) {
           styles.sectionContent,
           {
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.60)'
+              ? 'rgba(255,255,255,0.08)'
               : 'rgba(0,0,0,0.06)',
             borderWidth: StyleSheet.hairlineWidth,
           },
@@ -553,7 +641,7 @@ export function GlassSection({ title, children, style }: GlassSectionProps) {
       >
         {Platform.OS !== 'web' ? (
           <BlurView
-           
+
             intensity={80}
             tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}

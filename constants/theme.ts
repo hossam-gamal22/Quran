@@ -10,7 +10,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 export const Colors = {
   // الألوان الأساسية
   primary: '#0d8e62',
-  primaryLight: '#3da87e',
+  primaryLight: '#14b87a',
   primaryDark: '#0a7050',
   
   // الألوان الثانوية
@@ -74,7 +74,7 @@ export const Colors = {
 export const DarkColors = {
   // الألوان الأساسية
   primary: '#0d8e62',
-  primaryLight: '#3da87e',
+  primaryLight: '#14b87a',
   primaryDark: '#0a7050',
   
   // الألوان الثانوية
@@ -283,6 +283,21 @@ const createShadow = (
     shadowRadius: radius,
     elevation: elevation,
   };
+};
+
+// ============================================
+// ألوان موحّدة للـ Modals (نفس الشكل على iOS و Android)
+// Card surface inside a modal — opaque so it renders identically on both platforms.
+// ============================================
+export const ModalColors = {
+  // Single source of truth for modal card backgrounds.
+  // Change here to update every modal in the app at once.
+  cardDark: '#091f1d',
+  cardLight: '#ffffff',
+  // Overlay slightly lighter than full-black so the card border reads as a clear edge.
+  overlay: 'rgba(0,0,0,0.55)',
+  borderDark: 'rgba(255,255,255,0.18)',
+  borderLight: 'rgba(0,0,0,0.12)',
 };
 
 export const Shadows = {

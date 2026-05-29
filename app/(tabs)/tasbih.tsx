@@ -56,6 +56,18 @@ import {
   didReachTasbihTarget,
   removeLowerTargetDuplicateTasbihat,
 } from '@/lib/tasbih-progress';
+import {
+  type AppTasbihPreset,
+  getOpeningTasbihPreset,
+  getDefaultTasbihatForApp,
+  getTasbihVirtueTitle,
+  resolveTasbihPresetText,
+  YUNUS_DUA_POINT_TARGET,
+  YUNUS_DUA_TASBIH_REFERENCE,
+  YUNUS_DUA_TASBIH_TEXT,
+  YUNUS_DUA_TASBIH_TRANSLITERATION,
+  YUNUS_DUA_TASBIH_VIRTUE,
+} from '@/lib/tasbih-presets';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -70,16 +82,7 @@ function stripTashkeel(text: string): string {
 // الأنواع
 // ============================================
 
-interface TasbihItem {
-  id: number;
-  text: string;
-  transliteration?: string;
-  target: number;
-  virtue?: string;
-  reference?: string;
-  source?: 'quran' | 'hadith_sahih' | 'hadith_hasan' | 'athar';
-  grade?: string;
-}
+type TasbihItem = AppTasbihPreset & { grade?: string };
 
 interface CustomTasbih {
   id: number;
@@ -88,126 +91,13 @@ interface CustomTasbih {
   createdAt: string;
 }
 
-const YUNUS_DUA_TASBIH_TEXT = 'لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ';
-const YUNUS_DUA_TASBIH_TRANSLITERATION = 'La ilaha illa anta subhanaka inni kuntu minaz-zalimin';
-const YUNUS_DUA_TASBIH_VIRTUE = 'دعوة ذي النون عليه السلام؛ قال النبي ﷺ: «فإنه لم يدعُ بها رجل مسلم في شيء قط إلا استجاب الله له». ولم يثبت لها عدد مخصوص';
-const YUNUS_DUA_TASBIH_REFERENCE = 'الأنبياء: 87، وسنن الترمذي 3505';
-const YUNUS_DUA_POINT_TARGET = 1;
 const DEPRECATED_SUBHAN_WABIHAMDIH_TEXT = 'سبحان الله وبحمده';
 
 // ============================================
 // بيانات التسبيحات المعتمدة
 // ============================================
 
-const DEFAULT_PRESET_TASBIHAT: TasbihItem[] = [
-  {
-    id: 1,
-    text: 'سُبْحَانَ اللهِ',
-    transliteration: 'Subhan Allah',
-    target: 33,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 2,
-    text: 'الْحَمْدُ لِلَّهِ',
-    transliteration: 'Alhamdulillah',
-    target: 33,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 3,
-    text: 'اللهُ أَكْبَرُ',
-    transliteration: 'Allahu Akbar',
-    target: 33,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 4,
-    text: 'لَا إِلَهَ إِلَّا اللهُ',
-    transliteration: 'La ilaha illa Allah',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 5,
-    text: 'لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-    transliteration: 'La ilaha illa Allahu wahdahu la sharika lah, lahul mulku wa lahul hamdu wa huwa ala kulli shayin qadir',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 6,
-    text: YUNUS_DUA_TASBIH_TEXT,
-    transliteration: YUNUS_DUA_TASBIH_TRANSLITERATION,
-    target: 1,
-    source: 'quran',
-    virtue: YUNUS_DUA_TASBIH_VIRTUE,
-    reference: YUNUS_DUA_TASBIH_REFERENCE,
-  },
-  {
-    id: 7,
-    text: 'سُبْحَانَ اللهِ الْعَظِيمِ وَبِحَمْدِهِ',
-    transliteration: 'Subhan Allahil Azeem wa bihamdih',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 8,
-    text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللهِ',
-    transliteration: 'La hawla wa la quwwata illa billah',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 9,
-    text: 'أَسْتَغْفِرُ اللهَ',
-    transliteration: 'Astaghfirullah',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 10,
-    text: 'أَسْتَغْفِرُ اللهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ',
-    transliteration: 'Astaghfirullaha al-Azeem alladhi la ilaha illa huwal Hayyul Qayyumu wa atubu ilayh',
-    target: 3,
-    source: 'hadith_hasan',
-  },
-  {
-    id: 11,
-    text: 'سُبْحَانَ اللهِ، وَالْحَمْدُ لِلَّهِ، وَلَا إِلَهَ إِلَّا اللهُ، وَاللهُ أَكْبَرُ',
-    transliteration: 'Subhan Allah, wal hamdulillah, wa la ilaha illa Allah, wallahu Akbar',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 12,
-    text: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
-    transliteration: 'Allahumma salli wa sallim ala nabiyyina Muhammad',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 13,
-    text: 'رَبِّ اغْفِرْ لِي وَتُبْ عَلَيَّ إِنَّكَ أَنْتَ التَّوَّابُ الرَّحِيمُ',
-    transliteration: 'Rabbi ighfir li wa tub alayya innaka antat-Tawwabur-Rahim',
-    target: 100,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 14,
-    text: 'سُبُّوحٌ قُدُّوسٌ رَبُّ الْمَلَائِكَةِ وَالرُّوحِ',
-    transliteration: 'Subbuhun Quddusun Rabbul malaikati war-ruh',
-    target: 33,
-    source: 'hadith_sahih',
-  },
-  {
-    id: 15,
-    text: 'يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ',
-    transliteration: 'Ya Hayyu Ya Qayyum bi rahmatika astaghith',
-    target: 7,
-    source: 'hadith_hasan',
-  },
-];
+const DEFAULT_PRESET_TASBIHAT: TasbihItem[] = getDefaultTasbihatForApp();
 
 function normalizePresetTranslationId(id: unknown): number | undefined {
   if (typeof id === 'number' && Number.isInteger(id) && id >= 1 && id <= DEFAULT_PRESET_TASBIHAT.length) {
@@ -252,9 +142,11 @@ function getPresetVirtue(id: unknown, fallback?: string): string | undefined {
     return isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback;
   }
 
-  return getBundledTasbihValue('virtue', presetId) || (
-    isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback
-  );
+  return resolveTasbihPresetText({
+    language: getLanguage(),
+    bundled: getBundledTasbihValue('virtue', presetId),
+    fallback: isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback,
+  });
 }
 function getPresetReference(id: unknown, fallback?: string): string | undefined {
   const presetId = normalizePresetTranslationId(id);
@@ -263,9 +155,11 @@ function getPresetReference(id: unknown, fallback?: string): string | undefined 
     return isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback;
   }
 
-  return getBundledTasbihValue('reference', presetId) || (
-    isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback
-  );
+  return resolveTasbihPresetText({
+    language: getLanguage(),
+    bundled: getBundledTasbihValue('reference', presetId),
+    fallback: isGeneratedTasbihPlaceholder(cleanFallback) ? undefined : cleanFallback,
+  });
 }
 function getPresetGrade(id: unknown): string | undefined {
   const presetId = normalizePresetTranslationId(id);
@@ -441,6 +335,18 @@ export default function TasbihScreen() {
       if (nextPresets.length === 0) return;
 
       setPresetTasbihat(nextPresets);
+      const openingSelected = getOpeningTasbihPreset(nextPresets, {
+        selectedId: selectedIdRef.current,
+        count: countRef.current,
+        totalCount: totalCountRef.current,
+        rounds: roundsRef.current,
+      });
+      if (openingSelected) {
+        selectedIdRef.current = openingSelected.id;
+        setSelectedTasbih(openingSelected);
+        return;
+      }
+
       const updatedSelected = nextPresets.find(item => item.id === selectedIdRef.current);
       if (updatedSelected) {
         selectedIdRef.current = updatedSelected.id;
@@ -696,19 +602,25 @@ export default function TasbihScreen() {
           const progressDate = p.date || '';
           if (progressDate === todayISO) {
             console.log('📿 [Tasbih] Restoring same-day progress:', { count: p.count, total: p.totalCount, rounds: p.rounds });
-            setCount(p.count || 0);
-            setTotalCount(p.totalCount || 0);
-            setRounds(p.rounds || 0);
+            const savedCount = p.count || 0;
+            const savedTotalCount = p.totalCount || 0;
+            const savedRounds = p.rounds || 0;
+            setCount(savedCount);
+            setTotalCount(savedTotalCount);
+            setRounds(savedRounds);
             // Sync refs immediately
-            countRef.current = p.count || 0;
-            totalCountRef.current = p.totalCount || 0;
-            roundsRef.current = p.rounds || 0;
-            if (p.selectedId) {
-              const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
-              if (found) {
-                setSelectedTasbih(applyTasbihTargetOverride(found, targetOverridesRef.current));
-                selectedIdRef.current = found.id;
-              }
+            countRef.current = savedCount;
+            totalCountRef.current = savedTotalCount;
+            roundsRef.current = savedRounds;
+            const openingSelected = getOpeningTasbihPreset(PRESET_TASBIHAT, {
+              selectedId: p.selectedId,
+              count: savedCount,
+              totalCount: savedTotalCount,
+              rounds: savedRounds,
+            });
+            if (openingSelected) {
+              selectedIdRef.current = openingSelected.id;
+              setSelectedTasbih(applyTasbihTargetOverride(openingSelected, targetOverridesRef.current));
             }
           } else {
             console.log('📿 [Tasbih] Progress date mismatch, treating as fresh day:', { progressDate, todayISO });
@@ -1518,9 +1430,17 @@ export default function TasbihScreen() {
               borderColor: isDarkMode ? 'rgba(13,142,98,0.30)' : 'rgba(13,142,98,0.20)',
             }]}>
               {/* Header */}
-              <View style={[s.virtueHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[s.virtueHeader, {
+                flexDirection: 'row',
+                alignSelf: isRTL ? 'flex-end' : 'flex-start',
+              }]}>
                 <MaterialCommunityIcons name="star" size={16} color={GREEN} />
-                <Text style={[s.virtueTitle, { color: GREEN }]}>{t('azkar.dhikrVirtue')}</Text>
+                <Text style={[s.virtueTitle, {
+                  color: GREEN,
+                  marginLeft: 6,
+                  writingDirection: isRTL ? 'rtl' : 'ltr',
+                  textAlign: isRTL ? 'right' : 'left',
+                }]}>{getTasbihVirtueTitle(getLanguage())}</Text>
               </View>
               
               {/* Virtue text */}
@@ -1554,18 +1474,22 @@ export default function TasbihScreen() {
               overflow: 'hidden',
               ...Platform.select({
                 ios: { shadowColor: GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.10, shadowRadius: 20 },
-                android: { elevation: 4 },
+                android: {},
               }),
             }]}>
               {Platform.OS === 'ios' ? (
-                <BlurView
-                 
-                  intensity={80}
-                  tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-                  style={[StyleSheet.absoluteFill, { borderRadius: (RING_SIZE + 20) / 2 }]}
-                />
-              ) : null}
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.45)' : 'rgba(255,255,255,0.60)', borderRadius: (RING_SIZE + 20) / 2 }]} />
+                <>
+                  <BlurView
+
+                    intensity={80}
+                    tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+                    style={[StyleSheet.absoluteFill, { borderRadius: (RING_SIZE + 20) / 2 }]}
+                  />
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.45)' : 'rgba(255,255,255,0.60)', borderRadius: (RING_SIZE + 20) / 2 }]} />
+                </>
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(15,25,30,0.55)' : 'rgba(255,255,255,0.75)', borderRadius: (RING_SIZE + 20) / 2 }]} />
+              )}
               <Svg width={RING_SIZE} height={RING_SIZE} style={{ transform: [{ rotate: '-90deg' }] }}>
                 {/* Inner subtle fill */}
                 <Circle
@@ -1685,24 +1609,19 @@ export default function TasbihScreen() {
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
               <Text style={[s.sectionLabel, { color: C.textSec, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.approvedDhikr')}</Text>
               {PRESET_TASBIHAT.map((item) => (
-                <View key={item.id} style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8 }}>
-                  {Platform.OS === 'ios' && (
-                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-                  )}
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <View key={item.id} style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8, backgroundColor: isDarkMode ? 'rgba(15,25,30,0.55)' : 'rgba(255,255,255,0.85)' }}>
                   <TouchableOpacity
-                    style={[s.listItem, { backgroundColor: 'transparent', marginBottom: 0 }, selectedTasbih.id === item.id && { borderColor: GREEN, borderWidth: 2 }]}
+                    style={[s.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: 'transparent', marginBottom: 0 }, selectedTasbih.id === item.id && { borderColor: GREEN, borderWidth: 2 }]}
                     onPress={() => selectTasbih(item)}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[s.listItemText, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isArabic ? stripTashkeel(item.text) : (item.transliteration || stripTashkeel(item.text))}</Text>
-                      <View style={[s.listItemMeta, { justifyContent: isRTL ? 'flex-end' : 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <View style={[s.listItemMeta, { justifyContent: isRTL ? 'flex-start' : 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <Text style={[s.listItemTarget, { color: C.textSec }]}>× {item.target}</Text>
                         {getPresetGrade(item.id) && <View style={s.gradeBadge}><Text style={s.gradeBadgeText}>{getPresetGrade(item.id)}</Text></View>}
                       </View>
                       {getPresetVirtue(item.id, item.virtue) && <Text style={[s.listItemVirtue, { color: C.textSec, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>{getPresetVirtue(item.id, item.virtue)}</Text>}
                     </View>
-                    {selectedTasbih.id === item.id && <MaterialCommunityIcons name="check-circle" size={24} color={GREEN} />}
                   </TouchableOpacity>
                 </View>
               ))}
@@ -1711,11 +1630,7 @@ export default function TasbihScreen() {
                 <>
                   <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.myCustomDhikr')}</Text>
                   {customTasbihat.map((item) => (
-                    <View key={item.id} style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8 }}>
-                      {Platform.OS === 'ios' && (
-                        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-                      )}
-                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                    <View key={item.id} style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8, backgroundColor: isDarkMode ? 'rgba(15,25,30,0.55)' : 'rgba(255,255,255,0.85)' }}>
                       <TouchableOpacity
                         style={[s.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: 'transparent', marginBottom: 0 }]}
                         onPress={() => selectTasbih(item)}
@@ -2149,7 +2064,6 @@ const _s = StyleSheet.create({
   virtueHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     marginBottom: 8,
   },
   virtueTitle: {

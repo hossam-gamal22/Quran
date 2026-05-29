@@ -36,6 +36,7 @@ import { ThemeConfigProvider } from '@/contexts/ThemeConfigContext';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 import { CelebrationProvider } from '@/contexts/CelebrationContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import { SmartAlarmProvider } from '@/contexts/SmartAlarmContext';
 import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
 import { AdsProvider, useAds } from '@/lib/ads-context';
 import { AppConfigProvider } from '@/lib/app-config-context';
@@ -45,12 +46,13 @@ import { SubscriptionProvider, useSubscription } from '@/contexts/SubscriptionCo
 import { registerUser, updateLastActive, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore } from '@/lib/firebase-user';
 import { db } from '@/lib/firebase-config';
 import { doc as firestoreDoc, updateDoc as firestoreUpdateDoc, increment as firestoreIncrement } from 'firebase/firestore';
-import { 
-  initializeGlobalStats, 
-  trackAppOpen, 
-  syncLocalStats 
+import {
+  initializeGlobalStats,
+  trackAppOpen,
+  syncLocalStats,
+  flushAnalytics
 } from '@/lib/firebase-analytics';
-import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import { syncMonthlyEngagementFromLocalWorship, syncPreviousMonthIfPending, getEndOfMonthSyncIntervalMs } from '@/lib/rewards-manager';
 import { syncPremiumWorshipCloudData } from '@/lib/premium-worship-cloud-sync';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
@@ -100,6 +102,8 @@ import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
 import '@/lib/app-icon-background-task';
 import { registerAppIconBackgroundTask } from '@/lib/app-icon-background-task';
+import '@/lib/rewards-background-sync';
+import { registerRewardsBackgroundSync } from '@/lib/rewards-background-sync';
 import '@/lib/hijri-push-sync';
 import { applyHijriOverridePushPayload, registerHijriOverridePushTask } from '@/lib/hijri-push-sync';
 import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
@@ -1185,6 +1189,12 @@ export default function RootLayout() {
       'App icon background task registration',
       5000
     );
+
+    initWithTimeout(
+      () => registerRewardsBackgroundSync(),
+      'Rewards background sync registration',
+      5000
+    );
     
     // Rating: record session start + periodic check
     recordSessionStart();
@@ -1238,9 +1248,19 @@ export default function RootLayout() {
         runScheduleHealthCheck().catch((e) => console.warn('⚠️ [AppResume] scheduleHealthCheck:', e?.message));
         // Phase 9: رفع تقرير telemetry لـ Firestore (throttled 24س داخلياً)
         maybeUploadTelemetry().catch((e) => console.warn('⚠️ [AppResume] uploadTelemetry:', e?.message));
+        // Global maintenance reminder — schedule after a delay so prayers, adhkar,
+        // and the smart alarm have all finished (re)scheduling first. It inspects
+        // the farthest pending notification and nudges the user before it runs out.
+        setTimeout(() => {
+          import('@/lib/maintenance-reminder')
+            .then(({ scheduleGlobalMaintenanceReminder }) => scheduleGlobalMaintenanceReminder())
+            .catch((e) => console.warn('⚠️ [AppResume] maintenanceReminder:', e?.message));
+        }, 8000);
         recordSessionStart();
       } else if (nextAppState === 'background') {
         syncLocalStats().catch((e) => console.warn('⚠️ [AppBackground] syncLocalStats:', e?.message));
+        // Flush buffered analytics counts (one merged write per stats doc)
+        flushAnalytics().catch((e) => console.warn('⚠️ [AppBackground] flushAnalytics:', e?.message));
         // Sync widget data before app goes to background so widgets show fresh content
         syncWidgetDataToNative().catch((e) => console.warn('⚠️ [AppBackground] syncWidgetDataToNative:', e?.message));
         // Auto-backup: silently upload to cloud if premium, logged in, and >7 days since last backup
@@ -1289,13 +1309,21 @@ export default function RootLayout() {
       ensurePrayerNotificationsExist().catch(() => {});
     }, 10 * 60 * 1000);
 
+    // Flush buffered analytics every 5 minutes while the app stays open so
+    // counts reach the dashboard without waiting for a background event.
+    const analyticsFlushInterval = setInterval(() => {
+      flushAnalytics().catch(() => {});
+    }, 5 * 60 * 1000);
+
     return () => {
       subscription.remove();
       clearInterval(activityInterval);
       clearInterval(syncInterval);
       clearInterval(widgetSyncInterval);
       clearInterval(prayerCheckInterval);
+      clearInterval(analyticsFlushInterval);
       clearInterval(ratingCheckInterval);
+      flushAnalytics().catch(() => {});
       cleanupMidnight();
       unsubscribeSoundSettings();
       unsubscribeAzkar();
@@ -1309,6 +1337,61 @@ export default function RootLayout() {
     const cleanupAds = initializeAppOpenAds();
     return () => {
       cleanupAds();
+    };
+  }, []);
+
+  // End-of-month aggressive rewards sync.
+  // Background-task cadence is OS-controlled (15-60 min) which is too slow
+  // for the final hours of a month where rank can flip in minutes. While
+  // the app is in the foreground we tighten the interval as the month
+  // boundary approaches so a user's last-minute activity reaches the
+  // server before the winner-selection Cloud Function runs.
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const intervalMs = getEndOfMonthSyncIntervalMs();
+      if (intervalMs === null) {
+        timeoutId = setTimeout(scheduleNext, 60 * 60 * 1000);
+        return;
+      }
+      timeoutId = setTimeout(async () => {
+        try {
+          const { getUserId } = await import('@/lib/firebase-user');
+          const uid = await getUserId();
+          if (uid) await syncMonthlyEngagementFromLocalWorship(uid, { force: true });
+        } catch {}
+        scheduleNext();
+      }, intervalMs);
+    };
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  // First days of a new month — recover any stranded previous-month
+  // activity from this device. Without this, points earned in the last
+  // few minutes of the previous month that weren't yet uploaded would be
+  // lost and unfairly affect the winner selection.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const day = new Date().getDate();
+        if (day > 3) return;
+        const { getUserId } = await import('@/lib/firebase-user');
+        const uid = await getUserId();
+        if (!uid || cancelled) return;
+        await syncPreviousMonthIfPending(uid);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -1491,6 +1574,7 @@ export default function RootLayout() {
               <SubscriptionProvider>
               <AdsProvider>
                 <NotificationsProvider>
+                  <SmartAlarmProvider>
                   <QuranProvider>
                   <GlobalAudioProvider>
                     <KhatmaProvider>
@@ -1537,6 +1621,7 @@ export default function RootLayout() {
                           <Stack.Screen name="quran-reminder" />
                           <Stack.Screen name="daily-dua" />
                           <Stack.Screen name="daily-ayah" />
+                          <Stack.Screen name="gharib-quran" />
                           <Stack.Screen name="companions" />
                           <Stack.Screen name="religious-stories" />
                           <Stack.Screen name="question-answer" />
@@ -1552,6 +1637,16 @@ export default function RootLayout() {
                               animation: 'slide_from_bottom',
                             }}
                           />
+                          <Stack.Screen name="smart-alarm" />
+                          <Stack.Screen
+                            name="smart-alarm/ring"
+                            options={{
+                              headerShown: false,
+                              presentation: 'fullScreenModal',
+                              animation: 'slide_from_bottom',
+                              gestureEnabled: false,
+                            }}
+                          />
                         </Stack>
                         {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
                         <DynamicSplashOverlay />
@@ -1565,6 +1660,7 @@ export default function RootLayout() {
                     </KhatmaProvider>
                   </GlobalAudioProvider>
                   </QuranProvider>
+                  </SmartAlarmProvider>
                 </NotificationsProvider>
               </AdsProvider>
               </SubscriptionProvider>

@@ -423,40 +423,7 @@ export function useCompanionsContent<C extends { id?: string }, K>(
     let unsubscribe: (() => void) | undefined;
 
     const mergeCompanions = (cmsData: CMSCompanion[]) => {
-      // Merge CMS + bundled: CMS wins per-id, but bundled-only entries
-      // (e.g. new companions added to the JS bundle that the admin has not yet
-      // pushed to Firestore) are preserved instead of being dropped. Without
-      // this fallback the screen would silently shrink to the Firestore list.
-      const cmsById = new Map<string, CMSCompanion>();
-      for (const cms of cmsData) {
-        if (cms.id) cmsById.set(cms.id, cms);
-      }
-      const merged: C[] = [];
-      const seen = new Set<string>();
-
-      for (const hc of defaultCompanions) {
-        const id = (hc as { id?: string }).id;
-        if (!id) continue;
-        const cms = cmsById.get(id);
-        if (cms) {
-          merged.push({ ...hc, ...cms, audioTitle: cleanCMSAudioTitle(cms.audioTitle), ...pickEnFields(hc, cms) } as unknown as C);
-        } else {
-          merged.push(hc);
-        }
-        seen.add(id);
-      }
-      for (const cms of cmsData) {
-        if (cms.id && seen.has(cms.id)) continue;
-        merged.push({ ...cms, audioTitle: cleanCMSAudioTitle(cms.audioTitle) } as unknown as C);
-      }
-      // Dedup by Arabic name (after normalization): keep the entry with
-      // audio/video if any, else the longer transcript. Stops the same
-      // companion from showing twice when an admin re-imports.
-      const { deduped } = dedupByName(
-        merged as unknown as Array<CMSCompanion & { id?: string }>,
-        (entry) => entry.nameAr
-      );
-      return deduped as unknown as C[];
+      return mergeCompanionsForDisplay(cmsData, defaultCompanions);
     };
 
     fetchCompanionsContent().then((data) => {
@@ -508,6 +475,82 @@ const BUNDLED_RELIGIOUS_SEED: CMSReligiousStory[] = EXTRA_RELIGIOUS_STORIES
     order: story.order,
   }));
 
+export function mergeCompanionsForDisplay<C extends { id?: string }>(
+  cmsData: CMSCompanion[],
+  defaultCompanions: C[]
+): C[] {
+  // Admin order is the source of truth. CMS entries are rendered first in the
+  // exact Firestore array order, while bundled-only entries remain as a final
+  // fallback for newly shipped content that has not reached Firestore yet.
+  const defaultById = new Map<string, C>();
+  for (const companion of defaultCompanions) {
+    const id = companion.id;
+    if (id) defaultById.set(id, companion);
+  }
+
+  const merged: C[] = [];
+  const seen = new Set<string>();
+
+  for (const cms of cmsData) {
+    if (!cms?.id) continue;
+    const fallback = defaultById.get(cms.id);
+    if (fallback) {
+      merged.push({
+        ...fallback,
+        ...cms,
+        audioTitle: cleanCMSAudioTitle(cms.audioTitle),
+        ...pickEnFields(fallback, cms),
+      } as unknown as C);
+    } else {
+      merged.push({ ...cms, audioTitle: cleanCMSAudioTitle(cms.audioTitle) } as unknown as C);
+    }
+    seen.add(cms.id);
+  }
+
+  for (const companion of defaultCompanions) {
+    const id = companion.id;
+    if (id && seen.has(id)) continue;
+    merged.push(companion);
+  }
+
+  const { deduped } = dedupByName(
+    merged as unknown as Array<CMSCompanion & { id?: string }>,
+    (entry) => entry.nameAr
+  );
+  return deduped as unknown as C[];
+}
+
+export function normalizeReligiousStoriesForDisplay(items: CMSReligiousStory[]): CMSReligiousStory[] {
+  const firestoreById = new Map<string, CMSReligiousStory>();
+  for (const story of items) {
+    if (!story?.id || !story.title?.trim()) continue;
+    if (EXCLUDED_RELIGIOUS_STORY_IDS.has(story.id)) continue;
+    firestoreById.set(story.id, { ...story, audioTitle: cleanCMSAudioTitle(story.audioTitle) });
+  }
+
+  if (firestoreById.size === 0) {
+    return [...BUNDLED_RELIGIOUS_SEED].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  const seedById = new Map(BUNDLED_RELIGIOUS_SEED.map((seed) => [seed.id, seed]));
+  const merged: CMSReligiousStory[] = [];
+  const seenIds = new Set<string>();
+
+  for (const story of firestoreById.values()) {
+    const seed = seedById.get(story.id);
+    merged.push(seed ? { ...seed, ...story } : story);
+    seenIds.add(story.id);
+  }
+
+  for (const seed of BUNDLED_RELIGIOUS_SEED) {
+    if (seenIds.has(seed.id)) continue;
+    merged.push(seed);
+  }
+
+  const { deduped } = dedupByName(merged, (story) => story.title);
+  return deduped;
+}
+
 export function useReligiousStoriesContentStatus(): {
   stories: CMSReligiousStory[];
   isRefreshing: boolean;
@@ -529,35 +572,7 @@ export function useReligiousStoriesContentStatus(): {
     const lastSyncKey = `${CACHE_PREFIX}religious_stories:last_sync_at`;
 
     const normalizeStories = (items: CMSReligiousStory[]) => {
-      // Title is the only hard requirement now. Audio is optional — bundled
-      // seeds and freshly-created admin entries ship without it; the player
-      // hides itself when audioUrl is empty.
-      const firestoreById = new Map<string, CMSReligiousStory>();
-      for (const story of items) {
-        if (!story?.id || !story.title?.trim()) continue;
-        if (EXCLUDED_RELIGIOUS_STORY_IDS.has(story.id)) continue;
-        firestoreById.set(story.id, { ...story, audioTitle: cleanCMSAudioTitle(story.audioTitle) });
-      }
-      // Merge: bundled seed first, Firestore wins on collision (per id). Any
-      // Firestore-only stories that don't shadow a seed are appended.
-      const merged: CMSReligiousStory[] = [];
-      const seenIds = new Set<string>();
-      for (const seed of BUNDLED_RELIGIOUS_SEED) {
-        const fromFirestore = firestoreById.get(seed.id);
-        merged.push(fromFirestore || seed);
-        seenIds.add(seed.id);
-      }
-      for (const story of firestoreById.values()) {
-        if (seenIds.has(story.id)) continue;
-        merged.push(story);
-        seenIds.add(story.id);
-      }
-
-      // Dedup by normalized title: when two stories share the same title,
-      // keep the one with audio (or longer transcript). Shared helper so
-      // companions follow the same rule.
-      const { deduped } = dedupByName(merged, (story) => story.title);
-      return deduped.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      return normalizeReligiousStoriesForDisplay(items);
     };
 
     const getVersion = (data: ReligiousStoriesContent) =>

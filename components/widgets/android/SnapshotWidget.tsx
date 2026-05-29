@@ -18,6 +18,7 @@ import { FlexWidget, ImageWidget, OverlapWidget, TextWidget } from 'react-native
 import type { SharedWidgetData } from '@/lib/widget-data';
 import { androidWidgetProviderTarget } from '@/lib/widgets/registry';
 import { resolveWidgetTheme, type ResolvedWidgetTheme } from '@/lib/widgets/snapshot';
+import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
 import { APP_ICON, FONT, paletteFor, applyNumerals, resolveIsArabic } from './shared';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
 
@@ -193,6 +194,9 @@ export interface SnapshotWidgetProps {
   snapshotPath?: string;
   /** Diagnostic fallback reason when native could not load the PNG. */
   fallbackReason?: string;
+  /** Launcher-reported Android widget bounds in dp. Mirrors iOS GeometryReader scaling. */
+  widgetWidth?: number;
+  widgetHeight?: number;
 }
 
 /**
@@ -306,19 +310,13 @@ function formatCountdownFromEpoch(
 ): string {
   if (!nextPrayerAtEpochMs || !Number.isFinite(nextPrayerAtEpochMs)) return '—';
   const remainingSeconds = Math.max(0, Math.floor((nextPrayerAtEpochMs - now.getTime()) / 1000));
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-  const h = Math.floor(remainingSeconds / 3600);
-  const m = Math.floor((remainingSeconds % 3600) / 60);
-  const s = remainingSeconds % 60;
-  const timeStr = `${h}:${pad2(m)}:${pad2(s)}`;
-  const formatted = applyNumerals(timeStr, numerals, isArabic);
   if (__DEV__) {
     console.log(
       `[widget/android] countdown nowMs=${now.getTime()} nextPrayerAtEpochMs=${nextPrayerAtEpochMs} widgetRemainingSeconds=${remainingSeconds} prayerDataUpdatedAt=${prayerDataUpdatedAt ?? 'n/a'}`,
     );
     console.log('[PrayerCanonical] widget countdown:', remainingSeconds);
   }
-  return isArabic ? `بعد ${formatted}` : `in ${formatted}`;
+  return formatPrayerDurationWithPrefix(nextPrayerAtEpochMs, now.getTime(), isArabic ? 'ar' : 'en', 'until');
 }
 
 function formatPreviousFromEpoch(
@@ -328,14 +326,7 @@ function formatPreviousFromEpoch(
   now: Date,
 ): string {
   if (!previousPrayerAtEpochMs || !Number.isFinite(previousPrayerAtEpochMs)) return '—';
-  const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - previousPrayerAtEpochMs) / 1000));
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-  const h = Math.floor(elapsedSeconds / 3600);
-  const m = Math.floor((elapsedSeconds % 3600) / 60);
-  const s = elapsedSeconds % 60;
-  const timeStr = `${h}:${pad2(m)}:${pad2(s)}`;
-  const formatted = applyNumerals(timeStr, numerals, isArabic);
-  return isArabic ? `منذ ${formatted}` : `${formatted} ago`;
+  return formatPrayerDurationWithPrefix(previousPrayerAtEpochMs, now.getTime(), isArabic ? 'ar' : 'en', 'since');
 }
 
 const SIZE_DIMS: Record<AndroidSize, { width: number; height: number }> = {
@@ -391,6 +382,8 @@ export function SnapshotWidget({
   snapshotKey,
   snapshotPath,
   fallbackReason,
+  widgetWidth,
+  widgetHeight,
 }: SnapshotWidgetProps) {
   // Date widgets bypass the PNG entirely — they always read new Date() directly
   // so the date/time stays accurate indefinitely without app opens.
@@ -398,6 +391,13 @@ export function SnapshotWidget({
     return <LiveDateWidget widgetId={widgetId} size={size} data={data} clickAction={clickAction} clickUri={clickUri} />;
   }
   const { width, height } = SIZE_DIMS[size];
+  const targetWidth = Number.isFinite(widgetWidth) && (widgetWidth ?? 0) > 0 ? widgetWidth! : width;
+  const targetHeight = Number.isFinite(widgetHeight) && (widgetHeight ?? 0) > 0 ? widgetHeight! : height;
+  const renderScale = Math.min(targetWidth / width, targetHeight / height);
+  const renderedImageWidth = width * renderScale;
+  const renderedImageHeight = height * renderScale;
+  const imageOffsetX = (targetWidth - renderedImageWidth) / 2;
+  const imageOffsetY = (targetHeight - renderedImageHeight) / 2;
   const isAr = resolveIsArabic(data.widgetLanguage, data.language);
   // Resolve once — every consumer below reads from this single value so the
   // themed FlexWidget background, PNG file path, and live overlay colour
@@ -477,11 +477,11 @@ export function SnapshotWidget({
       style={{
         width: 'match_parent',
         height: 'match_parent',
-        // The PNG contains the full rounded React gallery tile. Fill the
-        // native parent with the same resolved theme so antialiased transparent
-        // corners never reveal Android's default light widget background.
-        backgroundColor: p.bg,
-        borderRadius: TILE_RADIUS[size],
+        // Android launchers can allocate a cell ratio that differs from the
+        // iOS/gallery snapshot. Keep the outer host transparent and fit the
+        // captured tile inside it so the snapshot is never cropped.
+        backgroundColor: '#00000000',
+        borderRadius: 0,
         overflow: 'hidden',
       }}
       clickAction={clickAction}
@@ -493,32 +493,38 @@ export function SnapshotWidget({
         // `file://` via BitmapFactory.decodeFile. Cast through `as any` because
         // we ship our snapshot PNGs to the app's documentDirectory.
         image={snapshotUri(widgetId, size, resolvedTheme, imageKey, imagePath) as any}
-        style={{ width: 'match_parent', height: 'match_parent' }}
-        // imageWidth/imageHeight are in DP — RNAW's native ImageWidget.java calls
-        // dpToPx() before passing to Bitmap.createScaledBitmap. So passing `width`
-        // (e.g. 155 dp) becomes 155 × density px (e.g. 465 px on 3× devices) and
-        // matches our high-res native-density PNG capture exactly. Passing
-        // physical pixels here would 3×-inflate the target and either blur the
-        // bitmap or, with scaleType="matrix", clip the top portion of the image.
-        imageWidth={width}
-        imageHeight={height}
+        style={{
+          width: renderedImageWidth,
+          height: renderedImageHeight,
+          marginLeft: imageOffsetX,
+          marginTop: imageOffsetY,
+        }}
+        // RNAW scales the source bitmap to imageWidth/imageHeight in dp before
+        // drawing. Use contain scaling because Pixel Launcher may pin a 329x155
+        // gallery tile into a 3x2 cell; fill scaling crops Arabic labels/times.
+        imageWidth={renderedImageWidth}
+        imageHeight={renderedImageHeight}
         radius={0}
       />
       {overlays.map((ov, index) => {
         const overlayStr = liveText(ov.kind, data, isAr, numerals, new Date());
         const renderedOverlayStr = ov.compact ? overlayStr.replace(/\s/g, '') : overlayStr;
+        const scaledX = imageOffsetX + ov.x * renderScale;
+        const scaledY = imageOffsetY + ov.y * renderScale;
+        const scaledWidth = ov.width * renderScale;
+        const scaledFontSize = ov.fontSize * renderScale;
         return renderedOverlayStr ? (
           <TextWidget
             key={`${ov.kind}-${index}`}
             text={renderedOverlayStr}
             style={{
-              width: ov.width,
-              fontSize: ov.fontSize,
+              width: scaledWidth,
+              fontSize: scaledFontSize,
               color: ov.kind === 'currentTime' ? p.text : p.muted,
               fontFamily: ov.fontFamily,
               textAlign: ov.textAlign ?? 'center',
-              marginLeft: Math.max(0, ov.x - ov.width / 2),
-              marginTop: Math.max(0, ov.y - ov.fontSize),
+              marginLeft: scaledX - scaledWidth / 2,
+              marginTop: scaledY - scaledFontSize,
             }}
             allowFontScaling={false}
             maxLines={1}

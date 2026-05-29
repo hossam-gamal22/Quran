@@ -22,7 +22,9 @@ import {
   type AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
+import { fontBold, fontMedium, fontRegular, fontSemiBold, quranFontFamily } from '@/lib/fonts';
+import { getGharibWordOfTheDay } from '@/data/gharib-quran';
+import { localizeNumber } from '@/lib/format-number';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,6 +32,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInRight, FadeIn, FadeOut, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ModalColors } from '@/constants/theme';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllSurahs, type QuranV4Surah } from '@/lib/qcf-page-data';
@@ -65,8 +68,8 @@ import { detectArabicSeasonalBannerKey, getArabicSeasonalBannerCopy } from '@/li
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { PermissionBanner } from '@/components/notifications/PermissionBanner';
-import { getUserId } from '@/lib/firebase-user';
-import { getMonthlyLeaderboard, getUserMonthlyInfo, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import { getUserId, getDisplayName } from '@/lib/firebase-user';
+import { getUserMonthlyInfo, getUserMonthlyRank, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 import { localDateKey, msUntilNextLocalDay } from '@/lib/local-date';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -245,6 +248,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
       { id: 'surah_mulk', labelKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah-mulk' },
       { id: 'ayat_kursi', labelKey: 'home.ayatKursi', icon: 'shield-star', color: '#9B7B00', route: '/ayat-kursi' },
       { id: 'daily_ayah', labelKey: 'home.dailyVerse', icon: 'star-four-points', color: '#c07b10', route: '/daily-ayah' },
+      { id: 'gharib_quran', labelKey: 'gharibQuran.title', icon: 'book-alphabet', color: '#3a7ca5', route: '/gharib-quran' },
       { id: 'full_mushaf', labelKey: 'home.fullMushaf', icon: 'book-open-variant', color: '#0d8e62', route: '/(tabs)/quran' },
     ],
   },
@@ -341,6 +345,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
       { id: 'surah_mulk', labelKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah-mulk' },
       { id: 'ayat_kursi', labelKey: 'home.ayatKursi', icon: 'shield-star', color: '#9B7B00', route: '/ayat-kursi' },
       { id: 'daily_ayah', labelKey: 'home.dailyVerse', icon: 'star-four-points', color: '#c07b10', route: '/daily-ayah' },
+      { id: 'gharib_quran', labelKey: 'gharibQuran.title', icon: 'book-alphabet', color: '#3a7ca5', route: '/gharib-quran' },
       { id: 'full_mushaf', labelKey: 'home.fullMushaf', icon: 'book-open-variant', color: '#0d8e62', route: '/(tabs)/quran' },
     ],
   },
@@ -678,20 +683,22 @@ export default function HomeScreen() {
         const userId = await getUserId();
         if (!userId) { setRankLoaded(true); return; }
         await syncMonthlyEngagementFromLocalWorship(userId).catch(() => null);
-        const [info, board] = await Promise.all([
+        const [info, displayName] = await Promise.all([
           getUserMonthlyInfo(userId),
-          getMonthlyLeaderboard(200),
+          getDisplayName(),
         ]);
         const userScore = info?.score || 0;
-        if (userScore > 0) {
-          const rankIndex = board.findIndex(u => u.userId === userId);
-          if (rankIndex >= 0) {
-            setUserRank(rankIndex + 1);
-          } else {
-            // User not in top N — calculate their approximate rank
-            const higherCount = board.filter(u => u.score > userScore).length;
-            setUserRank(higherCount + 1);
-          }
+        // Mirror honor-board eligibility: a user without a display name is
+        // excluded from the visible leaderboard, so showing them a rank
+        // here is misleading. Wait until they set a name.
+        const hasName = !!(displayName || '').trim();
+        if (hasName && userScore > 0) {
+          // `getUserMonthlyRank` returns the true rank — cache findIndex
+          // for top-50 users (0 extra reads) or a `count()` aggregation
+          // for the rest (1 read). Replaces the old `higherCount + 1`
+          // fallback that always evaluated to `(cacheSize) + 1`.
+          const rank = await getUserMonthlyRank(userId, userScore);
+          if (rank && rank > 0) setUserRank(rank);
         }
       } catch {}
       setRankLoaded(true);
@@ -2001,9 +2008,83 @@ export default function HomeScreen() {
           <DailyHighlights showReorderButton onNextPrayerPress={() => setShowNextPrayerModal(true)} onShareAppPress={() => setShareModalVisible(true)} />
         </CollapsibleSection>
 
+        {/* كلمة اليوم الغريبة */}
+        {(() => {
+          const gw = getGharibWordOfTheDay();
+          return (
+            <Animated.View entering={FadeInDown.delay(80).duration(500)}>
+              <Pressable
+                onPress={() => {
+                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                  router.push('/gharib-quran' as any);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('gharibQuran.wordOfTheDay')}
+              >
+                <GlassCard style={styles.gharibCard}>
+                  <View style={[styles.gharibHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.gharibTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <MaterialCommunityIcons name="book-alphabet" size={16} color="#3a7ca5" />
+                      <Text style={[styles.gharibLabel, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                        {t('gharibQuran.wordOfTheDay')}
+                      </Text>
+                    </View>
+                    <View style={[styles.gharibBadge, { backgroundColor: '#3a7ca5' }]}>
+                      <Text style={styles.gharibBadgeText}>{gw.surahName} {localizeNumber(gw.ayah)}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.gharibWord, { color: colors.text, fontFamily: quranFontFamily() }]} numberOfLines={1}>
+                    {gw.word}
+                  </Text>
+                  <Text
+                    style={[styles.gharibMeaning, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                    numberOfLines={2}
+                  >
+                    {gw.meaning}
+                  </Text>
+                </GlassCard>
+              </Pressable>
+            </Animated.View>
+          );
+        })()}
+
         {/* الوصول السريع */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <CollapsibleSection title={t('home.quickAccess')} icon="lightning-bolt" iconColor="#5856D6" sectionId="quickAccess" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
+          {/* تنبيه: يمكن تخصيص القائمة */}
+          <Pressable
+            onPress={() => {
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+              setPendingIds([...selectedQuickAccessIds]);
+              setPendingCustomItems([...customItems]);
+              setAddOtherMode(null);
+              setSurahSearch('');
+              setModalSearch('');
+              setExpandedCategories([]);
+              setModalMode('select');
+              setShowCustomizeModal(true);
+            }}
+            style={({ pressed }) => [styles.quickAccessHint, {
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              backgroundColor: isDarkMode ? 'rgba(88,86,214,0.18)' : 'rgba(88,86,214,0.10)',
+              borderColor: isDarkMode ? 'rgba(88,86,214,0.35)' : 'rgba(88,86,214,0.22)',
+              opacity: pressed ? 0.7 : 1,
+            }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.customizeQuickAccess')}
+          >
+            <MaterialCommunityIcons name="gesture-tap-button" size={18} color="#5856D6" />
+            <Text
+              style={[styles.quickAccessHintText, {
+                color: colors.text,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }]}
+              numberOfLines={2}
+            >
+              {t('home.quickAccessHint')}
+            </Text>
+          </Pressable>
           <ScrollView
             ref={quickAccessScrollRef}
             horizontal
@@ -2194,21 +2275,10 @@ export default function HomeScreen() {
         }}
       >
         <SafeAreaView style={styles.modalOverlay}>
-          <BlurView
-           
-            intensity={Platform.OS === 'ios' ? 40 : 35}
-            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-            style={styles.modalBlur}
-          >
+          <View style={[styles.modalBlur, { backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight }]}>
             <View style={[
               styles.modalContent,
-              {
-                backgroundColor: isDarkMode
-                  ? '#0f1a14'
-                  : 'rgba(255,255,255,0.97)',
-                borderWidth: 0.5,
-                borderColor: 'rgba(255,255,255,0.2)',
-              },
+              { backgroundColor: 'transparent', borderWidth: 0 },
             ]}>
               <Text style={[
                 styles.modalTitle,
@@ -2439,11 +2509,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   )}
                   <View style={[styles.modalButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel, { overflow: 'hidden' }]} onPress={() => setShowCustomizeModal(false)}>
-                      {Platform.OS === 'ios' && (
-                        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-                      )}
-                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                    <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} onPress={() => setShowCustomizeModal(false)}>
                       <Text style={[styles.modalBtnText, { color: colors.glassTextLight }]}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm, !pendingIds.length && { opacity: 0.5 }]} disabled={!pendingIds.length} onPress={() => { saveQuickAccessIds(pendingIds, pendingCustomItems); setShowCustomizeModal(false); }}>
@@ -2453,7 +2519,7 @@ export default function HomeScreen() {
                 </View>
               )}
             </View>
-          </BlurView>
+          </View>
         </SafeAreaView>
       </Modal>
 
@@ -2558,7 +2624,16 @@ export default function HomeScreen() {
                             return;
                           }
                           setNotificationScheduled(true);
-                          requestNotificationPermission().then(() => {
+                          requestNotificationPermission().then((hasPermission) => {
+                            if (!hasPermission) {
+                              setNotificationScheduled(false);
+                              Alert.alert(
+                                t('notificationSounds.notificationsRequired') || t('settings.notifications'),
+                                t('notificationSounds.notificationsRequiredMsg') || t('messages.notificationPermissionRequired'),
+                                [{ text: t('common.ok') }]
+                              );
+                              return null;
+                            }
                             // === TEST: send a notification in 30 seconds to verify ===
                             if (__DEV__) {
                               const testDate = new Date();
@@ -2582,6 +2657,7 @@ export default function HomeScreen() {
                             }
                             return schedulePrayerNotification(prayerNameAr, prayerDate, 5);
                           }).then((notifId) => {
+                            if (!notifId) return;
                             setScheduledNotifId(notifId);
                             if (!hideNotifAlert) {
                               Alert.alert(
@@ -2918,6 +2994,61 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 4,
     gap: 10,
+  },
+  gharibCard: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 16,
+  },
+  gharibHeaderRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  gharibTitleRow: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  gharibLabel: {
+    fontSize: 12.5,
+    fontFamily: fontSemiBold(),
+  },
+  gharibBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 9,
+  },
+  gharibBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontFamily: fontSemiBold(),
+  },
+  gharibWord: {
+    fontSize: 24,
+    lineHeight: 38,
+    marginBottom: 4,
+  },
+  gharibMeaning: {
+    fontSize: 14,
+    lineHeight: 23,
+    fontFamily: fontRegular(),
+  },
+  quickAccessHint: {
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  quickAccessHintText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: fontMedium(),
+    lineHeight: 19,
+    includeFontPadding: false,
   },
   quickAccessItem: {
     borderRadius: 20,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import TranslateButton from '../components/TranslateButton';
 
 // ==================== Types ====================
 interface QAQuestion {
@@ -653,7 +654,7 @@ function QuestionEditModal({
         </div>
 
         {/* Question */}
-        <div className="mb-4">
+        <div className="mb-2">
           <label className="text-sm text-admin-muted mb-1.5 block">السؤال ({LANGS.find(l => l.code === lang)?.name})</label>
           <textarea
             value={q.question[lang] || ''}
@@ -663,9 +664,20 @@ function QuestionEditModal({
             placeholder="اكتب السؤال هنا..."
           />
         </div>
+        <div className="mb-4">
+          <TranslateButton
+            sourceText={q.question['ar'] || ''}
+            sourceLang="ar"
+            contentType="ui"
+            compact
+            targetLangs={['en']}
+            label="🌐 ترجمة السؤال للإنجليزية"
+            onTranslated={(translations) => setQ(prev => ({ ...prev, question: { ...prev.question, ...translations } }))}
+          />
+        </div>
 
         {/* Answer */}
-        <div className="mb-6">
+        <div className="mb-2">
           <label className="text-sm text-admin-muted mb-1.5 block">الجواب ({LANGS.find(l => l.code === lang)?.name})</label>
           <textarea
             value={q.answer[lang] || ''}
@@ -673,6 +685,17 @@ function QuestionEditModal({
             className="w-full bg-admin-bg rounded-lg px-4 py-3 text-white text-sm border border-admin-border/50 focus:border-emerald-500/50 outline-none resize-none h-40"
             dir={isRTL ? 'rtl' : 'ltr'}
             placeholder="اكتب الجواب هنا..."
+          />
+        </div>
+        <div className="mb-6">
+          <TranslateButton
+            sourceText={q.answer['ar'] || ''}
+            sourceLang="ar"
+            contentType="section"
+            compact
+            targetLangs={['en']}
+            label="🌐 ترجمة الجواب للإنجليزية"
+            onTranslated={(translations) => setQ(prev => ({ ...prev, answer: { ...prev.answer, ...translations } }))}
           />
         </div>
 

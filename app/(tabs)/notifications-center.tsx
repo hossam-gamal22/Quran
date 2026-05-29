@@ -14,6 +14,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
+import { ModalColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -72,16 +73,7 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
         onPress={onClose}
       >
         <TouchableOpacity activeOpacity={1}>
-          <View style={{ borderRadius: 20, width: 280, overflow: 'hidden' }}>
-            {Platform.OS === 'ios' && (
-              <BlurView
-               
-                intensity={80}
-                tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-                style={StyleSheet.absoluteFill}
-              />
-            )}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+          <View style={{ borderRadius: 20, width: 280, overflow: 'hidden', backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight }}>
             <View style={{ padding: 24, alignItems: 'center' }}>
             <Text style={{ fontSize: 16, fontWeight: '800', color: colors.foreground, marginBottom: 20 }}>{title}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
