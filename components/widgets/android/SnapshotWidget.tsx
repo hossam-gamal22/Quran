@@ -524,6 +524,135 @@ function prayerTemplateTextOverlays(
   ];
 }
 
+// ─── Captured-anchor prayer overlays ─────────────────────────────────────────
+// The gallery records the exact dp rect of every dynamic prayer value (times,
+// names, countdown) when it bakes the PNG. Driving the home overlay from those
+// rects guarantees the live text lands precisely where the gallery drew it — no
+// hand-tuned per-size coordinates, so every size matches the gallery 1:1.
+
+const PRAYER_ANCHOR_WIDGET_IDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
+const PRAYER_ROW_KEY_ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+interface ManifestAnchor {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  fontWeight?: 'regular' | 'medium' | 'semibold' | 'bold';
+  color?: string;
+  alignment?: 'leading' | 'center' | 'trailing';
+  direction?: 'ltr' | 'rtl';
+  isCountdown?: boolean;
+}
+
+interface AnchorStaticItem {
+  key: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  textAlign: 'left' | 'right' | 'center';
+}
+
+interface AnchorCountdownSpec {
+  anchor: ManifestAnchor;
+  direction: 'until' | 'since';
+  withLabel: boolean;
+}
+
+function anchorTextAlign(alignment: ManifestAnchor['alignment'], rtl: boolean): 'left' | 'right' | 'center' {
+  if (alignment === 'leading') return rtl ? 'right' : 'left';
+  if (alignment === 'trailing') return rtl ? 'left' : 'right';
+  return 'center';
+}
+
+function anchorFontFamily(weight: ManifestAnchor['fontWeight']): string {
+  if (weight === 'bold' || weight === 'semibold') return FONT.rubikBold;
+  if (weight === 'medium') return FONT.rubikMedium;
+  return FONT.rubik;
+}
+
+/**
+ * Build static (times/names) + countdown overlay specs from the captured
+ * anchors. Returns null when no usable anchors exist so the caller can fall
+ * back to the legacy hand-tuned overlays.
+ */
+function buildPrayerAnchorOverlays(
+  widgetId: string,
+  size: AndroidSize,
+  anchors: ManifestAnchor[] | undefined,
+  data: SharedWidgetData,
+  isAr: boolean,
+  numerals: 'auto' | 'arabic' | 'western' | undefined,
+  textColor: string,
+  mutedColor: string,
+  now: Date,
+): { statics: AnchorStaticItem[]; countdowns: AnchorCountdownSpec[] } | null {
+  if (!PRAYER_ANCHOR_WIDGET_IDS.has(widgetId) || !anchors || anchors.length === 0) return null;
+  const tableState = resolvePrayerTableState(data.prayer, now.getTime());
+  const rows = tableState.rows;
+  const next = tableState.nextRow ?? rows[0];
+  const previous = tableState.previousRow ?? rows[rows.length - 1];
+  const fmt = (v?: string) => applyNumerals(v ?? '--:--', numerals, isAr);
+
+  const statics: AnchorStaticItem[] = [];
+  const countdowns: AnchorCountdownSpec[] = [];
+
+  for (const a of anchors) {
+    if (a.isCountdown || a.id === 'prayerHeroCountdown' || a.id === 'prayerUntilCountdown') {
+      countdowns.push({ anchor: a, direction: 'until', withLabel: widgetId === 'prayerTable' && size === 'large' });
+      continue;
+    }
+    if (a.id === 'prayerSinceCountdown') {
+      countdowns.push({ anchor: a, direction: 'since', withLabel: false });
+      continue;
+    }
+    let text = '';
+    let color = mutedColor;
+    if (a.id.startsWith('prayerRowTime.')) {
+      const key = a.id.slice('prayerRowTime.'.length);
+      const idx = PRAYER_ROW_KEY_ORDER.indexOf(key);
+      const row = idx >= 0 ? rows[idx] : undefined;
+      text = fmt(row?.time);
+      color = row?.isNext ? textColor : mutedColor;
+    } else if (a.id === 'prayerHeroTime' || a.id === 'prayerNextTime') {
+      text = fmt(next?.time ?? data.prayer?.nextPrayerTime);
+      color = textColor;
+    } else if (a.id === 'prayerPrevTime') {
+      text = fmt(previous?.time);
+      color = textColor;
+    } else {
+      // Names (prayerHeroName/prayerNextName/prayerPrevName) and prayer-row
+      // LABELS are baked into the per-state PNG on Android (AnchorReporter does
+      // not blank non-countdown content there), and the task handler already
+      // selects the PNG for the current prayer state — so they must NOT be
+      // overlaid again or they'd double-draw. Only the blanked TIMES + the live
+      // countdown are drawn here.
+      continue;
+    }
+    statics.push({
+      key: a.id,
+      text,
+      x: a.x,
+      y: a.y,
+      width: a.width,
+      height: a.height,
+      fontSize: a.fontSize,
+      fontFamily: anchorFontFamily(a.fontWeight),
+      color,
+      textAlign: anchorTextAlign(a.alignment, isAr),
+    });
+  }
+  if (statics.length === 0 && countdowns.length === 0) return null;
+  return { statics, countdowns };
+}
+
 function liveText(
   kind: OverlayKind,
   data: SharedWidgetData,
@@ -702,45 +831,103 @@ export function SnapshotWidget({
   const p = paletteFor(resolvedTheme);
   const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
   const overlays = overlaysFor(widgetId, size, isAr);
-  const templateTextOverlays = isPrayerStaticTemplate
-    ? prayerTemplateTextOverlays(widgetId, size, data, isAr, numerals, p.text, p.muted)
-    : [];
   const overlayNow = new Date();
   const prayerEpochCandidates = prayerEpochRows(data).map((row) => row.epochMs);
-  const nativeTextOverlays: NativePrayerTextOverlay[] = overlays
-    .filter((ov) => isNativePrayerTextOverlay(ov.kind))
-    .map((ov) => {
-      const overlayText = liveText(ov.kind, data, isAr, numerals, overlayNow);
-      const scaledX = imageOffsetX + ov.x * renderScale;
-      const scaledY = imageOffsetY + ov.y * renderScale;
-      const scaledWidth = ov.width * renderScale;
-      const scaledFontSize = ov.fontSize * renderScale;
-      const height = (ov.lineHeight ?? ov.fontSize * 2) * renderScale;
-      const top = scaledY - height / 2 - NATIVE_TEXT_VERTICAL_SAFETY;
-      const safeHeight = height + NATIVE_TEXT_VERTICAL_SAFETY * 2;
-      const isPrevious = ov.kind === 'prayerPreviousCountdown';
-      return {
-        text: overlayText,
-        targetEpochMs: isPrevious
-          ? resolvePreviousPrayerEpoch(data, overlayNow)
-          : resolveNextPrayerEpoch(data, overlayNow),
-        epochCandidates: prayerEpochCandidates,
-        direction: isPrevious ? 'since' : 'until',
-        labelKind: ov.kind === 'prayerNextCountdownWithLabel' ? 'nextPrayer' : 'duration',
-        language: isAr ? 'ar' : 'en',
-        arabicNumerals: numerals === 'arabic' || (numerals !== 'western' && isAr),
-        compact: ov.compact === true,
-        leftFraction: Math.max(0, scaledX - scaledWidth / 2) / targetWidth,
-        topFraction: Math.max(0, top) / targetHeight,
-        rightFraction: Math.max(0, targetWidth - (scaledX + scaledWidth / 2)) / targetWidth,
-        bottomFraction: Math.max(0, targetHeight - (top + safeHeight)) / targetHeight,
-        widgetWidth: targetWidth,
-        widgetHeight: targetHeight,
-        fontSize: scaledFontSize,
-        color: ov.kind === 'currentTime' ? p.text : p.muted,
-        textAlign: ov.textAlign ?? 'center',
-      };
-    });
+
+  // Captured-anchor path (preferred): positions come straight from the gallery
+  // bake, so the live times/names/countdown land exactly where the gallery drew
+  // them. Falls back to the legacy hand-tuned coords when no anchors exist.
+  const prayerAnchorOverlays = buildPrayerAnchorOverlays(
+    widgetId,
+    size,
+    manifestEntry?.anchors as ManifestAnchor[] | undefined,
+    data,
+    isAr,
+    numerals,
+    p.text,
+    p.muted,
+    overlayNow,
+  );
+
+  const templateTextOverlays = prayerAnchorOverlays
+    ? []
+    : isPrayerStaticTemplate
+      ? prayerTemplateTextOverlays(widgetId, size, data, isAr, numerals, p.text, p.muted)
+      : [];
+
+  const buildNativeFromAnchorCountdown = (spec: AnchorCountdownSpec): NativePrayerTextOverlay => {
+    const a = spec.anchor;
+    const scaledX = imageOffsetX + a.x * renderScale;
+    const scaledY = imageOffsetY + a.y * renderScale;
+    const scaledW = a.width * renderScale;
+    const scaledH = a.height * renderScale;
+    const top = scaledY - NATIVE_TEXT_VERTICAL_SAFETY;
+    const safeHeight = scaledH + NATIVE_TEXT_VERTICAL_SAFETY * 2;
+    const isPrev = spec.direction === 'since';
+    const kind: OverlayKind = isPrev
+      ? 'prayerPreviousCountdown'
+      : spec.withLabel
+        ? 'prayerNextCountdownWithLabel'
+        : 'prayerNextCountdown';
+    return {
+      text: liveText(kind, data, isAr, numerals, overlayNow),
+      targetEpochMs: isPrev
+        ? resolvePreviousPrayerEpoch(data, overlayNow)
+        : resolveNextPrayerEpoch(data, overlayNow),
+      epochCandidates: prayerEpochCandidates,
+      direction: spec.direction,
+      labelKind: spec.withLabel ? 'nextPrayer' : 'duration',
+      language: isAr ? 'ar' : 'en',
+      arabicNumerals: numerals === 'arabic' || (numerals !== 'western' && isAr),
+      compact: false,
+      leftFraction: Math.max(0, scaledX) / targetWidth,
+      topFraction: Math.max(0, top) / targetHeight,
+      rightFraction: Math.max(0, targetWidth - (scaledX + scaledW)) / targetWidth,
+      bottomFraction: Math.max(0, targetHeight - (top + safeHeight)) / targetHeight,
+      widgetWidth: targetWidth,
+      widgetHeight: targetHeight,
+      fontSize: a.fontSize * renderScale,
+      color: p.muted,
+      textAlign: anchorTextAlign(a.alignment, isAr),
+    };
+  };
+
+  const nativeTextOverlays: NativePrayerTextOverlay[] = prayerAnchorOverlays
+    ? prayerAnchorOverlays.countdowns.map(buildNativeFromAnchorCountdown)
+    : overlays
+        .filter((ov) => isNativePrayerTextOverlay(ov.kind))
+        .map((ov) => {
+          const overlayText = liveText(ov.kind, data, isAr, numerals, overlayNow);
+          const scaledX = imageOffsetX + ov.x * renderScale;
+          const scaledY = imageOffsetY + ov.y * renderScale;
+          const scaledWidth = ov.width * renderScale;
+          const scaledFontSize = ov.fontSize * renderScale;
+          const height = (ov.lineHeight ?? ov.fontSize * 2) * renderScale;
+          const top = scaledY - height / 2 - NATIVE_TEXT_VERTICAL_SAFETY;
+          const safeHeight = height + NATIVE_TEXT_VERTICAL_SAFETY * 2;
+          const isPrevious = ov.kind === 'prayerPreviousCountdown';
+          return {
+            text: overlayText,
+            targetEpochMs: isPrevious
+              ? resolvePreviousPrayerEpoch(data, overlayNow)
+              : resolveNextPrayerEpoch(data, overlayNow),
+            epochCandidates: prayerEpochCandidates,
+            direction: isPrevious ? 'since' : 'until',
+            labelKind: ov.kind === 'prayerNextCountdownWithLabel' ? 'nextPrayer' : 'duration',
+            language: isAr ? 'ar' : 'en',
+            arabicNumerals: numerals === 'arabic' || (numerals !== 'western' && isAr),
+            compact: ov.compact === true,
+            leftFraction: Math.max(0, scaledX - scaledWidth / 2) / targetWidth,
+            topFraction: Math.max(0, top) / targetHeight,
+            rightFraction: Math.max(0, targetWidth - (scaledX + scaledWidth / 2)) / targetWidth,
+            bottomFraction: Math.max(0, targetHeight - (top + safeHeight)) / targetHeight,
+            widgetWidth: targetWidth,
+            widgetHeight: targetHeight,
+            fontSize: scaledFontSize,
+            color: ov.kind === 'currentTime' ? p.text : p.muted,
+            textAlign: ov.textAlign ?? 'center',
+          };
+        });
   const rootClickActionData = {
     ...(clickUri ? { uri: clickUri } : {}),
     ...(nativeTextOverlays.length ? { nativeTextOverlays } : {}),
@@ -867,6 +1054,31 @@ export function SnapshotWidget({
           />
         );
       })}
+      {prayerAnchorOverlays
+        ? prayerAnchorOverlays.statics.map((it) => {
+            const scaledWidth = it.width * renderScale;
+            const scaledFontSize = it.fontSize * renderScale;
+            return (
+              <TextWidget
+                key={`anchor-${it.key}`}
+                text={it.text}
+                style={{
+                  width: scaledWidth,
+                  fontSize: scaledFontSize,
+                  color: it.color as any,
+                  fontFamily: it.fontFamily,
+                  textAlign: it.textAlign,
+                  // Anchor x/y are the captured top-left of the gallery rect, so
+                  // place the TextWidget's top-left there directly (no centering).
+                  marginLeft: imageOffsetX + it.x * renderScale,
+                  marginTop: imageOffsetY + it.y * renderScale,
+                }}
+                allowFontScaling={false}
+                maxLines={1}
+              />
+            );
+          })
+        : null}
       {overlays.filter((ov) => !isNativePrayerTextOverlay(ov.kind)).map((ov, index) => {
         // Prayer timers are painted by the native RemoteViews shell. Keeping
         // them outside the bitmap lets AlarmManager update the compact text

@@ -55,11 +55,16 @@ export interface SnapshotCaptureContextValue {
   /** No-op when `capturing` is false. The pump installs a real collector
    *  during capture; the gallery path leaves it as a no-op. */
   registerAnchor: (anchor: CaptureAnchor) => void;
+  /** Ref to the slot's root View. AnchorReporter measures its rect relative to
+   *  this so the reported x/y are FRAME-relative (not parent-relative), which is
+   *  what the native overlay / manifest consumers expect. */
+  rootRef?: React.RefObject<any> | null;
 }
 
 const NOOP_CONTEXT: SnapshotCaptureContextValue = {
   capturing: false,
   registerAnchor: () => {},
+  rootRef: null,
 };
 
 export const WidgetSnapshotCaptureContext =
@@ -71,6 +76,10 @@ export function useWidgetSnapshotCapture(): boolean {
 
 export function useAnchorRegistrar(): (anchor: CaptureAnchor) => void {
   return React.useContext(WidgetSnapshotCaptureContext).registerAnchor;
+}
+
+export function useSnapshotRootRef(): React.RefObject<any> | null {
+  return React.useContext(WidgetSnapshotCaptureContext).rootRef ?? null;
 }
 
 /**

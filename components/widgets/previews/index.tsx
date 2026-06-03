@@ -14,6 +14,8 @@ import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { getPageFontFamily, isPageFontLoaded, loadPageFont } from '@/lib/qcf-font-loader';
 import { getPrayerNameAr, getPrayerNameEn } from '@/lib/prayer-times';
+import { formatEpochTimeInTimeZone } from '@/lib/widget-timezone';
+import { resolvePrayerTableState } from '@/lib/widget-prayer-table-state';
 
 /**
  * Re-format a prayer time from its raw epoch into the language-current
@@ -24,16 +26,8 @@ import { getPrayerNameAr, getPrayerNameEn } from '@/lib/prayer-times';
  * visible (e.g. "12:17 م" while the UI is English). Reformatting on every
  * render guarantees the visible suffix always matches the current language.
  */
-function formatPrayerTimeForPreview(epochMs: number | undefined, ar: boolean): string | null {
-  if (!epochMs || !Number.isFinite(epochMs)) return null;
-  const d = new Date(epochMs);
-  const hours24 = d.getHours();
-  const minutes = d.getMinutes();
-  const hour12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
-  const mm = String(minutes).padStart(2, '0');
-  const isPM = hours24 >= 12;
-  const suffix = ar ? (isPM ? 'م' : 'ص') : (isPM ? 'PM' : 'AM');
-  return `${hour12}:${mm} ${suffix}`;
+function formatPrayerTimeForPreview(epochMs: number | undefined, ar: boolean, timeZone?: string): string | null {
+  return formatEpochTimeInTimeZone(epochMs, timeZone, ar ? 'ar' : 'en');
 }
 import { useSettings } from '@/contexts/SettingsContext';
 import {
@@ -617,10 +611,14 @@ function useLiveTick() {
   }, []);
 }
 
-function resolvePreviewEpoch(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean): number | undefined {
-  const now = Date.now();
-  const epochs = (sharedData?.prayer?.allPrayers ?? [])
-    .map((p) => (p as any).epochMs as number)
+function resolvePreviewEpoch(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean, now: number = Date.now()): number | undefined {
+  const tableState = resolvePrayerTableState(sharedData?.prayer, now);
+  const tableEpoch = isNext ? tableState.nextEpochMs : tableState.previousEpochMs;
+  if (tableEpoch) return tableEpoch;
+  const epochs = [
+    ...(sharedData?.prayer?.allPrayerEpochs ?? []),
+    ...(sharedData?.prayer?.allPrayers ?? []).map((p) => (p as any).epochMs as number),
+  ]
     .filter((e) => Number.isFinite(e) && e > 0)
     .sort((a, b) => a - b);
   if (isNext) {
@@ -629,8 +627,8 @@ function resolvePreviewEpoch(sharedData: ReturnType<typeof useWidgetPreviewData>
   return [...epochs].reverse().find((e) => e <= now) ?? sharedData?.prayer?.previousPrayerAtEpochMs;
 }
 
-function resolvePreviewPrayerItem(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean) {
-  const epoch = resolvePreviewEpoch(sharedData, isNext);
+function resolvePreviewPrayerItem(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean, now: number = Date.now()) {
+  const epoch = resolvePreviewEpoch(sharedData, isNext, now);
   if (!epoch) return undefined;
   return (sharedData?.prayer?.allPrayers ?? []).find(
     (p) => Math.abs(((p as any).epochMs as number) - epoch) < 90000
@@ -645,7 +643,7 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
   const trueNextItem = resolvePreviewPrayerItem(sharedData, true);
   // Reformat from epoch on every render so the AM/PM suffix follows the
   // current language. Falls back to cached strings only as a last resort.
-  const liveTimeStr = formatPrayerTimeForPreview(trueNextItem?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar);
+  const liveTimeStr = formatPrayerTimeForPreview(trueNextItem?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar, sharedData?.prayer?.timezone);
   const time = noWrapPrayerTime(applyNumerals(liveTimeStr ?? trueNextItem?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14', numerals, ar));
   const name = ar ? (trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
   const countdown = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), (s) => applyNumerals(s, numerals, ar), ar);
@@ -656,18 +654,26 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
         <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 11 : 13, lineHeight: size === 'small' ? 14 : 16, color: p.muted, marginBottom: 2, includeFontPadding: false }}>
           {ar ? 'الصلاة القادمة' : 'Next Prayer'}
         </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontFamily: PRAYER_NAME_FONT,
-            fontSize: size === 'small' ? 22 : 30,
-            lineHeight: size === 'small' ? 27 : 36,
-            color: p.text,
-            includeFontPadding: false,
-          }}
-        >
-          {name}
-        </Text>
+        {forSnapshot ? (
+          <AnchorReporter id="prayerHeroName" fontFamily={PRAYER_NAME_FONT} fontSize={size === 'small' ? 22 : 30} fontWeight="bold" color={p.text} alignment="center" direction={ar ? 'rtl' : 'ltr'}>
+            <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: size === 'small' ? 22 : 30, lineHeight: size === 'small' ? 27 : 36, color: p.text, includeFontPadding: false }}>
+              {name}
+            </Text>
+          </AnchorReporter>
+        ) : (
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: PRAYER_NAME_FONT,
+              fontSize: size === 'small' ? 22 : 30,
+              lineHeight: size === 'small' ? 27 : 36,
+              color: p.text,
+              includeFontPadding: false,
+            }}
+          >
+            {name}
+          </Text>
+        )}
         {/* Phase 2: when capturing for the static-PNG bake, the time digits
             also become a transparent placeholder so the native shell can draw
             today's actual numeric value on top of the baked card. Layout (font
@@ -680,13 +686,24 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
           numberOfLines={1}
           minimumFontScale={0.7}
           style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+          anchorId="prayerHeroTime"
+          anchorFontFamily={digitFont}
+          anchorFontSize={timeFs}
+          anchorFontWeight="bold"
+          anchorColor={p.text}
+          anchorAlignment="center"
+          anchorDirection={ar ? 'rtl' : 'ltr'}
         >
           {time}
         </DynamicTimeText>
         {/* Phase B C2: snapshot omits the live countdown; the iOS / Android shell
             draws it on top of the PNG so it stays accurate. */}
         {forSnapshot ? (
-          <View style={{ height: size === 'small' ? 14 : 16, marginTop: 4 }} />
+          <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Medium" fontSize={size === 'small' ? 10 : 12} fontWeight="medium" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 4 }}>
+            <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 10 : 12, lineHeight: size === 'small' ? 13 : 16, color: p.muted, includeFontPadding: false }}>
+              {countdown}
+            </Text>
+          </AnchorReporter>
         ) : (
           <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 10 : 12, lineHeight: size === 'small' ? 13 : 16, color: p.muted, marginTop: 4, includeFontPadding: false }}>
             {countdown}
@@ -712,12 +729,12 @@ const PRAYER_ROWS: {
   { keyAr: 'العشاء', keyEn: 'Isha', time: '08:19', icon: 'weather-night' },
 ];
 
-function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar: boolean) {
+function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar: boolean, now: number = Date.now()) {
   const items = data?.prayer?.allPrayers;
   // allPrayers contains today's 6 prayers only. Guard against stale multi-day
   // data that could produce duplicate keys in the list.
   if (!items?.length) return PRAYER_ROWS;
-  const todayItems = items.slice(0, 6);
+  const tableState = resolvePrayerTableState(data?.prayer, now);
   const iconFor = (name?: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] => {
     const k = (name ?? '').toLowerCase();
     if (k.includes('fajr')) return 'weather-sunset-up';
@@ -728,17 +745,18 @@ function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar:
     if (k.includes('isha')) return 'weather-night';
     return 'weather-sunny';
   };
-  return todayItems.map((item) => {
+  return tableState.rows.map((item) => {
     // Reformat from epochMs so the AM/PM suffix matches the CURRENT
     // language. Fall back to the cached `item.time` only if the epoch
     // is missing (very old shared-data shape).
-    const liveTime = formatPrayerTimeForPreview(item.epochMs, ar) ?? item.time ?? '--:--';
+    const liveTime = formatPrayerTimeForPreview(item.epochMs, ar, data?.prayer?.timezone) ?? item.time ?? '--:--';
     return {
       keyAr: item.nameAr ?? item.name ?? '',
       keyEn: item.name ?? item.nameAr ?? '',
       time: liveTime,
       icon: iconFor(item.name),
       isNext: !!item.isNext,
+      isPassed: !!item.isPassed,
     };
   });
 }
@@ -819,7 +837,7 @@ function DynamicTimeText({
   anchorDirection?: 'ltr' | 'rtl';
   anchorIsCountdown?: boolean;
 }) {
-  const hideInSnapshot = forSnapshot && Platform.OS !== 'android';
+  const hideInSnapshot = !!forSnapshot;
   const textNode = (
     <Text
       numberOfLines={numberOfLines}
@@ -855,11 +873,22 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
   useLiveTick();
   const timeFont = 'Rubik-Bold';
   const widgetFontL = useWidgetFontFamily(fontVariant);
-  const prayerRows = prayerRowsFromShared(sharedData, ar);
+  const nowMs = Date.now();
+  const prayerState = resolvePrayerTableState(sharedData?.prayer, nowMs);
+  const prayerRows = prayerRowsFromShared(sharedData, ar, nowMs);
   const nextPrayer = prayerRows.find((r) => r.isNext) ?? prayerRows[0] ?? PRAYER_ROWS[0];
+  const trueNextEpoch = prayerState.nextEpochMs ?? resolvePreviewEpoch(sharedData, true, nowMs);
+  const trueNextItem = resolvePreviewPrayerItem(sharedData, true, nowMs);
+  const heroNameAr = prayerState.nextRow?.nameAr ?? trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? nextPrayer.keyAr;
+  const heroNameEn = prayerState.nextRow?.name ?? trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? nextPrayer.keyEn;
+  const heroTime = formatPrayerTimeForPreview(trueNextEpoch, ar, sharedData?.prayer?.timezone)
+    ?? prayerState.nextRow?.time
+    ?? trueNextItem?.time
+    ?? sharedData?.prayer?.nextPrayerTime
+    ?? nextPrayer.time;
   const fmt = (s: string | number) => applyNumerals(s, numerals, ar);
   const remainingText = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar);
-  const remainingTight = remainingText.replace(/\s/g, '');
+  const remainingTight = Platform.OS === 'android' ? remainingText : remainingText.replace(/\s/g, '');
   // Highlight overlay for the active prayer row — light tint on light themes,
   // white tint on dark, so it stays legible across all 8 palettes.
   const activeBg = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)';
@@ -941,12 +970,12 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   direction={ar ? 'rtl' : 'ltr'}
                 >
                   <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
-                    {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
+                    {ar ? heroNameAr : heroNameEn}
                   </Text>
                 </AnchorReporter>
               ) : (
                 <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
-                  {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
+                  {ar ? heroNameAr : heroNameEn}
                 </Text>
               )}
               <DynamicTimeText
@@ -963,7 +992,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                 anchorAlignment="center"
                 anchorDirection={ar ? 'rtl' : 'ltr'}
               >
-                {noWrapPrayerTime(fmt(nextPrayer.time))}
+                {noWrapPrayerTime(fmt(heroTime))}
               </DynamicTimeText>
               {forSnapshot ? (
                 <AnchorReporter
@@ -1005,13 +1034,11 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
       <GlassTile size={size} padding={8} palette={p}>
         <View style={{ flex: 1, justifyContent: 'center' }}>
           <View style={{ flexDirection: rowDir, justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-            {forSnapshot ? (
-              <View style={{ width: 80, height: 12 }} />
-            ) : (
+            <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Medium" fontSize={9} fontWeight="medium" color={p.muted} alignment={ar ? 'leading' : 'trailing'} direction={ar ? 'rtl' : 'ltr'} isCountdown>
               <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
-                {remainingTight}
+                {remainingTight || (ar ? '— س — د' : '—H —M')}
               </Text>
-            )}
+            </AnchorReporter>
             <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
               {ar ? 'الصلاة القادمة' : 'Next Prayer'}
             </Text>
@@ -1020,6 +1047,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
             const active = !!row.isNext;
             const label = ar ? row.keyAr : row.keyEn;
             const timeStr = noWrapPrayerTime(fmt(row.time));
+            const rowAnchorId = `prayerRowTime.${row.keyEn.toLowerCase()}`;
             return (
               <View
                 key={row.keyEn}
@@ -1033,7 +1061,15 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   backgroundColor: active ? activeBg : 'transparent',
                 }}
               >
-                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
+                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}
+                  anchorId={rowAnchorId}
+                  anchorFontFamily={timeFont}
+                  anchorFontSize={listFs}
+                  anchorFontWeight="bold"
+                  anchorColor={p.text}
+                  anchorAlignment={ar ? 'leading' : 'trailing'}
+                  anchorDirection={ar ? 'rtl' : 'ltr'}
+                >
                   {timeStr}
                 </DynamicTimeText>
                 <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, includeFontPadding: false }}>
@@ -1108,14 +1144,34 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
           ) : null}
           <MaterialCommunityIcons name={nextPrayer.icon} size={isAndroid ? 28 : 32} color={p.muted} />
           <View style={{ flex: 1, alignItems: heroContentAlign }}>
-            <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
-              {ar ? nextPrayer.keyAr : nextPrayer.keyEn}
-            </Text>
-            <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}>
-              {noWrapPrayerTime(fmt(nextPrayer.time))}
+            {forSnapshot ? (
+              <AnchorReporter id="prayerHeroName" fontFamily={PRAYER_NAME_FONT} fontSize={heroNameFs} fontWeight="bold" color={p.text} alignment="center" direction={ar ? 'rtl' : 'ltr'}>
+                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
+                  {ar ? heroNameAr : heroNameEn}
+                </Text>
+              </AnchorReporter>
+            ) : (
+              <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
+                {ar ? heroNameAr : heroNameEn}
+              </Text>
+            )}
+            <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+              anchorId="prayerHeroTime"
+              anchorFontFamily={timeFont}
+              anchorFontSize={heroTimeFs}
+              anchorFontWeight="bold"
+              anchorColor={p.text}
+              anchorAlignment="center"
+              anchorDirection={ar ? 'rtl' : 'ltr'}
+            >
+              {noWrapPrayerTime(fmt(heroTime))}
             </DynamicTimeText>
             {forSnapshot ? (
-              <View style={{ height: isAndroid ? 14 : 16, marginTop: isAndroid ? 2 : 4 }} />
+              <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Medium" fontSize={isAndroid ? 11 : 12} fontWeight="medium" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: isAndroid ? 2 : 4 }}>
+                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: isAndroid ? 11 : 12, lineHeight: isAndroid ? 14 : 16, color: p.muted, includeFontPadding: false }}>
+                  {ar ? `الصلاة القادمة ${remainingLarge}` : `Next prayer ${remainingLarge}`}
+                </Text>
+              </AnchorReporter>
             ) : (
               <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontFamily: 'Rubik-Medium', fontSize: isAndroid ? 11 : 12, lineHeight: isAndroid ? 14 : 16, color: p.muted, marginTop: isAndroid ? 2 : 4, includeFontPadding: false }}>
                 {ar ? `الصلاة القادمة ${remainingLarge}` : `Next prayer ${remainingLarge}`}
@@ -1128,6 +1184,7 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
             const active = !!row.isNext;
             const label = ar ? row.keyAr : row.keyEn;
             const timeStr = noWrapPrayerTime(fmt(row.time));
+            const rowAnchorId = `prayerRowTime.${row.keyEn.toLowerCase()}`;
             return (
               <View
                 key={row.keyEn}
@@ -1142,7 +1199,15 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   marginBottom: isAndroid ? 0 : 1,
                 }}
               >
-                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}>
+                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}
+                  anchorId={rowAnchorId}
+                  anchorFontFamily={timeFont}
+                  anchorFontSize={rowFs}
+                  anchorFontWeight="bold"
+                  anchorColor={p.text}
+                  anchorAlignment={ar ? 'leading' : 'trailing'}
+                  anchorDirection={ar ? 'rtl' : 'ltr'}
+                >
                   {timeStr}
                 </DynamicTimeText>
                 <View style={{ flexDirection: innerGroupDir, alignItems: 'center', gap: 6 }}>
@@ -1177,24 +1242,30 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
     label: ar ? 'الصلاة القادمة' : 'Next Prayer',
     name: nextName,
     time: noWrapPrayerTime(fmt(
-      formatPrayerTimeForPreview(trueNextPrev?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar)
+      formatPrayerTimeForPreview(trueNextPrev?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar, sharedData?.prayer?.timezone)
       ?? trueNextPrev?.time
       ?? sharedData?.prayer?.nextPrayerTime
       ?? '04:14'
     )),
     sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar),
     icon: 'weather-sunset-up' as const,
+    nameId: 'prayerNextName',
+    timeId: 'prayerNextTime',
+    subId: 'prayerUntilCountdown',
   };
   const previousItem = {
     label: ar ? 'الصلاة السابقة' : 'Previous Prayer',
     name: previousName,
     time: noWrapPrayerTime(fmt(
-      formatPrayerTimeForPreview(truePrevPrev?.epochMs ?? sharedData?.prayer?.previousPrayerAtEpochMs, ar)
+      formatPrayerTimeForPreview(truePrevPrev?.epochMs ?? sharedData?.prayer?.previousPrayerAtEpochMs, ar, sharedData?.prayer?.timezone)
       ?? truePrevPrev?.time
       ?? '08:18'
     )),
     sub: compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, false), fmt, ar, 'previous'),
     icon: 'weather-night' as const,
+    nameId: 'prayerPrevName',
+    timeId: 'prayerPrevTime',
+    subId: 'prayerSinceCountdown',
   };
   // Order follows the widget's localized name reading direction:
   //   Arabic "الصلاة السابقة والقادمة" → السابقة-RIGHT, القادمة-LEFT
@@ -1226,20 +1297,28 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
             }}
           >
             <MaterialCommunityIcons name={item.icon as any} size={isAndroid ? 18 : 20} color={p.muted} />
-            <Text
-              numberOfLines={1}
-              style={{
-                fontFamily: PRAYER_NAME_FONT,
-                fontSize: isAndroid ? 15 : 16,
-                lineHeight: isAndroid ? 19 : 21,
-                color: p.text,
-                marginTop: 4,
-                textAlign: 'center',
-                includeFontPadding: false,
-              }}
-            >
-              {item.name}
-            </Text>
+            {forSnapshot ? (
+              <AnchorReporter id={item.nameId} fontFamily={PRAYER_NAME_FONT} fontSize={isAndroid ? 15 : 16} fontWeight="bold" color={p.text} alignment="center" direction={ar ? 'rtl' : 'ltr'} style={{ marginTop: 4 }}>
+                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: isAndroid ? 15 : 16, lineHeight: isAndroid ? 19 : 21, color: p.text, textAlign: 'center', includeFontPadding: false }}>
+                  {item.name}
+                </Text>
+              </AnchorReporter>
+            ) : (
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: PRAYER_NAME_FONT,
+                  fontSize: isAndroid ? 15 : 16,
+                  lineHeight: isAndroid ? 19 : 21,
+                  color: p.text,
+                  marginTop: 4,
+                  textAlign: 'center',
+                  includeFontPadding: false,
+                }}
+              >
+                {item.name}
+              </Text>
+            )}
             <DynamicTimeText
               forSnapshot={forSnapshot}
               numberOfLines={1}
@@ -1254,13 +1333,22 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
                 letterSpacing: -0.5,
                 includeFontPadding: false,
               }}
+              anchorId={item.timeId}
+              anchorFontFamily={timeFont}
+              anchorFontSize={isAndroid ? 24 : 28}
+              anchorFontWeight="bold"
+              anchorColor={p.text}
+              anchorAlignment="center"
+              anchorDirection={ar ? 'rtl' : 'ltr'}
             >
               {item.time}
             </DynamicTimeText>
             {/* Dynamic countdown/since labels are drawn by the native shell so
                 both cards stay fresh and visually balanced on the home screen. */}
             {forSnapshot ? (
-              <View style={{ height: 12, marginTop: 2 }} />
+              <AnchorReporter id={item.subId} fontFamily="Rubik-Medium" fontSize={9} fontWeight="medium" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 2 }}>
+                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>{item.sub}</Text>
+              </AnchorReporter>
             ) : (
               <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>{item.sub}</Text>
             )}

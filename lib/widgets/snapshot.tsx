@@ -183,7 +183,9 @@ export interface WidgetSnapshotResult {
 
 /** Per-theme hash key prefix. Each resolved theme stores its own hash so a
  *  partial run (e.g. active theme only) does not short-circuit later passes. */
-const HASH_KEY_PREFIX = '@widget_snapshot_hash_v2';
+// v3: anchors are now FRAME-relative (measureLayout vs root) — bump to force a
+// one-time re-bake so the manifest captures the corrected anchor positions.
+const HASH_KEY_PREFIX = '@widget_snapshot_hash_v3';
 function hashKey(theme: ResolvedWidgetTheme): string { return `${HASH_KEY_PREFIX}:${theme}`; }
 
 /** SHA-1 not available in JS without a dep; we use a fast non-crypto hash. */
@@ -314,8 +316,8 @@ function OffscreenSlot({ def, size, language, theme, sharedData, innerRef, slotK
   }>;
   const lang: 'ar' | 'en' = (def.forcedLanguage ?? language) as 'ar' | 'en';
   const captureValue = React.useMemo(
-    () => ({ capturing: true, registerAnchor: getAnchorRegistrar(slotKey) }),
-    [slotKey],
+    () => ({ capturing: true, registerAnchor: getAnchorRegistrar(slotKey), rootRef: innerRef }),
+    [slotKey, innerRef],
   );
   return (
     <WidgetSnapshotCaptureContext.Provider value={captureValue}>
@@ -427,6 +429,19 @@ export function SnapshotHost() {
 
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;
 let runningPromise: Promise<WidgetSnapshotResult> | null = null;
+let snapshotHostTail: Promise<void> = Promise.resolve();
+
+async function withSnapshotHostLock<T>(work: () => Promise<T>): Promise<T> {
+  const previous = snapshotHostTail;
+  let release!: () => void;
+  snapshotHostTail = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release();
+  }
+}
 
 async function settleNextFrame(ms = 32): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -801,10 +816,10 @@ export async function pumpWidgetSnapshotsForThemes(
       const inputForPass = opts.includeRouteKeys?.length
         ? { ...input, includeRouteKeys: opts.includeRouteKeys }
         : input;
-      const result = await runSnapshotPass(inputForPass, todo, combinedHash, {
+      const result = await withSnapshotHostLock(() => runSnapshotPass(inputForPass, todo, combinedHash, {
         cleanup: opts.cleanup,
         commit: opts.commit,
-      });
+      }));
       // Only persist a theme's hash if no errors were recorded for that theme.
       // A placed-widget-only pass intentionally does not prove the whole theme is
       // complete, so do not store the per-theme hash for partial foreground runs.
@@ -1071,14 +1086,40 @@ const prayerNameEn = (key: PrayerStateKey, date: Date) =>
 const BAKE_TIMES: Record<PrayerStateKey, string> = {
   fajr: '04:14', sunrise: '05:35', dhuhr: '12:17', asr: '15:33', maghrib: '18:42', isha: '20:19',
 };
-const BAKE_BASE_EPOCH = Date.now();
+const ANDROID_PRAYER_TEMPLATE_SCHEMA = 3;
+const ANDROID_PRAYER_TEMPLATE_HASH_KEY = '@widget_android_prayer_template_hash_v1';
+const ANDROID_PRAYER_TEMPLATE_DIR = `${FileSystem.documentDirectory}prayer-static/`;
+const androidPrayerTemplatePromises = new Map<string, Promise<{ generated: number; skipped: boolean; errors: string[] }>>();
+
+function androidPrayerTemplateSignatureKey(signature: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < signature.length; i += 1) {
+    hash ^= signature.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${ANDROID_PRAYER_TEMPLATE_HASH_KEY}:${(hash >>> 0).toString(36)}:${signature.length}`;
+}
+
+export interface AndroidPrayerStaticTemplateTarget {
+  widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious';
+  size: PreviewSize;
+  active?: PrayerStateKey;
+  previous?: PrayerStateKey;
+}
+
+type AndroidPrayerStaticRequest = {
+  def: typeof WIDGET_REGISTRY[number];
+  size: PreviewSize;
+  active?: PrayerStateKey;
+  previous?: PrayerStateKey;
+};
 
 /** Build a `SharedWidgetData` fixture that asserts `nextState` is the next
  *  prayer (highlighted, hero-baked). `previousState` is the one immediately
  *  before in the prayer order, used by the next/prev widget. */
 function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateKey): SharedWidgetData {
   const order = PRAYER_STATE_KEYS;
-  const nowMs = BAKE_BASE_EPOCH;
+  const nowMs = Date.now();
   const targetIdx = order.indexOf(nextState);
   // Build a synthetic timeline where:
   //   • every prayer with index < targetIdx has epoch in the PAST
@@ -1135,6 +1176,111 @@ function defaultPreviousFor(next: PrayerStateKey): PrayerStateKey {
     case 'asr':     return 'dhuhr';
     case 'maghrib': return 'asr';
     case 'isha':    return 'maghrib';
+  }
+}
+
+/**
+ * Build the local Android prayer-state templates used after the foreground app
+ * is closed. Each image is captured from the same React preview as the gallery,
+ * with numeric values hidden by `DynamicTimeText`; the headless widget task
+ * overlays locally recomputed values and swaps the state image at prayer
+ * boundaries. One active theme/language matrix is only 30 images.
+ */
+export async function ensureAndroidPrayerStaticTemplates(opts: {
+  theme: ResolvedWidgetTheme;
+  language: 'ar' | 'en';
+  force?: boolean;
+  targets?: AndroidPrayerStaticTemplateTarget[];
+}): Promise<{ generated: number; skipped: boolean; errors: string[] }> {
+  if (Platform.OS !== 'android') return { generated: 0, skipped: true, errors: [] };
+  if (!hostSetSlots) return { generated: 0, skipped: true, errors: ['SnapshotHost not mounted'] };
+
+  const prayerKinds = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
+  const requested: AndroidPrayerStaticRequest[] = opts.targets?.length
+    ? opts.targets
+        .map((target) => {
+          const def = WIDGET_REGISTRY.find((item) => item.id === target.widgetId);
+          if (!def || !prayerKinds.has(def.id) || !def.platforms.includes('android')) return null;
+          if (!def.sizes.includes(target.size)) return null;
+          return { def, size: target.size, active: target.active, previous: target.previous };
+        })
+        .filter(Boolean) as AndroidPrayerStaticRequest[]
+    : WIDGET_REGISTRY
+        .filter((def) => prayerKinds.has(def.id) && def.platforms.includes('android'))
+        .flatMap((def) => def.sizes.map((size) => ({ def, size })));
+  const expected = requested.flatMap(({ def, size, active, previous }) => {
+    const states = active ? [active] : PRAYER_STATE_KEYS;
+    return states.map((nextState) => {
+      const prevState = previous ?? defaultPreviousFor(nextState);
+      const stateToken = def.id === 'prayerNextPrevious' ? `${prevState}_${nextState}` : nextState;
+      return `${def.id}_${size}_${opts.theme}_${opts.language}_${stateToken}`;
+    });
+  });
+  const signature = [
+    ANDROID_PRAYER_TEMPLATE_SCHEMA,
+    WIDGET_REGISTRY_VERSION,
+    opts.theme,
+    opts.language,
+    expected.join('|'),
+  ].join(':');
+  const signatureKey = androidPrayerTemplateSignatureKey(signature);
+
+  const existingPromise = androidPrayerTemplatePromises.get(signature);
+  if (existingPromise) return existingPromise;
+
+  const promise = (async () => {
+    if (!opts.force) {
+      try {
+        const checks = await Promise.all(expected.map((name) => FileSystem.getInfoAsync(`${ANDROID_PRAYER_TEMPLATE_DIR}${name}.png`)));
+        if (checks.every((info) => info.exists)) {
+          const stored = await AsyncStorage.getItem(signatureKey);
+          if (stored === signature) return { generated: 0, skipped: true, errors: [] };
+        }
+      } catch {}
+    }
+
+    return withSnapshotHostLock(async () => {
+      await FileSystem.makeDirectoryAsync(ANDROID_PRAYER_TEMPLATE_DIR, { intermediates: true }).catch(() => {});
+      const errors: string[] = [];
+      let generated = 0;
+      for (const { def, size, active, previous } of requested) {
+        const states = active ? [active] : PRAYER_STATE_KEYS;
+        for (const nextState of states) {
+          const prevState = previous ?? defaultPreviousFor(nextState);
+          const fixture = buildBakeFixture(nextState, prevState);
+          const stateToken = def.id === 'prayerNextPrevious' ? `${prevState}_${nextState}` : nextState;
+          const assetName = `${def.id}_${size}_${opts.theme}_${opts.language}_${stateToken}`;
+          hostSetSlots!({
+            [assetName]: { def, size, language: opts.language, theme: opts.theme, sharedData: fixture },
+          } as any);
+          await settleNextFrame(250);
+          try {
+            const tmpUri = await captureRef(getOrCreateRef(assetName), { format: 'png', quality: 1, result: 'tmpfile' });
+            const verify = await verifyAlpha(tmpUri);
+            if (!verify.ok) throw new Error(verify.notes.join(','));
+            const dst = `${ANDROID_PRAYER_TEMPLATE_DIR}${assetName}.png`;
+            try { await FileSystem.deleteAsync(dst, { idempotent: true }); } catch {}
+            await FileSystem.copyAsync({ from: tmpUri, to: dst });
+            generated++;
+          } catch (e) {
+            errors.push(`${assetName}:${(e as Error)?.message ?? 'capture_failed'}`);
+          }
+        }
+      }
+      hostSetSlots!({} as any);
+      if (errors.length === 0) {
+        try { await AsyncStorage.setItem(signatureKey, signature); } catch {}
+      }
+      if (__DEV__) console.log(`[widget/android] prayer static templates generated=${generated} errors=${errors.length}`);
+      return { generated, skipped: false, errors };
+    });
+  })();
+  androidPrayerTemplatePromises.set(signature, promise);
+
+  try {
+    return await promise;
+  } finally {
+    androidPrayerTemplatePromises.delete(signature);
   }
 }
 

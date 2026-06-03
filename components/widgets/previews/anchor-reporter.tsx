@@ -40,6 +40,7 @@ import { Platform, View, type LayoutChangeEvent, type ViewStyle } from 'react-na
 
 import {
   useAnchorRegistrar,
+  useSnapshotRootRef,
   useWidgetSnapshotCapture,
   type CaptureAnchor,
 } from './snapshot-capture-context';
@@ -81,31 +82,57 @@ export function AnchorReporter(props: AnchorReporterProps): React.ReactElement {
   const capturing = useWidgetSnapshotCapture();
   const hideDuringCapture = capturing && !(Platform.OS === 'android' && !props.isCountdown);
   const register = useAnchorRegistrar();
+  const rootRef = useSnapshotRootRef();
   const reportedRef = React.useRef(false);
+  const selfRef = React.useRef<View>(null);
 
   const onLayout = React.useCallback(
     (e: LayoutChangeEvent) => {
       if (!capturing || reportedRef.current) return;
-      const { x, y, width, height } = e.nativeEvent.layout;
-      reportedRef.current = true;
-      register({
-        id: props.id,
-        x,
-        y,
-        width,
-        height,
-        fontFamily: props.fontFamily,
-        fontSize: props.fontSize,
-        fontWeight: props.fontWeight ?? 'regular',
-        color: props.color,
-        alignment: props.alignment ?? 'center',
-        direction: props.direction ?? 'ltr',
-        isCountdown: props.isCountdown,
-      });
+      const emit = (x: number, y: number, width: number, height: number) => {
+        if (reportedRef.current) return;
+        reportedRef.current = true;
+        register({
+          id: props.id,
+          x,
+          y,
+          width,
+          height,
+          fontFamily: props.fontFamily,
+          fontSize: props.fontSize,
+          fontWeight: props.fontWeight ?? 'regular',
+          color: props.color,
+          alignment: props.alignment ?? 'center',
+          direction: props.direction ?? 'ltr',
+          isCountdown: props.isCountdown,
+        });
+      };
+      // `onLayout` reports PARENT-relative coords. The manifest/native overlay
+      // need FRAME-relative coords, so measure against the slot's root View when
+      // available; fall back to the parent-relative layout otherwise.
+      const self = selfRef.current as any;
+      const root = rootRef?.current as any;
+      const layout = e.nativeEvent.layout;
+      // Fabric's measureLayout takes the relative ref instance; Paper accepts a
+      // node handle. Pass the instance and fall back to the handle/parent rect.
+      if (root && self?.measureLayout) {
+        try {
+          self.measureLayout(
+            root,
+            (x: number, y: number, width: number, height: number) => emit(x, y, width, height),
+            () => emit(layout.x, layout.y, layout.width, layout.height),
+          );
+        } catch {
+          emit(layout.x, layout.y, layout.width, layout.height);
+        }
+      } else {
+        emit(layout.x, layout.y, layout.width, layout.height);
+      }
     },
     [
       capturing,
       register,
+      rootRef,
       props.id,
       props.fontFamily,
       props.fontSize,
@@ -119,6 +146,7 @@ export function AnchorReporter(props: AnchorReporterProps): React.ReactElement {
 
   return (
     <View
+      ref={selfRef}
       onLayout={capturing ? onLayout : undefined}
       style={[
         // Important: when capturing, opacity:0 hides the visible glyphs but
