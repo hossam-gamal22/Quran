@@ -1,6 +1,6 @@
 {
   "name": "rooh-almuslim",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.2.3",
   "scripts": {
     "start": "expo start",
@@ -21,7 +21,7 @@
     "migrate:dedupe-names": "node scripts/dedupe-display-names.js",
     "verify:adhan-assets": "node scripts/verify-adhan-assets.js",
     "build-prayer-imagesets": "node scripts/build-prayer-static-imagesets.mjs",
-    "postinstall": "node scripts/patch-expo-notifications.js || true"
+    "postinstall": "node scripts/patch-expo-notifications.js || true; node scripts/patch-react-native-android-widget.js || true"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

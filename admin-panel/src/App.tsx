@@ -125,6 +125,7 @@ import PdfTemplatesManager from './pages/PdfTemplatesManager';
 import Rewards from './pages/Rewards';
 import TranslationOverrides from './pages/TranslationOverrides';
 import ContentManager from './pages/ContentManager';
+import GharibManager from './pages/GharibManager';
 import HijriOverrides from './pages/HijriOverrides';
 import AppIconManager from './pages/AppIconManager';
 import SuggestionsPage from './pages/Suggestions';
@@ -161,6 +162,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/daily-content', icon: CalendarHeart, label: 'المحتوى اليومي' },
       { path: '/content-manager', icon: BookOpen, label: 'المحتوى الديني' },
+      { path: '/gharib-quran', icon: BookOpen, label: 'غريب القرآن' },
       { path: '/temp-pages', icon: Timer, label: 'صفحات مؤقتة' },
     ],
   },
@@ -514,6 +516,7 @@ const App: React.FC = () => {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/engagement-notifications" element={<EngagementNotifications />} />
               <Route path="/quran-themes" element={<QuranThemesManager />} />
+              <Route path="/gharib-quran" element={<GharibManager />} />
               <Route path="/tasbih-presets" element={<TasbihPresetsManager />} />
               <Route path="/islamic-events" element={<IslamicEventsManager />} />
               <Route path="/hijri-overrides" element={<HijriOverrides />} />

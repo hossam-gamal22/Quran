@@ -100,6 +100,7 @@ import { maybeUploadTelemetry } from '@/lib/notification-telemetry';
 // Import at module scope to register the background task definition (required by expo-task-manager)
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
+import { registerAndroidWidgetTaskHandler } from '@/lib/register-android-widget-task';
 import '@/lib/app-icon-background-task';
 import { registerAppIconBackgroundTask } from '@/lib/app-icon-background-task';
 import '@/lib/rewards-background-sync';
@@ -247,15 +248,7 @@ if (Platform.OS !== 'web') {
 }
 
 // Register Android widget task handler at module scope
-if (Platform.OS === 'android') {
-  try {
-    const { registerWidgetTaskHandler } = require('react-native-android-widget');
-    const { widgetTaskHandler } = require('@/lib/android-widget-task-handler');
-    registerWidgetTaskHandler(widgetTaskHandler);
-  } catch {
-    // react-native-android-widget not available
-  }
-}
+registerAndroidWidgetTaskHandler();
 
 // Set global default font and force Western numerals for all Text components
 function westernizeChildren(children: any): any {
@@ -1131,6 +1124,14 @@ export default function RootLayout() {
 
     // Schedule midnight refresh for daily verse/dhikr widget content
     const cleanupMidnight = scheduleMidnightRefresh();
+
+    // Warm up the "Verse of the Day" screen (resolve verse + load its QCF page
+    // font + decode the background) once the app is idle, so the first open is
+    // instant instead of waiting on a lazy font/image load.
+    try {
+      const { prewarmDailyAyah } = require('@/lib/prewarm-daily-ayah');
+      prewarmDailyAyah();
+    } catch {}
 
     // Phase 8: cold-start schedule health check (throttled internally to 6h)
     // يفحص لو الإشعارات اختفت من النظام بعد OEM kill أو system restore

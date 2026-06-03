@@ -17,6 +17,7 @@ import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 
 import { fontBold, fontMedium, fontSemiBold } from '@/lib/fonts';
+import { fadeOutAndStop } from '@/lib/sound-manager';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { uiText } from '@/lib/ui-text';
@@ -220,9 +221,9 @@ export default function SmartAlarmScreen() {
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
-      try { await previewSoundRef.current.stopAsync(); } catch {}
-      try { await previewSoundRef.current.unloadAsync(); } catch {}
+      const sound = previewSoundRef.current;
       previewSoundRef.current = null;
+      await fadeOutAndStop(sound);
     }
   }, []);
 

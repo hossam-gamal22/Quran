@@ -37,6 +37,7 @@ import {
   fetchPrayerTimes,
   parsePrayerTimes,
   applyAdjustments,
+  alignPrayerTimesToUpcomingDay,
   getPrayerSettings,
   savePrayerSettings,
   saveLocation,
@@ -49,6 +50,7 @@ import {
   getNextPrayer,
   getTimeRemaining,
   getPrayerTranslationKey,
+  isPrayerPassed,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
 import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
@@ -70,6 +72,7 @@ import { Spacing } from '@/constants/theme';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { getDateLocale } from '@/lib/i18n';
 import { GlassCard, GlassToggle } from '@/components/ui/GlassCard';
+import { AppModal } from '@/components/ui/AppModal';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Line, G } from 'react-native-svg';
@@ -110,11 +113,21 @@ import {
 } from '@/lib/prayer-week-cache';
 import {
   buildCanonicalPrayerSnapshot,
+  loadCanonicalPrayerSnapshot,
   saveCanonicalPrayerSnapshot,
 } from '@/lib/canonical-prayer-snapshot';
+import { deviceTimezone, ensurePrayerLocationTimezone } from '@/lib/prayer-location-timezone';
 
 const CLOCK_STYLE_KEY = '@prayer_clock_style';
 const CLOCK_THUMB_SIZE = 72;
+
+const formatDateKey = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const getPrayerCalendarDate = (): Date => new Date();
+
+const getPrayerCalendarDateKey = (): string => formatDateKey(getPrayerCalendarDate());
 
 const getPrayerMethods = (t: (key: string) => string): { value: CalculationMethod; label: string; subtitle: string }[] => [
   { value: 4, label: t('prayer.methodUmmAlQura'), subtitle: t('prayer.methodUmmAlQuraDesc') },
@@ -181,6 +194,7 @@ export default function PrayerScreen() {
   const [cacheAgeDays, setCacheAgeDays] = useState(0);
   const [usingMakkahFallback, setUsingMakkahFallback] = useState(false);
   const [showAsrPicker, setShowAsrPicker] = useState(false);
+  const prayerTimezone = deviceTimezone();
 
   // Long-press status modal for the prayer-times list (matches the worship tracker UX).
   const [statusModal, setStatusModal] = useState<{
@@ -235,8 +249,9 @@ export default function PrayerScreen() {
 
   const clockThumbnailData = useMemo(() => {
     const pad = (n: number) => String(Math.max(0, n)).padStart(2, '0');
-    const next = prayerTimes ? getNextPrayer(prayerTimes) : null;
-    const remaining = prayerTimes ? getTimeRemaining(prayerTimes) : null;
+    const prayerContext = { timezone: prayerTimezone, now: thumbnailNow };
+    const next = prayerTimes ? getNextPrayer(prayerTimes, prayerContext) : null;
+    const remaining = prayerTimes ? getTimeRemaining(prayerTimes, prayerContext) : null;
     const name = next?.name ?? 'fajr';
     const label = t(getPrayerTranslationKey(name));
     const countdown = remaining
@@ -251,7 +266,7 @@ export default function PrayerScreen() {
       countdownShort,
       time: next ? formatPrayerTime(next.time, settings.prayer.show24Hour) : '--:--',
     };
-  }, [prayerTimes, settings.prayer.show24Hour, t, thumbnailNow]);
+  }, [prayerTimes, prayerTimezone, settings.prayer.show24Hour, t, thumbnailNow]);
 
   const analogThumbHands = useMemo(() => {
     const hours = thumbnailNow.getHours() % 12;
@@ -565,35 +580,32 @@ export default function PrayerScreen() {
       ];
 
       const now = new Date();
+      const prayerContext = { timezone: location?.timezone, now };
+      const nextPrayerResult = getNextPrayer(times, prayerContext);
+      const remaining = getTimeRemaining(times, prayerContext);
       const allPrayers = prayerNames.map(p => {
-        const [h, m] = (times[p.key] as string).split(':').map(Number);
-        const pTime = new Date();
-        pTime.setHours(h, m, 0, 0);
         return {
           name: p.name,
           nameAr: p.name,
           time: formatPrayerTime(times[p.key] as string, settings.prayer.show24Hour),
-          passed: pTime < now,
+          passed: isPrayerPassed(times[p.key] as string, prayerContext),
         };
       });
 
-      const nextPrayer = allPrayers.find(p => !p.passed) || allPrayers[allPrayers.length - 1];
-      const [nh, nm] = nextPrayer.time ? nextPrayer.time.split(':').map(Number) : [0, 0];
-      const nextTime = new Date();
-      // Parse 12h time back for remaining calculation
-      const nextKey = prayerNames.find(p => p.name === nextPrayer.nameAr)?.key;
-      if (nextKey) {
-        const [ph, pm] = (times[nextKey] as string).split(':').map(Number);
-        nextTime.setHours(ph, pm, 0, 0);
-      }
-      const remainingMinutes = Math.max(0, Math.round((nextTime.getTime() - now.getTime()) / 60000));
+      const nextPrayerName = nextPrayerResult
+        ? t(getPrayerTranslationKey(nextPrayerResult.name))
+        : allPrayers.find(p => !p.passed)?.name || allPrayers[allPrayers.length - 1].name;
+      const nextPrayerTime = nextPrayerResult
+        ? formatPrayerTime(nextPrayerResult.time, settings.prayer.show24Hour)
+        : allPrayers.find(p => !p.passed)?.time || allPrayers[allPrayers.length - 1].time;
+      const remainingMinutes = remaining ? Math.max(0, Math.ceil(remaining.totalSeconds / 60)) : 0;
 
       const hijriStr = hijri ? `${hijri.day} ${hijri.month?.ar || ''} ${hijri.year}` : '';
 
       const data: LiveActivityData = {
-        nextPrayerName: nextPrayer.name,
-        nextPrayerNameAr: nextPrayer.nameAr,
-        nextPrayerTime: nextPrayer.time,
+        nextPrayerName,
+        nextPrayerNameAr: nextPrayerName,
+        nextPrayerTime,
         timeRemainingMinutes: remainingMinutes,
         allPrayers,
         hijriDate: hijriStr,
@@ -680,14 +692,18 @@ export default function PrayerScreen() {
       setPrayerSettings(settingsFromStore);
       console.log(`🕌 [prayer-times] method=${settings.prayer.calculationMethod}, school=${settings.prayer.asrJuristic}, source=app_settings`);
 
-      const today = getTodayDateString();
+      let today = getTodayDateString();
       const publishCanonicalPrayerData = async (
         times: PrayerTimes,
         loc: LocationType | null | undefined,
         source: Parameters<typeof buildCanonicalPrayerSnapshot>[0]['source'],
+        timezone?: string,
       ) => {
         const effectiveLoc = loc ?? await getStoredLocation();
         if (!effectiveLoc) return;
+        if (timezone && timezone !== effectiveLoc.timezone) {
+          await saveLocation({ ...effectiveLoc, timezone });
+        }
         const locationLabel = effectiveLoc.city
           ? `${effectiveLoc.city}${effectiveLoc.country ? ', ' + effectiveLoc.country : ''}`
           : '';
@@ -697,6 +713,7 @@ export default function PrayerScreen() {
           locationName: locationLabel,
           settings: settingsFromStore,
           source,
+          timezone: deviceTimezone(),
         });
         await saveCanonicalPrayerSnapshot(snapshot);
         console.log('[PrayerCanonical] app countdown:', Math.max(0, Math.floor((snapshot.nextPrayerAtEpochMs - Date.now()) / 1000)));
@@ -765,18 +782,63 @@ export default function PrayerScreen() {
           } catch (e) {
             console.log('Re-geocode failed, using stored names:', e);
           }
+          if (currentLoc) {
+            currentLoc = await ensurePrayerLocationTimezone(currentLoc, true);
+          }
           setLocation(currentLoc);
         }
       }
 
-      if (!forceRefresh) {
+      // Legacy installs may have cached HH:mm values before the selected
+      // location timezone was persisted. Do one live AlAdhan refresh first so
+      // the cache, app screen and both widget platforms share one timezone.
+      if (!forceRefresh && currentLoc?.timezone) {
+        today = getPrayerCalendarDateKey();
+        const canonical = await loadCanonicalPrayerSnapshot({
+          date: today,
+          settings: {
+            calculationMethod: settings.prayer.calculationMethod,
+            asrJuristic: settings.prayer.asrJuristic,
+            adjustments: settings.prayer.adjustments,
+          },
+          location: currentLoc,
+        });
+        if (canonical?.prayerTimes) {
+          const canonicalTimes = await alignPrayerTimesToUpcomingDay(
+            canonical.prayerTimes,
+            currentLoc,
+            new Date(),
+            {
+              calculationMethod: settings.prayer.calculationMethod,
+              asrJuristic: settings.prayer.asrJuristic,
+              adjustments: settings.prayer.adjustments,
+            },
+          ).catch(() => canonical.prayerTimes);
+          rawPrayerTimesRef.current = null;
+          setPrayerTimes(canonicalTimes);
+          setDataSource((canonical.source as PrayerDataSource) || 'todayCache');
+          setCacheAgeDays(0);
+          publishCanonicalPrayerData(canonicalTimes, currentLoc, canonical.source).catch(() => {});
+          setIsLoading(false);
+          return;
+        }
         const cached = await getCachedPrayerTimes(today, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
         if (cached) {
+          const cachedTimes = await alignPrayerTimesToUpcomingDay(
+            cached,
+            currentLoc,
+            new Date(),
+            {
+              calculationMethod: settings.prayer.calculationMethod,
+              asrJuristic: settings.prayer.asrJuristic,
+              adjustments: settings.prayer.adjustments,
+            },
+          ).catch(() => cached);
           rawPrayerTimesRef.current = null;
-          setPrayerTimes(cached);
+          setPrayerTimes(cachedTimes);
           setDataSource('todayCache');
           setCacheAgeDays(0);
-          publishCanonicalPrayerData(cached, currentLoc, 'todayCache').catch(() => {});
+          publishCanonicalPrayerData(cachedTimes, currentLoc, 'todayCache').catch(() => {});
           setIsLoading(false);
           return;
         }
@@ -792,9 +854,12 @@ export default function PrayerScreen() {
         placeholderText: { color: '#fff', fontSize: 18, opacity: 0.7, fontFamily: fontBold() },
       });
 
-      const loc = currentLoc || await fetchLocation();
+      let loc = currentLoc || await fetchLocation();
       if (!loc) throw new Error(t('messages.locationRequired'));
+      loc = await ensurePrayerLocationTimezone(loc, true);
       setLocation(loc);
+      const prayerCalendarDate = getPrayerCalendarDate();
+      today = formatDateKey(prayerCalendarDate);
       const effectiveSettings = isMakkahFallbackLocation(loc) && settings.prayer.methodManuallySet !== true
         ? {
             ...settingsFromStore,
@@ -827,10 +892,16 @@ export default function PrayerScreen() {
         throw new Error('offline_no_data');
       }
 
-      const response = await fetchPrayerTimes(loc, new Date(), effectiveSettings);
+      const response = await fetchPrayerTimes(loc, prayerCalendarDate, effectiveSettings);
       const rawTimes = parsePrayerTimes(response);
       rawPrayerTimesRef.current = rawTimes;
-      const times = applyAdjustments(rawTimes, effectiveSettings.adjustments);
+      let times = applyAdjustments(rawTimes, effectiveSettings.adjustments);
+      if (response.meta?.timezone && response.meta.timezone !== loc.timezone) {
+        loc = { ...loc, timezone: response.meta.timezone };
+        await saveLocation(loc);
+        setLocation(loc);
+      }
+      times = await alignPrayerTimesToUpcomingDay(times, loc, new Date(), effectiveSettings).catch(() => times);
       await cachePrayerTimes(today, times, effectiveSettings.calculationMethod, effectiveSettings.asrJuristic);
       setPrayerTimes(times);
       setDataSource('live');
@@ -840,8 +911,7 @@ export default function PrayerScreen() {
       // Build week cache from monthly API for offline resilience
       try {
         const { fetchMonthlyPrayerTimes: fetchMonthly } = require('@/lib/prayer-times') as typeof import('@/lib/prayer-times');
-        const now = new Date();
-        const monthlyData = await fetchMonthly(loc, now.getMonth() + 1, now.getFullYear(), effectiveSettings);
+        const monthlyData = await fetchMonthly(loc, prayerCalendarDate.getMonth() + 1, prayerCalendarDate.getFullYear(), effectiveSettings);
         if (monthlyData?.length) {
           const weekEntries = buildWeekEntries(monthlyData, effectiveSettings);
           if (weekEntries.length > 0) {
@@ -853,7 +923,7 @@ export default function PrayerScreen() {
       }
 
       // Sync prayer times to widget data so home screen widgets update immediately
-      publishCanonicalPrayerData(times, loc, 'live').catch(() => {});
+      publishCanonicalPrayerData(times, loc, 'live', response.meta?.timezone).catch(() => {});
 
       // Save scheduled times to worship tracker for historical Fajr tracking
       saveDayTimes(today, {
@@ -904,6 +974,7 @@ export default function PrayerScreen() {
                   adjustments: settings.prayer.adjustments,
                 },
                 source: snapshotSource,
+                timezone: deviceTimezone(),
               });
               await saveCanonicalPrayerSnapshot(snapshot);
               const { updateSharedData } = require('@/lib/widget-data');
@@ -929,7 +1000,7 @@ export default function PrayerScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
       lastFetchAtRef.current = Date.now();
-      lastFetchDayRef.current = new Date().toDateString();
+      lastFetchDayRef.current = getPrayerCalendarDateKey();
     }
   };
 
@@ -981,7 +1052,7 @@ export default function PrayerScreen() {
     try {
       const { updateSharedData } = require('@/lib/widget-data');
       const locationLabel = location?.city ? `${location.city}${location.country ? ', ' + location.country : ''}` : '';
-      const today = getTodayDateString();
+      const today = getPrayerCalendarDateKey();
       cachePrayerTimes(today, adjusted, settings.prayer.calculationMethod, settings.prayer.asrJuristic).catch(() => {});
       if (location) {
         const snapshot = buildCanonicalPrayerSnapshot({
@@ -994,6 +1065,7 @@ export default function PrayerScreen() {
             adjustments: curr,
           },
           source: 'live',
+          timezone: deviceTimezone(),
         });
         saveCanonicalPrayerSnapshot(snapshot).catch(() => {});
       }
@@ -1044,7 +1116,7 @@ export default function PrayerScreen() {
       if (state !== 'active') return;
       const now = Date.now();
       const ageMs = now - (lastFetchAtRef.current || 0);
-      const today = new Date().toDateString();
+      const today = getPrayerCalendarDateKey();
       const dayChanged = lastFetchDayRef.current && lastFetchDayRef.current !== today;
       if (lastFetchAtRef.current === 0) return; // initial load not done yet
       if (dayChanged || ageMs > STALE_AFTER_MS) {
@@ -1239,18 +1311,18 @@ export default function PrayerScreen() {
                             <View style={styles.thumbWidgetContainer}>
                               <View style={styles.thumbWidgetCard}>
                                 <View style={[styles.thumbWidgetRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                  {/* Logo on left */}
+                                  {/* Countdown — on the right in RTL (matches RectangleWidgetView) */}
+                                  <View style={styles.thumbWidgetCountdownSide}>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.thumbWidgetCountdown, { color: colors.text }]}>{clockThumbnailData.countdownShort}</Text>
+                                    <Text numberOfLines={1} style={[styles.thumbWidgetPrayerLabel, { color: colors.textLight }]}>{clockThumbnailData.label}</Text>
+                                  </View>
+                                  {/* Logo — on the left in RTL (matches RectangleWidgetView) */}
                                   <View style={styles.thumbWidgetLogoSide}>
                                     <Image
                                       source={logoSource}
                                       style={styles.thumbWidgetLogo}
                                     />
                                     <Text style={styles.thumbWidgetAppName}>{appName}</Text>
-                                  </View>
-                                  {/* Countdown on right */}
-                                  <View style={styles.thumbWidgetCountdownSide}>
-                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.thumbWidgetCountdown, { color: colors.text }]}>{clockThumbnailData.countdownShort}</Text>
-                                    <Text numberOfLines={1} style={[styles.thumbWidgetPrayerLabel, { color: colors.textLight }]}>{clockThumbnailData.label}</Text>
                                   </View>
                                 </View>
                               </View>
@@ -1301,11 +1373,11 @@ export default function PrayerScreen() {
               {/* Clock view based on active style */}
               <Animated.View entering={FadeInDown.delay(100).duration(500)}>
                 {activeClockStyle === 'widget' ? (
-                  <RectangleWidgetView prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} iconSource={iconSource} />
+                  <RectangleWidgetView prayerTimes={prayerTimes} timezone={prayerTimezone} language={language} isDarkMode={isDarkMode} iconSource={iconSource} />
                 ) : activeClockStyle === 'analog' ? (
-                  <AnalogClockView prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} show24Hour={settings.prayer.show24Hour} />
+                  <AnalogClockView prayerTimes={prayerTimes} timezone={prayerTimezone} language={language} isDarkMode={isDarkMode} show24Hour={settings.prayer.show24Hour} />
                 ) : (
-                  <DigitalTypographyView prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} show24Hour={settings.prayer.show24Hour} />
+                  <DigitalTypographyView prayerTimes={prayerTimes} timezone={prayerTimezone} language={language} isDarkMode={isDarkMode} show24Hour={settings.prayer.show24Hour} />
                 )}
               </Animated.View>
             </>
@@ -1321,7 +1393,7 @@ export default function PrayerScreen() {
               )}
 
               <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-                <PrayerList prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} notificationSettings={prayerSettings?.notifications} onToggleNotification={handleToggleNotification} showNotificationToggle showSunrise={settings.prayer.showSunrise} show24Hour={settings.prayer.show24Hour} prayerStatuses={(todayPrayer || undefined) as any} onPrayerLongPress={openPrayerStatusModal} />
+                <PrayerList prayerTimes={prayerTimes} timezone={prayerTimezone} language={language} isDarkMode={isDarkMode} notificationSettings={prayerSettings?.notifications} onToggleNotification={handleToggleNotification} showNotificationToggle showSunrise={settings.prayer.showSunrise} show24Hour={settings.prayer.show24Hour} prayerStatuses={(todayPrayer || undefined) as any} onPrayerLongPress={openPrayerStatusModal} />
               </Animated.View>
 
               {/* Eid prayer card — shown 3 days before Eid through ~11am Eid day */}
@@ -1414,16 +1486,15 @@ export default function PrayerScreen() {
 
 
 
-        <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
-          <View style={settingsStyles.overlay}>
-            <GlassCard style={settingsStyles.content}>
-              <View style={[settingsStyles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <Text style={[settingsStyles.title, { color: colors.text }]}>{t('prayer.prayerSettingsTitle')}</Text>
-                <TouchableOpacity onPress={() => setShowSettings(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(34, 197, 94, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
-                  <MaterialCommunityIcons name="close" size={18} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
+        <AppModal
+          visible={showSettings}
+          onClose={() => setShowSettings(false)}
+          title={t('prayer.prayerSettingsTitle')}
+          position="center"
+          scroll
+          sheetStyle={{ maxHeight: '85%' }}
+        >
+              <View style={{ paddingBottom: 8 }}>
                 {/* الضبط تلقائيًا — Switch toggle */}
                 <GlassToggle
                   label={t('prayer.autoAdjust')}
@@ -1437,7 +1508,7 @@ export default function PrayerScreen() {
                 {/* Manual method picker — only when auto is OFF */}
                 {!isAutoMode && (
                   <>
-                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.calculationMethod')}</Text>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.calculationMethod')}</Text>
                     <TouchableOpacity
                       style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                       onPress={() => setShowMethodPicker(prev => !prev)}
@@ -1463,7 +1534,7 @@ export default function PrayerScreen() {
                 {/* مذهب العصر — only when auto is OFF */}
                 {!isAutoMode && (
                   <>
-                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.asrMethod')}</Text>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.asrMethod')}</Text>
                     <TouchableOpacity
                       style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                       onPress={() => setShowAsrPicker(prev => !prev)}
@@ -1489,7 +1560,7 @@ export default function PrayerScreen() {
                 {/* ضبط يدوي لأوقات الصلاة — يظهر فقط عند إيقاف الضبط التلقائي */}
                 {!isAutoMode && (
                   <>
-                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayerAdjustments.title')}</Text>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayerAdjustments.title')}</Text>
                     {(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map((prayer) => {
                       const adj = settings.prayer.adjustments?.[prayer] || 0;
                       const prayerTime = prayerTimes ? formatPrayerTime(prayerTimes[prayer], settings.prayer.show24Hour) : '--:--';
@@ -1525,7 +1596,7 @@ export default function PrayerScreen() {
                   </>
                 )}
 
-                <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.displayOptions')}</Text>
+                <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.displayOptions')}</Text>
                 <GlassToggle label={t('prayer.showSunrise')} icon="weather-sunny" enabled={settings.prayer.showSunrise} onToggle={(val) => updatePrayer({ showSunrise: val })} />
                 <GlassToggle label={t('prayer.hourFormat24')} icon="clock-digital" enabled={settings.prayer.show24Hour} onToggle={(val) => updatePrayer({ show24Hour: val })} />
                 <GlassToggle label={t('prayer.showDate')} icon="calendar" enabled={settings.prayer.showDate !== false} onToggle={(val) => updatePrayer({ showDate: val })} />
@@ -1534,7 +1605,7 @@ export default function PrayerScreen() {
                 {/* الأنشطة الحية — iOS 16.1+ */}
                 {Platform.OS === 'ios' && (
                   <>
-                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.liveActivities')}</Text>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.liveActivities')}</Text>
                     <GlassToggle
                       label={t('prayer.enableLiveActivity')}
                       icon="cellphone-nfc"
@@ -1593,11 +1664,8 @@ export default function PrayerScreen() {
                   </>
                 )}
 
-                <View style={{ height: 40 }} />
-              </ScrollView>
-            </GlassCard>
-          </View>
-        </Modal>
+              </View>
+        </AppModal>
 
         {/* Long-press status modal (mawaqit list → record prayer status) */}
         <Modal

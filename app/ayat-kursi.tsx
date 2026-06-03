@@ -65,6 +65,8 @@ export default function AyatKursiScreen() {
   const themeTextColor = quranTheme?.primary || '#1A1000';
   const isLightBg = isThemeLight(themeIndex);
   const shareOrnamentColor = isLightBg ? '#11171d' : getGoldenColor(themeIndex);
+  // Gold tint for the on-screen ornament frame (same as the Ruqya banner)
+  const ornamentColor = isDarkMode ? '#C9A84C' : '#8B7332';
 
   const [qcfFontLoaded, setQcfFontLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -190,6 +192,25 @@ export default function AyatKursiScreen() {
     verseInner: {
       padding: 20,
       alignItems: 'center',
+    },
+    verseBanner: {
+      width: '100%',
+      height: 54,
+      marginBottom: 16,
+    },
+    verseBannerOrnament: {
+      width: '100%',
+      height: 50,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    verseBannerText: {
+      fontSize: 17,
+      fontFamily: 'Amiri-Bold',
+      textAlign: 'center',
+      lineHeight: 28,
+      width: '100%',
+      includeFontPadding: false,
     },
     qcfText: {
       fontFamily: getPageFontFamily(qcfPage, isDarkMode),
@@ -383,6 +404,24 @@ export default function AyatKursiScreen() {
           {/* Verse Card */}
           <GlassCard style={styles.verseCard}>
             <View style={styles.verseInner}>
+              {/* Ornamental surah-style banner (same frame as Ruqya) */}
+              <View style={styles.verseBanner}>
+                <ImageBackground
+                  source={surahOrnament}
+                  style={styles.verseBannerOrnament}
+                  resizeMode="contain"
+                  tintColor={ornamentColor}
+                >
+                  <Text
+                    style={[styles.verseBannerText, { color: ornamentColor }]}
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                  >
+                    {isRTL ? 'آية الكرسي' : 'Ayat Al-Kursi'}
+                  </Text>
+                </ImageBackground>
+              </View>
+
               {qcfFontLoaded && qcfText ? (
                 <Text allowFontScaling={false} style={styles.qcfText}>
                   {qcfText}

@@ -80,6 +80,11 @@ export function handleNotificationNavigation(
       router.push('/(tabs)/prayer' as any);
       return { navigated: true };
 
+    // ─── "You missed Fajr" follow-up → open the prayer tab to log it.
+    case 'smart_alarm_missed':
+      router.push('/(tabs)/prayer' as any);
+      return { navigated: true };
+
     // ─── Full Adhan Player ───
     // Fired when the user taps a prayer notification that was scheduled with
     // `useFullAdhan` enabled, OR taps the test notification while the toggle

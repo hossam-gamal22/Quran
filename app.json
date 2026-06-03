@@ -223,6 +223,7 @@
           "iosAppId": "ca-app-pub-3645278220050673~7902167287"
         }
       ],
+      "./plugins/with-android-widget-pin",
       [
         "react-native-android-widget",
         {
@@ -272,7 +273,6 @@
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
       "./plugins/with-android-full-adhan",
-      "./plugins/with-android-widget-pin",
       [
         "./plugins/with-notification-large-icon",
         {

@@ -1,12 +1,11 @@
 // app/umrah.tsx
 // صفحة مناسك العمرة — منفصلة
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, ScrollView, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
 
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -18,8 +17,6 @@ import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { ScreenContainer } from '@/components/screen-container';
 import { NativeTabs } from '@/components/ui/NativeTabs';
-import { exportAsPDF, showAdThenExport } from '@/lib/pdf-export';
-import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { MissingTranslationCard } from '@/components/ui/MissingTranslationCard';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
@@ -32,11 +29,13 @@ import {
 } from './hajj-umrah';
 import {
   ACCENT,
-  ACCENT_LIGHT,
   ACCENT_BORDER,
+  COUNT_BADGE_BG,
+  COUNT_BADGE_TEXT,
   s as _s,
 } from '@/components/hajj/shared';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { localizeNumber } from '@/lib/format-number';
 
 export default function UmrahScreen() {
   const router = useRouter();
@@ -45,50 +44,13 @@ export default function UmrahScreen() {
   const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
   const [activeTab, setActiveTab] = useState<'rituals' | 'duas'>('rituals');
-  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   // Use CMS data with hardcoded fallback
   const { umrahSections, duasByRitual } = useHajjUmrahContent();
 
   // Umrah-related duas (first 4 groups: إحرام، طواف، سعي، عامة)
   const umrahDuas = duasByRitual.filter((_, i) => i <= 3 || i >= 8);
-
-  const handleSharePdf = useCallback(async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (activeTab === 'duas') {
-        const title = t('hajjUmrah.umrahDuas');
-        const html = umrahDuas.map((group, i) => {
-          const duasHtml = group.duas.map(d =>
-            `<div class="dua-box"><div class="dua-arabic">${d.arabic}</div>${d.occasion ? `<div class="dua-note">${t('hajjUmrah.whenLabel')}: ${d.occasion}</div>` : ''}${d.reference ? `<div class="dua-note">${t('hajjUmrah.referenceLabel')}: ${d.reference}</div>` : ''}</div>`
-          ).join('');
-          return `<div class="section"><div class="section-title">${i + 1}. ${group.title}</div>${duasHtml}</div>`;
-        }).join('');
-        await showAdThenExport(() => exportAsPDF(title, html));
-        return;
-      }
-      const title = t('hajjUmrah.umrahRituals');
-      const html = umrahSections.map((sec, i) => {
-        const stepsHtml = sec.steps.map((step, j) =>
-          `<div class="step"><span class="step-num">${j + 1}</span><span class="step-text">${step.text}</span></div>`
-        ).join('');
-        const duasHtml = sec.duas.map(d =>
-          `<div class="dua-box"><div class="dua-arabic">${d.arabic}</div>${d.note ? `<div class="dua-note">— ${d.note}</div>` : ''}</div>`
-        ).join('');
-        return `<div class="section">
-          <div class="section-title">${i + 1}. ${sec.title}</div>
-          <div class="section-desc">${sec.description}</div>
-          <div class="steps-label">${t('hajjUmrah.steps')}:</div>
-          ${stepsHtml}
-          ${duasHtml ? `<div class="steps-label" style="margin-top:10px;">${t('hajjUmrah.duas')}:</div>${duasHtml}` : ''}
-        </div>`;
-      }).join('');
-      await showAdThenExport(() => exportAsPDF(title, html));
-    } catch (pdfError) {
-      setPdfErrorVisible(true);
-      console.log('Umrah PDF sharing failed', pdfError);
-    }
-  }, [activeTab, umrahSections, umrahDuas]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']} screenKey="hajj_umrah">
@@ -127,7 +89,7 @@ export default function UmrahScreen() {
       </View>
 
       {/* Tabs */}
-      <View style={{ marginTop: 10 }}>
+      <View style={{ marginTop: 10, marginHorizontal: 16 }}>
         <NativeTabs
           tabs={[
             { key: 'rituals', label: t('hajjUmrah.rituals') },
@@ -140,35 +102,33 @@ export default function UmrahScreen() {
       </View>
 
       {/* Content */}
-      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+      <ScrollView ref={scrollRef} style={s.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
         <ContentLanguageNotice />
         {activeTab === 'duas' ? (
           <>
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap' }}>
-              <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, flexShrink: 1 }]}>
-                <Text style={[s.countText, { color: ACCENT }]}>
-                  {umrahDuas.reduce((sum, g) => sum + g.duas.length, 0)} {t('hajjUmrah.duaCount')} • {umrahDuas.length} {t('hajjUmrah.sectionsCount')}
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: 16 }}>
+              <View style={[s.countBadge, { backgroundColor: COUNT_BADGE_BG, flexShrink: 1, marginBottom: 0 }]}>
+                <Text style={[s.countText, { color: COUNT_BADGE_TEXT }]}>
+                  {t('hajjUmrah.duaCount')} {localizeNumber(umrahDuas.reduce((sum, g) => sum + g.duas.length, 0))} • {t('hajjUmrah.sectionsCount')} {localizeNumber(umrahDuas.length)}
                 </Text>
               </View>
-              <PdfShareButton onPress={handleSharePdf} />
             </View>
             {umrahDuas.map((group, index) => (
-              <DuaRitualCard key={`duas-${index}`} group={group} isDarkMode={isDarkMode} colors={colors} initiallyExpanded={index === 0} />
+              <DuaRitualCard key={`duas-${index}`} group={group} isDarkMode={isDarkMode} colors={colors} initiallyExpanded={index === 0} scrollRef={scrollRef} />
             ))}
           </>
         ) : (
           <>
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap' }}>
-              <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, flexShrink: 1 }]}>
-                <Text style={[s.countText, { color: ACCENT }]}>{umrahSections.length} {t('hajjUmrah.ritualsCount')}</Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: 16 }}>
+              <View style={[s.countBadge, { backgroundColor: COUNT_BADGE_BG, flexShrink: 1, marginBottom: 0 }]}>
+                <Text style={[s.countText, { color: COUNT_BADGE_TEXT }]}>{t('hajjUmrah.ritualsCount')} {localizeNumber(umrahSections.length)}</Text>
               </View>
-              <PdfShareButton onPress={handleSharePdf} />
             </View>
             <View style={s.timeline}>
               {umrahSections.map((section, index) => (
                 <View key={`umrah-${index}`}>
                   {index < umrahSections.length - 1 && <View style={[s.timelineLine, { backgroundColor: ACCENT_BORDER }]} />}
-                  <GlassSection section={section} sectionIndex={index} isDarkMode={isDarkMode} colors={colors} initiallyExpanded={index === 0} />
+                  <GlassSection section={section} sectionIndex={index} isDarkMode={isDarkMode} colors={colors} initiallyExpanded={index === 0} scrollRef={scrollRef} />
                 </View>
               ))}
             </View>
@@ -188,14 +148,6 @@ export default function UmrahScreen() {
         <MissingTranslationCard pageName="Umrah" />
       </ScrollView>
       <BannerAdComponent screen="hajj_umrah" />
-      <PdfShareErrorModal
-        visible={pdfErrorVisible}
-        onRetry={() => {
-          setPdfErrorVisible(false);
-          handleSharePdf();
-        }}
-        onClose={() => setPdfErrorVisible(false)}
-      />
     </ScreenContainer>
   );
 }

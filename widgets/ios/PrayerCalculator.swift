@@ -75,12 +75,12 @@ final class PrayerCalculator {
         }
         let result = DayPrayerTimes(
             date: date,
-            fajr: times.fajr,
-            sunrise: times.sunrise,
-            dhuhr: times.dhuhr,
-            asr: times.asr,
-            maghrib: times.maghrib,
-            isha: times.isha
+            fajr: normalizedForDisplay(times.fajr, calendarDay: comps),
+            sunrise: normalizedForDisplay(times.sunrise, calendarDay: comps),
+            dhuhr: normalizedForDisplay(times.dhuhr, calendarDay: comps),
+            asr: normalizedForDisplay(times.asr, calendarDay: comps),
+            maghrib: normalizedForDisplay(times.maghrib, calendarDay: comps),
+            isha: normalizedForDisplay(times.isha, calendarDay: comps)
         )
         dayCache[key] = result
         return result
@@ -197,10 +197,39 @@ final class PrayerCalculator {
             a.isha    += adj.isha ?? 0
             params.adjustments = a
         }
+        if let calibration = inputs.providerCalibration {
+            var a = params.adjustments
+            a.fajr    += calibration.fajr ?? 0
+            a.sunrise += calibration.sunrise ?? 0
+            a.dhuhr   += calibration.dhuhr ?? 0
+            a.asr     += calibration.asr ?? 0
+            a.maghrib += calibration.maghrib ?? 0
+            a.isha    += calibration.isha ?? 0
+            params.adjustments = a
+        }
         return params
     }
 
     // MARK: - Helpers
+
+    /// The app presents prayer rows beside the visible phone clock. Extract
+    /// the solar wall-clock value at the calculation coordinates, then compose
+    /// that same HH:mm on the phone's display day. This mirrors the JS widget
+    /// calculator and prevents remote/stale coordinates from wrapping the
+    /// table across midnight (for example Dhuhr before Fajr).
+    private func normalizedForDisplay(_ rawDate: Date, calendarDay: DateComponents) -> Date {
+        var calculationCalendar = Calendar(identifier: .gregorian)
+        calculationCalendar.timeZone = inputs.resolvedCalculationTimeZone
+        let clock = calculationCalendar.dateComponents([.hour, .minute], from: rawDate)
+
+        var displayCalendar = Calendar(identifier: .gregorian)
+        displayCalendar.timeZone = inputs.resolvedTimeZone
+        var composed = calendarDay
+        composed.hour = clock.hour
+        composed.minute = clock.minute
+        composed.second = 0
+        return displayCalendar.date(from: composed) ?? rawDate
+    }
 
     private func isoDateKey(_ date: Date) -> String {
         var cal = Calendar(identifier: .gregorian)

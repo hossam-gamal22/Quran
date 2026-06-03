@@ -60,6 +60,7 @@ import { guardPremiumFeature } from '@/lib/premium-guard';
 import {
   getQuranTextColor,
 } from '@/components/ui/QuranBackgroundWrapper';
+import { AppModal } from '@/components/ui/AppModal';
 import { QURAN_THEMES, getGoldenColor, getSafeThemeIndex, getThemeCount, isThemeLight } from '@/constants/quran-themes';
 import { Spacing, FONT_SIZES, DarkColors, ModalColors } from '@/constants/theme';
 import { useColors } from '@/hooks/use-colors';
@@ -2605,32 +2606,15 @@ export default function SurahScreen() {
           {/* ══════════════════════════════════════════ */}
           {/* SETTINGS MODAL — uses GLOBAL app theme     */}
           {/* ══════════════════════════════════════════ */}
-          <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
-            <View style={s.sheetOverlay}>
-              <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowSettings(false)} />
-              <View style={[s.sheetContainer, { height: '82%' }]}>
-                <BlurView
-                  intensity={Platform.OS === 'ios' ? 50 : 30}
-                  tint={(settingsIsLight ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
-                  style={s.sheetBlur}
-                >
-                  <View style={[s.sheetContent, {
-                    backgroundColor: settingsIsLight ? ModalColors.cardLight : ModalColors.cardDark,
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: settingsIsLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)',
-                  }]}>
-                    <View style={s.sheetHandle}>
-                      <View style={[s.sheetHandleBar, { backgroundColor: settingsIsLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }]} />
-                    </View>
-
-                    <View style={[s.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <Text style={[s.settingsTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('common.settings')}</Text>
-                      <TouchableOpacity hitSlop={12} onPress={() => setShowSettings(false)}>
-                        <Ionicons name="close-circle" size={24} color={settingsIsLight ? '#999' : '#666'} />
-                      </TouchableOpacity>
-                    </View>
-
-                    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Math.max(insets.bottom, 16) + 16 }} showsVerticalScrollIndicator={false}>
+          <AppModal
+            visible={showSettings}
+            onClose={() => setShowSettings(false)}
+            title={translate('common.settings')}
+            position="center"
+            scroll
+            sheetStyle={{ maxHeight: '85%' }}
+          >
+                    <View>
 
                       {/* ─── Mushaf Theme (Segmented: Colors | Backgrounds) ─── */}
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)' }]}>
@@ -3064,12 +3048,8 @@ export default function SurahScreen() {
                         </View>
                       </View>
 
-                    </ScrollView>
-                  </View>
-                </BlurView>
-              </View>
-            </View>
-          </Modal>
+                    </View>
+          </AppModal>
 
           {/* Tajweed first-time bulk download */}
           <TajweedDownloadModal

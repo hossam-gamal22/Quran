@@ -17,7 +17,7 @@ import {
   type WidgetSnapshotManifestEntry,
 } from './widget-data';
 import { getLanguage } from './i18n';
-import { type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes, applyAdjustments } from './prayer-times';
+import { type Location, type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes, applyAdjustments } from './prayer-times';
 import { getOfflinePrayerTimes } from './prayer-week-cache';
 import {
   buildCanonicalPrayerSnapshot,
@@ -25,13 +25,20 @@ import {
   saveCanonicalPrayerSnapshot,
   type CanonicalPrayerSnapshot,
 } from './canonical-prayer-snapshot';
+import { deviceTimezone } from './prayer-location-timezone';
 import { getEffectivePrayerCalcSettings } from './prayer-settings-source';
 import type {
   PrayerWidgetInputs,
   CalculationMethodId,
   HighLatRuleId,
 } from './widget-prayer-calculator';
-import { PRAYER_INPUTS_KEY, PRAYER_INPUTS_VERSION } from './widget-prayer-calculator';
+import {
+  computePrayerTimesForDay,
+  PRAYER_INPUTS_KEY,
+  PRAYER_INPUTS_VERSION,
+  type PrayerKey,
+} from './widget-prayer-calculator';
+import { nextPrayerStaticState } from './widget-prayer-table-state';
 
 const APP_GROUP = 'group.com.rooh.almuslim';
 const WIDGET_DATA_KEY = 'widget_shared_data';
@@ -56,7 +63,18 @@ interface UpdateWidgetDataOptions {
   forceSnapshots?: boolean;
   clearSnapshotCache?: boolean;
   refreshProofMarker?: string;
+  displayOverride?: WidgetDisplayOverride;
 }
+
+export type WidgetDisplayOverride = Partial<{
+  widgetFontVariant: 'widget1' | 'widget2';
+  widgetCalendar: string;
+  widgetDayCalendar: string;
+  widgetMonthCalendar: string;
+  widgetNumerals: string;
+  widgetTheme: string;
+  widgetDateFormat: string;
+}>;
 
 /**
  * Trigger native widget reload on both platforms.
@@ -86,13 +104,24 @@ async function triggerNativeWidgetReload(sharedData?: SharedWidgetData): Promise
       // — `androidWidgetProviderNames()` returns exactly that.
       const { androidWidgetProviderNames } = require('./widgets/registry');
       const widgetNames: string[] = androidWidgetProviderNames();
+      const snapshotOverrides = new Map<string, AndroidSnapshotRenderOverride>();
+
+      await Promise.allSettled(widgetNames.map(async (widgetName) => {
+        const override = await resolveAndroidSnapshotRenderOverride(widgetName, sharedData);
+        if (override) snapshotOverrides.set(widgetName, override);
+      }));
 
       await Promise.allSettled(
         widgetNames.map((widgetName) =>
           requestWidgetUpdate({
             widgetName,
-            renderWidget: () => {
-              const element = renderWidgetByName(widgetName, sharedData);
+            renderWidget: (widgetInfo: { width?: number; height?: number }) => {
+              const element = renderWidgetByName(
+                widgetName,
+                sharedData,
+                widgetInfo,
+                snapshotOverrides.get(widgetName),
+              );
               return element;
             },
             widgetNotFound: () => {
@@ -244,43 +273,18 @@ export async function writePrayerInputs(): Promise<PrayerWidgetInputs | null> {
       // keep defaults
     }
 
-    // Timezone — MUST be the timezone of the user's selected LOCATION, not
-    // the device's timezone. Otherwise the widget computes prayer times for
-    // (e.g.) San Francisco coordinates but interprets the date in the
-    // device's Cairo timezone, producing nonsense times. Source of truth is
-    // `CanonicalPrayerSnapshot.timezone` (populated from the AlAdhan
-    // response's `meta.timezone`, which the app already uses).
-    let timezone = 'UTC';
-    try {
-      const snapshot = await loadCanonicalPrayerSnapshot({
-        settings: {
-          calculationMethod: calc.calculationMethod as any,
-          asrJuristic: calc.asrJuristic,
-          adjustments: calc.adjustments as any,
-        },
-        location,
-        allowAnySameDayLocation: true,
-      });
-      if (snapshot?.timezone) {
-        timezone = snapshot.timezone;
-      } else {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (tz) timezone = tz;
-      }
-    } catch {
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (tz) timezone = tz;
-      } catch {
-        // keep UTC
-      }
-    }
+    // The widget table is rendered beside the phone clock, so its absolute
+    // epochs must follow the same visible wall clock. The location still
+    // controls the solar calculation coordinates; the device timezone
+    // controls how displayed HH:mm values are interpreted and counted down.
+    const timezone = deviceTimezone();
 
     const inputs: PrayerWidgetInputs = {
       version: PRAYER_INPUTS_VERSION,
       latitude: location.latitude,
       longitude: location.longitude,
       timezone,
+      calculationTimezone: location.timezone || timezone,
       calculationMethod: calc.calculationMethod as CalculationMethodId,
       madhab: calc.asrJuristic === 1 ? 'hanafi' : 'shafi',
       highLatitudeRule: undefined as HighLatRuleId | undefined,
@@ -289,6 +293,48 @@ export async function writePrayerInputs(): Promise<PrayerWidgetInputs | null> {
       adjustments: calc.adjustments as PrayerWidgetInputs['adjustments'],
       writtenAt: new Date().toISOString(),
     };
+
+    // AlAdhan API and the vendored offline Adhan engines occasionally differ
+    // by a provider rounding minute. Calibrate the offline inputs against the
+    // latest trusted same-day snapshot so a widget remains aligned after the
+    // API cache expires, without mutating the user's own adjustments.
+    try {
+      const canonical = await loadCanonicalPrayerSnapshot({
+        settings: {
+          calculationMethod: calc.calculationMethod as any,
+          asrJuristic: calc.asrJuristic,
+          adjustments: calc.adjustments as any,
+        },
+        location,
+      });
+      if (canonical && canonical.timezone === timezone) {
+        const [year, month, day] = canonical.date.split('-').map(Number);
+        const canonicalLocalDay = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)
+          ? new Date(year, month - 1, day, 12, 0, 0, 0)
+          : new Date();
+        const local = computePrayerTimesForDay(inputs, canonicalLocalDay);
+        const canonicalEpochs: Record<PrayerKey, number> = {
+          fajr: canonical.fajrAtEpochMs,
+          sunrise: canonical.sunriseAtEpochMs,
+          dhuhr: canonical.dhuhrAtEpochMs,
+          asr: canonical.asrAtEpochMs,
+          maghrib: canonical.maghribAtEpochMs,
+          isha: canonical.ishaAtEpochMs,
+        };
+        const providerCalibration: Partial<Record<PrayerKey, number>> = {};
+        (Object.keys(canonicalEpochs) as PrayerKey[]).forEach((key) => {
+          const deltaMinutes = Math.round((canonicalEpochs[key] - local[key].getTime()) / 60_000);
+          if (deltaMinutes !== 0 && Math.abs(deltaMinutes) <= 180) {
+            providerCalibration[key] = deltaMinutes;
+          }
+        });
+        if (Object.keys(providerCalibration).length > 0) {
+          inputs.providerCalibration = providerCalibration;
+        }
+      }
+    } catch {
+      // Inputs remain usable without calibration when no trusted API day is cached.
+    }
 
     const json = JSON.stringify(inputs);
 
@@ -318,6 +364,8 @@ export async function writePrayerInputs(): Promise<PrayerWidgetInputs | null> {
         madhab: inputs.madhab,
         location: `${inputs.latitude.toFixed(4)},${inputs.longitude.toFixed(4)}`,
         timezone: inputs.timezone,
+        calculationTimezone: inputs.calculationTimezone,
+        providerCalibration: inputs.providerCalibration ?? {},
       });
     }
 
@@ -335,6 +383,47 @@ async function readCachedSharedData(): Promise<SharedWidgetData | null> {
   } catch {
     return null;
   }
+}
+
+function applyDisplayOverrideToSharedData(
+  data: SharedWidgetData,
+  displayOverride?: WidgetDisplayOverride,
+): SharedWidgetData {
+  if (!displayOverride) return data;
+  return {
+    ...data,
+    ...(displayOverride.widgetFontVariant ? { widgetFontVariant: displayOverride.widgetFontVariant } : {}),
+    ...(displayOverride.widgetCalendar ? {
+      widgetCalendar: displayOverride.widgetCalendar,
+      widgetDayCalendar: displayOverride.widgetDayCalendar ?? displayOverride.widgetCalendar,
+      widgetMonthCalendar: displayOverride.widgetMonthCalendar ?? displayOverride.widgetCalendar,
+    } : {}),
+    ...(displayOverride.widgetDayCalendar ? { widgetDayCalendar: displayOverride.widgetDayCalendar } : {}),
+    ...(displayOverride.widgetMonthCalendar ? { widgetMonthCalendar: displayOverride.widgetMonthCalendar } : {}),
+    ...(displayOverride.widgetNumerals ? { widgetNumerals: displayOverride.widgetNumerals } : {}),
+    ...(displayOverride.widgetTheme ? { widgetTheme: displayOverride.widgetTheme } : {}),
+    ...(displayOverride.widgetDateFormat ? { widgetDateFormat: displayOverride.widgetDateFormat } : {}),
+  };
+}
+
+export async function refreshWidgetDisplayNow(displayOverride: WidgetDisplayOverride): Promise<void> {
+  const previous = await readCachedSharedData();
+  if (!previous) {
+    await updateWidgetData(undefined, undefined, { displayOverride });
+    return;
+  }
+
+  const sharedData = applyDisplayOverrideToSharedData(previous, displayOverride);
+  const writeT0 = Date.now();
+  await writeToSharedStorage(WIDGET_DATA_KEY, JSON.stringify(sharedData));
+  if (__DEV__) {
+    console.log(`[widget/refresh] displayOnlyWriteMs=${Date.now() - writeT0}`);
+    logWidgetTheme('display-only shared data pushed:', {
+      selectedWidgetTheme: sharedData.widgetTheme,
+      displayOverride,
+    });
+  }
+  await triggerNativeWidgetReload(sharedData);
 }
 
 async function nextSnapshotVersion(): Promise<number> {
@@ -458,6 +547,123 @@ async function getActiveSnapshotRouteKeys(
   return out;
 }
 
+type AndroidPrayerStaticState = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+
+const ANDROID_PRAYER_STATIC_WIDGETS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
+const ANDROID_PRAYER_STATIC_STATES: AndroidPrayerStaticState[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+function normalizeAndroidPrayerStaticState(value?: string): AndroidPrayerStaticState | null {
+  const normalized = String(value ?? '').toLowerCase();
+  return (ANDROID_PRAYER_STATIC_STATES as string[]).includes(normalized)
+    ? normalized as AndroidPrayerStaticState
+    : null;
+}
+
+function androidPrayerStaticTargetsForRouteKeys(
+  routeKeys: string[],
+  active: AndroidPrayerStaticState,
+): Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large'; active: AndroidPrayerStaticState }> {
+  const out: Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large'; active: AndroidPrayerStaticState }> = [];
+  const seen = new Set<string>();
+  for (const routeKey of routeKeys) {
+    const [widgetId, size] = routeKey.split('_');
+    if (!widgetId || !ANDROID_PRAYER_STATIC_WIDGETS.has(widgetId)) continue;
+    if (size !== 'small' && size !== 'medium' && size !== 'large') continue;
+    const key = `${widgetId}_${size}_${active}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      widgetId: widgetId as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
+      size,
+      active,
+    });
+  }
+  return out;
+}
+
+function androidPrayerStaticAllStateTargetsForRouteKeys(
+  routeKeys: string[],
+): Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large' }> {
+  const out: Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large' }> = [];
+  const seen = new Set<string>();
+  for (const routeKey of routeKeys) {
+    const [widgetId, size] = routeKey.split('_');
+    if (!widgetId || !ANDROID_PRAYER_STATIC_WIDGETS.has(widgetId)) continue;
+    if (size !== 'small' && size !== 'medium' && size !== 'large') continue;
+    const key = `${widgetId}_${size}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      widgetId: widgetId as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
+      size,
+    });
+  }
+  return out;
+}
+
+function routeKeysForTheme(routeKeys: string[], fromTheme: string, toTheme: string): string[] {
+  return routeKeys.map((routeKey) =>
+    routeKey.endsWith(`_${fromTheme}`)
+      ? `${routeKey.slice(0, -fromTheme.length)}${toTheme}`
+      : routeKey
+  );
+}
+
+interface AndroidSnapshotRenderOverride {
+  hasSnapshot?: boolean;
+  snapshotKey?: string;
+  snapshotPath?: string;
+  isPrayerStaticTemplate?: boolean;
+}
+
+async function resolveAndroidSnapshotRenderOverride(
+  widgetName: string,
+  data: SharedWidgetData,
+): Promise<AndroidSnapshotRenderOverride | undefined> {
+  if (Platform.OS !== 'android') return undefined;
+  try {
+    const { androidWidgetProviderTarget } = require('./widgets/registry');
+    const target = androidWidgetProviderTarget(widgetName);
+    if (!target || !ANDROID_PRAYER_STATIC_WIDGETS.has(target.id)) return undefined;
+
+    const active = normalizeAndroidPrayerStaticState(nextPrayerStaticState(data.prayer));
+    if (!active) return undefined;
+    if (target.size !== 'small' && target.size !== 'medium' && target.size !== 'large') return undefined;
+
+    const {
+      prayerStaticAssetExistsOnDevice,
+      prayerStaticAssetName,
+      prayerStaticAssetPath,
+    } = require('./widget-android-asset-resolver');
+    const { resolveWidgetTheme } = require('./widgets/snapshot');
+    const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
+    const templateOpts = {
+      widgetId: target.id,
+      size: target.size,
+      theme,
+      language: data.widgetLanguage === 'en' || data.language === 'en' ? 'en' : 'ar',
+      active,
+    };
+
+    if (!(await prayerStaticAssetExistsOnDevice(templateOpts))) return undefined;
+
+    const snapshotKey = prayerStaticAssetName(templateOpts);
+    const snapshotPath = prayerStaticAssetPath(templateOpts);
+    if (__DEV__) {
+      console.log(`[widget/refresh] immediate prayer static override widget=${widgetName} key=${snapshotKey}`);
+    }
+    return {
+      hasSnapshot: true,
+      snapshotKey,
+      snapshotPath,
+      isPrayerStaticTemplate: true,
+    };
+  } catch (e) {
+    if (__DEV__) console.warn('[widget/refresh] immediate prayer static override failed:', e);
+    return undefined;
+  }
+}
+
 /**
  * Render the correct widget component for a given widget name using the provided data.
  *
@@ -471,7 +677,12 @@ async function getActiveSnapshotRouteKeys(
  *      render `SnapshotWidget` directly using the (id, size) tuple resolved
  *      from the unified Android provider target map.
  */
-function renderWidgetByName(widgetName: string, data: SharedWidgetData): React.ReactElement | null {
+function renderWidgetByName(
+  widgetName: string,
+  data: SharedWidgetData,
+  widgetBounds?: { width?: number; height?: number },
+  snapshotOverride?: AndroidSnapshotRenderOverride,
+): React.ReactElement | null {
   const { androidWidgetProviderTarget } = require('./widgets/registry');
   const target = androidWidgetProviderTarget(widgetName);
   if (target) {
@@ -504,6 +715,12 @@ function renderWidgetByName(widgetName: string, data: SharedWidgetData): React.R
       widgetId: target.id,
       size: target.size,
       data,
+      hasSnapshot: snapshotOverride?.hasSnapshot,
+      snapshotKey: snapshotOverride?.snapshotKey,
+      snapshotPath: snapshotOverride?.snapshotPath,
+      isPrayerStaticTemplate: snapshotOverride?.isPrayerStaticTemplate,
+      widgetWidth: widgetBounds?.width,
+      widgetHeight: widgetBounds?.height,
       clickAction: 'OPEN_URI',
       clickUri,
     });
@@ -565,6 +782,7 @@ export async function updateWidgetData(
 
     const effectiveCalc = await getEffectivePrayerCalcSettings();
     const storedLocation = await getStoredLocation();
+    const displayTimezone = deviceTimezone();
     let canonicalSnapshot: CanonicalPrayerSnapshot | null = await loadCanonicalPrayerSnapshot({
       settings: {
         calculationMethod: effectiveCalc.calculationMethod as any,
@@ -574,6 +792,12 @@ export async function updateWidgetData(
       location: storedLocation,
       allowAnySameDayLocation: !storedLocation,
     });
+    if (
+      canonicalSnapshot
+      && canonicalSnapshot.timezone !== displayTimezone
+    ) {
+      canonicalSnapshot = null;
+    }
 
     // Auto-use the app's canonical prayer snapshot first. Widgets must not
     // silently calculate a different location/method/timezone than the Prayer
@@ -602,6 +826,7 @@ export async function updateWidgetData(
                 adjustments: effectiveCalc.adjustments as any,
               },
               source: offlineResult.source as any,
+              timezone: displayTimezone,
             });
             await saveCanonicalPrayerSnapshot(canonicalSnapshot);
           }
@@ -629,7 +854,7 @@ export async function updateWidgetData(
     // Write small inputs JSON for offline widget calculation (iOS App Group +
     // Android AsyncStorage). Best-effort — falls through to legacy cached
     // prayer epochs if location/settings aren't set yet.
-    writePrayerInputs().catch(() => {});
+    await writePrayerInputs().catch(() => null);
 
     const settledResults = await Promise.allSettled([
       preparePrayerWidgetData(effectivePrayerTimes, location, lang, canonicalSnapshot),
@@ -696,6 +921,19 @@ export async function updateWidgetData(
         if (d?.widgetNumerals) widgetNumerals = d.widgetNumerals;
         if (d?.widgetTheme) widgetTheme = d.widgetTheme;
         if (d?.widgetDateFormat) widgetDateFormat = d.widgetDateFormat;
+      }
+      const displayOverride = options.displayOverride;
+      if (displayOverride) {
+        if (displayOverride.widgetFontVariant === 'widget1' || displayOverride.widgetFontVariant === 'widget2') {
+          widgetFontVariant = displayOverride.widgetFontVariant;
+        }
+        if (displayOverride.widgetCalendar) widgetCalendar = displayOverride.widgetCalendar;
+        if (displayOverride.widgetDayCalendar) widgetDayCalendar = displayOverride.widgetDayCalendar;
+        if (displayOverride.widgetMonthCalendar) widgetMonthCalendar = displayOverride.widgetMonthCalendar;
+        if (displayOverride.widgetNumerals) widgetNumerals = displayOverride.widgetNumerals;
+        if (displayOverride.widgetTheme) widgetTheme = displayOverride.widgetTheme;
+        if (displayOverride.widgetDateFormat) widgetDateFormat = displayOverride.widgetDateFormat;
+        logWidgetTheme('applied immediate display override (updateWidgetData):', displayOverride);
       }
       logWidgetTheme('after merge/normalization (updateWidgetData):', {
         selectedWidgetTheme: widgetTheme,
@@ -905,6 +1143,29 @@ export async function updateWidgetData(
           throw new Error(`snapshot_generation_empty:${result.reason}`);
         }
         snapshotManifest = mergeSnapshotManifest(previousSharedData, generatedManifest);
+        if (Platform.OS === 'android') {
+          const { ensureAndroidPrayerStaticTemplates } = require('./widgets/snapshot');
+          const currentPrayerState = normalizeAndroidPrayerStaticState(nextPrayerStaticState(prayerData));
+          const priorityTargets = currentPrayerState
+            ? androidPrayerStaticTargetsForRouteKeys(placedRouteKeys, currentPrayerState)
+            : [];
+          if (priorityTargets.length > 0) {
+            const templates = await ensureAndroidPrayerStaticTemplates?.({
+              theme: activeTheme,
+              language: lang === 'en' ? 'en' : 'ar',
+              force: !!options.clearSnapshotCache,
+              targets: priorityTargets,
+            });
+            if (templates?.errors?.length) {
+              throw new Error(`android_prayer_template_generation_failed:${templates.errors.join('|')}`);
+            }
+            if (__DEV__) {
+              console.log(
+                `[widget/android] priority prayer templates ready generated=${templates?.generated ?? 0} skipped=${templates?.skipped ?? false} targets=${priorityTargets.length}`,
+              );
+            }
+          }
+        }
         if (__DEV__) {
           Object.values(generatedManifest).forEach((entry) => {
             console.log(`[widget/app] generated snapshot key=${entry.key} path=${entry.path ?? 'n/a'} hash=${entry.hash ?? 'n/a'}`);
@@ -958,34 +1219,68 @@ export async function updateWidgetData(
           try {
             const prewarmT0 = Date.now();
             const { pumpThemesFromCurrentState } = require('./widgets/pump');
-            const result = await pumpThemesFromCurrentState?.([prewarmTheme], {
-              debounceMs: 0,
-              force: false,
-              cleanup: true,
-              commit: false,
-            });
-            if (result?.entries?.length) {
-              const extraEntries = result.entries.filter((entry: any) => !activeRouteKeySet.has(entry.routeKey));
-              if (extraEntries.length > 0) {
-                const prewarmManifest = buildManifestFromEntries(extraEntries, new Date().toISOString());
-                const latest = await readCachedSharedData();
-                if (latest) {
-                  const merged: SharedWidgetData = {
-                    ...latest,
-                    snapshotManifest: mergeSnapshotManifest(latest, prewarmManifest),
-                  };
-                  await writeToSharedStorage(WIDGET_DATA_KEY, JSON.stringify(merged));
+            const { RESOLVED_WIDGET_THEMES } = require('./widgets/snapshot');
+            const themes: string[] = Platform.OS === 'android' ? Array.from(RESOLVED_WIDGET_THEMES ?? [prewarmTheme]) : [prewarmTheme];
+            let prewarmEntries = 0;
+            for (const theme of themes) {
+              const includeRouteKeys = Platform.OS === 'android'
+                ? routeKeysForTheme(activeRouteKeysForPrewarm, prewarmTheme, theme)
+                : undefined;
+              const result = await pumpThemesFromCurrentState?.([theme], {
+                debounceMs: 0,
+                force: false,
+                includeRouteKeys: includeRouteKeys && includeRouteKeys.length > 0 ? includeRouteKeys : undefined,
+                cleanup: theme === themes[themes.length - 1],
+                commit: false,
+              });
+              if (result?.entries?.length) {
+                const extraEntries = result.entries.filter((entry: any) => !activeRouteKeySet.has(entry.routeKey));
+                prewarmEntries += result.entries.length;
+                if (extraEntries.length > 0) {
+                  const prewarmManifest = buildManifestFromEntries(extraEntries, new Date().toISOString());
+                  const latest = await readCachedSharedData();
+                  if (latest) {
+                    const merged: SharedWidgetData = {
+                      ...latest,
+                      snapshotManifest: mergeSnapshotManifest(latest, prewarmManifest),
+                    };
+                    await writeToSharedStorage(WIDGET_DATA_KEY, JSON.stringify(merged));
+                  }
                 }
               }
             }
             if (__DEV__) {
-              console.log(`[widget/refresh] backgroundPrewarmMs=${Date.now() - prewarmT0} entries=${result?.entries?.length ?? 0}`);
+              console.log(`[widget/refresh] backgroundPrewarmMs=${Date.now() - prewarmT0} entries=${prewarmEntries}`);
+            }
+            if (Platform.OS === 'android') {
+              const staticT0 = Date.now();
+              const { ensureAndroidPrayerStaticTemplates } = require('./widgets/snapshot');
+              let generated = 0;
+              let skipped = 0;
+              for (const theme of themes) {
+                const targetRouteKeys = routeKeysForTheme(activeRouteKeysForPrewarm, prewarmTheme, theme);
+                const targets = androidPrayerStaticAllStateTargetsForRouteKeys(targetRouteKeys);
+                if (targets.length === 0) continue;
+                const templates = await ensureAndroidPrayerStaticTemplates?.({
+                  theme,
+                  language: lang === 'en' ? 'en' : 'ar',
+                  force: false,
+                  targets,
+                });
+                generated += templates?.generated ?? 0;
+                if (templates?.skipped) skipped += 1;
+              }
+              if (__DEV__) {
+                console.log(
+                  `[widget/android] backgroundPrayerTemplatesMs=${Date.now() - staticT0} generated=${generated} skipped=${skipped}`,
+                );
+              }
             }
           } catch (e) {
             if (__DEV__) console.warn('[widget/refresh] background prewarm skipped:', e);
           }
         })();
-      }, 0);
+      }, 5000);
     }
 
     if (__DEV__) {

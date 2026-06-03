@@ -1,17 +1,9 @@
 // widgets/ios/NextPrayerWidget.swift
-// ويدجت مواقيت الصلاة - روح المسلم
+// ويدجت الصلاة القادمة - روح المسلم
 // iOS 14+ WidgetKit
 
 import WidgetKit
 import SwiftUI
-
-private func defaultDhuhrNameAr() -> String {
-    Calendar(identifier: .gregorian).component(.weekday, from: Date()) == 6 ? "صلاة الجمعة" : "الظهر"
-}
-
-private func defaultDhuhrNameEn() -> String {
-    Calendar(identifier: .gregorian).component(.weekday, from: Date()) == 6 ? "Jumuah" : "Dhuhr"
-}
 
 // ========================================
 // نموذج البيانات
@@ -188,17 +180,17 @@ struct PrayerWidgetProvider: TimelineProvider {
     // بيانات تجريبية
     private var sampleData: PrayerWidgetData {
         PrayerWidgetData(
-            nextPrayer: "dhuhr",
-            nextPrayerName: defaultDhuhrNameEn(),
-            nextPrayerNameAr: defaultDhuhrNameAr(),
-            nextPrayerTime: "12:15 م",
+            nextPrayer: "fajr",
+            nextPrayerName: "Fajr",
+            nextPrayerNameAr: "الفجر",
+            nextPrayerTime: "--:--",
             timeRemaining: "2:30",
             timeRemainingMinutes: 150,
             timeRemainingLabel: "الوقت المتبقي",
             allPrayers: [
-                PrayerTime(name: "Fajr", nameAr: "الفجر", time: "4:30 ص", isPassed: true, isNext: false),
+                PrayerTime(name: "Fajr", nameAr: "الفجر", time: "--:--", isPassed: false, isNext: true),
                 PrayerTime(name: "Sunrise", nameAr: "الشروق", time: "5:55 ص", isPassed: true, isNext: false),
-                PrayerTime(name: defaultDhuhrNameEn(), nameAr: defaultDhuhrNameAr(), time: "12:15 م", isPassed: false, isNext: true),
+                PrayerTime(name: "Dhuhr", nameAr: "الظهر", time: "--:--", isPassed: false, isNext: false),
                 PrayerTime(name: "Asr", nameAr: "العصر", time: "3:45 م", isPassed: false, isNext: false),
                 PrayerTime(name: "Maghrib", nameAr: "المغرب", time: "6:20 م", isPassed: false, isNext: false),
                 PrayerTime(name: "Isha", nameAr: "العشاء", time: "7:50 م", isPassed: false, isNext: false),
@@ -323,7 +315,7 @@ struct LargeClassicPrayerView: View {
                         HStack {
                             Image(systemName: prayerIcon)
                                 .font(.system(size: 18))
-                            Text(entry.data?.nextPrayerNameAr ?? defaultDhuhrNameAr())
+                            Text(entry.data?.nextPrayerNameAr ?? "الفجر")
                                 .font(.system(size: 24, weight: .bold))
                         }
                         .foregroundColor(theme.textColor)
@@ -332,7 +324,7 @@ struct LargeClassicPrayerView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text(entry.data?.nextPrayerTime ?? "12:15 م")
+                        Text(entry.data?.nextPrayerTime ?? "--:--")
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(theme.textColor)
                         
@@ -448,7 +440,7 @@ struct NextPrayerWidget: Widget {
         ) { entry in
             NextPrayerWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("مواقيت الصلاة")
+        .configurationDisplayName("الصلاة القادمة")
         .description("عرض الصلاة القادمة والوقت المتبقي")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
@@ -551,9 +543,9 @@ struct AccessoryInlinePrayerView: View {
     
     var body: some View {
         ViewThatFits {
-            Text("\(entry.data?.nextPrayerNameAr ?? defaultDhuhrNameAr()) • \(entry.data?.nextPrayerTime ?? "12:15")")
-            Text("\(entry.data?.nextPrayerNameAr ?? defaultDhuhrNameAr()) \(entry.data?.nextPrayerTime ?? "12:15")")
-            Text(entry.data?.nextPrayerNameAr ?? defaultDhuhrNameAr())
+            Text("\(entry.data?.nextPrayerNameAr ?? "الفجر") • \(entry.data?.nextPrayerTime ?? "--:--")")
+            Text("\(entry.data?.nextPrayerNameAr ?? "الفجر") \(entry.data?.nextPrayerTime ?? "--:--")")
+            Text(entry.data?.nextPrayerNameAr ?? "الفجر")
         }
     }
 }
@@ -576,7 +568,7 @@ struct AccessoryCircularPrayerView: View {
             Text("")
         } currentValueLabel: {
             VStack(spacing: 0) {
-                Text(entry.data?.nextPrayerNameAr ?? defaultDhuhrNameAr())
+                Text(entry.data?.nextPrayerNameAr ?? "الفجر")
                     .font(.system(size: 10, weight: .bold))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)

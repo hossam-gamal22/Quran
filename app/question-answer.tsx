@@ -957,6 +957,24 @@ export default function QuestionAnswerScreen() {
           <Text style={emptyTextStyle}>
             {isSearching ? t('questionAnswer.noSearchResults') : t('questionAnswer.noQuestions')}
           </Text>
+          {isSearching && (
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const q = searchQuery.trim();
+                startNewChat();          // افتح محادثة جديدة بدل الاستمرار على القديمة
+                setShowAssistantModal(true);
+                submitAssistantQuestion(q);
+              }}
+              activeOpacity={0.85}
+              style={[styles.askAssistantCta, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            >
+              <MaterialCommunityIcons name="robot-outline" size={20} color="#fff" />
+              <Text style={styles.askAssistantCtaText}>
+                {t('questionAnswer.searchAskAssistant')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
@@ -1325,6 +1343,22 @@ const centerContainerStyle: ViewStyle = {
 
 const styles = StyleSheet.create({
 
+  askAssistantCta: {
+    marginTop: Spacing.lg,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.full,
+    backgroundColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  askAssistantCtaText: {
+    fontFamily: fontSemiBold(),
+    fontSize: 15,
+    color: '#fff',
+    includeFontPadding: false,
+  },
   searchBar: {
     marginHorizontal: Spacing.md,
     marginTop: Spacing.xs,

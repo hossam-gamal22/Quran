@@ -98,7 +98,7 @@ export default function WelcomeScreen() {
       <StatusBar style="light" translucent />
       
       <View
-        style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}
+        style={[styles.gradient, { backgroundColor: '#0f1a14' }]}
       >
         {/* الهيدر: رجوع */}
         <SafeAreaView edges={['top']} style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>

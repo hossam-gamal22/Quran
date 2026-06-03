@@ -34,6 +34,7 @@ import {
   scheduleDailyAyahNotification,
 } from '@/lib/notifications-manager';
 import { getPrayerTranslationKey } from '@/lib/prayer-times';
+import { fadeOutAndStop } from '@/lib/sound-manager';
 
 // ─── Time Picker Modal ────────────────────────────────────────────────────────
 interface TimePickerProps {
@@ -140,11 +141,9 @@ export default function NotificationsCenterScreen() {
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
-      try {
-        await previewSoundRef.current.stopAsync();
-        await previewSoundRef.current.unloadAsync();
-      } catch { /* ignore */ }
+      const sound = previewSoundRef.current;
       previewSoundRef.current = null;
+      await fadeOutAndStop(sound);
     }
     setPreviewPlaying(null);
     setPreviewLoading(null);

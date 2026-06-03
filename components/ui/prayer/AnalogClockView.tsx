@@ -36,6 +36,7 @@ interface AnalogClockViewProps {
   language?: string;
   isDarkMode?: boolean;
   show24Hour?: boolean;
+  timezone?: string;
 }
 
 const CLOCK_SIZE = Math.min(width * 0.7, 280);
@@ -47,6 +48,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   language = 'ar',
   isDarkMode = false,
   show24Hour = false,
+  timezone,
 }) => {
   const isRTL = useIsRTL();
   const { fs } = useColors();
@@ -78,14 +80,14 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   useEffect(() => {
     if (!prayerTimes) return;
     const update = () => {
-      setNextPrayer(getNextPrayer(prayerTimes));
-      setTimeRemaining(getTimeRemaining(prayerTimes));
+      setNextPrayer(getNextPrayer(prayerTimes, { timezone }));
+      setTimeRemaining(getTimeRemaining(prayerTimes, { timezone }));
       setCurrentTime(new Date());
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimes]);
+  }, [prayerTimes, timezone]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     opacity: pulseOpacity.value,

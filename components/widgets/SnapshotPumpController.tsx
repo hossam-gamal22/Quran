@@ -5,10 +5,12 @@
 // app/_layout.tsx; renders nothing.
 //
 // Triggers a debounced pump:
-//   - Whenever the relevant display settings change (theme, language, calendar,
-//     numerals, fontVariant, dateFormat).
-//   - On premium status change.
+//   - On Android WIDGET_ADDED after the app foregrounds.
 //   - On app foreground (AppState 'active') when the data signature is fresh.
+//
+// Ordinary in-app widget setting changes are handled by updateWidgetData(),
+// which writes shared data, regenerates the placed widget snapshots, and
+// reloads native widgets in one foreground-priority path.
 //
 // Implements C5 (hash-based skip) + C8 (incremental, observable). The pump
 // itself short-circuits if nothing changed.
@@ -124,7 +126,9 @@ export function SnapshotPumpController() {
           await AsyncStorage.removeItem(PUMP_PENDING_KEY);
         }
       } catch {}
-      runActiveThenBackgroundPump(pending).catch(() => {});
+      if (pending) {
+        runActiveThenBackgroundPump(true).catch(() => {});
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

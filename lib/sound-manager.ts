@@ -454,6 +454,44 @@ async function ensurePlaybackAudioMode(): Promise<void> {
 }
 
 /**
+ * Gracefully fade a Sound's volume to zero, then stop + unload it, so previews
+ * (short adhan, ringtones) don't cut off abruptly when the user stops them or
+ * navigates away. Falls back to an immediate stop if anything fails. Safe to
+ * call with null. After this resolves the Sound is unloaded — discard the ref.
+ *
+ * @param sound    The expo-av Sound to fade out (may be null).
+ * @param duration Total fade length in ms (default 600).
+ */
+export async function fadeOutAndStop(
+  sound: Audio.Sound | null,
+  duration = 600,
+): Promise<void> {
+  if (!sound) return;
+  const steps = 8;
+  const stepMs = Math.max(20, Math.floor(duration / steps));
+  try {
+    const status = await sound.getStatusAsync();
+    // If it's not actually playing, skip the fade and stop immediately.
+    if (status.isLoaded && status.isPlaying) {
+      const startVolume =
+        typeof status.volume === 'number' ? status.volume : 1.0;
+      for (let i = steps - 1; i >= 1; i--) {
+        try {
+          await sound.setVolumeAsync(startVolume * (i / steps));
+        } catch {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, stepMs));
+      }
+    }
+  } catch {
+    // getStatus/setVolume can fail if already unloaded — fall through to stop.
+  }
+  try { await sound.stopAsync(); } catch {}
+  try { await sound.unloadAsync(); } catch {}
+}
+
+/**
  * Play a sound from a require() source and return the Sound instance.
  * The sound auto-unloads when playback finishes.
  */

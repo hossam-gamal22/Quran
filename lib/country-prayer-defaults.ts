@@ -191,8 +191,18 @@ export function getCountryPrayerDefaultsOrFallback(
 // Core Calculation (Pure Offline)
 // ────────────────────────────────────────────
 
-function formatTime(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+function formatTime(date: Date, timezone?: string): string {
+  if (!timezone) {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return `${String(get('hour') % 24).padStart(2, '0')}:${String(get('minute')).padStart(2, '0')}`;
 }
 
 /**
@@ -205,6 +215,7 @@ export function calculateLocalPrayerTimes(
   date: Date,
   methodId: number,
   asrSchool: 0 | 1 = 0,
+  calculationTimezone?: string,
 ): PrayerTimes {
   const coordinates = new Coordinates(lat, lng);
   const params = getAdhanCalcParams(methodId);
@@ -214,14 +225,14 @@ export function calculateLocalPrayerTimes(
   const sunnahTimes = new SunnahTimes(prayerTimes);
 
   return {
-    fajr: formatTime(prayerTimes.fajr),
-    sunrise: formatTime(prayerTimes.sunrise),
-    dhuhr: formatTime(prayerTimes.dhuhr),
-    asr: formatTime(prayerTimes.asr),
-    maghrib: formatTime(prayerTimes.maghrib),
-    isha: formatTime(prayerTimes.isha),
-    midnight: formatTime(sunnahTimes.middleOfTheNight),
-    lastThird: formatTime(sunnahTimes.lastThirdOfTheNight),
+    fajr: formatTime(prayerTimes.fajr, calculationTimezone),
+    sunrise: formatTime(prayerTimes.sunrise, calculationTimezone),
+    dhuhr: formatTime(prayerTimes.dhuhr, calculationTimezone),
+    asr: formatTime(prayerTimes.asr, calculationTimezone),
+    maghrib: formatTime(prayerTimes.maghrib, calculationTimezone),
+    isha: formatTime(prayerTimes.isha, calculationTimezone),
+    midnight: formatTime(sunnahTimes.middleOfTheNight, calculationTimezone),
+    lastThird: formatTime(sunnahTimes.lastThirdOfTheNight, calculationTimezone),
   };
 }
 
@@ -251,6 +262,7 @@ export function getCountryFallbackPrayerTimes(date?: Date): CountryFallbackResul
     targetDate,
     defaults.method,
     defaults.asrSchool,
+    'Asia/Riyadh',
   );
 
   return {
@@ -283,6 +295,7 @@ export function getCountryFallbackTimesRange(
       d,
       defaults.method,
       defaults.asrSchool,
+      'Asia/Riyadh',
     );
     result.push({ date: dateStr, times });
   }

@@ -23,6 +23,7 @@ interface LargeWidgetVariantsProps {
   isDarkMode?: boolean;
   show24Hour?: boolean;
   iconSource?: any;
+  timezone?: string;
 }
 
 const PRAYER_KEYS: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
@@ -32,6 +33,7 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   isDarkMode = false,
   show24Hour = false,
   iconSource,
+  timezone,
 }) => {
   const isRTL = useIsRTL();
   const { fs } = useColors();
@@ -49,13 +51,13 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   useEffect(() => {
     if (!prayerTimes) return;
     const update = () => {
-      setNextPrayer(getNextPrayer(prayerTimes));
-      setTimeRemaining(getTimeRemaining(prayerTimes));
+      setNextPrayer(getNextPrayer(prayerTimes, { timezone }));
+      setTimeRemaining(getTimeRemaining(prayerTimes, { timezone }));
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimes]);
+  }, [prayerTimes, timezone]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
   const nextName = nextPrayer?.name ?? 'fajr';

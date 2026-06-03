@@ -20,7 +20,7 @@ import { getLanguage } from '@/lib/i18n';
 import { useSmartAlarm } from '@/contexts/SmartAlarmContext';
 import { ChallengeRunner } from '@/components/smart-alarm/challenges/ChallengeRunner';
 import { FajrStreakBanner } from '@/components/smart-alarm/FajrStreakBanner';
-import { cancelAllPendingRings } from '@/lib/smart-alarm/scheduler';
+import { cancelAllPendingRings, cancelMissedFajrForToday } from '@/lib/smart-alarm/scheduler';
 import {
   appendAlarmHistory,
   updateLatestHistory,
@@ -196,6 +196,11 @@ export default function SmartAlarmRingScreen() {
           dismissedAt: new Date().toISOString(),
           challengePassed,
         }).catch(() => {});
+
+        // The user woke for Fajr → cancel today's "you missed Fajr" follow-up.
+        if (kind === 'fajr') {
+          await cancelMissedFajrForToday().catch(() => {});
+        }
 
         // Auto-log fasting on successful Suhoor dismiss — the user is awake
         // for suhoor, so they'll fast today. Reflects in worship stats + honor board.

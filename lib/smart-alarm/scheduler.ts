@@ -21,6 +21,11 @@ import {
 } from './storage';
 
 const PRIMARY_KEY_PREFIX = '@smart_alarm_notif_id_';
+// IDs of the "you missed Fajr" follow-ups, stored as [{id, ms}] so we can
+// cancel today's one the moment the user actually dismisses the alarm.
+const MISSED_KEY = '@smart_alarm_missed_fajr';
+// The missed-Fajr follow-up fires this many minutes AFTER the real fajr time.
+const MISSED_AFTER_FAJR_MIN = 90;
 
 // The smart alarm's whole point is the *cascade* (6 rings every 10s). A single
 // daily notification wouldn't wake anyone, so every scheduled day gets the FULL
@@ -306,9 +311,10 @@ export async function scheduleSmartAlarms(
     suhoor: { scheduled: false, triggerAt: null, cascadeCount: 0 },
   };
 
-  // Always clear stale rings first
+  // Always clear stale rings + missed follow-ups first
   await cancelAllPendingRings('fajr');
   await cancelAllPendingRings('suhoor');
+  await cancelAllMissedFajr();
 
   if (!prayerTimes) {
     return result;
@@ -351,6 +357,23 @@ export async function scheduleSmartAlarms(
         result.fajr.scheduled = true;
         result.fajr.triggerAt = dayTriggers[0];
         result.fajr.cascadeCount = ids.length;
+      }
+
+      // "You missed Fajr" follow-up at fajr + MISSED_AFTER_FAJR_MIN for each
+      // armed day. Reusing computeDayTriggers with a negative offset gives us
+      // (fajr + N min). Cancelled the instant the user dismisses the alarm.
+      const missedTriggers = await computeDayTriggers(
+        prayerTimes,
+        -MISSED_AFTER_FAJR_MIN,
+        fajrDays,
+      );
+      const missedIds: { id: string; ms: number }[] = [];
+      for (const t of missedTriggers) {
+        const id = await scheduleMissedFajrNotification(t);
+        if (id) missedIds.push({ id, ms: t.getTime() });
+      }
+      if (missedIds.length > 0) {
+        await AsyncStorage.setItem(MISSED_KEY, JSON.stringify(missedIds));
       }
     }
   }
@@ -426,6 +449,74 @@ export async function rescheduleSmartAlarmsFromStorage(): Promise<ScheduleResult
 export async function cancelAllSmartAlarms(): Promise<void> {
   await cancelAllPendingRings('fajr');
   await cancelAllPendingRings('suhoor');
+  await cancelAllMissedFajr();
+}
+
+// ─── "You missed Fajr" follow-up ────────────────────────────────────────────
+
+/** Schedule a single "you missed Fajr" follow-up at the given time. */
+async function scheduleMissedFajrNotification(triggerDate: Date): Promise<string | null> {
+  if (triggerDate.getTime() <= Date.now()) return null;
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: dirText(uiText({ ar: 'لقد فاتتك صلاة الفجر', en: 'You missed Fajr prayer' })),
+        body: dirText(uiText({
+          ar: 'افتح التطبيق لتسجيلها والاستمرار في تلقي تنبيهات الفجر',
+          en: 'Open the app to log it and keep receiving Fajr alarms',
+        })),
+        data: { type: 'smart_alarm_missed', kind: 'fajr' },
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        ...(Platform.OS === 'android' && { channelId: 'general' }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        ...(Platform.OS === 'android' && { channelId: 'general' }),
+      },
+    });
+  } catch (e) {
+    if (__DEV__) console.warn('[SmartAlarm] missed-fajr schedule failed', e);
+    return null;
+  }
+}
+
+/** Cancel ALL pending missed-Fajr follow-ups (used on full reschedule). */
+async function cancelAllMissedFajr(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(MISSED_KEY);
+    if (!raw) return;
+    const list = JSON.parse(raw) as { id: string; ms: number }[];
+    for (const { id } of list) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    }
+    await AsyncStorage.removeItem(MISSED_KEY);
+  } catch {}
+}
+
+/**
+ * Cancel today's missed-Fajr follow-up — called the moment the user actually
+ * dismisses the alarm, so they don't get told they "missed" a prayer they woke for.
+ */
+export async function cancelMissedFajrForToday(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(MISSED_KEY);
+    if (!raw) return;
+    const list = JSON.parse(raw) as { id: string; ms: number }[];
+    const now = Date.now();
+    const cutoff = now + 8 * 60 * 60 * 1000; // within the next 8h = today's
+    const remaining: { id: string; ms: number }[] = [];
+    for (const entry of list) {
+      if (entry.ms > now && entry.ms < cutoff) {
+        await Notifications.cancelScheduledNotificationAsync(entry.id).catch(() => {});
+      } else {
+        remaining.push(entry);
+      }
+    }
+    await AsyncStorage.setItem(MISSED_KEY, JSON.stringify(remaining));
+  } catch {}
 }
 
 /**

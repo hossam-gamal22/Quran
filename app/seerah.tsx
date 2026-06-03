@@ -32,9 +32,6 @@ import { UniversalHeader } from '@/components/ui';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { SourcesList } from '@/components/ui/SourcesList';
-import { showAdThenExport } from '@/lib/pdf-export';
-import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
-import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { t, getLanguage } from '@/lib/i18n';
@@ -948,7 +945,6 @@ export default function SeerahScreen() {
   const colors = useColors();
   const s = useScaledStyles(_s, colors.fs);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
-  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const sectionPositionsRef = useRef<Record<number, number>>({});
   const timelineOffsetRef = useRef(0);
@@ -996,26 +992,6 @@ export default function SeerahScreen() {
       return next;
     });
   }, []);
-
-  const handleSharePdf = useCallback(async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await showAdThenExport(() => shareIslamicPdf({
-        title: t('seerah.title'),
-        subtitle: t('seerah.heroSubtitle'),
-        shortDescription: t('seerah.heroTitle'),
-        category: 'رُوح المسلم',
-        footerTitle: 'رُوح المسلم',
-        sections: seerahSections.map((sec, index) => ({
-          title: `${index + 1}. ${sec.title}`,
-          body: sec.paragraphs,
-        })),
-      }));
-    } catch (pdfError) {
-      setPdfErrorVisible(true);
-      console.log('Seerah PDF sharing failed', pdfError);
-    }
-  }, [seerahSections, t]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right']} screenKey="seerah">
@@ -1075,7 +1051,6 @@ export default function SeerahScreen() {
               {seerahSections.length} {t('seerah.chapters')}
             </Text>
           </View>
-          <PdfShareButton onPress={handleSharePdf} />
         </View>
 
         {/* Single audio for the whole Seerah (admin-managed) */}
@@ -1162,14 +1137,6 @@ export default function SeerahScreen() {
         </View>
       </ScrollView>
       <BannerAdComponent screen="seerah" />
-      <PdfShareErrorModal
-        visible={pdfErrorVisible}
-        onRetry={() => {
-          setPdfErrorVisible(false);
-          handleSharePdf();
-        }}
-        onClose={() => setPdfErrorVisible(false)}
-      />
     </ScreenContainer>
   );
 }

@@ -52,7 +52,11 @@ const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
 // with bypassDnd=true + alarm-style vibration so the Fajr/Suhoor alarm rings
 // through Do-Not-Disturb. The reminder_alarm_* channels from v28 are no longer
 // used by the smart alarm (kept for backwards compat / no harm).
-const CURRENT_CHANNELS_VERSION = '29';
+// v30: Re-encoded the 14 short-adhan clips (assets/sounds/<voice>.mp3) with a
+// 2s fade-out at the tail so the notification adhan no longer cuts off abruptly
+// at 15s. Channel sounds are immutable once created on Android, so this bump
+// forces the adhan_* channels to be recreated with the faded audio.
+const CURRENT_CHANNELS_VERSION = '30';
 
 export const ANDROID_FULL_ADHAN_CHANNEL_ID = 'adhan_full_visual';
 

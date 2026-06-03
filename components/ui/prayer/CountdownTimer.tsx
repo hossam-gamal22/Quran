@@ -52,6 +52,7 @@ interface CountdownTimerProps {
   secondaryColor?: string;
   variant?: 'classic' | 'creative';
   show24Hour?: boolean;
+  timezone?: string;
 }
 
 // ========================================
@@ -68,6 +69,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   secondaryColor = '#3da87e',
   variant = 'creative',
   show24Hour = false,
+  timezone,
 }) => {
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
@@ -111,10 +113,10 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     if (!prayerTimes) return;
 
     const updateCountdown = () => {
-      const next = getNextPrayer(prayerTimes);
+      const next = getNextPrayer(prayerTimes, { timezone });
       setNextPrayer(next);
 
-      const remaining = getTimeRemaining(prayerTimes);
+      const remaining = getTimeRemaining(prayerTimes, { timezone });
       setTimeRemaining(remaining);
 
       if (remaining) {
@@ -142,7 +144,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [prayerTimes, totalDuration]);
+  }, [prayerTimes, timezone, totalDuration]);
 
   // خصائص الدائرة المتحركة
   const animatedCircleProps = useAnimatedProps(() => ({

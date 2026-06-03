@@ -121,7 +121,7 @@ export default function CompleteScreen() {
     <View style={styles.container}>
       <StatusBar style="light" translucent />
       
-      <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
+      <View style={[styles.gradient, { backgroundColor: '#0f1a14' }]}>
         {/* كونفيتي */}
         <ConfettiCannon
           count={80}

@@ -43,8 +43,12 @@ async function sendPush(messages) {
 }
 
 async function selectMonthlyWinners() {
+  // `--force` (or FORCE_WINNER_SELECTION=1) re-runs selection even when the
+  // month was already marked processed. Use it to correct a prior bad run
+  // (e.g. winners chosen before the lastFinalizedMonth union fix).
+  const force = process.argv.includes('--force') || process.env.FORCE_WINNER_SELECTION === '1';
   const monthKey = getPreviousMonthKey();
-  console.log(`Selecting winners for month: ${monthKey}`);
+  console.log(`Selecting winners for month: ${monthKey}${force ? ' (FORCE)' : ''}`);
 
   const configRef = db.collection('config').doc('rewards-settings');
   const configSnap = await configRef.get();
@@ -55,8 +59,8 @@ async function selectMonthlyWinners() {
     return;
   }
 
-  if (configData.currentMonth === monthKey || configData.processedMonth === monthKey) {
-    console.log(`Already processed month ${monthKey}, skipping.`);
+  if (!force && (configData.currentMonth === monthKey || configData.processedMonth === monthKey)) {
+    console.log(`Already processed month ${monthKey}, skipping. (pass --force to re-run)`);
     return;
   }
 
@@ -65,35 +69,73 @@ async function selectMonthlyWinners() {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + rewardDurationDays);
   const expiresAtIso = expiresAt.toISOString();
+  const candidateLimit = Math.max(winnersCount * 5, 20);
 
-  const snapshot = await db
-    .collection('users')
-    .where('monthlyEngagement.month', '==', monthKey)
-    .orderBy('monthlyEngagement.score', 'desc')
-    .limit(Math.max(winnersCount * 5, 20))
-    .get();
+  // Query users in two ways and union the results (mirrors the deployed
+  // `selectMonthlyWinners` Cloud Function):
+  // 1) Users whose monthlyEngagement still points at the previous month —
+  //    they haven't opened the app under the new month yet.
+  // 2) Users who already rolled over into the new month but kept a
+  //    denormalised snapshot of their final previous-month score in
+  //    lastFinalizedMonth. Active users fall in this bucket, so querying
+  //    only monthlyEngagement.month would silently drop the top scorers.
+  const [activeSnapshot, finalizedSnapshot] = await Promise.all([
+    db.collection('users')
+      .where('monthlyEngagement.month', '==', monthKey)
+      .orderBy('monthlyEngagement.score', 'desc')
+      .limit(candidateLimit)
+      .get(),
+    db.collection('users')
+      .where('lastFinalizedMonth.month', '==', monthKey)
+      .orderBy('lastFinalizedMonth.score', 'desc')
+      .limit(candidateLimit)
+      .get(),
+  ]);
 
-  const winners = snapshot.docs
-    .filter((docSnap) => {
-      const data = docSnap.data();
-      const displayName = String(data.displayName || '').trim();
-      const score = data.monthlyEngagement?.score || 0;
-      return displayName && score > 0 && !data.hiddenFromLeaderboard && !data.placeholder;
-    })
+  const candidatesById = new Map();
+  const consider = (userId, data, score, displayName) => {
+    if (!displayName || score <= 0) return;
+    if (data.hiddenFromLeaderboard || data.placeholder) return;
+    const existing = candidatesById.get(userId);
+    if (!existing || score > existing.score) {
+      candidatesById.set(userId, { userId, displayName, score, data });
+    }
+  };
+
+  activeSnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    consider(
+      docSnap.id,
+      data,
+      Number(data.monthlyEngagement?.score) || 0,
+      String(data.displayName || '').trim(),
+    );
+  });
+
+  finalizedSnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const finalized = data.lastFinalizedMonth;
+    consider(
+      docSnap.id,
+      data,
+      Number(finalized?.score) || 0,
+      String(finalized?.displayName || data.displayName || '').trim(),
+    );
+  });
+
+  const winners = Array.from(candidatesById.values())
+    .sort((a, b) => b.score - a.score)
     .slice(0, winnersCount)
-    .map((docSnap, index) => {
-      const data = docSnap.data();
-      return {
-        userId: docSnap.id,
-        rank: index + 1,
-        score: data.monthlyEngagement?.score || 0,
-        displayName: String(data.displayName || '').trim(),
-        fcmToken: data.fcmToken,
-        rewardedAt: new Date().toISOString(),
-        notified: false,
-        premiumExpiresAt: expiresAtIso,
-      };
-    });
+    .map((candidate, index) => ({
+      userId: candidate.userId,
+      rank: index + 1,
+      score: candidate.score,
+      displayName: candidate.displayName,
+      fcmToken: candidate.data.fcmToken,
+      rewardedAt: new Date().toISOString(),
+      notified: false,
+      premiumExpiresAt: expiresAtIso,
+    }));
 
   console.log(`Found ${winners.length} eligible winners`);
 

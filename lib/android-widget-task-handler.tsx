@@ -11,6 +11,16 @@ import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SharedWidgetData } from './widget-data';
 import { getPrayerNameAr, getPrayerNameEn } from './prayer-times';
+import { formatEpochTimeInTimeZone } from './widget-timezone';
+import { nextPrayerStaticState } from './widget-prayer-table-state';
+import {
+  prayerStaticAssetName,
+  prayerStaticAssetPath,
+  prayerStaticAssetExistsOnDevice,
+  type PrayerLang,
+  type PrayerStateKey,
+  type PrayerTheme,
+} from './widget-android-asset-resolver';
 
 import {
   SnapshotWidget,
@@ -80,6 +90,14 @@ async function loadWidgetData(): Promise<SharedWidgetData | null> {
     // ignore
   }
   return null;
+}
+
+async function persistWidgetData(data: SharedWidgetData): Promise<void> {
+  try {
+    await AsyncStorage.setItem(WIDGET_DATA_KEY, JSON.stringify(data));
+  } catch {
+    // A widget update should still render the freshly computed in-memory data.
+  }
 }
 
 async function hasAppEverOpened(): Promise<boolean> {
@@ -229,13 +247,13 @@ function isPrayerWidget(widgetName: string): boolean {
 }
 
 /**
- * Offline refresh for prayer widgets — reads small `@widget_prayer_inputs`
- * record and computes today's prayer times locally via the adhan npm package.
- * Merges the freshly-computed fields into `data.prayer` so the snapshot widget
- * renders accurate values even if the user hasn't opened the app for weeks.
+ * Refresh prayer widgets without requiring the foreground app.
  *
- * Falls through silently if inputs aren't set yet (returns input data
- * unchanged). The task handler then renders with whatever was cached.
+ * Prefer the app's canonical API-backed rows while they still cover the
+ * selected location's current day. This keeps the widget byte-for-byte aligned
+ * with the Prayer tab, including provider-specific minute rounding. Once that
+ * cache has expired, fall back to the local adhan calculation so a placed
+ * widget continues working indefinitely while the app stays closed.
  */
 async function refreshPrayerWidgetData(
   widgetName: string,
@@ -248,9 +266,54 @@ async function refreshPrayerWidgetData(
       computeFlatSnapshot,
       PRAYER_ORDER,
     } = require('./widget-prayer-calculator');
+    const now = new Date();
+    const cachedRows = (data.prayer?.allPrayers ?? [])
+      .map((row, index) => ({
+        ...row,
+        key: (PRAYER_ORDER as string[])[index],
+        epochMs: Number(row.epochMs),
+      }))
+      .filter((row) => row.key && Number.isFinite(row.epochMs) && row.epochMs > 0)
+      .sort((a, b) => a.epochMs - b.epochMs);
+    const cachedNext = cachedRows.find((row) => row.epochMs > now.getTime());
+    if (cachedNext) {
+      const cachedPrevious = [...cachedRows].reverse().find((row) => row.epochMs <= now.getTime());
+      const remainingSeconds = Math.max(0, Math.floor((cachedNext.epochMs - now.getTime()) / 1000));
+      const merged: SharedWidgetData = {
+        ...data,
+        prayer: {
+          ...(data.prayer ?? {}),
+          nextPrayer: cachedNext.key,
+          nextPrayerName: cachedNext.name,
+          nextPrayerNameAr: cachedNext.nameAr,
+          nextPrayerTime: cachedNext.time,
+          nextPrayerAtEpochMs: cachedNext.epochMs,
+          previousPrayerName: cachedPrevious?.name ?? data.prayer?.previousPrayerName,
+          previousPrayerNameAr: cachedPrevious?.nameAr ?? data.prayer?.previousPrayerNameAr,
+          previousPrayerAtEpochMs: cachedPrevious?.epochMs ?? data.prayer?.previousPrayerAtEpochMs,
+          timeRemainingMinutes: Math.floor(remainingSeconds / 60),
+          allPrayers: cachedRows.map((row) => ({
+            name: row.name,
+            nameAr: row.nameAr,
+            time: row.time,
+            epochMs: row.epochMs,
+            isPassed: row.epochMs <= now.getTime(),
+            isNext: row.epochMs === cachedNext.epochMs,
+          })),
+        } as SharedWidgetData['prayer'],
+      };
+      if (__DEV__) {
+        console.log('[widget/android] refreshed prayer data from canonical day cache', {
+          next: cachedNext.key,
+          nextAt: new Date(cachedNext.epochMs).toISOString(),
+          source: data.prayer?.source,
+        });
+      }
+      return merged;
+    }
+
     const inputs = await readPrayerInputs();
     if (!inputs) return data;
-    const now = new Date();
     const snapshot = computeFlatSnapshot(inputs, now, 7);
     // Map prayer keys to display names.
     const nameMap: Record<string, { en: string; ar: string }> = {
@@ -261,16 +324,16 @@ async function refreshPrayerWidgetData(
       maghrib: { en: getPrayerNameEn('maghrib', now), ar: getPrayerNameAr('maghrib', now) },
       isha:    { en: getPrayerNameEn('isha', now),    ar: getPrayerNameAr('isha', now) },
     };
-    const formatHHMM = (ms: number) => {
-      const d = new Date(ms);
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const isAr = data.widgetLanguage === 'ar' || (!data.widgetLanguage && (data.language || 'ar') === 'ar');
+    const formatWidgetTime = (ms: number) => {
+      return formatEpochTimeInTimeZone(ms, inputs.timezone, isAr ? 'ar' : 'en') ?? '--:--';
     };
     const nextNames = nameMap[snapshot.next] ?? nameMap.fajr;
     const prevNames = nameMap[snapshot.previous] ?? nameMap.isha;
     const allPrayers = (PRAYER_ORDER as string[]).map((key) => ({
       name: nameMap[key].en,
       nameAr: nameMap[key].ar,
-      time: formatHHMM(snapshot.todayTimes[key]),
+      time: formatWidgetTime(snapshot.todayTimes[key]),
       epochMs: snapshot.todayTimes[key],
       isPassed: snapshot.todayTimes[key] <= now.getTime(),
       isNext: key === snapshot.next,
@@ -282,11 +345,12 @@ async function refreshPrayerWidgetData(
         nextPrayer: snapshot.next,
         nextPrayerName: nextNames.en,
         nextPrayerNameAr: nextNames.ar,
-        nextPrayerTime: formatHHMM(snapshot.nextAtEpochMs),
+        nextPrayerTime: formatWidgetTime(snapshot.nextAtEpochMs),
         nextPrayerAtEpochMs: snapshot.nextAtEpochMs,
         previousPrayerName: prevNames.en,
         previousPrayerNameAr: prevNames.ar,
         previousPrayerAtEpochMs: snapshot.previousAtEpochMs,
+        timezone: inputs.timezone,
         allPrayers,
         allPrayerEpochs: snapshot.allPrayerEpochs,
         source: 'widget-local-adhan',
@@ -366,10 +430,29 @@ async function renderSnapshotWidget(
   const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
   const routeKey = snapshotRouteKeyForPlacement(target.id, target.size, theme);
   const manifestEntry = data.snapshotManifest?.[routeKey];
-  const snapshotKey = manifestEntry?.key ?? routeKey;
-  const path = manifestEntry?.path ?? (manifestEntry?.key
+  let snapshotKey = manifestEntry?.key ?? routeKey;
+  let path = manifestEntry?.path ?? (manifestEntry?.key
     ? snapshotFilePathForKey(manifestEntry.key)
     : snapshotFilePath(target.id, target.size, theme));
+  let isPrayerStaticTemplate = false;
+  if (PRAYER_WIDGET_IDS.has(target.id)) {
+    const rawState = nextPrayerStaticState(data.prayer);
+    const validStates = new Set<PrayerStateKey>(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']);
+    if (rawState && validStates.has(rawState as PrayerStateKey)) {
+      const templateOpts = {
+        widgetId: target.id as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
+        size: target.size,
+        theme: theme as PrayerTheme,
+        language: (data.widgetLanguage === 'en' || data.language === 'en' ? 'en' : 'ar') as PrayerLang,
+        active: rawState as PrayerStateKey,
+      };
+      if (await prayerStaticAssetExistsOnDevice(templateOpts)) {
+        snapshotKey = prayerStaticAssetName(templateOpts);
+        path = prayerStaticAssetPath(templateOpts);
+        isPrayerStaticTemplate = true;
+      }
+    }
+  }
   let hasSnapshot = false;
   let fallbackReason: string | undefined;
   try {
@@ -394,6 +477,7 @@ async function renderSnapshotWidget(
       snapshotKey={snapshotKey}
       snapshotPath={path}
       fallbackReason={fallbackReason}
+      isPrayerStaticTemplate={isPrayerStaticTemplate}
       widgetWidth={widgetBounds?.width}
       widgetHeight={widgetBounds?.height}
       clickAction="OPEN_URI"
@@ -408,11 +492,13 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
 
   switch (widgetAction) {
     case 'WIDGET_ADDED': {
+      let data = await loadWidgetData();
+
       // Premium gate: non-free widgets require premium subscription
       if (!isAndroidLockWidgetProvider(widgetName) && !FREE_WIDGET_NAMES.includes(widgetName)) {
         const premium = await isUserPremium();
         if (!premium) {
-          renderWidget(<LockedWidget widgetName={widgetName} />);
+          renderWidget(<LockedWidget widgetName={widgetName} data={data} />);
           return;
         }
       }
@@ -427,8 +513,6 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // Widget just added — try to generate fresh data immediately only after
       // the app has launched once. Before that, show instructions instead of
       // silently writing generic Makkah/sample data.
-      let data = await loadWidgetData();
-
       if (!data && !appOpened) {
         renderWidget(<AppNotOpenedWidget />);
         return;
@@ -457,22 +541,24 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // Prayer widgets: recompute prayer times locally via adhan so the widget
       // stays accurate for weeks without the main app being opened.
       const fresh = await refreshPrayerWidgetData(widgetName, data);
+      if (fresh !== data) await persistWidgetData(fresh);
       await renderSnapshotWidget(widgetName, fresh, renderWidget, widgetInfo);
       return;
     }
 
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
+      let data = await loadWidgetData();
+
       // Premium gate: non-free widgets require premium subscription
       if (!isAndroidLockWidgetProvider(widgetName) && !FREE_WIDGET_NAMES.includes(widgetName)) {
         const premium = await isUserPremium();
         if (!premium) {
-          renderWidget(<LockedWidget widgetName={widgetName} />);
+          renderWidget(<LockedWidget widgetName={widgetName} data={data} />);
           return;
         }
       }
 
-      let data = await loadWidgetData();
       const appOpened = await hasAppEverOpened();
 
       if (!data && !appOpened) {
@@ -499,6 +585,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // Prayer widgets: recompute prayer times locally via adhan so the widget
       // stays accurate for weeks without the main app being opened.
       const fresh = await refreshPrayerWidgetData(widgetName, data);
+      if (fresh !== data) await persistWidgetData(fresh);
       await renderSnapshotWidget(widgetName, fresh, renderWidget, widgetInfo);
       return;
     }

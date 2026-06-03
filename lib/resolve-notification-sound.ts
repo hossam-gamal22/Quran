@@ -53,6 +53,16 @@ export function resolveNotificationSound(soundType?: string, soundEnabled?: bool
   // so this only affects reminder/general-style notifications.
   if (!soundType || soundType === 'default') return 'default';
 
+  // iOS short-adhan: Apple only reliably plays caf/aiff/wav for
+  // UNNotificationSound — mp3 is silently dropped to the default tone. The
+  // matching <voice>.caf clips (15s, 2s fade-out) are bundled into the iOS
+  // target by plugins/with-ios-adhan-sounds.js, which copies every .caf from
+  // assets/sounds/adhan_full_ios/. Android is untouched: it keeps playing the
+  // faded <voice>.mp3 via its immutable notification channel.
+  if (Platform.OS === 'ios' && ADHAN_SOUND_FILES[soundType]) {
+    return `${soundType}.caf`;
+  }
+
   // 1. Check installed custom sounds (downloaded from Firebase)
   const customSoundValue = getNotificationSoundValueSync(soundType);
   if (customSoundValue) {

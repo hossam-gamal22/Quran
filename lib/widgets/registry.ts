@@ -72,7 +72,12 @@ import type { PreviewSize } from '@/components/widgets/previews/shared';
 // cannot fall back to the default Day Simple tile.
 // v26: Android prayer-table snapshots bake static prayer times/names into the
 // PNG; only the fast-changing countdown stays as a native overlay.
-export const WIDGET_REGISTRY_VERSION = 26; // Android prayer table baked text parity
+// v27: Prayer-table large native row times follow the preview's expanded
+// space-between layout instead of the old compact coordinates.
+// v28: Android live date cards preserve the gallery/iOS logical aspect ratio
+// inside launcher cells, Gregorian month subtitles use the selected full date
+// format, and the small prayer card keeps its time clear of the prayer name.
+export const WIDGET_REGISTRY_VERSION = 28; // Android small-card parity
 
 export type WidgetCategory = 'date' | 'prayer' | 'quran' | 'azkar' | 'hijri';
 export type WidgetPlatform = 'ios' | 'android';
@@ -271,7 +276,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     overlay: {
       kind: 'prayerCountdown',
       anchors: {
-        small: { x: 78, y: 130, fontSize: 10, fontFamily: 'Rubik-Medium', align: 'center', color: 'muted', clearWidth: 140, clearHeight: 14 },
+        small: { x: 78, y: 130, fontSize: 10, fontFamily: 'Rubik-Medium', align: 'center', color: 'muted', clearWidth: 118, clearHeight: 18 },
       },
     },
     androidProvider: 'RoohPrayerSmall',
@@ -291,9 +296,9 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     overlay: {
       kind: 'prayerCountdown',
       anchors: {
-        small: { x: 44, y: 24, fontSize: 9, fontFamily: 'Rubik-Medium', align: 'left', color: 'muted', clearWidth: 82, clearHeight: 12 },
-        medium: { x: 246, y: 130, fontSize: 9, fontFamily: 'Rubik-Medium', align: 'center', color: 'muted', clearWidth: 112, clearHeight: 12 },
-        large: { x: 246, y: 126, fontSize: 12, fontFamily: 'Rubik-Medium', align: 'center', color: 'muted', clearWidth: 180, clearHeight: 18 },
+        small: { x: 44, y: 18, fontSize: 9, fontFamily: 'Rubik-Medium', align: 'left', color: 'muted', clearWidth: 82, clearHeight: 16 },
+        medium: { x: 247, y: 128, fontSize: 9, fontFamily: 'Rubik-Medium', align: 'center', color: 'muted', clearWidth: 112, clearHeight: 16 },
+        large: { x: 236, y: 106, fontSize: 10, fontFamily: 'Rubik-Medium', align: 'center', color: 'muted', clearWidth: 190, clearHeight: 18 },
       },
     },
     androidProvider: 'RoohPrayerMedium',

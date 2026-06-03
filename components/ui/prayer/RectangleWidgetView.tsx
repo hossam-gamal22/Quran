@@ -23,6 +23,7 @@ interface RectangleWidgetViewProps {
   language?: string;
   isDarkMode?: boolean;
   iconSource?: any;
+  timezone?: string;
 }
 
 const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
@@ -30,6 +31,7 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   language = 'ar',
   isDarkMode = false,
   iconSource,
+  timezone,
 }) => {
   const isRTL = useIsRTL();
   const { fs } = useColors();
@@ -47,13 +49,13 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   useEffect(() => {
     if (!prayerTimes) return;
     const update = () => {
-      setNextPrayer(getNextPrayer(prayerTimes));
-      setTimeRemaining(getTimeRemaining(prayerTimes));
+      setNextPrayer(getNextPrayer(prayerTimes, { timezone }));
+      setTimeRemaining(getTimeRemaining(prayerTimes, { timezone }));
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimes]);
+  }, [prayerTimes, timezone]);
 
   if (!prayerTimes || !nextPrayer || !timeRemaining) {
     return (

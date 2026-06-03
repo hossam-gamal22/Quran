@@ -5,10 +5,12 @@ import {
   type PrayerName,
   type PrayerSettings,
   type PrayerTimes,
-  getNextPrayer,
-  getTodayDateString,
-  timeStringToDate,
+  hasChronologicalPrayerTimes,
 } from '@/lib/prayer-times';
+import {
+  epochForTimeStringOnDateInTimeZone,
+  partsInTimeZone,
+} from '@/lib/widget-timezone';
 
 export const CANONICAL_PRAYER_SNAPSHOT_KEY = '@canonical_prayer_snapshot_v1';
 export const PRAYER_LOCATION_STABILITY_KM = 5;
@@ -43,8 +45,9 @@ export interface CanonicalPrayerSnapshot {
   source: 'cached-location' | 'gps' | 'manual' | 'todayCache' | 'weekCache' | 'extrapolated' | 'localCalc' | 'countryFallback' | 'live';
 }
 
-function dateStringFor(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+function dateStringForTimeZone(date: Date, timezone: string): string {
+  const parts = partsInTimeZone(date, timezone);
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }
 
 export function prayerSettingsSignature(settings: Pick<PrayerSettings, 'calculationMethod' | 'asrJuristic' | 'adjustments'>): string {
@@ -72,12 +75,12 @@ export function haversineDistanceKm(a: Pick<Location, 'latitude' | 'longitude'>,
   return 2 * earthKm * Math.asin(Math.sqrt(h));
 }
 
-function epochFor(time: string, baseDate: Date): number {
-  return timeStringToDate(time, baseDate).getTime();
-}
-
 function previousPrayerFromEpochs(epochs: Array<{ name: PrayerName; epochMs: number }>, nowMs: number) {
   return [...epochs].reverse().find((p) => p.epochMs <= nowMs) ?? epochs[epochs.length - 1];
+}
+
+function nextPrayerFromEpochs(epochs: Array<{ name: PrayerName; epochMs: number }>, nowMs: number) {
+  return epochs.find((p) => p.epochMs > nowMs);
 }
 
 export function buildCanonicalPrayerSnapshot(args: {
@@ -87,27 +90,32 @@ export function buildCanonicalPrayerSnapshot(args: {
   source: CanonicalPrayerSnapshot['source'];
   date?: Date;
   locationName?: string;
+  timezone?: string;
 }): CanonicalPrayerSnapshot {
   const now = args.date ?? new Date();
   const nowMs = now.getTime();
-  const date = dateStringFor(now);
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Prayer rows are presented as wall-clock values beside the device clock.
+  // Keep every consumer on that same visible timeline. The selected
+  // location's timezone remains useful API metadata, but must not reinterpret
+  // a displayed "04:20" as a different instant than the phone user sees.
+  const timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const date = dateStringForTimeZone(now, timezone);
   const locationName = args.locationName ?? [args.location.city, args.location.country].filter(Boolean).join(', ');
 
   const epochs = PRAYER_KEYS.map((name) => ({
     name,
-    epochMs: epochFor(args.times[name], now),
+    epochMs: epochForTimeStringOnDateInTimeZone(args.times[name], now, timezone),
   }));
 
-  const next = getNextPrayer(args.times) ?? { name: 'fajr' as PrayerName, time: args.times.fajr };
-  let nextPrayerAtEpochMs = epochFor(next.time, now);
-  if (nextPrayerAtEpochMs <= nowMs) {
-    nextPrayerAtEpochMs += 24 * 60 * 60 * 1000;
-  }
+  const tomorrowFajr = args.times.tomorrowFajr || args.times.fajr;
+  const next = nextPrayerFromEpochs(epochs, nowMs) ?? {
+    name: 'fajr' as PrayerName,
+    epochMs: epochForTimeStringOnDateInTimeZone(tomorrowFajr, now, timezone, 1),
+  };
 
   const previous = previousPrayerFromEpochs(epochs, nowMs);
   const previousPrayerAtEpochMs = previous.epochMs > nowMs
-    ? previous.epochMs - 24 * 60 * 60 * 1000
+    ? epochForTimeStringOnDateInTimeZone(args.times[previous.name], now, timezone, -1)
     : previous.epochMs;
 
   const snapshot: CanonicalPrayerSnapshot = {
@@ -127,7 +135,7 @@ export function buildCanonicalPrayerSnapshot(args: {
     maghribAtEpochMs: epochs.find((p) => p.name === 'maghrib')!.epochMs,
     ishaAtEpochMs: epochs.find((p) => p.name === 'isha')!.epochMs,
     nextPrayerName: next.name,
-    nextPrayerAtEpochMs,
+    nextPrayerAtEpochMs: next.epochMs,
     previousPrayerName: previous.name,
     previousPrayerAtEpochMs,
     generatedAtEpochMs: nowMs,
@@ -160,7 +168,8 @@ export async function loadCanonicalPrayerSnapshot(options: {
     const raw = await AsyncStorage.getItem(CANONICAL_PRAYER_SNAPSHOT_KEY);
     if (!raw) return null;
     const snapshot = JSON.parse(raw) as CanonicalPrayerSnapshot;
-    const expectedDate = options.date ?? getTodayDateString();
+    if (!hasChronologicalPrayerTimes(snapshot.prayerTimes)) return null;
+    const expectedDate = options.date ?? dateStringForTimeZone(new Date(), snapshot.timezone);
     if (snapshot.date !== expectedDate) return null;
     if (options.settings && snapshot.settingsSignature !== prayerSettingsSignature(options.settings)) return null;
     if (options.location && !options.allowAnySameDayLocation) {
@@ -173,6 +182,27 @@ export async function loadCanonicalPrayerSnapshot(options: {
     return snapshot;
   } catch (e) {
     console.warn('[PrayerCanonical] failed to load snapshot:', e);
+    return null;
+  }
+}
+
+/**
+ * Recover a previously verified location timezone even when the prayer
+ * snapshot belongs to an older calendar day. Only live API snapshots are
+ * trusted here: cache-only snapshots created before the timezone was known
+ * may have fallen back to the device timezone.
+ */
+export async function loadCanonicalPrayerTimezoneForLocation(
+  location: Pick<Location, 'latitude' | 'longitude'>,
+): Promise<string | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CANONICAL_PRAYER_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const snapshot = JSON.parse(raw) as CanonicalPrayerSnapshot;
+    if (snapshot.source !== 'live' || !snapshot.timezone) return null;
+    if (haversineDistanceKm(snapshot, location) > PRAYER_LOCATION_STABILITY_KM) return null;
+    return snapshot.timezone;
+  } catch {
     return null;
   }
 }

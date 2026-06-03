@@ -5,6 +5,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
 import { MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
+import {
+  dateForTimeZoneCalendarDay,
+  epochForTimeStringOnDateInTimeZone,
+} from './widget-timezone';
 
 // ========================================
 // الأنواع والواجهات
@@ -19,6 +23,8 @@ export interface PrayerTimes {
   isha: string;
   midnight: string;
   lastThird: string;
+  /** Next location-local calendar day's Fajr, used after today's Isha. */
+  tomorrowFajr?: string;
 }
 
 // Source of truth lives in prayer-api.ts. Re-exported here to keep all
@@ -32,6 +38,8 @@ export interface Location {
   longitude: number;
   city?: string;
   country?: string;
+  /** IANA timezone for these coordinates, persisted from the AlAdhan response. */
+  timezone?: string;
 }
 
 export interface PrayerSettings {
@@ -201,7 +209,9 @@ const distanceKm = (a: Location, b: Location): number => {
 export const fetchPrayerTimes = async (
   location: Location,
   date: Date = new Date(),
-  settings: PrayerSettings = DEFAULT_SETTINGS
+  // Only the calculation method + school are needed to build the request, so accept
+  // any object carrying them (callers pass either app or prayer-lib settings shapes).
+  settings: Pick<PrayerSettings, 'calculationMethod' | 'asrJuristic'> = DEFAULT_SETTINGS
 ): Promise<PrayerTimesResponse> => {
   const { latitude, longitude } = location;
   const day = date.getDate();
@@ -277,6 +287,20 @@ export const parsePrayerTimes = (response: PrayerTimesResponse): PrayerTimes => 
   };
 };
 
+/** Prayer rows shown beside one visible phone day must remain ordered. Reject
+ * stale caches that were accidentally converted across timezone boundaries
+ * (for example Dhuhr at 00:09 before Fajr at 15:20). */
+export const hasChronologicalPrayerTimes = (times: PrayerTimes | null | undefined): times is PrayerTimes => {
+  if (!times) return false;
+  const values = [times.fajr, times.sunrise, times.dhuhr, times.asr, times.maghrib, times.isha]
+    .map((time) => {
+      const [hour, minute] = time.split(':').map(Number);
+      return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : NaN;
+    });
+  return values.every((value) => Number.isFinite(value))
+    && values.every((value, index) => index === 0 || value > values[index - 1]);
+};
+
 /**
  * تطبيق التعديلات على المواقيت
  */
@@ -303,6 +327,39 @@ export const applyAdjustments = (
     midnight: times.midnight,
     lastThird: times.lastThird,
   };
+};
+
+export const withTomorrowFajr = async (
+  times: PrayerTimes,
+  location: Location,
+  referenceDate: Date,
+  settings: Pick<PrayerSettings, 'calculationMethod' | 'asrJuristic' | 'adjustments'>,
+  displayTimezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): Promise<PrayerTimes> => {
+  if (times.tomorrowFajr) return times;
+  const tomorrow = dateForTimeZoneCalendarDay(referenceDate, displayTimezone, 1);
+  const response = await fetchPrayerTimes(location, tomorrow, settings);
+  const tomorrowTimes = applyAdjustments(parsePrayerTimes(response), settings.adjustments);
+  return { ...times, tomorrowFajr: tomorrowTimes.fajr };
+};
+
+export const alignPrayerTimesToUpcomingDay = async (
+  times: PrayerTimes,
+  location: Location,
+  referenceDate: Date,
+  settings: Pick<PrayerSettings, 'calculationMethod' | 'asrJuristic' | 'adjustments'>,
+  displayTimezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): Promise<PrayerTimes> => {
+  const tomorrowDate = dateForTimeZoneCalendarDay(referenceDate, displayTimezone, 1);
+  const tomorrowResponse = await fetchPrayerTimes(location, tomorrowDate, settings);
+  const tomorrowTimes = applyAdjustments(parsePrayerTimes(tomorrowResponse), settings.adjustments);
+  const todayIshaEpoch = epochForTimeStringOnDateInTimeZone(times.isha, referenceDate, displayTimezone);
+
+  if (todayIshaEpoch <= referenceDate.getTime()) {
+    return withTomorrowFajr(tomorrowTimes, location, tomorrowDate, settings, displayTimezone);
+  }
+
+  return { ...times, tomorrowFajr: tomorrowTimes.fajr };
 };
 
 /**
@@ -366,8 +423,34 @@ export const formatPrayerTime = (timeString: string, use24Hour: boolean): string
 /**
  * الحصول على الصلاة القادمة
  */
-export const getNextPrayer = (times: PrayerTimes): { name: PrayerName; time: string } | null => {
-  const now = new Date();
+export type PrayerTimeContext = string | {
+  now?: Date;
+  timezone?: string;
+};
+
+export interface NextPrayerResult {
+  name: PrayerName;
+  time: string;
+  epochMs?: number;
+}
+
+const normalizePrayerTimeContext = (context?: PrayerTimeContext): { now: Date; timezone: string } => {
+  const now = typeof context === 'object' && context?.now ? context.now : new Date();
+  const timezone = typeof context === 'string'
+    ? context
+    : context?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return { now, timezone };
+};
+
+const getPrayerEpochForContext = (
+  prayerTime: string,
+  context: { now: Date; timezone: string },
+  dayOffset = 0,
+): number => epochForTimeStringOnDateInTimeZone(prayerTime, context.now, context.timezone, dayOffset);
+
+export const getNextPrayer = (times: PrayerTimes, context?: PrayerTimeContext): NextPrayerResult | null => {
+  const resolvedContext = normalizePrayerTimeContext(context);
+  const nowMs = resolvedContext.now.getTime();
   const prayers: { name: PrayerName; time: string }[] = [
     { name: 'fajr', time: times.fajr },
     { name: 'sunrise', time: times.sunrise },
@@ -378,21 +461,27 @@ export const getNextPrayer = (times: PrayerTimes): { name: PrayerName; time: str
   ];
 
   for (const prayer of prayers) {
-    const prayerTime = timeStringToDate(prayer.time);
-    if (prayerTime > now) {
-      return prayer;
+    const epochMs = getPrayerEpochForContext(prayer.time, resolvedContext);
+    if (epochMs > nowMs) {
+      return { ...prayer, epochMs };
     }
   }
 
   // إذا انتهت كل الصلوات اليوم، الصلاة القادمة هي فجر الغد
-  return { name: 'fajr', time: times.fajr };
+  const tomorrowFajr = times.tomorrowFajr || times.fajr;
+  return {
+    name: 'fajr',
+    time: tomorrowFajr,
+    epochMs: getPrayerEpochForContext(tomorrowFajr, resolvedContext, 1),
+  };
 };
 
 /**
  * الحصول على الصلاة الحالية (التي دخل وقتها)
  */
-export const getCurrentPrayer = (times: PrayerTimes): PrayerName | null => {
-  const now = new Date();
+export const getCurrentPrayer = (times: PrayerTimes, context?: PrayerTimeContext): PrayerName | null => {
+  const resolvedContext = normalizePrayerTimeContext(context);
+  const nowMs = resolvedContext.now.getTime();
   const prayers: { name: PrayerName; time: string }[] = [
     { name: 'isha', time: times.isha },
     { name: 'maghrib', time: times.maghrib },
@@ -403,8 +492,8 @@ export const getCurrentPrayer = (times: PrayerTimes): PrayerName | null => {
   ];
 
   for (const prayer of prayers) {
-    const prayerTime = timeStringToDate(prayer.time);
-    if (now >= prayerTime) {
+    const epochMs = getPrayerEpochForContext(prayer.time, resolvedContext);
+    if (nowMs >= epochMs) {
       return prayer.name;
     }
   }
@@ -416,20 +505,15 @@ export const getCurrentPrayer = (times: PrayerTimes): PrayerName | null => {
  * حساب الوقت المتبقي للصلاة القادمة
  */
 export const getTimeRemaining = (
-  times: PrayerTimes
+  times: PrayerTimes,
+  context?: PrayerTimeContext,
 ): { hours: number; minutes: number; seconds: number; totalSeconds: number } | null => {
-  const nextPrayer = getNextPrayer(times);
+  const resolvedContext = normalizePrayerTimeContext(context);
+  const nextPrayer = getNextPrayer(times, resolvedContext);
   if (!nextPrayer) return null;
 
-  const now = new Date();
-  let prayerTime = timeStringToDate(nextPrayer.time);
-
-  // إذا كان الوقت قد مر، أضف يوم (فجر الغد)
-  if (prayerTime <= now) {
-    prayerTime.setDate(prayerTime.getDate() + 1);
-  }
-
-  const diff = prayerTime.getTime() - now.getTime();
+  const nextPrayerEpochMs = nextPrayer.epochMs ?? getPrayerEpochForContext(nextPrayer.time, resolvedContext);
+  const diff = nextPrayerEpochMs - resolvedContext.now.getTime();
   const totalSeconds = Math.floor(diff / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -550,6 +634,7 @@ export const saveLocation = async (location: Location): Promise<void> => {
             ...existing,
             city: location.city || existing.city,
             country: location.country || existing.country,
+            timezone: location.timezone || existing.timezone,
           };
           console.log(`[PrayerCanonical] location drift ignored: ${driftKm.toFixed(2)}km < ${LOCATION_STABILITY_KM}km`);
           await AsyncStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(stableLocation));
@@ -607,16 +692,25 @@ export const cachePrayerTimes = async (
  */
 export const getCachedPrayerTimes = async (date: string, method?: number, school?: number): Promise<PrayerTimes | null> => {
   try {
-    // Try method-specific key first if provided
+    // When a method+school is specified, return ONLY the method-specific cache.
+    // The generic key is shared across all callers (home, widgets, worship tracker)
+    // and holds whichever method was written last — falling back to it could serve
+    // a DIFFERENT method's times than the user's current one, making the on-screen
+    // countdown disagree with the (correctly method-matched) notifications by a few
+    // minutes. Returning null instead forces a fresh fetch with the right method.
     if (method !== undefined && school !== undefined) {
       const specificKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}_M${method}_S${school}`;
       const specificData = await AsyncStorage.getItem(specificKey);
-      if (specificData) return JSON.parse(specificData);
+      if (!specificData) return null;
+      const parsed = JSON.parse(specificData) as PrayerTimes;
+      return hasChronologicalPrayerTimes(parsed) ? parsed : null;
     }
-    // Fallback to generic key
+    // No method specified — caller accepts the method-agnostic generic cache.
     const genericKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}`;
     const data = await AsyncStorage.getItem(genericKey);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    const parsed = JSON.parse(data) as PrayerTimes;
+    return hasChronologicalPrayerTimes(parsed) ? parsed : null;
   } catch (error) {
     console.error('Error getting cached prayer times:', error);
     return null;
@@ -681,10 +775,9 @@ export const getTodayDateString = (): string => {
 /**
  * هل الصلاة فاتت؟
  */
-export const isPrayerPassed = (prayerTime: string): boolean => {
-  const now = new Date();
-  const prayer = timeStringToDate(prayerTime);
-  return now > prayer;
+export const isPrayerPassed = (prayerTime: string, context?: PrayerTimeContext): boolean => {
+  const resolvedContext = normalizePrayerTimeContext(context);
+  return resolvedContext.now.getTime() > getPrayerEpochForContext(prayerTime, resolvedContext);
 };
 
 /**

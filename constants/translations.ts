@@ -2694,6 +2694,7 @@ export interface TranslationKeys {
     contentLangNotice: string;
     searchPlaceholder: string;
     noSearchResults: string;
+    searchAskAssistant: string;
   };
   // التتبع الذكي
   smartTracker: {
@@ -5430,6 +5431,7 @@ const ar: TranslationKeys = {
     contentLangNotice: 'الأسئلة والأجوبة متوفرة باللغتين العربية والإنجليزية فقط. وعند اختيار لغة أخرى يتم عرض النص بالإنجليزية.',
     searchPlaceholder: 'ابحث في الأسئلة والأجوبة…',
     noSearchResults: 'لا توجد نتائج مطابقة لبحثك',
+    searchAskAssistant: 'اسأل المساعد الذكي عن بحثك',
   },
   smartTracker: {
     title: 'صلاتي',
@@ -8163,6 +8165,7 @@ const en: TranslationKeys = {
     contentLangNotice: 'Questions and answers are available in Arabic and English only. For other languages, the English text is shown.',
     searchPlaceholder: 'Search questions and answers…',
     noSearchResults: 'No results match your search',
+    searchAskAssistant: 'Ask the smart assistant about your search',
   },
   smartTracker: {
     title: 'My Prayer',
@@ -10893,6 +10896,7 @@ const fr: TranslationKeys = {
     contentLangNotice: 'Les questions et réponses sont disponibles uniquement en arabe et en anglais. Pour les autres langues, le texte anglais est affiché.',
     searchPlaceholder: 'Rechercher dans les questions et réponses…',
     noSearchResults: 'Aucun résultat ne correspond à votre recherche',
+    searchAskAssistant: 'Demandez à l’assistant intelligent au sujet de votre recherche',
   },
   smartTracker: {
     title: 'Ma Prière',
@@ -13590,6 +13594,7 @@ const de: TranslationKeys = {
     contentLangNotice: 'Fragen und Antworten sind nur auf Arabisch und Englisch verfügbar. Bei anderen Sprachen wird der englische Text angezeigt.',
     searchPlaceholder: 'Fragen und Antworten durchsuchen…',
     noSearchResults: 'Keine Ergebnisse für deine Suche',
+    searchAskAssistant: 'Frag den intelligenten Assistenten zu deiner Suche',
   },
   smartTracker: {
     title: 'Mein Gebet',
@@ -16287,6 +16292,7 @@ const tr: TranslationKeys = {
     contentLangNotice: 'Sorular ve cevaplar yalnızca Arapça ve İngilizce olarak mevcuttur. Diğer dillerde İngilizce metin gösterilir.',
     searchPlaceholder: 'Soru ve cevaplarda ara…',
     noSearchResults: 'Aramanızla eşleşen sonuç yok',
+    searchAskAssistant: 'Akıllı asistana aramanızı sorun',
   },
   smartTracker: {
     title: 'Namazım',
@@ -18984,6 +18990,7 @@ const es: TranslationKeys = {
     contentLangNotice: 'Las preguntas y respuestas solo están disponibles en árabe e inglés. Para otros idiomas se muestra el texto en inglés.',
     searchPlaceholder: 'Buscar en preguntas y respuestas…',
     noSearchResults: 'No hay resultados que coincidan con tu búsqueda',
+    searchAskAssistant: 'Pregunta al asistente inteligente sobre tu búsqueda',
   },
   smartTracker: {
     title: 'Mi Oración',
@@ -21680,6 +21687,7 @@ const ur: TranslationKeys = {
     contentLangNotice: 'سوالات اور جوابات صرف عربی اور انگریزی میں دستیاب ہیں۔ دیگر زبانوں کے لیے انگریزی متن دکھایا جاتا ہے۔',
     searchPlaceholder: 'سوالات اور جوابات میں تلاش کریں…',
     noSearchResults: 'آپ کی تلاش سے کوئی نتیجہ مماثل نہیں',
+    searchAskAssistant: 'اپنی تلاش کے بارے میں ذہین معاون سے پوچھیں',
   },
   smartTracker: {
     title: 'میری نماز',
@@ -24377,6 +24385,7 @@ const id: TranslationKeys = {
     contentLangNotice: 'Pertanyaan dan jawaban hanya tersedia dalam bahasa Arab dan Inggris. Untuk bahasa lain, teks bahasa Inggris ditampilkan.',
     searchPlaceholder: 'Cari pertanyaan dan jawaban…',
     noSearchResults: 'Tidak ada hasil yang cocok dengan pencarian Anda',
+    searchAskAssistant: 'Tanyakan pencarian Anda kepada asisten cerdas',
   },
   smartTracker: {
     title: 'Sholat Saya',
@@ -27074,6 +27083,7 @@ const ms: TranslationKeys = {
     contentLangNotice: 'Soalan dan jawapan hanya tersedia dalam bahasa Arab dan Inggeris. Untuk bahasa lain, teks bahasa Inggeris dipaparkan.',
     searchPlaceholder: 'Cari soalan dan jawapan…',
     noSearchResults: 'Tiada hasil yang sepadan dengan carian anda',
+    searchAskAssistant: 'Tanya pembantu pintar tentang carian anda',
   },
   smartTracker: {
     title: 'Solat Saya',
@@ -29771,6 +29781,7 @@ const hi: TranslationKeys = {
     contentLangNotice: 'प्रश्न और उत्तर केवल अरबी और अंग्रेज़ी में उपलब्ध हैं। अन्य भाषाओं के लिए अंग्रेज़ी पाठ दिखाया जाता है।',
     searchPlaceholder: 'प्रश्न और उत्तर खोजें…',
     noSearchResults: 'आपकी खोज से मेल खाता कोई परिणाम नहीं',
+    searchAskAssistant: 'अपनी खोज के बारे में स्मार्ट सहायक से पूछें',
   },
   smartTracker: {
     title: 'मेरी नमाज़',
@@ -32468,6 +32479,7 @@ const bn: TranslationKeys = {
     contentLangNotice: 'প্রশ্ন ও উত্তর কেবল আরবি ও ইংরেজিতে উপলব্ধ। অন্যান্য ভাষার জন্য ইংরেজি লেখা দেখানো হয়।',
     searchPlaceholder: 'প্রশ্ন ও উত্তরে খুঁজুন…',
     noSearchResults: 'আপনার অনুসন্ধানের সাথে মিলে এমন কোনো ফলাফল নেই',
+    searchAskAssistant: 'আপনার অনুসন্ধান সম্পর্কে স্মার্ট সহকারীকে জিজ্ঞাসা করুন',
   },
   smartTracker: {
     title: 'আমার নামাজ',
@@ -35165,6 +35177,7 @@ const ru: TranslationKeys = {
     contentLangNotice: 'Вопросы и ответы доступны только на арабском и английском языках. Для других языков отображается текст на английском.',
     searchPlaceholder: 'Поиск по вопросам и ответам…',
     noSearchResults: 'Нет результатов по вашему запросу',
+    searchAskAssistant: 'Спросите умного помощника о вашем запросе',
   },
   smartTracker: {
     title: 'Моя молитва',

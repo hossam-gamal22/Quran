@@ -2,7 +2,7 @@
 // كاش أسبوعي لمواقيت الصلاة مع تقدير ذكي للأيام اللاحقة
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PrayerTimes, parsePrayerTimes, applyAdjustments, PrayerSettings, getCachedPrayerTimes, cachePrayerTimes, getTodayDateString, type PrayerTimesResponse } from '@/lib/prayer-times';
+import { PrayerTimes, parsePrayerTimes, applyAdjustments, PrayerSettings, getCachedPrayerTimes, cachePrayerTimes, getTodayDateString, hasChronologicalPrayerTimes, type PrayerTimesResponse } from '@/lib/prayer-times';
 import { calculateLocalPrayerTimes, getCountryFallbackPrayerTimes } from '@/lib/country-prayer-defaults';
 import { getStoredLocation } from '@/lib/prayer-times';
 import { getEffectivePrayerCalcSettings } from '@/lib/prayer-settings-source';
@@ -56,7 +56,8 @@ export async function clearAllWeekCaches(): Promise<void> {
     console.warn('[prayer-week-cache] clearAllWeekCaches failed:', e);
   }
 }
-const PRAYER_KEYS: (keyof PrayerTimes)[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha', 'midnight', 'lastThird'];
+type CachedPrayerTimeKey = Exclude<keyof PrayerTimes, 'tomorrowFajr'>;
+const PRAYER_KEYS: CachedPrayerTimeKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha', 'midnight', 'lastThird'];
 
 // ────────────────────────────────────────────
 // Date Helpers
@@ -156,7 +157,7 @@ export async function getWeekCacheAgeDays(): Promise<number> {
 
 export function findDayInWeekCache(cache: WeekCacheData, targetDate: string): PrayerTimes | null {
   const entry = cache.entries.find(e => e.date === targetDate);
-  return entry?.times || null;
+  return hasChronologicalPrayerTimes(entry?.times) ? entry.times : null;
 }
 
 // ────────────────────────────────────────────
@@ -167,7 +168,7 @@ export function findDayInWeekCache(cache: WeekCacheData, targetDate: string): Pr
  * Calculate linear regression slope for a prayer time across cached days.
  * Returns minutes-per-day change rate.
  */
-function calculateSlope(entries: DayPrayerEntry[], prayerKey: keyof PrayerTimes): number {
+function calculateSlope(entries: DayPrayerEntry[], prayerKey: CachedPrayerTimeKey): number {
   if (entries.length < 2) return 0;
 
   const n = entries.length;
@@ -308,6 +309,7 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
         targetDateObj,
         eff.calculationMethod,
         eff.asrJuristic,
+        storedLoc.timezone,
       );
       const times = applyAdjustments(rawTimes, eff.adjustments as any);
       console.log(`📍 Offline: used local calculation from stored coordinates method=${eff.calculationMethod} school=${eff.asrJuristic}`);
@@ -452,6 +454,7 @@ export async function getOfflinePrayerTimesRange(
           d,
           eff.calculationMethod,
           eff.asrJuristic,
+          storedLoc.timezone,
         );
         const times = applyAdjustments(rawTimes, eff.adjustments as any);
         results.push({ date: dateStr, times, source: 'localCalc' });

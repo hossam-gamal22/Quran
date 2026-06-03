@@ -474,10 +474,18 @@ export const preparePrayerWidgetData = async (
   
   // الصلاة القادمة
   const effectivePrayerTimes = canonicalSnapshot?.prayerTimes ?? prayerTimes;
-  const nextPrayerResult = effectivePrayerTimes ? getNextPrayer(effectivePrayerTimes) : null;
-  const nextPrayerKey = nextPrayerResult?.name || 'fajr';
-  const nextPrayerTime = nextPrayerResult?.time || '--:--';
-  const timeRemaining = effectivePrayerTimes ? getTimeRemaining(effectivePrayerTimes) : null;
+  const nextPrayerResult = effectivePrayerTimes && !canonicalSnapshot ? getNextPrayer(effectivePrayerTimes) : null;
+  const nextPrayerKey = canonicalSnapshot?.nextPrayerName || nextPrayerResult?.name || 'fajr';
+  const isTomorrowFajr = nextPrayerKey === 'fajr'
+    && !!canonicalSnapshot?.nextPrayerAtEpochMs
+    && canonicalSnapshot.nextPrayerAtEpochMs > canonicalSnapshot.ishaAtEpochMs;
+  const nextPrayerTime = isTomorrowFajr && effectivePrayerTimes?.tomorrowFajr
+    ? effectivePrayerTimes.tomorrowFajr
+    : (effectivePrayerTimes?.[nextPrayerKey as keyof PrayerTimes] as string || nextPrayerResult?.time || '--:--');
+  const canonicalRemainingSeconds = canonicalSnapshot?.nextPrayerAtEpochMs
+    ? Math.max(0, Math.floor((canonicalSnapshot.nextPrayerAtEpochMs - now.getTime()) / 1000))
+    : null;
+  const timeRemaining = canonicalRemainingSeconds === null && effectivePrayerTimes ? getTimeRemaining(effectivePrayerTimes) : null;
   
   // أسماء الصلوات
   const prayerNames: Record<string, { en: string; ar: string }> = {
@@ -652,15 +660,19 @@ export const preparePrayerWidgetData = async (
     // Replaces the previous HH:MM raw format. Consumers like the Android
     // task handler and any direct `data.prayer.timeRemaining` reader pick
     // up the new shape automatically.
-    timeRemaining: timeRemaining
-      ? formatPrayerDurationCompact(
-          (timeRemaining.hours * 60 + timeRemaining.minutes) * 60,
-          isRTL() ? 'ar' : 'en',
-        )
-      : '',
-    timeRemainingMinutes: timeRemaining
-      ? timeRemaining.hours * 60 + timeRemaining.minutes
-      : 0,
+    timeRemaining: canonicalRemainingSeconds !== null
+      ? formatPrayerDurationCompact(canonicalRemainingSeconds, isRTL() ? 'ar' : 'en')
+      : (timeRemaining
+        ? formatPrayerDurationCompact(
+            (timeRemaining.hours * 60 + timeRemaining.minutes) * 60,
+            isRTL() ? 'ar' : 'en',
+          )
+        : ''),
+    timeRemainingMinutes: canonicalRemainingSeconds !== null
+      ? Math.floor(canonicalRemainingSeconds / 60)
+      : (timeRemaining
+        ? timeRemaining.hours * 60 + timeRemaining.minutes
+        : 0),
     timeRemainingLabel: t('prayer.timeRemaining'),
     allPrayers,
     allPrayerEpochs,
@@ -899,73 +911,19 @@ export const prepareVerseWidgetData = async (
 ): Promise<VerseWidgetData> => {
   const todayDate = new Date().toISOString().split('T')[0]!;
 
-  // PRIMARY SOURCE: same picker the in-app daily-ayah screen uses
-  // (`DAILY_AYAHS[dayOfYear % len]` + optional admin override). Was
-  // previously calling `getTodayAyah()` which hits AlQuran Cloud with a
-  // different selection algorithm — that's why the widget and the app
-  // showed *different* ayat for the same day even though both claimed to
-  // be "verse of the day".
+  // PRIMARY SOURCE: the exact same `resolveDailyVerse()` picker the in-app
+  // daily-ayah screen and notifications use. Was previously calling
+  // `getTodayAyah()` which hits AlQuran Cloud with a different selection
+  // algorithm — that's why the widget and the app showed *different* ayat for
+  // the same day even though both claimed to be "verse of the day".
   try {
-    const { DAILY_AYAHS } = require('@/data/daily-ayahs');
-    const { getDailyAyahOverride } = require('@/lib/daily-content-override');
-    const { getSeasonalAyahForDate } = require('@/lib/seasonal-ayah');
-
-    let chosen: { arabic: string; ref: string; trans: string; surah: number; ayah: number } | null = null;
-
-    // Admin override takes precedence (mirrors app/daily-ayah.tsx).
-    try {
-      const ov = await getDailyAyahOverride();
-      if (ov?.data && typeof ov.data.text === 'string') {
-        chosen = {
-          arabic: ov.data.text,
-          ref: ov.data.surahName || '',
-          trans: '',
-          surah: Number(ov.data.surah) || 0,
-          ayah: Number(ov.data.ayah) || 0,
-        };
-      }
-    } catch {}
-
-    // Seasonal ayah comes before the generic rolling pool so widgets match
-    // the in-app "Verse of the Day" during Ramadan, Dhul Hijjah, Hajj, etc.
-    if (!chosen) {
-      try {
-        const seasonal = getSeasonalAyahForDate();
-        if (seasonal) chosen = seasonal;
-      } catch {}
-    }
-
-    if (!chosen) {
-      try {
-        const { ensureVersePool, daysSinceSeed } = require('@/lib/verse-pool');
-        const pool = await ensureVersePool();
-        if (pool?.entries?.length) {
-          const elapsed = Math.max(0, daysSinceSeed(pool));
-          const idx = ((elapsed % pool.entries.length) + pool.entries.length) % pool.entries.length;
-          const entry = pool.entries[idx];
-          if (entry) {
-            chosen = {
-              arabic: entry.arabic,
-              ref: `${entry.surahName} ${entry.ayahNumber}`,
-              trans: entry.translation || '',
-              surah: entry.surahNumber,
-              ayah: entry.ayahNumber,
-            };
-          }
-        }
-      } catch (e) {
-        if (__DEV__) console.warn('[Widget] verse-pool picker failed, falling back to DAILY_AYAHS:', e);
-      }
-    }
-
-    if (!chosen) {
-      const now = new Date();
-      const start = Date.UTC(now.getFullYear(), 0, 0);
-      const diff = now.getTime() - start;
-      const dayOfYear = Math.floor(diff / 86400000);
-      const idx = ((dayOfYear % DAILY_AYAHS.length) + DAILY_AYAHS.length) % DAILY_AYAHS.length;
-      chosen = DAILY_AYAHS[idx];
-    }
+    // Single source of truth shared with the in-app "Verse of the Day" screen
+    // and notifications (override → seasonal → verse-pool → rolling fallback,
+    // always with the complete Uthmani text). Keeps every surface in sync.
+    const { resolveDailyVerse } = require('@/lib/seasonal-ayah');
+    const resolved = await resolveDailyVerse();
+    let chosen: { arabic: string; ref: string; trans: string; surah: number; ayah: number } | null =
+      resolved?.ayah ?? null;
 
     if (chosen) {
       if (!chosen.trans && chosen.surah > 0 && chosen.ayah > 0) {

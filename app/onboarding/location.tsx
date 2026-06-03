@@ -187,7 +187,7 @@ export default function LocationScreen() {
     <View style={styles.container}>
       <StatusBar style="light" translucent />
       
-      <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
+      <View style={[styles.gradient, { backgroundColor: '#0f1a14' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Header */}
           <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>

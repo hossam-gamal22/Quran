@@ -600,17 +600,29 @@ export const syncPendingScores = async (userId: string): Promise<void> => {
  * Returns how often the foreground app should push the user's monthly
  * score to the server, based on how close we are to the month boundary.
  *
- * - Last hour of month: every 60 seconds (last-minute activity matters)
- * - Last 24 hours of month: every 5 minutes
- * - Otherwise: null (no aggressive foreground sync; the 15-min
- *   background task is enough)
+ * Winner selection runs at 12:00 on day 1, so a user's true score must
+ * already be on the server before the month rolls over at midnight.
+ * The window below is intentionally wide so that any user who opens the
+ * app in the final two days gets their score uploaded while it is still
+ * the current month — maximising the chance the leaderboard ranking is
+ * correct at selection time:
+ *
+ * - Last 30 minutes of month: every 30 seconds (last-minute activity)
+ * - Last 2 hours of month: every 60 seconds
+ * - Last 48 hours of month: every 5 minutes
+ * - Otherwise: null (the 15-min background task is enough)
+ *
+ * Note: this only fires while the app is in the foreground. Devices that
+ * stay closed through the rollover are still recovered (best-effort) by
+ * the day 1–3 `syncPreviousMonthIfPending` back-fill on next app open.
  */
 export const getEndOfMonthSyncIntervalMs = (now: Date = new Date()): number | null => {
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
   const msUntilEnd = endOfMonth.getTime() - now.getTime();
   if (msUntilEnd <= 0) return null;
-  if (msUntilEnd <= 60 * 60 * 1000) return 60 * 1000;
-  if (msUntilEnd <= 24 * 60 * 60 * 1000) return 5 * 60 * 1000;
+  if (msUntilEnd <= 30 * 60 * 1000) return 30 * 1000;
+  if (msUntilEnd <= 2 * 60 * 60 * 1000) return 60 * 1000;
+  if (msUntilEnd <= 48 * 60 * 60 * 1000) return 5 * 60 * 1000;
   return null;
 };
 

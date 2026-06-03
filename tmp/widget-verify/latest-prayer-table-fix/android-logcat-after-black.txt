@@ -1,0 +1,267 @@
+--------- beginning of main
+06-02 00:44:55.071  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:55.071  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:56.065  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:56.065  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+--------- beginning of system
+06-02 00:44:56.458   666   782 D ActivityManager: freezing 10000 com.android.vending:background
+06-02 00:44:56.597  9145  9150 I m.rooh.almuslim: Background concurrent mark compact GC freed 24MB AllocSpace bytes, 12(240KB) LOS objects, 45% free, 28MB/52MB, paused 3.639ms,14.984ms total 385.262ms
+06-02 00:44:57.181  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:57.181  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:58.220  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:58.220  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:58.510 10644 10644 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: package
+06-02 00:44:58.580  4186 22658 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/base.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+06-02 00:44:58.585  4186 22658 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_AdsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.588  4186 22658 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.591  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteLoader_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.595  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteModulesA_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.601  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteModulesC_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.604  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_GoogleCertificates_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.606  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_MapsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.613  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_MeasurementDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:44:58.614  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+06-02 00:44:58.622  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-MlkitOcrCommon.optional_250834100400.apk has no usable artifacts
+06-02 00:44:58.628  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+06-02 00:44:58.629  4186 22658 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.630  4186 22658 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.631  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.637  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+06-02 00:44:58.638  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.646  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.647  4186 22658 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.657  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.660  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.667  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.678  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000a/dl-VisionOcr.optional_250834100000.apk has no usable artifacts
+06-02 00:44:58.680  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.686  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.688  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.708  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.710  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.714  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000e/dl-Appsearch.optional_250834100400.apk has no usable artifacts
+06-02 00:44:58.719  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-MlkitBarcodeUi.optional_250834100400.apk has no usable artifacts
+06-02 00:44:58.720  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.721  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:44:58.724  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~4cPW0RHYeOwEXUGXa4p-tg==/com.android.vending-XTZWahl5qYy6jsp2VizrYA==/base.apk, fd=-1
+06-02 00:44:59.387  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:44:59.387  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:00.700  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:00.700  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:01.966  1048  1240 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+06-02 00:45:02.340  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:02.340  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:03.073  9145  9150 I m.rooh.almuslim: Background concurrent mark compact GC freed 25MB AllocSpace bytes, 2(824KB) LOS objects, 46% free, 28MB/52MB, paused 6.051ms,5.959ms total 582.252ms
+06-02 00:45:03.677  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:03.678  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:04.147  9145  9145 I PrayerWidgetRefresh: refresh alarm fired source=prayer action=com.rooh.almuslim.widget.PRAYER_WIDGET_REFRESH trigger=1780346704046
+06-02 00:45:04.187  9145  9172 I PrayerWidgetRefresh: Requested prayer update provider=RoohPrayerTableMedium ids=29,31
+06-02 00:45:04.190  9145  9172 I PrayerWidgetRefresh: Requested prayer update provider=RoohPrayerTableLarge ids=34
+06-02 00:45:04.222  9145  9172 I PrayerWidgetRefresh: Scheduled prayer refresh at=1780346764193 requestCode=9102
+06-02 00:45:04.291  9145  9145 I PrayerWidgetRefresh: Scheduled prayer refresh at=1780346764288 requestCode=9102
+06-02 00:45:04.330  9145  9145 I PrayerWidgetRefresh: Scheduled prayer refresh at=1780346764322 requestCode=9102
+06-02 00:45:04.622  9145  9164 W JobInfo : Requested important-while-foreground flag for job4267 is ignored and takes no effect
+06-02 00:45:04.719  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:04.719  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:04.730  9145  9164 W JobInfo : Requested important-while-foreground flag for job4269 is ignored and takes no effect
+06-02 00:45:04.919  9145  9164 W JobInfo : Requested important-while-foreground flag for job4271 is ignored and takes no effect
+06-02 00:45:05.902  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:05.902  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:06.151  9145  9493 I ReactNativeJS: '[widget/android] refreshed prayer data from canonical day cache', { next: 'fajr',
+06-02 00:45:06.151  9145  9493 I ReactNativeJS:   nextAt: '2026-06-02T00:20:00.000Z',
+06-02 00:45:06.151  9145  9493 I ReactNativeJS:   source: 'todayCache' }
+06-02 00:45:06.179  9145  9493 I ReactNativeJS: '[widget/android] refreshed prayer data from canonical day cache', { next: 'fajr',
+06-02 00:45:06.179  9145  9493 I ReactNativeJS:   nextAt: '2026-06-02T00:20:00.000Z',
+06-02 00:45:06.179  9145  9493 I ReactNativeJS:   source: 'todayCache' }
+06-02 00:45:06.200  9145  9493 I ReactNativeJS: '[widget/android] refreshed prayer data from canonical day cache', { next: 'fajr',
+06-02 00:45:06.200  9145  9493 I ReactNativeJS:   nextAt: '2026-06-02T00:20:00.000Z',
+06-02 00:45:06.200  9145  9493 I ReactNativeJS:   source: 'todayCache' }
+06-02 00:45:07.389  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:07.390  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:07.492  9145  9493 I ReactNativeJS: [widget/android] loaded snapshot route=prayerTable_medium_desert key=prayerTable_medium_desert_ar_fajr path=file:///data/user/0/com.rooh.almuslim/files/prayer-static/prayerTable_medium_desert_ar_fajr.png
+06-02 00:45:07.495  9145  9493 I ReactNativeJS: [widget/android] loading snapshot route=prayerTable_medium_desert key=prayerTable_medium_desert_ar_fajr path=file:///data/user/0/com.rooh.almuslim/files/prayer-static/prayerTable_medium_desert_ar_fajr.png
+06-02 00:45:07.496  9145  9493 I ReactNativeJS: '[WidgetTheme] native Android background:', { selectedWidgetTheme: 'desert',
+06-02 00:45:07.496  9145  9493 I ReactNativeJS:   resolvedWidgetTheme: 'desert',
+06-02 00:45:07.496  9145  9493 I ReactNativeJS:   nativeBackground: '#4C3523',
+06-02 00:45:07.496  9145  9493 I ReactNativeJS:   creamEdgeSource: 'native parent is themed; if a light edge remains, inspect generated PNG edge pixels' }
+06-02 00:45:07.501  9145  9493 I ReactNativeJS: [widget/android] countdown nowMs=1780346707499 nextPrayerAtEpochMs=1780359600000 widgetRemainingSeconds=12892 prayerDataUpdatedAt=2026-06-01T20:43:28.220Z
+06-02 00:45:07.504  9145  9493 I ReactNativeJS: '[PrayerCanonical] widget countdown:', 12892
+06-02 00:45:07.518  9145  9493 I ReactNativeJS: [widget/android] loaded snapshot route=prayerTable_medium_desert key=prayerTable_medium_desert_ar_fajr path=file:///data/user/0/com.rooh.almuslim/files/prayer-static/prayerTable_medium_desert_ar_fajr.png
+06-02 00:45:07.519  9145  9493 I ReactNativeJS: [widget/android] loading snapshot route=prayerTable_medium_desert key=prayerTable_medium_desert_ar_fajr path=file:///data/user/0/com.rooh.almuslim/files/prayer-static/prayerTable_medium_desert_ar_fajr.png
+06-02 00:45:07.520  9145  9493 I ReactNativeJS: '[WidgetTheme] native Android background:', { selectedWidgetTheme: 'desert',
+06-02 00:45:07.520  9145  9493 I ReactNativeJS:   resolvedWidgetTheme: 'desert',
+06-02 00:45:07.520  9145  9493 I ReactNativeJS:   nativeBackground: '#4C3523',
+06-02 00:45:07.520  9145  9493 I ReactNativeJS:   creamEdgeSource: 'native parent is themed; if a light edge remains, inspect generated PNG edge pixels' }
+06-02 00:45:07.521  9145  9493 I ReactNativeJS: [widget/android] countdown nowMs=1780346707520 nextPrayerAtEpochMs=1780359600000 widgetRemainingSeconds=12892 prayerDataUpdatedAt=2026-06-01T20:43:28.220Z
+06-02 00:45:07.521  9145  9493 I ReactNativeJS: '[PrayerCanonical] widget countdown:', 12892
+06-02 00:45:07.528  9145  9493 I ReactNativeJS: [widget/android] loaded snapshot route=prayerTable_large_desert key=prayerTable_large_desert_ar_fajr path=file:///data/user/0/com.rooh.almuslim/files/prayer-static/prayerTable_large_desert_ar_fajr.png
+06-02 00:45:07.528  9145  9493 I ReactNativeJS: [widget/android] loading snapshot route=prayerTable_large_desert key=prayerTable_large_desert_ar_fajr path=file:///data/user/0/com.rooh.almuslim/files/prayer-static/prayerTable_large_desert_ar_fajr.png
+06-02 00:45:07.529  9145  9493 I ReactNativeJS: '[WidgetTheme] native Android background:', { selectedWidgetTheme: 'desert',
+06-02 00:45:07.529  9145  9493 I ReactNativeJS:   resolvedWidgetTheme: 'desert',
+06-02 00:45:07.529  9145  9493 I ReactNativeJS:   nativeBackground: '#4C3523',
+06-02 00:45:07.529  9145  9493 I ReactNativeJS:   creamEdgeSource: 'native parent is themed; if a light edge remains, inspect generated PNG edge pixels' }
+06-02 00:45:07.552  9145  9493 I ReactNativeJS: [widget/android] countdown nowMs=1780346707529 nextPrayerAtEpochMs=1780359600000 widgetRemainingSeconds=12892 prayerDataUpdatedAt=2026-06-01T20:43:28.220Z
+06-02 00:45:07.552  9145  9493 I ReactNativeJS: '[PrayerCanonical] widget countdown:', 12892
+06-02 00:45:07.683  9145  9494 W HWUI    : Image decoding logging dropped!
+06-02 00:45:07.963  9145  9150 I m.rooh.almuslim: Background concurrent mark compact GC freed 21MB AllocSpace bytes, 4(1648KB) LOS objects, 44% free, 29MB/53MB, paused 2.256ms,11.731ms total 324.297ms
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{b0bfbdc com.google.android.apps.youtube.music/10170} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{b0bfbdc com.google.android.apps.youtube.music/10170} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.030   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.031   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.031   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{ddeca6b com.google.android.settings.intelligence/10144} BLOCKED
+06-02 00:45:08.045   666  1875 W ParceledListSlice: Element #15 is 21192 bytes.
+06-02 00:45:08.045   666  1875 W ParceledListSlice: Element #16 is 21372 bytes.
+06-02 00:45:08.046   666  1875 W ParceledListSlice: Element #17 is 21584 bytes.
+06-02 00:45:08.048   666  1872 W ParceledListSlice: Element #18 is 21096 bytes.
+06-02 00:45:08.102   666   861 D AppWidgetServiceImpl: Trying to notify widget update for package com.rooh.almuslim with widget id: 29
+06-02 00:45:08.222  9145  9494 W HWUI    : Image decoding logging dropped!
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{b0bfbdc com.google.android.apps.youtube.music/10170} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{b0bfbdc com.google.android.apps.youtube.music/10170} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.369   666  1872 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{ddeca6b com.google.android.settings.intelligence/10144} BLOCKED
+06-02 00:45:08.379   666  1872 W ParceledListSlice: Element #15 is 21192 bytes.
+06-02 00:45:08.379   666  1872 W ParceledListSlice: Element #16 is 21372 bytes.
+06-02 00:45:08.379   666  1872 W ParceledListSlice: Element #17 is 21584 bytes.
+06-02 00:45:08.381   666  1872 W ParceledListSlice: Element #18 is 21096 bytes.
+06-02 00:45:08.387   666   861 D AppWidgetServiceImpl: Trying to notify widget update for package com.rooh.almuslim with widget id: 31
+06-02 00:45:08.520 10653 10653 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: package
+06-02 00:45:08.522  9145  9494 W HWUI    : Image decoding logging dropped!
+06-02 00:45:08.718  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/base.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+06-02 00:45:08.728  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_AdsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.734  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.744  4186  4186 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteLoader_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.776  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteModulesA_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.816  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteModulesC_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.835  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_GoogleCertificates_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.856  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_MapsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.884  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_MeasurementDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:08.884  4186  4644 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+06-02 00:45:08.887  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-MlkitOcrCommon.optional_250834100400.apk has no usable artifacts
+06-02 00:45:08.895  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+06-02 00:45:08.895  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.896  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.897  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.898  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+06-02 00:45:08.899  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.900  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.900  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.901  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.902  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.903  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.905  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000a/dl-VisionOcr.optional_250834100000.apk has no usable artifacts
+06-02 00:45:08.906  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.908  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.909  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.910  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.911  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.915  4186  4186 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000e/dl-Appsearch.optional_250834100400.apk has no usable artifacts
+06-02 00:45:08.920  4186  4644 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-MlkitBarcodeUi.optional_250834100400.apk has no usable artifacts
+06-02 00:45:08.921  4186  4186 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.922  4186 22658 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:08.924  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~4cPW0RHYeOwEXUGXa4p-tg==/com.android.vending-XTZWahl5qYy6jsp2VizrYA==/base.apk, fd=-1
+06-02 00:45:08.955   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{b0bfbdc com.google.android.apps.youtube.music/10170} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{b0bfbdc com.google.android.apps.youtube.music/10170} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{2ff74e5 com.google.android.contacts/10153} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{a80bbba com.google.android.deskclock/10163} BLOCKED
+06-02 00:45:08.956   666  1875 I AppsFilter: interaction: PackageSetting{7b994d4 com.rooh.almuslim/10225} -> PackageSetting{ddeca6b com.google.android.settings.intelligence/10144} BLOCKED
+06-02 00:45:08.965   666  1875 W ParceledListSlice: Element #15 is 21192 bytes.
+06-02 00:45:08.967   666  1875 W ParceledListSlice: Element #16 is 21372 bytes.
+06-02 00:45:08.967   666  1875 W ParceledListSlice: Element #17 is 21584 bytes.
+06-02 00:45:08.968   666  1875 W ParceledListSlice: Element #18 is 21096 bytes.
+06-02 00:45:08.978   666   861 D AppWidgetServiceImpl: Trying to notify widget update for package com.rooh.almuslim with widget id: 34
+06-02 00:45:08.977  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:08.979  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:09.970  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:09.970  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:11.086  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:11.087  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:11.871  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:11.871  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:11.958  1048  1240 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+06-02 00:45:12.790  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:12.790  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:13.479   666   895 D androidtc: Initializing SystemTextClassifier, type = System
+06-02 00:45:13.497   666   895 E ClipboardService: Denying clipboard access to com.google.android.gms, application is not in focus nor is it a system service for user 0
+06-02 00:45:13.499  9145  9150 I m.rooh.almuslim: Background concurrent mark compact GC freed 23MB AllocSpace bytes, 1(204KB) LOS objects, 44% free, 30MB/54MB, paused 5.508ms,2.634ms total 446.267ms
+06-02 00:45:13.510   927   927 I ClipboardListener: Clipboard overlay suppressed.
+06-02 00:45:13.512  1638  1638 I AiAiTextClassifier: onCreateTextClassificationSession = TextClassificationSessionId {b41a7317-30be-4222-8151-3112d9518084}
+06-02 00:45:13.521  1638  1780 I AiAiTranslate: C2T - not in a conversation
+06-02 00:45:13.537  1489 10656 D androidtc: Initializing SystemTextClassifier, type = System
+06-02 00:45:13.571  1638  1796 I AiAiTextClassifier: GenerateLinks did not find valid links, returning empty result
+06-02 00:45:13.572   666   896 E ClipboardService: Denying clipboard access to com.google.android.gms, application is not in focus nor is it a system service for user 0
+06-02 00:45:13.575   927   927 I ClipboardListener: Clipboard overlay suppressed.
+06-02 00:45:13.579  1638  1796 I AiAiTextClassifier: GenerateLinks did not find valid links, returning empty result
+06-02 00:45:13.635  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:13.636  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:13.766  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:13.766  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:14.529  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:14.529  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:15.528  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:15.528  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:16.294  9580  9580 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.ads.service.CACHE xflg=0x4 pkg=com.google.android.gms }
+06-02 00:45:16.542  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:16.542  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:17.567  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:17.567  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:18.440 10657 10657 W dumpsys : Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: package
+06-02 00:45:18.474  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/base.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+06-02 00:45:18.475  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_AdsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.476  4186  4190 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.477  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteLoader_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.478  4186  4190 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteModulesA_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.479  4186  4190 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_DynamiteModulesC_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.479  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_GoogleCertificates_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.480  4186  4190 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_MapsDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.481  4186  4644 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~43Xsbt5nJ4E2v9o5Gnpuyg==/com.google.android.gms-y6Mibg0ZEar7ran9SSdk1g==/oat/arm64/split_MeasurementDynamite_installtime.odex) is kOatUpToDate with filter 'speed' executable 'false'
+06-02 00:45:18.481  4186 22658 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+06-02 00:45:18.482  4186 22658 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-MlkitOcrCommon.optional_250834100400.apk has no usable artifacts
+06-02 00:45:18.485  4186  4644 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+06-02 00:45:18.485  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.485  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.486  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.487  4186  4644 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000a/dl-VisionOcr.optional_250834100000.apk has no usable artifacts
+06-02 00:45:18.487  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.487  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.487  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.487  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.488  4186  4644 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.488  4186  4644 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000e/dl-Appsearch.optional_250834100400.apk has no usable artifacts
+06-02 00:45:18.489  4186  4190 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-MlkitBarcodeUi.optional_250834100400.apk has no usable artifacts
+06-02 00:45:18.489  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.489  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~33SuE_8h_c4hRK4YMjiCpg==/com.google.android.gms-5MdLcpJO8ue_tamFYOex5g==/base.apk, fd=-1
+06-02 00:45:18.489  4186  4190 W artd    : Could not get dex checksums for location /data/app/~~4cPW0RHYeOwEXUGXa4p-tg==/com.android.vending-XTZWahl5qYy6jsp2VizrYA==/base.apk, fd=-1
+06-02 00:45:18.548  1638  1638 I AiAiTextClassifier: onDestroyTextClassificationSession = TextClassificationSessionId {2373b938-a684-44a3-8911-6b2485e3b28f}
+06-02 00:45:18.618  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:18.618  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:19.612  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+06-02 00:45:19.612  9145  9494 W unknown:ReactNative: StatusBarModule: Ignored status bar change, current activity is edge-to-edge.

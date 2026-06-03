@@ -31,7 +31,6 @@ import { getLanguage, t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
-import { getCachedPrayerTimes, getNextPrayer, getPrayerTranslationKey } from '@/lib/prayer-times';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { ModalColors } from '@/constants/theme';
 const STORY_CACHE_KEY = 'story_of_day_cache';
@@ -92,7 +91,6 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
   const [highlightOrder, setHighlightOrder] = useState<string[]>([]);
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [tempOrder, setTempOrder] = useState<string[]>([]);
-  const [nextPrayerTitle, setNextPrayerTitle] = useState<string>('');
 
   const storyBgColor = STORY_COLORS[getDayOfYear() % STORY_COLORS.length];
 
@@ -146,27 +144,6 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     };
     load();
     return () => { mounted = false; };
-  }, []);
-
-  // Fetch next prayer name for highlights
-  useEffect(() => {
-    let mounted = true;
-    const loadNextPrayer = async () => {
-      try {
-        const todayStr = getTodayDateString();
-        const times = await getCachedPrayerTimes(todayStr);
-        if (!times || !mounted) return;
-        const next = getNextPrayer(times);
-        if (next && mounted) {
-          const prayerLabel = t(getPrayerTranslationKey(next.name)) || next.name;
-          setNextPrayerTitle(`${prayerLabel} — ${next.time}`);
-        }
-      } catch { /* silent */ }
-    };
-    loadNextPrayer();
-    // Refresh every minute for accurate "next prayer"
-    const interval = setInterval(loadNextPrayer, 60_000);
-    return () => { mounted = false; clearInterval(interval); };
   }, []);
 
   // Subscribe to real-time admin highlights + fetch temp pages
@@ -312,7 +289,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     },
     {
       id: 'next-prayer',
-      title: nextPrayerTitle || t('prayer.nextPrayer'),
+      title: t('prayer.nextPrayer'),
       icon: 'mosque',
       color: '#7c2d12',
       route: '/(tabs)/prayer',

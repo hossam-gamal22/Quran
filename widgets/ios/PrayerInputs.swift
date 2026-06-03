@@ -66,12 +66,18 @@ struct PrayerInputs: Codable {
     let longitude: Double
     /// IANA timezone identifier, e.g. "Asia/Dubai".
     let timezone: String
+    /// IANA timezone for the calculation coordinates. Solar times are
+    /// extracted in this wall clock, then displayed against `timezone`.
+    let calculationTimezone: String?
     let calculationMethod: CalculationMethodId
     let madhab: MadhabId
     let highLatitudeRule: HighLatRuleId?
     let timeFormat: String      // "12h" | "24h"
     let numerals: String        // "western" | "arabic"
     let adjustments: PrayerInputsAdjustments?
+    /// Minute correction inferred from the latest API-backed day. Separate
+    /// from user adjustments so offline recomputation preserves both.
+    let providerCalibration: PrayerInputsAdjustments?
     let writtenAt: String       // ISO 8601
 
     static let appGroup = "group.com.rooh.almuslim"
@@ -100,6 +106,10 @@ struct PrayerInputs: Codable {
     /// `Locale.current` if the timezone isn't a recognized identifier.
     var resolvedTimeZone: TimeZone {
         TimeZone(identifier: timezone) ?? TimeZone.current
+    }
+
+    var resolvedCalculationTimeZone: TimeZone {
+        calculationTimezone.flatMap(TimeZone.init(identifier:)) ?? resolvedTimeZone
     }
 
     var usesArabicNumerals: Bool { numerals == "arabic" }

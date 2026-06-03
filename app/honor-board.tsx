@@ -660,7 +660,7 @@ export default function HonorBoard() {
         {config.currentWinners.filter(w => w.displayName && w.displayName.toLowerCase() !== 'fallback').length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {isArabic ? 'فائزو الشهر الماضي 🏆' : 'Last Month Winners 🏆'}
+              {isArabic ? 'الفائزون في الشهر الماضي 🏆' : 'Last Month Winners 🏆'}
             </Text>
             {config.currentWinners.filter(w => w.displayName && w.displayName.toLowerCase() !== 'fallback').map((winner, i) => {
                 const medals = MEDAL_STYLES(isDarkMode);
@@ -680,9 +680,6 @@ export default function HonorBoard() {
                     <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
                       <Text style={[styles.winnerName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isNameRTL(winner.displayName) ? 'rtl' : 'ltr' }]}>
                         {winner.displayName}
-                      </Text>
-                      <Text style={[styles.winnerScore, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                        {winner.score} {t('honor.points')}
                       </Text>
                     </View>
                     <View style={[styles.premiumBadge, { backgroundColor: isDarkMode ? '#f59e0b20' : '#B5720020' }]}>

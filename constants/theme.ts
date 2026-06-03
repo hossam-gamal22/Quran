@@ -292,7 +292,7 @@ const createShadow = (
 export const ModalColors = {
   // Single source of truth for modal card backgrounds.
   // Change here to update every modal in the app at once.
-  cardDark: '#091f1d',
+  cardDark: '#0f1a14',
   cardLight: '#ffffff',
   // Overlay slightly lighter than full-black so the card border reads as a clear edge.
   overlay: 'rgba(0,0,0,0.55)',

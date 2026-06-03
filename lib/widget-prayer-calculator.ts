@@ -24,6 +24,11 @@ import {
   Madhab,
   HighLatitudeRule,
 } from 'adhan';
+import {
+  dateForTimeZoneCalendarDay,
+  epochForCalendarDayLocalTime,
+  partsInTimeZone,
+} from './widget-timezone';
 
 export const PRAYER_INPUTS_KEY = '@widget_prayer_inputs';
 export const PRAYER_INPUTS_VERSION = 1 as const;
@@ -35,12 +40,18 @@ export interface PrayerWidgetInputs {
   latitude: number;
   longitude: number;
   timezone: string;                 // IANA, e.g. "Asia/Dubai"
+  /** Timezone of the calculation coordinates. Prayer wall-clock values are
+   *  extracted here, then composed onto the visible phone timezone above. */
+  calculationTimezone?: string;
   calculationMethod: CalculationMethodId;
   madhab: 'shafi' | 'hanafi';
   highLatitudeRule?: HighLatRuleId;
   timeFormat: '12h' | '24h';
   numerals: 'western' | 'arabic';
   adjustments?: Partial<Record<PrayerKey, number>>;
+  /** Per-prayer minute correction inferred from the latest API-backed day.
+   *  Kept separate from user adjustments so offline widgets preserve both. */
+  providerCalibration?: Partial<Record<PrayerKey, number>>;
   writtenAt: string;                // ISO 8601
 }
 
@@ -133,6 +144,17 @@ function buildParams(inputs: PrayerWidgetInputs): CalculationParameters {
       ...inputs.adjustments,
     };
   }
+  if (inputs.providerCalibration) {
+    params.adjustments = {
+      ...params.adjustments,
+      ...Object.fromEntries(
+        PRAYER_ORDER.map((key) => [
+          key,
+          (params.adjustments[key] ?? 0) + (inputs.providerCalibration?.[key] ?? 0),
+        ]),
+      ),
+    };
+  }
   return params;
 }
 
@@ -150,22 +172,40 @@ export interface DayPrayerTimes {
   isha: Date;
 }
 
-function toDayPrayerTimes(pt: PrayerTimes): DayPrayerTimes {
+function normalizePrayerDateForDisplay(
+  rawDate: Date,
+  referenceDate: Date,
+  inputs: PrayerWidgetInputs,
+): Date {
+  const calculationTimezone = inputs.calculationTimezone || inputs.timezone;
+  const clock = partsInTimeZone(rawDate, calculationTimezone);
+  const displayDay = partsInTimeZone(referenceDate, inputs.timezone);
+  return new Date(epochForCalendarDayLocalTime(
+    displayDay.year,
+    displayDay.month,
+    displayDay.day,
+    clock.hour,
+    clock.minute,
+    inputs.timezone,
+  ));
+}
+
+function toDayPrayerTimes(pt: PrayerTimes, date: Date, inputs: PrayerWidgetInputs): DayPrayerTimes {
   return {
     date: pt.date,
-    fajr: pt.fajr,
-    sunrise: pt.sunrise,
-    dhuhr: pt.dhuhr,
-    asr: pt.asr,
-    maghrib: pt.maghrib,
-    isha: pt.isha,
+    fajr: normalizePrayerDateForDisplay(pt.fajr, date, inputs),
+    sunrise: normalizePrayerDateForDisplay(pt.sunrise, date, inputs),
+    dhuhr: normalizePrayerDateForDisplay(pt.dhuhr, date, inputs),
+    asr: normalizePrayerDateForDisplay(pt.asr, date, inputs),
+    maghrib: normalizePrayerDateForDisplay(pt.maghrib, date, inputs),
+    isha: normalizePrayerDateForDisplay(pt.isha, date, inputs),
   };
 }
 
 export function computePrayerTimesForDay(inputs: PrayerWidgetInputs, date: Date): DayPrayerTimes {
   const coords = new Coordinates(inputs.latitude, inputs.longitude);
   const params = buildParams(inputs);
-  return toDayPrayerTimes(new PrayerTimes(coords, date, params));
+  return toDayPrayerTimes(new PrayerTimes(coords, date, params), date, inputs);
 }
 
 export function computePrayerTimesForRange(
@@ -179,7 +219,7 @@ export function computePrayerTimesForRange(
   for (let i = 0; i < days; i++) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    out.push(toDayPrayerTimes(new PrayerTimes(coords, d, params)));
+    out.push(toDayPrayerTimes(new PrayerTimes(coords, d, params), d, inputs));
   }
   return out;
 }
@@ -205,9 +245,10 @@ export function resolvePrayerState(
   inputs: PrayerWidgetInputs,
   now: Date,
 ): PrayerState {
-  const today = computePrayerTimesForDay(inputs, now);
-  const tomorrow = computePrayerTimesForDay(inputs, new Date(now.getTime() + 24 * 3600 * 1000));
-  const yesterday = computePrayerTimesForDay(inputs, new Date(now.getTime() - 24 * 3600 * 1000));
+  const todayDate = dateForTimeZoneCalendarDay(now, inputs.timezone, 0);
+  const today = computePrayerTimesForDay(inputs, todayDate);
+  const tomorrow = computePrayerTimesForDay(inputs, dateForTimeZoneCalendarDay(now, inputs.timezone, 1));
+  const yesterday = computePrayerTimesForDay(inputs, dateForTimeZoneCalendarDay(now, inputs.timezone, -1));
 
   // Build a flat ordered list spanning yesterday→tomorrow with prayer keys
   // attached. This lets us pick the previous-passed and next-upcoming
@@ -258,8 +299,7 @@ export function computeFlatSnapshot(
   now: Date = new Date(),
   days: number = 7,
 ): FlatPrayerSnapshot {
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
+  const startOfToday = dateForTimeZoneCalendarDay(now, inputs.timezone, 0);
   const range = computePrayerTimesForRange(inputs, startOfToday, days);
   const state = resolvePrayerState(inputs, now);
 
@@ -280,9 +320,10 @@ export function computeFlatSnapshot(
     isha: today.isha.getTime(),
   };
 
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
+  const localNow = partsInTimeZone(now, inputs.timezone);
+  const yyyy = localNow.year;
+  const mm = String(localNow.month).padStart(2, '0');
+  const dd = String(localNow.day).padStart(2, '0');
 
   return {
     date: `${yyyy}-${mm}-${dd}`,

@@ -41,6 +41,7 @@ import { getPrayerTranslationKey } from '@/lib/prayer-times';
 import {
   ADHAN_SOUNDS as ADHAN_SOUND_FILES,
   NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES,
+  fadeOutAndStop,
   fetchDisabledBundledSounds,
   normalizeCompleteAdhanVoice,
   normalizeFullAdhanNotificationVoice,
@@ -662,11 +663,9 @@ export default function NotificationsScreen() {
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
-      try {
-        await previewSoundRef.current.stopAsync();
-        await previewSoundRef.current.unloadAsync();
-      } catch { /* ignore */ }
+      const sound = previewSoundRef.current;
       previewSoundRef.current = null;
+      await fadeOutAndStop(sound);
     }
     setPreviewPlaying(null);
     setPreviewLoading(null);

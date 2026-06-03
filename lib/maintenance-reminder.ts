@@ -15,6 +15,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { dirText } from './notification-text-direction';
+import { getScheduledNotificationFireMs } from './notification-trigger-time';
 import { uiText } from './ui-text';
 
 const MAINTENANCE_KEY = '@app_maintenance_reminder_id';
@@ -25,21 +26,7 @@ export const MAINTENANCE_TYPE = 'app_maintenance';
 const LEAD_TIME_MS = 18 * 60 * 60 * 1000; // 18 hours
 
 /** Defensively extract a future fire-time (ms epoch) from any trigger shape. */
-function triggerToMs(trigger: any): number | null {
-  if (!trigger) return null;
-  // iOS date trigger → { type:'date', value: <ms> }
-  if (typeof trigger.value === 'number' && trigger.value > 1_000_000_000_000) {
-    return trigger.value;
-  }
-  if (typeof trigger.timestamp === 'number') return trigger.timestamp;
-  if (trigger.date != null) {
-    const d = typeof trigger.date === 'number' ? trigger.date : new Date(trigger.date).getTime();
-    if (Number.isFinite(d)) return d;
-  }
-  // Relative (seconds) trigger
-  if (typeof trigger.seconds === 'number') return Date.now() + trigger.seconds * 1000;
-  return null;
-}
+const triggerToMs = getScheduledNotificationFireMs;
 
 async function cancelExisting(): Promise<void> {
   try {

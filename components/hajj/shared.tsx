@@ -35,6 +35,11 @@ export const ACCENT = '#0d8e62';
 export const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 export const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
+// Count badge (e.g. "عدد المناسك ١١") — solid amber pill so the text stays
+// clearly readable in both light and dark themes (the green-on-green was too faint).
+export const COUNT_BADGE_BG = '#E0A82E';
+export const COUNT_BADGE_TEXT = '#2B2000';
+
 // Removed hardcoded ARABIC_NUMS — use localizeNumber() instead
 
 // ========================================

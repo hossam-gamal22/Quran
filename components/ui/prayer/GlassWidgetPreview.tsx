@@ -20,12 +20,14 @@ interface GlassWidgetPreviewProps {
   prayerTimes?: PrayerTimes | null;
   isDarkMode?: boolean;
   iconSource?: any;
+  timezone?: string;
 }
 
 export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   prayerTimes = null,
   isDarkMode = false,
   iconSource,
+  timezone,
 }) => {
   const { fs } = useColors();
   const styles = useScaledStyles(_styles, fs);
@@ -42,13 +44,13 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   useEffect(() => {
     if (!prayerTimes) return;
     const update = () => {
-      setNextPrayer(getNextPrayer(prayerTimes));
-      setTimeRemaining(getTimeRemaining(prayerTimes));
+      setNextPrayer(getNextPrayer(prayerTimes, { timezone }));
+      setTimeRemaining(getTimeRemaining(prayerTimes, { timezone }));
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimes]);
+  }, [prayerTimes, timezone]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
   const prayerName = nextPrayer ? t(getPrayerTranslationKey(nextPrayer.name)) : t('prayer.fajr');

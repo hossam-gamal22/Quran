@@ -1653,42 +1653,47 @@ async function searchDorarDirect(question: string): Promise<AutoQaSource[]> {
  * the site's own search results for their question.
  */
 function buildGenericSearchLinks(question: string, language = 'ar'): AutoQaSource[] {
-  const encoded = encodeURIComponent(question);
   const shortQ = question.slice(0, 60);
+  // Route through a site-scoped Google search instead of each site's own search
+  // page. The sites' internal search endpoints are unreliable (islamweb/dorar block
+  // datacenter IPs and change paths), but a Google `site:` query always lands the
+  // user on real, current results that open fine on their device.
+  const siteSearch = (site: string) =>
+    `https://www.google.com/search?q=${encodeURIComponent(`site:${site} ${question}`)}`;
   if (!isArabicLanguage(language)) {
     return [
       {
-        title: `Search results on Islamweb: ${shortQ}`,
-        url: `${ISLAMWEB_BASE}/ar/fatwa/search/?q=${encoded}`,
-        snippet: 'Open this link to browse fatwas related to your question in the Islamweb database.',
+        title: `Islamweb results: ${shortQ}`,
+        url: siteSearch('islamweb.net'),
+        snippet: 'Open results from the Islamweb fatwa database related to your question.',
       },
       {
-        title: `Search results on Islam Q&A: ${shortQ}`,
-        url: `${ISLAMQA_BASE}/ar/search?q=${encoded}`,
-        snippet: 'Open this link to browse answers related to your question on Islam Question & Answer.',
+        title: `Islam Q&A results: ${shortQ}`,
+        url: siteSearch('islamqa.info'),
+        snippet: 'Open results from Islam Question & Answer related to your question.',
       },
       {
-        title: `Search results on Dorar: ${shortQ}`,
-        url: `${DORAR_BASE}/feqhia?q=${encoded}`,
-        snippet: 'Open this link to browse fiqh issues related to your question in the jurisprudence encyclopedia.',
+        title: `Dorar results: ${shortQ}`,
+        url: siteSearch('dorar.net'),
+        snippet: 'Open results from the Dorar jurisprudence encyclopedia related to your question.',
       },
     ];
   }
   return [
     {
       title: `نتائج البحث في إسلام ويب: ${shortQ}`,
-      url: `${ISLAMWEB_BASE}/ar/fatwa/search/?q=${encoded}`,
-      snippet: 'اضغط هنا للاطلاع على الفتاوى المتعلقة بسؤالك مباشرةً في قاعدة بيانات إسلام ويب.',
+      url: siteSearch('islamweb.net'),
+      snippet: 'اضغط هنا لعرض الفتاوى المتعلقة بسؤالك من موقع إسلام ويب.',
     },
     {
-      title: `نتائج البحث في إسلام Q&A: ${shortQ}`,
-      url: `${ISLAMQA_BASE}/ar/search?q=${encoded}`,
-      snippet: 'اضغط هنا للاطلاع على فتاوى مجانبة لسؤالك في موقع إسلام سؤال وجواب.',
+      title: `نتائج البحث في إسلام سؤال وجواب: ${shortQ}`,
+      url: siteSearch('islamqa.info'),
+      snippet: 'اضغط هنا لعرض الفتاوى المتعلقة بسؤالك من موقع إسلام سؤال وجواب.',
     },
     {
       title: `نتائج البحث في الدرر السنية: ${shortQ}`,
-      url: `${DORAR_BASE}/feqhia?q=${encoded}`,
-      snippet: 'اضغط هنا للاطلاع على المسائل الفقهية المتعلقة بسؤالك في الموسوعة الفقهية.',
+      url: siteSearch('dorar.net'),
+      snippet: 'اضغط هنا لعرض المسائل الفقهية المتعلقة بسؤالك في الموسوعة الفقهية.',
     },
   ];
 }
@@ -1992,17 +1997,19 @@ export const guardMonthlyEngagementRegression = functions.firestore
   });
 
 /**
- * Scheduled Cloud Function: runs at 12:00 on the 3rd of every month.
+ * Scheduled Cloud Function: runs at 12:00 on the 1st of every month.
  * Selects top winners from the previous month's leaderboard,
  * grants them admin premium, and sends push notifications.
  *
- * The 48h+ grace period after month-end gives clients time to upload
- * late activity (background sync, force-sync on first app open) so
- * users with strong last-minute activity aren't penalised for not
- * having opened the app right at midnight.
+ * Winners must surface on day 1 (not after a multi-day grace period).
+ * The dual-query union below (monthlyEngagement.month OR
+ * lastFinalizedMonth.month) is what makes early selection safe: an
+ * active user who already opened the app in the new month is still
+ * found via their denormalised lastFinalizedMonth snapshot, so we are
+ * not relying on every client having synced before midnight.
  */
 export const selectMonthlyWinners = onSchedule(
-  { schedule: '0 12 3 * *', timeZone: 'Asia/Riyadh', secrets: ['EXPO_ACCESS_TOKEN'] },
+  { schedule: '0 12 1 * *', timeZone: 'Africa/Cairo', secrets: ['EXPO_ACCESS_TOKEN'] },
   async () => {
     try {
       const now = new Date();

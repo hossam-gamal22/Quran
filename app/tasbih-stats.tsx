@@ -80,6 +80,10 @@ export default function TasbihStatsScreen() {
   const avgPerDay = Math.round(allTimeTotal / daysCount);
   const rounds = Math.floor(totalToday / 33);
 
+  // Last 30 days (chronological), used for both the bar chart and the list
+  const last30 = Object.entries(dailyStats).slice(-30);
+  const maxCount = last30.reduce((m, [, c]) => Math.max(m, c), 0) || 1;
+
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
@@ -212,8 +216,38 @@ export default function TasbihStatsScreen() {
                 </>
               )}
 
-            {/* Last 7 days */}
-            <Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.last7Days')}</Text>
+            {/* Last 30 days */}
+            <Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.last30Days')}</Text>
+
+            {/* Bar chart — at-a-glance overview of the last 30 days */}
+            {last30.length > 0 && (
+              <View style={[s.chartCard, { overflow: 'hidden' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
+                <View style={[s.chartRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  {last30.map(([date, cnt]) => (
+                    <View key={date} style={s.chartBarSlot}>
+                      <View
+                        style={[
+                          s.chartBar,
+                          {
+                            height: `${Math.max(4, (cnt / maxCount) * 100)}%`,
+                            backgroundColor: date === todayISO ? GREEN : (isDarkMode ? 'rgba(13,142,98,0.45)' : 'rgba(13,142,98,0.35)'),
+                          },
+                        ]}
+                      />
+                    </View>
+                  ))}
+                </View>
+                <View style={[s.chartAxis, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Text style={[s.chartAxisLabel, { color: C.glassTextLight }]} numberOfLines={1}>{last30[0]?.[0]?.slice(5)}</Text>
+                  <Text style={[s.chartAxisLabel, { color: C.glassTextLight }]} numberOfLines={1}>{last30[last30.length - 1]?.[0]?.slice(5)}</Text>
+                </View>
+              </View>
+            )}
+
             {Object.entries(dailyStats).length === 0 ? (
               <View style={[s.emptyState, { overflow: 'hidden' }]}>
                 {Platform.OS === 'ios' && (
@@ -225,8 +259,8 @@ export default function TasbihStatsScreen() {
                 <Text style={[s.emptySubtext, { color: C.glassTextLight }]}>{t('tasbih.startTasbihHint')}</Text>
               </View>
             ) : (
-              Object.entries(dailyStats)
-                .slice(-7)
+              last30
+                .slice()
                 .reverse()
                 .map(([date, cnt]) => {
                   const dayTypeStats = typeStats[date];
@@ -366,6 +400,39 @@ const _s = StyleSheet.create({
     fontFamily: fontSemiBold(),
     marginBottom: 8,
     lineHeight: 24,
+    includeFontPadding: false,
+  },
+  chartCard: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 90,
+    gap: 2,
+  },
+  chartBarSlot: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  chartBar: {
+    width: '70%',
+    minHeight: 3,
+    borderRadius: 3,
+  },
+  chartAxis: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  chartAxisLabel: {
+    fontSize: 10,
+    fontFamily: fontRegular(),
     includeFontPadding: false,
   },
   statsRow: {

@@ -16,6 +16,7 @@ import { dirText } from './notification-text-direction';
 import { validatePrayerTimings } from './prayer-time-validator';
 import { resolveNotificationSound } from './resolve-notification-sound';
 import { getNotificationIconAttachment } from './notification-icons';
+import { getScheduledNotificationFireMs } from './notification-trigger-time';
 import {
   completeAdhanVoiceToIosNotificationSoundFile,
   completeAdhanVoiceToNotificationSoundKey,
@@ -376,10 +377,11 @@ export async function schedulePrayerNotifications(
           Maghrib: dayData.timings.Maghrib,
           Isha: dayData.timings.Isha,
         };
-        // Offline range returns effective app times already (cached/week/local
-        // calculation paths apply adjustments at source), so do not apply the
-        // same offsets a second time here.
-        const timings = rawTimings;
+        // The monthly API returns un-adjusted times. The display path applies the
+        // user's per-prayer minute adjustments via applyAdjustments(), so we MUST
+        // apply the same offsets here — otherwise notifications fire at a different
+        // moment than the on-screen countdown (the "adhan came N minutes off" bug).
+        const timings = applyTimingAdjustments(rawTimings, prayerAdjustments);
         // Phase 1.F: validate — تجنب جدولة أوقات مستحيلة (خلل API)
         const v = validatePrayerTimings(timings);
         if (!v.valid) {
@@ -451,15 +453,24 @@ export async function schedulePrayerNotifications(
       // keep one if cancelling it could leave the user with no adhan.
       const isOldFormat = /^prayer_[a-z]+(?:_d\d+)?$/.test(n.identifier);
 
-      // Extract trigger date if this is a DATE trigger (expo-notifications shape)
+      // Extract the absolute fire time. Handles Android `{ value }` AND the iOS
+      // `{ type: 'calendar', dateComponents }` shape — without the latter the
+      // imminent guard silently failed on iOS (see getScheduledNotificationFireMs).
       const trig: any = n.trigger;
-      const triggerMs: number | null =
-        trig && typeof trig === 'object' && typeof trig.value === 'number' ? trig.value
-        : trig && typeof trig === 'object' && trig.date instanceof Date ? trig.date.getTime()
-        : trig && typeof trig === 'object' && typeof trig.date === 'number' ? trig.date
-        : null;
+      const triggerMs: number | null = getScheduledNotificationFireMs(trig);
 
-      if (isPrayerTimeNotif && triggerMs !== null) {
+      // Never protect a prayer the user has DISABLED. The critical-imminent guard
+      // exists to avoid silencing an adhan during reschedule — but if the user just
+      // turned this prayer off (e.g. toggled Maghrib off minutes before its time),
+      // keeping its old imminent notification would fire an adhan they explicitly
+      // disabled. In that case fall through and cancel it like any other.
+      const prayerKeyMatch = n.identifier.match(/^prayer_([a-z]+)/);
+      const prayerKeyOfNotif = prayerKeyMatch ? (prayerKeyMatch[1] as PrayerKey) : null;
+      const prayerStillEnabled = prayerKeyOfNotif
+        ? notifSettings.prayers[prayerKeyOfNotif] !== false
+        : true;
+
+      if (isPrayerTimeNotif && triggerMs !== null && prayerStillEnabled) {
         const msUntilFire = triggerMs - cancelCheckNow;
         if (msUntilFire > 0 && msUntilFire <= CRITICAL_PRAYER_NOTIFICATION_WINDOW_MS) {
           const freshTriggerMs = resolveFreshPrayerTriggerMs(n.identifier, scheduleDays, notifSettings.advanceMinutes);

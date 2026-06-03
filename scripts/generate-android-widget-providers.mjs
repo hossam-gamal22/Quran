@@ -2,14 +2,13 @@
 // scripts/generate-android-widget-providers.mjs
 // Reads widget definitions from widget-registry.json and generates Android
 // receivers for:
-//   - the legacy generic providers (RoohSmall/Medium/Large),
 //   - one home-screen provider per (id, size) gallery variant,
 //   - dedicated keyguard providers that mirror the iOS lock-screen widgets.
 //
 // Outputs: Java class + widgetprovider XML + strings.xml description +
 // AndroidManifest <receiver> entry.
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -20,67 +19,27 @@ const ANDROID_RES = resolve(ROOT, 'android/app/src/main/res');
 const ANDROID_JAVA = resolve(ROOT, 'android/app/src/main/java/com/rooh/almuslim/widget');
 const MANIFEST = resolve(ROOT, 'android/app/src/main/AndroidManifest.xml');
 const STRINGS = resolve(ANDROID_RES, 'values/strings.xml');
-const PREVIEW_SNAPSHOT_DIR = resolve(ROOT, 'tmp/widget-previews');
 const ANDROID_PREVIEW_RES = resolve(ANDROID_RES, 'drawable-nodpi');
 const ANDROID_DRAWABLE_RES = resolve(ANDROID_RES, 'drawable');
 
-const previewSourceByDrawable = new Map();
-const lockedPreviewDrawables = new Map();
-
 function rememberPreview(id, size) {
-  const drawable = previewDrawableName(id, size);
-  previewSourceByDrawable.set(drawable, `${id}_${size}_light.png`);
-  return drawable;
-}
-
-function lockedPreviewDrawableName(baseDrawable) {
-  return `${baseDrawable}_locked`;
+  return previewDrawableName(id, size);
 }
 
 function rememberLockedPreview(id, size) {
-  const baseDrawable = rememberPreview(id, size);
-  const lockedDrawable = lockedPreviewDrawableName(baseDrawable);
-  lockedPreviewDrawables.set(lockedDrawable, baseDrawable);
-  return lockedDrawable;
+  return rememberPreview(id, size);
 }
 
 const SIZE_DIMS = {
-  small: { width: 110, height: 110 },
-  medium: { width: 250, height: 110 },
-  large: { width: 250, height: 250 },
+  small: { width: 110, height: 110, targetCellWidth: 2, targetCellHeight: 2 },
+  medium: { width: 250, height: 110, targetCellWidth: 3, targetCellHeight: 2 },
+  large: { width: 250, height: 250, targetCellWidth: 3, targetCellHeight: 4 },
 };
 
-const BASE_PROVIDERS = [
-  {
-    className: 'RoohSmall',
-    xmlRes: 'widgetprovider_roohsmall',
-    stringKey: 'widget_roohsmall_description',
-    label: 'الويدجت الصغيرة',
-    description: 'أضفها ثم اضغط مطولًا واختر النمط.',
-    ...SIZE_DIMS.small,
-    preview: rememberPreview('daySimple', 'small'),
-    category: 'home_screen',
-  },
-  {
-    className: 'RoohMedium',
-    xmlRes: 'widgetprovider_roohmedium',
-    stringKey: 'widget_roohmedium_description',
-    label: 'الويدجت المتوسطة',
-    description: 'أضفها ثم اضغط مطولًا واختر النمط.',
-    ...SIZE_DIMS.medium,
-    preview: rememberPreview('daySimple', 'medium'),
-    category: 'home_screen',
-  },
-  {
-    className: 'RoohLarge',
-    xmlRes: 'widgetprovider_roohlarge',
-    stringKey: 'widget_roohlarge_description',
-    label: 'الويدجت الكبيرة',
-    description: 'أضفها ثم اضغط مطولًا واختر النمط.',
-    ...SIZE_DIMS.large,
-    preview: rememberPreview('prayerTable', 'large'),
-    category: 'home_screen',
-  },
+const RETIRED_PICKER_PROVIDERS = [
+  { className: 'RoohSmall', xmlRes: 'widgetprovider_roohsmall' },
+  { className: 'RoohMedium', xmlRes: 'widgetprovider_roohmedium' },
+  { className: 'RoohLarge', xmlRes: 'widgetprovider_roohlarge' },
 ];
 
 const LOCK_PROVIDERS = [
@@ -113,6 +72,7 @@ const LOCK_PROVIDERS = [
     ...SIZE_DIMS.small,
     preview: rememberPreview('prayerSingle', 'small'),
     category: 'keyguard',
+    isPrayer: true,
   },
   {
     className: 'RoohLockAllPrayers',
@@ -123,6 +83,7 @@ const LOCK_PROVIDERS = [
     ...SIZE_DIMS.medium,
     preview: rememberPreview('prayerTable', 'medium'),
     category: 'keyguard',
+    isPrayer: true,
   },
   {
     className: 'RoohLockHijriCircular',
@@ -143,6 +104,7 @@ const LOCK_PROVIDERS = [
     ...SIZE_DIMS.small,
     preview: rememberPreview('prayerSingle', 'small'),
     category: 'keyguard',
+    isPrayer: true,
   },
 ];
 
@@ -223,16 +185,17 @@ const homeProviders = variants.map((v) => {
     ...dims,
     preview: v.isPremium ? rememberLockedPreview(v.id, v.size) : rememberPreview(v.id, v.size),
     category: 'home_screen',
+    isPrayer: v.id.startsWith('prayer'),
   };
 });
 
 const providers = [
-  ...BASE_PROVIDERS,
   ...homeProviders,
   ...LOCK_PROVIDERS,
 ];
 
 const STALE_PROVIDER_CLASSES = [
+  ...RETIRED_PICKER_PROVIDERS.map((provider) => provider.className),
   // Removed from the current iOS/gallery registry. Keeping these receivers in
   // the Android manifest makes Launcher show old small/large variants that no
   // longer exist in the app gallery.
@@ -243,45 +206,23 @@ const STALE_PROVIDER_CLASSES = [
   'RoohDailyDhikrSmall',
 ];
 
-// Keep the Android launcher widget picker visually aligned with the in-app
-// gallery. These PNGs are produced by the React snapshot pump and committed as
-// drawable-nodpi resources so Android can show real thumbnails before add-time.
+// Keep Android's resource folders tidy. The launcher thumbnails themselves are
+// generated by generate-android-widget-preview-images.mjs immediately before
+// this script, so this script must not overwrite its picker-only overlays with
+// the raw React snapshot sources.
 mkdirSync(ANDROID_PREVIEW_RES, { recursive: true });
 mkdirSync(ANDROID_DRAWABLE_RES, { recursive: true });
-let copiedPreviewCount = 0;
-for (const [drawable, filename] of previewSourceByDrawable.entries()) {
-  const source = resolve(PREVIEW_SNAPSHOT_DIR, filename);
-  const dest = resolve(ANDROID_PREVIEW_RES, `${drawable}.png`);
-  if (existsSync(source)) {
-    copyFileSync(source, dest);
-    copiedPreviewCount += 1;
-  } else if (!existsSync(dest)) {
-    console.warn(`! Missing Android widget preview source: ${source}`);
-  }
-}
 
-for (const [lockedDrawable, baseDrawable] of lockedPreviewDrawables.entries()) {
-  const dest = resolve(ANDROID_DRAWABLE_RES, `${lockedDrawable}.xml`);
-  const content = `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/${baseDrawable}" />
-    <item
-        android:width="14dp"
-        android:height="14dp"
-        android:gravity="top|end"
-        android:top="6dp"
-        android:right="6dp"
-        android:drawable="@drawable/ic_widget_premium_lock_badge" />
-</layer-list>
-`;
-  writeFileSync(dest, content);
-}
 for (const file of readdirSync(ANDROID_DRAWABLE_RES)) {
   if (!/^widget_preview_.*_locked\.xml$/.test(file)) continue;
-  const drawableName = file.replace(/\.xml$/, '');
-  if (!lockedPreviewDrawables.has(drawableName)) {
-    unlinkSync(resolve(ANDROID_DRAWABLE_RES, file));
-  }
+  unlinkSync(resolve(ANDROID_DRAWABLE_RES, file));
+}
+
+for (const provider of RETIRED_PICKER_PROVIDERS) {
+  const javaPath = resolve(ANDROID_JAVA, `${provider.className}.java`);
+  const xmlPath = resolve(ANDROID_RES, 'xml', `${provider.xmlRes}.xml`);
+  if (existsSync(javaPath)) unlinkSync(javaPath);
+  if (existsSync(xmlPath)) unlinkSync(xmlPath);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,11 +232,11 @@ const javaFiles = [];
 for (const provider of providers) {
   const className = provider.className;
   const javaPath = resolve(ANDROID_JAVA, `${className}.java`);
+  const baseClass = provider.isPrayer ? 'PrayerAwareWidgetProvider' : 'RNWidgetProvider';
+  const providerImport = provider.isPrayer ? '' : '\nimport com.reactnativeandroidwidget.RNWidgetProvider;\n';
   const content = `package com.rooh.almuslim.widget;
-
-import com.reactnativeandroidwidget.RNWidgetProvider;
-
-public class ${className} extends RNWidgetProvider {
+${providerImport}
+public class ${className} extends ${baseClass} {
 }
 `;
   writeFileSync(javaPath, content);
@@ -315,8 +256,9 @@ for (const provider of providers) {
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="${provider.width}dp"
     android:minHeight="${provider.height}dp"
+    android:targetCellWidth="${provider.targetCellWidth}"
+    android:targetCellHeight="${provider.targetCellHeight}"
     android:resizeMode="none"
-    android:description="@string/${provider.stringKey}"
     android:initialLayout="@layout/rn_widget"
 ${keyguardLine}    android:previewImage="@drawable/${provider.preview}"
     android:updatePeriodMillis="1800000"

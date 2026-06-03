@@ -4,7 +4,7 @@
  * مع بحث فوري و«كلمة اليوم». كل كلمة قابلة للنقر لفتح موضعها في المصحف.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,8 +30,8 @@ import {
   getGharibWordOfTheDay,
   searchGharib,
   getGharibGroupedBySurah,
-  GHARIB_WORDS,
 } from '@/data/gharib-quran';
+import { fetchGharibWords, getGharibWordsSync } from '@/lib/gharib-api';
 
 const ACCENT = '#3a7ca5';
 
@@ -40,10 +40,20 @@ export default function GharibQuranScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [words, setWords] = useState<GharibWord[]>(() => getGharibWordsSync());
 
-  const wordOfDay = useMemo(() => getGharibWordOfTheDay(), []);
+  // حمّل الكلمات المدموجة (مبنيّة + بعيدة من لوحة التحكم) عند فتح الصفحة
+  useEffect(() => {
+    let alive = true;
+    fetchGharibWords()
+      .then((w) => { if (alive) setWords(w); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
-  const results = useMemo(() => searchGharib(query), [query]);
+  const wordOfDay = useMemo(() => getGharibWordOfTheDay(new Date(), words), [words]);
+
+  const results = useMemo(() => searchGharib(query, words), [query, words]);
   const groups = useMemo(() => getGharibGroupedBySurah(results), [results]);
   const isSearching = query.trim().length > 0;
 
@@ -70,7 +80,7 @@ export default function GharibQuranScreen() {
           <Text
             style={[
               styles.wordText,
-              { color: colors.text, fontFamily: quranFontFamily() },
+              { color: colors.text, fontFamily: quranFontFamily(), textAlign, writingDirection: writingDir },
             ]}
           >
             {w.word}
@@ -184,7 +194,7 @@ export default function GharibQuranScreen() {
         ))}
 
         <Text style={[styles.footerNote, { color: colors.textLight }]}>
-          {`${localizeNumber(GHARIB_WORDS.length)} ${t('gharibQuran.totalWords')}`}
+          {`${localizeNumber(words.length)} ${t('gharibQuran.totalWords')}`}
         </Text>
       </ScrollView>
     </ScreenContainer>

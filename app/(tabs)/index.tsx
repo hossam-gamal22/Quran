@@ -24,6 +24,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold, quranFontFamily } from '@/lib/fonts';
 import { getGharibWordOfTheDay } from '@/data/gharib-quran';
+import { fetchGharibWords, getGharibWordsSync } from '@/lib/gharib-api';
 import { localizeNumber } from '@/lib/format-number';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -58,7 +59,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { Dimensions } from 'react-native';
-import { getCachedPrayerTimes, getNextPrayer, getTimeRemaining, getPrayerNameAr, getPrayerTranslationKey, timeStringToDate, type PrayerTimes, type PrayerName } from '@/lib/prayer-times';
+import { getCachedPrayerTimes, getNextPrayer, getTimeRemaining, getPrayerNameAr, getPrayerTranslationKey, getStoredLocation, formatPrayerTime, alignPrayerTimesToUpcomingDay, type PrayerTimes, type PrayerName } from '@/lib/prayer-times';
 import { schedulePrayerNotification, requestNotificationPermission, cancelNotification, scheduleLocalNotification } from '@/lib/push-notifications';
 import * as Notifications from 'expo-notifications';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -71,8 +72,14 @@ import { PermissionBanner } from '@/components/notifications/PermissionBanner';
 import { getUserId, getDisplayName } from '@/lib/firebase-user';
 import { getUserMonthlyInfo, getUserMonthlyRank, syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 import { localDateKey, msUntilNextLocalDay } from '@/lib/local-date';
+import { deviceTimezone, ensurePrayerLocationTimezone } from '@/lib/prayer-location-timezone';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const formatPrayerDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const prayerDateForDisplay = (): Date => new Date();
 
 // ========================================
 // Helper to get azkar category color/icon from single source of truth (categories.json)
@@ -614,6 +621,59 @@ const collapsibleStyles = StyleSheet.create({
 // Curated Arabic banner text is centralized in lib/seasonal-banner-copy.ts.
 
 // ========================================
+// كرت «كلمة اليوم» الغريبة — يظهر داخل قسم سور وآيات قرآنية
+// ========================================
+function GharibWordHomeCard() {
+  const router = useRouter();
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const { t } = useSettings();
+  const [gw, setGw] = useState(() => getGharibWordOfTheDay(new Date(), getGharibWordsSync()));
+
+  useEffect(() => {
+    let alive = true;
+    fetchGharibWords()
+      .then((w) => { if (alive) setGw(getGharibWordOfTheDay(new Date(), w)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <Pressable
+      onPress={() => {
+        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+        router.push('/gharib-quran' as any);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={t('gharibQuran.wordOfTheDay')}
+    >
+      <GlassCard style={_styles.gharibCard}>
+        <View style={[_styles.gharibHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[_styles.gharibTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons name="book-alphabet" size={16} color="#3a7ca5" />
+            <Text style={[_styles.gharibLabel, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('gharibQuran.wordOfTheDay')}
+            </Text>
+          </View>
+          <View style={[_styles.gharibBadge, { backgroundColor: '#3a7ca5' }]}>
+            <Text style={_styles.gharibBadgeText}>{gw.surahName} {localizeNumber(gw.ayah)}</Text>
+          </View>
+        </View>
+        <Text style={[_styles.gharibWord, { color: colors.text, fontFamily: quranFontFamily(), textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+          {gw.word}
+        </Text>
+        <Text
+          style={[_styles.gharibMeaning, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+          numberOfLines={2}
+        >
+          {gw.meaning}
+        </Text>
+      </GlassCard>
+    </Pressable>
+  );
+}
+
+// ========================================
 // المكون الرئيسي
 // ========================================
 
@@ -809,6 +869,9 @@ export default function HomeScreen() {
   const [modalSearch, setModalSearch] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
+  // Quick Access customization hint (shows up to 3 times, once every 3 days, with permanent dismiss)
+  const [showQuickAccessHint, setShowQuickAccessHint] = useState(false);
+
   // Next Prayer modal state
   const [showNextPrayerModal, setShowNextPrayerModal] = useState(false);
   const [notificationScheduled, setNotificationScheduled] = useState(false);
@@ -885,6 +948,7 @@ export default function HomeScreen() {
     } catch { /* ignore */ }
   }, []);
   const [cachedPrayerTimes, setCachedPrayerTimes] = useState<PrayerTimes | null>(null);
+  const [prayerTimezone, setPrayerTimezone] = useState<string | undefined>(undefined);
   const [nextPrayerCountdown, setNextPrayerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
   // Banner countdown state (always-on, independent of modal)
   const [bannerCountdown, setBannerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
@@ -902,17 +966,25 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadPrayerTimes = async () => {
       try {
+        let storedLoc = await getStoredLocation();
+        if (storedLoc) {
+          storedLoc = await ensurePrayerLocationTimezone(storedLoc, true);
+        }
+        setPrayerTimezone(deviceTimezone());
         const today = homeDateKey;
         const cached = await getCachedPrayerTimes(today, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
         if (cached) {
-          setCachedPrayerTimes(cached);
+          const cachedTimes = storedLoc
+            ? await alignPrayerTimesToUpcomingDay(cached, storedLoc, new Date(), settings.prayer).catch(() => cached)
+            : cached;
+          setCachedPrayerTimes(cachedTimes);
           return;
         }
         // No cache — try to fetch using saved location. Never request permission
         // here; that happens during onboarding or when the user opens prayer/qibla.
-        const { getStoredLocation, fetchPrayerTimes, parsePrayerTimes, saveLocation, cachePrayerTimes, applyAdjustments } = await import('@/lib/prayer-times');
+        const { fetchPrayerTimes, parsePrayerTimes, saveLocation, cachePrayerTimes, applyAdjustments } = await import('@/lib/prayer-times');
         const { MAKKAH_FALLBACK_DEFAULTS } = await import('@/lib/country-prayer-defaults');
-        let loc = await getStoredLocation();
+        let loc = storedLoc;
         if (!loc) {
           // Check existing permission status without prompting the user
           const ExpoLocation = await import('expo-location');
@@ -921,6 +993,8 @@ export default function HomeScreen() {
             try {
               const current = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
               loc = { latitude: current.coords.latitude, longitude: current.coords.longitude, city: '', country: '' };
+              loc = await ensurePrayerLocationTimezone(loc, true);
+              setPrayerTimezone(deviceTimezone());
               await saveLocation(loc);
               import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
                 rescheduleAllFromStorage().catch(() => {});
@@ -936,15 +1010,31 @@ export default function HomeScreen() {
               longitude: MAKKAH_FALLBACK_DEFAULTS.lng,
               city: MAKKAH_FALLBACK_DEFAULTS.cityNameAr,
               country: 'السعودية',
+              timezone: 'Asia/Riyadh',
             };
+            setPrayerTimezone(deviceTimezone());
           }
         }
         if (loc) {
-          const response = await fetchPrayerTimes(loc);
+          loc = await ensurePrayerLocationTimezone(loc, true);
+          setPrayerTimezone(deviceTimezone());
+          // Pass the user's actual prayer settings so the API uses their real
+          // calculation method/school. Without this, fetchPrayerTimes defaults to
+          // DEFAULT_SETTINGS (Makkah/Umm Al-Qura) and we'd cache those times under
+          // the user's method-specific key — poisoning it with the wrong method and
+          // making the on-screen times disagree with the (correctly method-matched)
+          // notifications by a few minutes.
+          const prayerDate = prayerDateForDisplay();
+          const prayerDateKey = formatPrayerDateKey(prayerDate);
+          const response = await fetchPrayerTimes(loc, prayerDate, settings.prayer);
           if (response) {
+            loc = { ...loc, timezone: response.meta?.timezone || loc.timezone };
+            setPrayerTimezone(deviceTimezone());
+            await saveLocation(loc);
             const rawTimes = parsePrayerTimes(response);
-            const times = applyAdjustments(rawTimes, settings.prayer.adjustments);
-            await cachePrayerTimes(today, times, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
+            let times = applyAdjustments(rawTimes, settings.prayer.adjustments);
+            times = await alignPrayerTimesToUpcomingDay(times, loc, new Date(), settings.prayer).catch(() => times);
+            await cachePrayerTimes(prayerDateKey, times, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
             setCachedPrayerTimes(times);
             // Sync to widget data
             try {
@@ -969,27 +1059,27 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!showNextPrayerModal || !cachedPrayerTimes) return;
     const update = () => {
-      const remaining = getTimeRemaining(cachedPrayerTimes);
+      const remaining = getTimeRemaining(cachedPrayerTimes, { timezone: prayerTimezone });
       setNextPrayerCountdown(remaining);
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [showNextPrayerModal, cachedPrayerTimes]);
+  }, [showNextPrayerModal, cachedPrayerTimes, prayerTimezone]);
 
   // Always-on banner countdown (updates every second for WelcomeBanner)
   useEffect(() => {
     if (!cachedPrayerTimes) return;
     const update = () => {
-      const next = getNextPrayer(cachedPrayerTimes);
+      const next = getNextPrayer(cachedPrayerTimes, { timezone: prayerTimezone });
       setBannerNextPrayer(next);
-      const remaining = getTimeRemaining(cachedPrayerTimes);
+      const remaining = getTimeRemaining(cachedPrayerTimes, { timezone: prayerTimezone });
       setBannerCountdown(remaining);
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [cachedPrayerTimes]);
+  }, [cachedPrayerTimes, prayerTimezone]);
 
   // Debug: Log when modal opens
   useEffect(() => {
@@ -1240,6 +1330,36 @@ export default function HomeScreen() {
         AsyncStorage.setItem('@quick_access_customized', 'true');
       }
     });
+  }, []);
+
+  // Decide whether to show the customization hint:
+  // - permanently hidden once user taps "don't show again"
+  // - otherwise shown up to 3 times total, at most once every 3 days
+  useEffect(() => {
+    const HINT_MAX_SHOWS = 3;
+    const HINT_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+    Promise.all([
+      AsyncStorage.getItem('@quick_access_hint_dismissed'),
+      AsyncStorage.getItem('@quick_access_hint_count'),
+      AsyncStorage.getItem('@quick_access_hint_last_shown'),
+    ]).then(([dismissed, countStr, lastShownStr]) => {
+      if (dismissed === 'true') return;
+      const count = parseInt(countStr || '0', 10) || 0;
+      if (count >= HINT_MAX_SHOWS) return;
+      const lastShown = lastShownStr ? parseInt(lastShownStr, 10) || 0 : 0;
+      const now = Date.now();
+      // First time shows immediately; subsequent shows wait for the interval to elapse
+      if (count > 0 && now - lastShown < HINT_INTERVAL_MS) return;
+      setShowQuickAccessHint(true);
+      AsyncStorage.setItem('@quick_access_hint_count', String(count + 1));
+      AsyncStorage.setItem('@quick_access_hint_last_shown', String(now));
+    }).catch(() => {});
+  }, []);
+
+  const dismissQuickAccessHint = useCallback(async () => {
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    setShowQuickAccessHint(false);
+    await AsyncStorage.setItem('@quick_access_hint_dismissed', 'true');
   }, []);
 
   const saveQuickAccessIds = useCallback(async (ids: string[], customs: CustomQuickAccessItem[]) => {
@@ -1710,9 +1830,18 @@ export default function HomeScreen() {
               if (minutes >= 3 && minutes <= 10) return `${minutes} دقائق`;
               return `${minutes} دقيقة`;
             };
+            const secondTextAr = (seconds: number) => {
+              if (seconds === 1) return 'ثانية';
+              if (seconds === 2) return 'ثانيتان';
+              if (seconds >= 3 && seconds <= 10) return `${seconds} ثوانٍ`;
+              return `${seconds} ثانية`;
+            };
 
             if (isArabic) {
-              if (c.hours <= 0 && c.minutes <= 0) return 'أقل من دقيقة';
+              // Under a minute: tick down the actual seconds (59 ثانية … 1 ثانية).
+              if (c.hours <= 0 && c.minutes <= 0) {
+                return c.seconds > 0 ? secondTextAr(c.seconds) : 'الآن';
+              }
               if (c.hours <= 0) return minuteTextAr(c.minutes);
               if (c.minutes <= 0) return hourTextAr(c.hours);
               return `${hourTextAr(c.hours)} ${minuteTextAr(c.minutes)}`;
@@ -1721,7 +1850,11 @@ export default function HomeScreen() {
             const unit = (value: number, singular: string) => (
               settings.language === 'en' && value !== 1 ? `${singular}s` : singular
             );
-            if (c.hours <= 0 && c.minutes <= 0) return `< 1 ${t('home.minuteLabel')}`;
+            if (c.hours <= 0 && c.minutes <= 0) {
+              return c.seconds > 0
+                ? `${c.seconds} ${unit(c.seconds, t('home.secondLabel'))}`
+                : `< 1 ${t('home.minuteLabel')}`;
+            }
             if (c.hours <= 0) return `${c.minutes} ${unit(c.minutes, t('home.minuteLabel'))}`;
             if (c.minutes <= 0) return `${c.hours} ${unit(c.hours, t('home.hour'))}`;
             return `${c.hours} ${unit(c.hours, t('home.hour'))} ${c.minutes} ${unit(c.minutes, t('home.minuteLabel'))}`;
@@ -2008,83 +2141,75 @@ export default function HomeScreen() {
           <DailyHighlights showReorderButton onNextPrayerPress={() => setShowNextPrayerModal(true)} onShareAppPress={() => setShareModalVisible(true)} />
         </CollapsibleSection>
 
-        {/* كلمة اليوم الغريبة */}
-        {(() => {
-          const gw = getGharibWordOfTheDay();
-          return (
-            <Animated.View entering={FadeInDown.delay(80).duration(500)}>
-              <Pressable
-                onPress={() => {
-                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-                  router.push('/gharib-quran' as any);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('gharibQuran.wordOfTheDay')}
-              >
-                <GlassCard style={styles.gharibCard}>
-                  <View style={[styles.gharibHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={[styles.gharibTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <MaterialCommunityIcons name="book-alphabet" size={16} color="#3a7ca5" />
-                      <Text style={[styles.gharibLabel, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                        {t('gharibQuran.wordOfTheDay')}
-                      </Text>
-                    </View>
-                    <View style={[styles.gharibBadge, { backgroundColor: '#3a7ca5' }]}>
-                      <Text style={styles.gharibBadgeText}>{gw.surahName} {localizeNumber(gw.ayah)}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.gharibWord, { color: colors.text, fontFamily: quranFontFamily() }]} numberOfLines={1}>
-                    {gw.word}
-                  </Text>
-                  <Text
-                    style={[styles.gharibMeaning, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
-                    numberOfLines={2}
-                  >
-                    {gw.meaning}
-                  </Text>
-                </GlassCard>
-              </Pressable>
-            </Animated.View>
-          );
-        })()}
-
         {/* الوصول السريع */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <CollapsibleSection title={t('home.quickAccess')} icon="lightning-bolt" iconColor="#5856D6" sectionId="quickAccess" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
-          {/* تنبيه: يمكن تخصيص القائمة */}
-          <Pressable
-            onPress={() => {
-              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-              setPendingIds([...selectedQuickAccessIds]);
-              setPendingCustomItems([...customItems]);
-              setAddOtherMode(null);
-              setSurahSearch('');
-              setModalSearch('');
-              setExpandedCategories([]);
-              setModalMode('select');
-              setShowCustomizeModal(true);
-            }}
-            style={({ pressed }) => [styles.quickAccessHint, {
-              flexDirection: isRTL ? 'row-reverse' : 'row',
-              backgroundColor: isDarkMode ? 'rgba(88,86,214,0.18)' : 'rgba(88,86,214,0.10)',
-              borderColor: isDarkMode ? 'rgba(88,86,214,0.35)' : 'rgba(88,86,214,0.22)',
-              opacity: pressed ? 0.7 : 1,
-            }]}
-            accessibilityRole="button"
-            accessibilityLabel={t('home.customizeQuickAccess')}
-          >
-            <MaterialCommunityIcons name="gesture-tap-button" size={18} color="#5856D6" />
-            <Text
-              style={[styles.quickAccessHintText, {
-                color: colors.text,
-                textAlign: isRTL ? 'right' : 'left',
-                writingDirection: isRTL ? 'rtl' : 'ltr',
+          {/* تنبيه: يمكن تخصيص القائمة (يظهر حتى ٣ مرات، مع خيار عدم الظهور مرة أخرى) */}
+          {showQuickAccessHint && (
+            <Animated.View
+              entering={FadeInDown.duration(400)}
+              style={[styles.quickAccessHint, {
+                backgroundColor: isDarkMode ? 'rgba(88,86,214,0.18)' : 'rgba(88,86,214,0.10)',
+                borderColor: isDarkMode ? 'rgba(88,86,214,0.35)' : 'rgba(88,86,214,0.22)',
               }]}
-              numberOfLines={2}
             >
-              {t('home.quickAccessHint')}
-            </Text>
-          </Pressable>
+              <Pressable
+                onPress={() => {
+                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                  setPendingIds([...selectedQuickAccessIds]);
+                  setPendingCustomItems([...customItems]);
+                  setAddOtherMode(null);
+                  setSurahSearch('');
+                  setModalSearch('');
+                  setExpandedCategories([]);
+                  setModalMode('select');
+                  setShowCustomizeModal(true);
+                }}
+                style={({ pressed }) => [{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  opacity: pressed ? 0.7 : 1,
+                }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('home.customizeQuickAccess')}
+              >
+                <MaterialCommunityIcons name="gesture-tap-button" size={18} color="#5856D6" />
+                <Text
+                  style={[styles.quickAccessHintText, {
+                    color: colors.text,
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                  }]}
+                  numberOfLines={2}
+                >
+                  {t('home.quickAccessHint')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={dismissQuickAccessHint}
+                hitSlop={8}
+                style={({ pressed }) => [{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  alignSelf: isRTL ? 'flex-start' : 'flex-end',
+                  gap: 4,
+                  marginTop: 8,
+                  opacity: pressed ? 0.6 : 1,
+                }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('home.dontShowAgain')}
+              >
+                <MaterialCommunityIcons name="eye-off-outline" size={14} color={colors.textLight} />
+                <Text style={[styles.quickAccessHintDismissText, {
+                  color: colors.textLight,
+                  writingDirection: isRTL ? 'rtl' : 'ltr',
+                }]}>
+                  {t('home.dontShowAgain')}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          )}
           <ScrollView
             ref={quickAccessScrollRef}
             horizontal
@@ -2164,6 +2289,7 @@ export default function HomeScreen() {
               isDarkMode={isDarkMode}
               infoKey={section.id}
             >
+              {section.id === 'quran_surahs' && <GharibWordHomeCard />}
               <View style={[isGrid ? styles.categoriesGridWrap : styles.categoriesGrid, isGrid && { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 {section.items.map((item, index) => (
                   <Animated.View
@@ -2539,7 +2665,7 @@ export default function HomeScreen() {
             <View style={styles.nextPrayerHandle} />
 
             {(() => {
-              const nextPrayer = cachedPrayerTimes ? getNextPrayer(cachedPrayerTimes) : null;
+              const nextPrayer = cachedPrayerTimes ? getNextPrayer(cachedPrayerTimes, { timezone: prayerTimezone }) : null;
               const prayerNameAr = nextPrayer ? getPrayerNameAr(nextPrayer.name) : '';
               const prayerNameTranslated = nextPrayer ? t(getPrayerTranslationKey(nextPrayer.name)) : '';
               return (
@@ -2558,8 +2684,8 @@ export default function HomeScreen() {
                       <Text style={[styles.nextPrayerName, { color: '#0D9488' }]}>
                         {prayerNameTranslated}
                       </Text>
-                      <Text style={[styles.nextPrayerTime, { color: colors.textLight }]}>
-                        {nextPrayer.time}
+                      <Text style={[styles.nextPrayerTime, { color: colors.textLight, textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                        {formatPrayerTime(nextPrayer.time, settings.prayer.show24Hour)}
                       </Text>
 
                       {/* Countdown */}
@@ -2651,10 +2777,7 @@ export default function HomeScreen() {
                               ).catch(() => {});
                             }
                             // === END TEST ===
-                            const prayerDate = timeStringToDate(nextPrayer.time);
-                            if (prayerDate <= new Date()) {
-                              prayerDate.setDate(prayerDate.getDate() + 1);
-                            }
+                            const prayerDate = new Date(nextPrayer.epochMs ?? Date.now());
                             return schedulePrayerNotification(prayerNameAr, prayerDate, 5);
                           }).then((notifId) => {
                             if (!notifId) return;
@@ -2996,14 +3119,14 @@ const _styles = StyleSheet.create({
     gap: 10,
   },
   gharibCard: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   gharibHeaderRow: {
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   gharibTitleRow: {
     alignItems: 'center',
@@ -3024,18 +3147,16 @@ const _styles = StyleSheet.create({
     fontFamily: fontSemiBold(),
   },
   gharibWord: {
-    fontSize: 24,
-    lineHeight: 38,
-    marginBottom: 4,
+    fontSize: 19,
+    lineHeight: 28,
+    marginBottom: 1,
   },
   gharibMeaning: {
-    fontSize: 14,
-    lineHeight: 23,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: fontRegular(),
   },
   quickAccessHint: {
-    alignItems: 'center',
-    gap: 8,
     marginHorizontal: 20,
     marginBottom: 12,
     paddingVertical: 10,
@@ -3048,6 +3169,11 @@ const _styles = StyleSheet.create({
     fontSize: 12.5,
     fontFamily: fontMedium(),
     lineHeight: 19,
+    includeFontPadding: false,
+  },
+  quickAccessHintDismissText: {
+    fontSize: 11.5,
+    fontFamily: fontMedium(),
     includeFontPadding: false,
   },
   quickAccessItem: {

@@ -7,16 +7,23 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PNG } from 'pngjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 
 const REGISTRY_JSON = resolve(ROOT, 'widgets/ios/Resources/widget-registry.json');
 const IOS_ENUMS = resolve(ROOT, 'widgets/ios/GeneratedWidgetEnums.swift');
+const IOS_TARGET_ENUMS = resolve(ROOT, 'ios/RoohAlMuslimWidgets/GeneratedWidgetEnums.swift');
 const IOS_SWIFT = resolve(ROOT, 'widgets/ios/RoohWidgets.swift');
 const IOS_BUNDLE = resolve(ROOT, 'widgets/ios/WidgetBundle.swift');
 const IOS_TARGET_SWIFT = resolve(ROOT, 'ios/RoohAlMuslimWidgets/RoohWidgets.swift');
 const IOS_TARGET_BUNDLE = resolve(ROOT, 'ios/RoohAlMuslimWidgets/WidgetBundle.swift');
+const IOS_LOCALIZABLE = resolve(ROOT, 'widgets/ios/Localizable.xcstrings');
+const IOS_TARGET_LOCALIZABLE = resolve(ROOT, 'ios/RoohAlMuslimWidgets/Localizable.xcstrings');
+const IOS_PRAYER_INPUTS = resolve(ROOT, 'widgets/ios/PrayerInputs.swift');
+const IOS_TARGET_PRAYER_INPUTS = resolve(ROOT, 'ios/RoohAlMuslimWidgets/PrayerInputs.swift');
+const IOS_LEGACY_NEXT_PRAYER = resolve(ROOT, 'widgets/ios/NextPrayerWidget.swift');
 const ANDROID_MANIFEST = resolve(ROOT, 'android/app/src/main/AndroidManifest.xml');
 const ANDROID_XML_DIR = resolve(ROOT, 'android/app/src/main/res/xml');
 const ANDROID_JAVA_DIR = resolve(ROOT, 'android/app/src/main/java/com/rooh/almuslim/widget');
@@ -26,10 +33,17 @@ const REGISTRY_TS = resolve(ROOT, 'lib/widgets/registry.ts');
 const ANDROID_TASK = resolve(ROOT, 'lib/android-widget-task-handler.tsx');
 const ANDROID_SNAPSHOT = resolve(ROOT, 'components/widgets/android/SnapshotWidget.tsx');
 const ANDROID_SHARED = resolve(ROOT, 'components/widgets/android/shared.ts');
+const ANDROID_LOCKED = resolve(ROOT, 'components/widgets/android/LockedWidget.tsx');
+const ANDROID_NATIVE_OVERLAY = resolve(ROOT, 'android/app/src/main/java/com/rooh/almuslim/widget/NativeWidgetTextOverlay.kt');
+const SNAPSHOT_PUMP_CONTROLLER = resolve(ROOT, 'components/widgets/SnapshotPumpController.tsx');
 const SNAPSHOT_TS = resolve(ROOT, 'lib/widgets/snapshot.tsx');
 const BRIDGE_TS = resolve(ROOT, 'lib/widget-data-bridge.ts');
 const PACKAGE_JSON = resolve(ROOT, 'package.json');
 const APP_LAYOUT = resolve(ROOT, 'app/_layout.tsx');
+const APP_WIDGET = resolve(ROOT, 'app/widget.tsx');
+const ANDROID_PREVIEW_GENERATOR = resolve(ROOT, 'scripts/generate-android-widget-preview-images.mjs');
+const ANDROID_PROVIDER_GENERATOR = resolve(ROOT, 'scripts/generate-android-widget-providers.mjs');
+const ANDROID_WIDGET_PATCH = resolve(ROOT, 'scripts/patch-react-native-android-widget.js');
 
 const LOCK_PROVIDERS = [
   { ios: 'RoohLockDayThuluthWidget', android: 'RoohLockDayThuluth', xml: 'widgetprovider_roohlockdaythuluth', id: 'dayThuluth', size: 'small' },
@@ -49,11 +63,7 @@ const FORBIDDEN_GALLERY_WIDGETS = [
   },
 ];
 
-const LEGACY_PROVIDER_LABELS = [
-  { className: 'RoohSmall', label: 'الويدجت الصغيرة' },
-  { className: 'RoohMedium', label: 'الويدجت المتوسطة' },
-  { className: 'RoohLarge', label: 'الويدجت الكبيرة' },
-];
+const RETIRED_ANDROID_PICKER_PROVIDERS = ['RoohSmall', 'RoohMedium', 'RoohLarge'];
 
 const STALE_ANDROID_VARIANT_PROVIDERS = [
   'RoohVerseOfDaySmall',
@@ -87,8 +97,7 @@ function premiumRequiredForSize(def, size) {
 }
 
 function expectedHomePreviewDrawable(def, size) {
-  const base = previewDrawableName(def.id, size);
-  return premiumRequiredForSize(def, size) ? `${base}_locked` : base;
+  return previewDrawableName(def.id, size);
 }
 
 function fail(errors, message) {
@@ -97,6 +106,10 @@ function fail(errors, message) {
 
 function assertContains(errors, haystack, needle, label) {
   if (!haystack.includes(needle)) fail(errors, `${label}: missing ${needle}`);
+}
+
+function assertNotContains(errors, haystack, needle, label) {
+  if (haystack.includes(needle)) fail(errors, `${label}: still contains ${needle}`);
 }
 
 function assertFile(errors, path, label) {
@@ -110,45 +123,99 @@ function assertEqualFile(errors, a, b, label) {
   if (left !== right) fail(errors, `${label}: source and Xcode target files are out of sync`);
 }
 
+function assertRegionHasInk(errors, filePath, region, label) {
+  if (!existsSync(filePath)) return;
+  const png = PNG.sync.read(readFileSync(filePath));
+  let darkPixelCount = 0;
+  for (let y = region.y; y < Math.min(region.y + region.height, png.height); y += 1) {
+    for (let x = region.x; x < Math.min(region.x + region.width, png.width); x += 1) {
+      const index = (png.width * y + x) << 2;
+      const average = (png.data[index] + png.data[index + 1] + png.data[index + 2]) / 3;
+      if (png.data[index + 3] > 64 && average < 130) darkPixelCount += 1;
+    }
+  }
+  if (darkPixelCount < 40) {
+    fail(errors, `${label}: dynamic text is missing (${darkPixelCount} dark pixels)`);
+  }
+}
+
 function main() {
   const errors = [];
   const registry = JSON.parse(readFileSync(REGISTRY_JSON, 'utf8'));
   const iosEnums = readFileSync(IOS_ENUMS, 'utf8');
+  const iosTargetEnums = readFileSync(IOS_TARGET_ENUMS, 'utf8');
   const iosSwift = readFileSync(IOS_SWIFT, 'utf8');
   const iosBundle = readFileSync(IOS_BUNDLE, 'utf8');
   const iosTargetSwift = readFileSync(IOS_TARGET_SWIFT, 'utf8');
   const iosTargetBundle = readFileSync(IOS_TARGET_BUNDLE, 'utf8');
+  const iosLocalizable = readFileSync(IOS_LOCALIZABLE, 'utf8');
+  const iosTargetLocalizable = readFileSync(IOS_TARGET_LOCALIZABLE, 'utf8');
   const androidManifest = readFileSync(ANDROID_MANIFEST, 'utf8');
   const registryTs = readFileSync(REGISTRY_TS, 'utf8');
   const androidTask = readFileSync(ANDROID_TASK, 'utf8');
   const androidSnapshot = readFileSync(ANDROID_SNAPSHOT, 'utf8');
   const androidShared = readFileSync(ANDROID_SHARED, 'utf8');
+  const androidLocked = readFileSync(ANDROID_LOCKED, 'utf8');
+  const androidNativeOverlay = readFileSync(ANDROID_NATIVE_OVERLAY, 'utf8');
+  const snapshotPumpController = readFileSync(SNAPSHOT_PUMP_CONTROLLER, 'utf8');
   const snapshotTs = readFileSync(SNAPSHOT_TS, 'utf8');
   const bridgeTs = readFileSync(BRIDGE_TS, 'utf8');
   const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8'));
   const appLayout = readFileSync(APP_LAYOUT, 'utf8');
+  const appWidget = readFileSync(APP_WIDGET, 'utf8');
+  const androidPreviewGenerator = readFileSync(ANDROID_PREVIEW_GENERATOR, 'utf8');
+  const androidProviderGenerator = readFileSync(ANDROID_PROVIDER_GENERATOR, 'utf8');
+  const androidWidgetPatch = readFileSync(ANDROID_WIDGET_PATCH, 'utf8');
+  const iosLegacyNextPrayer = readFileSync(IOS_LEGACY_NEXT_PRAYER, 'utf8');
 
+  assertEqualFile(errors, IOS_ENUMS, IOS_TARGET_ENUMS, 'iOS GeneratedWidgetEnums.swift');
   assertEqualFile(errors, IOS_SWIFT, IOS_TARGET_SWIFT, 'iOS RoohWidgets.swift');
   assertEqualFile(errors, IOS_BUNDLE, IOS_TARGET_BUNDLE, 'iOS WidgetBundle.swift');
+  assertEqualFile(errors, IOS_LOCALIZABLE, IOS_TARGET_LOCALIZABLE, 'iOS Localizable.xcstrings');
+  assertEqualFile(errors, IOS_PRAYER_INPUTS, IOS_TARGET_PRAYER_INPUTS, 'iOS PrayerInputs.swift');
 
-  if (iosSwift.includes('AppIntentConfiguration(') || iosTargetSwift.includes('AppIntentConfiguration(')) {
-    fail(errors, 'iOS home widgets: AppIntentConfiguration still exposes Edit Widget visual options');
-  }
-  assertContains(errors, iosSwift, 'StaticConfiguration(kind:', 'iOS static home widgets');
+  assertContains(errors, iosBundle, 'RoohSmallWidget()', 'iOS grouped small widget');
+  assertContains(errors, iosBundle, 'RoohMediumWidget()', 'iOS grouped medium widget');
+  assertContains(errors, iosBundle, 'RoohLargeWidget()', 'iOS grouped large widget');
+  assertContains(errors, iosSwift, 'AppIntentConfiguration(', 'iOS grouped configurable widgets');
+  assertContains(errors, iosSwift, 'StaticConfiguration(kind:', 'iOS lock/static widgets');
   assertContains(errors, iosSwift, 'snapshotManifest', 'iOS snapshot manifest decoding');
   assertContains(errors, iosSwift, 'nextPrayerAtEpochMs', 'iOS countdown from absolute prayer timestamp');
   assertContains(errors, iosSwift, 'return .light', 'iOS auto theme resolves to light');
   assertContains(errors, iosSwift, 'loaded snapshot route=', 'iOS loaded snapshot logging');
   assertContains(errors, iosSwift, 'fallback reason=', 'iOS fallback snapshot logging');
+  assertNotContains(errors, iosEnums, 'Previous & Next Prayer', 'iOS Arabic app-intent fallback for previous/next widget');
+  assertNotContains(errors, iosTargetEnums, 'Previous & Next Prayer', 'iOS target Arabic app-intent fallback for previous/next widget');
+  assertNotContains(errors, iosLocalizable, '"value" : "Previous & Next Prayer"', 'iOS previous/next localized title');
+  assertNotContains(errors, iosTargetLocalizable, '"value" : "Previous & Next Prayer"', 'iOS target previous/next localized title');
+  assertContains(errors, iosLocalizable, '"widget.kind.prayerNextPrevious"', 'iOS previous/next localized key');
+  assertContains(errors, iosLocalizable, '"value" : "الصلاة السابقة والقادمة"', 'iOS previous/next Arabic localized value');
 
   if (!androidShared.includes("auto: { bg: '#E3E0DB'")) {
     fail(errors, 'Android auto theme must resolve to the gallery light/cream palette');
   }
+  assertContains(errors, androidShared, 'watermarkFontFor', 'Android date widgets share the iOS watermark font rule');
   if (androidManifest.includes('android:configure=')) {
     fail(errors, 'Android manifest: visual configuration activity is still exposed');
   }
   assertContains(errors, androidSnapshot, 'snapshotManifest', 'Android snapshot manifest lookup');
   assertContains(errors, androidSnapshot, 'OverlapWidget', 'Android true overlay container');
+  assertContains(errors, androidSnapshot, 'ANDROID_OVERLAY_ANCHORS', 'Android live countdown overlay anchors');
+  assertContains(errors, androidSnapshot, 'NATIVE_TEXT_VERTICAL_SAFETY', 'Android native countdown text safety inset');
+  assertNotContains(errors, androidNativeOverlay, 'localized.replace("\\\\s".toRegex(), "")', 'Android native countdown preserves gallery whitespace');
+  assertNotContains(errors, androidSnapshot, "overlayText.replace(/\\s/g, '')", 'Android initial countdown render preserves gallery whitespace');
+  assertNotContains(errors, androidSnapshot, "overlayStr.replace(/\\s/g, '')", 'Android fallback countdown render preserves gallery whitespace');
+  assertNotContains(errors, iosSwift, 'remaining.replacingOccurrences(of: " ", with: "")', 'iOS compact countdown preserves gallery whitespace');
+  assertNotContains(errors, iosSwift, 'raw.replacingOccurrences(of: " ", with: "")', 'iOS fallback countdown render preserves gallery whitespace');
+  assertContains(errors, androidWidgetPatch, 'android:includeFontPadding="true"', 'Android native countdown keeps Arabic font padding');
+  assertContains(errors, androidWidgetPatch, `.replace(/android:includeFontPadding="false"/g, 'android:includeFontPadding="true"')`, 'Android native countdown patch migrates old clipped layouts');
+  assertContains(errors, androidSnapshot, "'#0000001A' : '#FFFFFF1A'", 'Android watermark RGBA opacity order');
+  assertNotContains(errors, androidSnapshot, "'#1A000000' : '#1AFFFFFF'", 'Android watermark must not use ARGB in React Native styles');
+  assertNotContains(errors, androidSnapshot, "widgetId === 'monthSimple' || widgetId === 'monthThuluth'", 'Android month widgets must not share one broken renderer');
+  assertContains(errors, androidSnapshot, "widgetId === 'monthSimple'", 'Android monthSimple renderer');
+  assertContains(errors, androidSnapshot, "widgetId === 'monthThuluth'", 'Android monthThuluth renderer');
+  assertNotContains(errors, androidSnapshot, "'Amiri-Bold'", 'Android daySimple must match iOS Rubik typography');
+  assertNotContains(errors, androidSnapshot, 'fontFamily: isAr ? widgetFont', 'Android day/month labels must not switch to decorative font');
   assertContains(errors, androidSnapshot, 'nextPrayerAtEpochMs', 'Android countdown from absolute prayer timestamp');
   assertContains(errors, androidSnapshot, 'backgroundColor: p.bg', 'Android themed PNG backing shell');
   if (androidSnapshot.includes("backgroundColor: '#E3E0DB'") || androidSnapshot.includes('backgroundColor: "#E3E0DB"')) {
@@ -157,12 +224,52 @@ function main() {
   assertContains(errors, androidSnapshot, 'widgetWidth?: number', 'Android launcher widget width input');
   assertContains(errors, androidSnapshot, 'widgetHeight?: number', 'Android launcher widget height input');
   assertContains(errors, androidSnapshot, 'renderScale = Math.min(targetWidth / width, targetHeight / height)', 'Android preserves full gallery snapshot');
+  assertContains(errors, androidSnapshot, 'renderScale = Math.min(targetWidth / logicalWidth, targetHeight / logicalHeight)', 'Android live date widgets preserve gallery aspect ratio');
+  assertContains(errors, androidSnapshot, 'formatDateSample(now, configuredDateFormat, numerals, isAr)', 'Android live date widgets use the gallery date-format source');
+  assertContains(errors, androidSnapshot, "widgetId === 'prayerSingle' && ov.key === 'hero'", 'Android small prayer time keeps a dedicated centered baseline');
   assertContains(errors, androidSnapshot, 'imageWidth={renderedImageWidth}', 'Android scaled ImageWidget width');
   assertContains(errors, androidSnapshot, 'imageHeight={renderedImageHeight}', 'Android scaled ImageWidget height');
   assertContains(errors, androidTask, 'widgetWidth={widgetBounds?.width}', 'Android task passes launcher width');
   assertContains(errors, androidTask, 'widgetHeight={widgetBounds?.height}', 'Android task passes launcher height');
+  assertContains(errors, bridgeTs, 'renderWidget: (widgetInfo:', 'Android immediate refresh receives launcher widget info');
+  assertContains(errors, bridgeTs, 'renderWidgetByName(\n                widgetName,\n                sharedData,\n                widgetInfo,', 'Android immediate refresh passes launcher bounds');
+  assertContains(errors, bridgeTs, 'snapshotOverrides.get(widgetName)', 'Android immediate refresh passes prayer static template overrides');
+  assertContains(errors, bridgeTs, 'resolveAndroidSnapshotRenderOverride', 'Android immediate refresh resolves the same prayer template as the task handler');
+  assertContains(errors, bridgeTs, 'immediate prayer static override', 'Android immediate refresh logs prayer static override selection');
+  assertContains(errors, bridgeTs, 'isPrayerStaticTemplate: true', 'Android immediate refresh uses live prayer text overlays on static templates');
+  assertContains(errors, bridgeTs, 'widgetWidth: widgetBounds?.width', 'Android immediate refresh passes launcher width');
+  assertContains(errors, bridgeTs, 'widgetHeight: widgetBounds?.height', 'Android immediate refresh passes launcher height');
+  assertContains(errors, bridgeTs, 'priority prayer templates ready', 'Android settings refresh generates only visible prayer templates before reload');
+  assertContains(errors, bridgeTs, 'targets: priorityTargets', 'Android settings refresh scopes prayer template generation to placed widgets');
+  assertContains(errors, bridgeTs, '}, 5000);', 'Android background prayer prewarm is delayed after the visible reload');
+  assertContains(errors, bridgeTs, 'displayOverride?: WidgetDisplayOverride', 'Android settings refresh can bypass stale stored display values');
+  assertContains(errors, bridgeTs, "applied immediate display override (updateWidgetData)", 'Android settings refresh applies the just-selected display value immediately');
+  assertContains(errors, bridgeTs, 'refreshWidgetDisplayNow', 'Widget settings have a display-only fast refresh path');
+  assertContains(errors, bridgeTs, 'displayOnlyWriteMs', 'Widget display-only refresh writes shared data before full prayer sync');
+  assertContains(errors, bridgeTs, 'RESOLVED_WIDGET_THEMES', 'Android background prewarm prepares placed widgets for all themes');
+  assertContains(errors, bridgeTs, 'androidPrayerStaticAllStateTargetsForRouteKeys', 'Android background prewarm prepares all prayer states for placed prayer widgets');
+  assertContains(errors, appWidget, 'immediate widget sync queued', 'Widget settings start native sync as soon as an option is picked');
+  assertContains(errors, snapshotTs, 'targets?: AndroidPrayerStaticTemplateTarget[]', 'Android prayer static templates support priority subsets');
+  assertContains(
+    errors,
+    snapshotPumpController,
+    'if (pending) {\n        runActiveThenBackgroundPump(true).catch(() => {});\n      }',
+    'Widget settings changes do not start a competing snapshot pump',
+  );
+  const foregroundPumpCalls = snapshotPumpController.match(/runActiveThenBackgroundPump\(pending\)\.catch/g) ?? [];
+  if (foregroundPumpCalls.length > 1) {
+    fail(errors, 'Widget settings changes: duplicate unconditional snapshot pump can race updateWidgetData and delay native widget refresh');
+  }
   assertContains(errors, androidSnapshot, 'loading snapshot route=', 'Android loaded snapshot logging');
   assertContains(errors, androidSnapshot, 'fallback reason=', 'Android fallback snapshot logging');
+  assertNotContains(errors, androidLocked, 'APP_ICON', 'Android premium locked widget must match iOS without app icon');
+  assertNotContains(errors, androidLocked, 'ImageWidget', 'Android premium locked widget must match iOS without app icon image');
+  assertNotContains(errors, androidLocked, '#1A1A2E', 'Android premium locked widget must use the selected widget palette');
+  assertNotContains(errors, androidLocked, 'اشترك للحصول على هذه الودجت', 'Android premium locked widget old copy');
+  assertContains(errors, androidLocked, 'SvgWidget', 'Android premium locked widget lock glyph');
+  assertContains(errors, androidLocked, 'اشترك للوصول', 'Android premium locked widget title');
+  assertContains(errors, androidLocked, 'افتح التطبيق للاشتراك', 'Android premium locked widget subtitle');
+  assertContains(errors, androidLocked, 'paletteFor', 'Android premium locked widget theme palette');
   assertContains(errors, snapshotTs, 'snapshotVersion', 'Snapshot version/hash key');
   assertContains(errors, snapshotTs, 'moveAsync({ from: tmpDst, to: dst })', 'Android atomic snapshot move');
   assertContains(errors, snapshotTs, 'cleanupOldSnapshots', 'Snapshot cleanup');
@@ -191,13 +298,15 @@ function main() {
   if (stalePreviewPngs.length > 0) {
     fail(errors, `Android picker previews: stale drawable-nodpi PNGs are still present (${stalePreviewPngs.join(', ')})`);
   }
-  for (const provider of LEGACY_PROVIDER_LABELS) {
-    assertContains(
-      errors,
-      androidManifest,
-      `android:name=".widget.${provider.className}" android:exported="false" android:label="${provider.label}"`,
-      `Android legacy provider label:${provider.className}`,
-    );
+  const staleLockedPreviewXml = readdirSync(ANDROID_DRAWABLE_DIR)
+    .filter((name) => /^widget_preview_.*_locked\.xml$/.test(name));
+  if (staleLockedPreviewXml.length > 0) {
+    fail(errors, `Android picker previews: stale locked layer-list XMLs are still present (${staleLockedPreviewXml.join(', ')})`);
+  }
+  for (const className of RETIRED_ANDROID_PICKER_PROVIDERS) {
+    if (androidManifest.includes(`android:name=".widget.${className}"`)) {
+      fail(errors, `Android manifest:${className}: generic iOS-style picker provider is still visible`);
+    }
   }
   for (const className of STALE_ANDROID_VARIANT_PROVIDERS) {
     if (androidManifest.includes(`android:name=".widget.${className}"`)) {
@@ -243,8 +352,6 @@ function main() {
       assertContains(errors, androidManifest, `android:resource="@xml/${xmlRes}"`, `Android manifest:${className}`);
       assertContains(errors, registryTs, `${className}:`, `Android provider route:${className}`);
       assertFile(errors, resolve(ANDROID_JAVA_DIR, `${className}.java`), `Android Java:${className}`);
-      assertContains(errors, iosBundle, `${className}Widget()`, `iOS static widget bundle:${className}`);
-      assertContains(errors, iosSwift, `kind: "${className}Widget"`, `iOS static widget kind:${className}`);
 
       const xmlPath = resolve(ANDROID_XML_DIR, `${xmlRes}.xml`);
       assertFile(errors, xmlPath, `Android XML:${className}`);
@@ -255,38 +362,21 @@ function main() {
         const basePreview = previewDrawableName(def.id, size);
         assertContains(errors, xml, `android:previewImage="@drawable/${preview}"`, `Android XML:${className}`);
         assertFile(errors, resolve(ANDROID_PREVIEW_DIR, `${basePreview}.png`), `Android preview:${className}`);
-        if (premiumRequiredForSize(def, size)) {
-          const lockedPreviewPath = resolve(ANDROID_DRAWABLE_DIR, `${preview}.xml`);
-          assertFile(errors, lockedPreviewPath, `Android locked preview:${className}`);
-          if (existsSync(lockedPreviewPath)) {
-            const lockedXml = readFileSync(lockedPreviewPath, 'utf8');
-            assertContains(errors, lockedXml, `@drawable/${basePreview}`, `Android locked preview:${className}`);
-            assertContains(errors, lockedXml, '@drawable/ic_widget_premium_lock_badge', `Android locked preview:${className}`);
-          }
+        if (xml.includes('android:description=')) {
+          fail(errors, `Android XML:${className}: picker title is repeated through android:description`);
+        }
+        const expectedTargetCells = {
+          small: { width: 2, height: 2 },
+          medium: { width: 3, height: 2 },
+          large: { width: 3, height: 4 },
+        }[size];
+        if (expectedTargetCells) {
+          assertContains(errors, xml, `android:targetCellWidth="${expectedTargetCells.width}"`, `Android XML:${className}`);
+          assertContains(errors, xml, `android:targetCellHeight="${expectedTargetCells.height}"`, `Android XML:${className}`);
         }
         if (xml.includes('roohsmall_preview') || xml.includes('roohmedium_preview') || xml.includes('roohlarge_preview')) {
           fail(errors, `Android XML:${className}: launcher preview still uses generic app logo`);
         }
-      }
-    }
-  }
-
-  for (const base of [
-    { className: 'RoohSmall', xml: 'widgetprovider_roohsmall', id: 'daySimple', size: 'small' },
-    { className: 'RoohMedium', xml: 'widgetprovider_roohmedium', id: 'daySimple', size: 'medium' },
-    { className: 'RoohLarge', xml: 'widgetprovider_roohlarge', id: 'prayerTable', size: 'large' },
-  ]) {
-    assertContains(errors, androidManifest, `android:name=".widget.${base.className}"`, `Android legacy provider:${base.className}`);
-    assertFile(errors, resolve(ANDROID_JAVA_DIR, `${base.className}.java`), `Android legacy Java:${base.className}`);
-    const xmlPath = resolve(ANDROID_XML_DIR, `${base.xml}.xml`);
-    assertFile(errors, xmlPath, `Android legacy XML:${base.className}`);
-    if (existsSync(xmlPath)) {
-      const xml = readFileSync(xmlPath, 'utf8');
-      const preview = previewDrawableName(base.id, base.size);
-      assertContains(errors, xml, `android:previewImage="@drawable/${preview}"`, `Android legacy XML:${base.className}`);
-      assertFile(errors, resolve(ANDROID_PREVIEW_DIR, `${preview}.png`), `Android legacy preview:${base.className}`);
-      if (xml.includes('roohsmall_preview') || xml.includes('roohmedium_preview') || xml.includes('roohlarge_preview')) {
-        fail(errors, `Android legacy XML:${base.className}: launcher preview still uses generic app logo`);
       }
     }
   }
@@ -307,6 +397,9 @@ function main() {
       const preview = previewDrawableName(provider.id, provider.size);
       assertContains(errors, xml, `android:previewImage="@drawable/${preview}"`, `Android lock XML:${provider.android}`);
       assertFile(errors, resolve(ANDROID_PREVIEW_DIR, `${preview}.png`), `Android lock preview:${provider.android}`);
+      if (xml.includes('android:description=')) {
+        fail(errors, `Android lock XML:${provider.android}: picker title is repeated through android:description`);
+      }
       if (xml.includes('roohsmall_preview') || xml.includes('roohmedium_preview') || xml.includes('roohlarge_preview')) {
         fail(errors, `Android lock XML:${provider.android}: launcher preview still uses generic app logo`);
       }
@@ -317,6 +410,47 @@ function main() {
   assertContains(errors, androidTask, '!data && !appOpened', 'Android open-first branch');
   assertContains(errors, androidTask, 'premiumRequiredForSize', 'Android premium gate');
   assertContains(errors, androidTask, 'LockedWidget', 'Android premium locked state');
+  assertContains(errors, androidTask, 'AsyncStorage.setItem(WIDGET_DATA_KEY', 'Android persists fresh offline prayer calculation');
+  assertContains(errors, androidPreviewGenerator, 'pickerDynamicOverlaySvg', 'Android picker dynamic thumbnail overlays');
+  assertContains(errors, androidPreviewGenerator, 'ANDROID_OVERLAY_ANCHORS', 'Android picker thumbnails use the live overlay anchor table');
+  assertNotContains(errors, androidPreviewGenerator, 'font-family="Arial, sans-serif"', 'Android picker countdown typography must match live Rubik overlay');
+  assertNotContains(errors, androidPreviewGenerator, 'y="136"', 'Android picker countdown must not use old clipped y coordinate');
+  assertNotContains(errors, androidPreviewGenerator, 'y="134"', 'Android picker countdown must not use old clipped y coordinate');
+  assertContains(errors, androidPreviewGenerator, ".resize(dims.width, dims.height, { fit: 'fill' })", 'Android picker thumbnail normalization');
+  assertContains(errors, androidProviderGenerator, 'targetCellWidth', 'Android launcher provider target cell width');
+  assertContains(errors, androidProviderGenerator, 'targetCellHeight', 'Android launcher provider target cell height');
+  if (androidPreviewGenerator.includes('<rect x="126" y="100"')) {
+    fail(errors, 'Android prayerTable large picker overlay still uses a visible mask rectangle');
+  }
+  assertRegionHasInk(
+    errors,
+    resolve(ANDROID_PREVIEW_DIR, 'widget_preview_daydigital_small.png'),
+    { x: 25, y: 38, width: 105, height: 68 },
+    'Android dayDigital picker thumbnail',
+  );
+  assertRegionHasInk(
+    errors,
+    resolve(ANDROID_PREVIEW_DIR, 'widget_preview_prayertable_large.png'),
+    { x: 185, y: 305, width: 125, height: 34 },
+    'Android prayerTable large picker thumbnail bottom row',
+  );
+  assertRegionHasInk(
+    errors,
+    resolve(ANDROID_PREVIEW_DIR, 'widget_preview_prayertable_small.png'),
+    { x: 0, y: 0, width: 120, height: 50 },
+    'Android prayerTable small picker thumbnail countdown header',
+  );
+  assertContains(errors, androidSnapshot, 'prayerNextCountdownWithLabel', 'Android prayerTable large live countdown matches gallery label');
+  assertContains(errors, iosSwift, '.configurationDisplayName("الصلاة القادمة")', 'iOS next-prayer widget title');
+  assertContains(errors, iosSwift, '.supportedFamilies([.accessoryRectangular, .accessoryInline])', 'iOS lock next-prayer inline family');
+  assertContains(errors, iosSwift, 'if family == .accessoryInline', 'iOS lock next-prayer inline renderer');
+  assertContains(errors, iosSwift, 'sharedDataWithFreshPrayer(now:', 'iOS lock widgets refresh prayer calculation');
+  if (iosLegacyNextPrayer.includes('"12:15')) {
+    fail(errors, 'iOS legacy next-prayer widget: hard-coded 12:15 fallback is still present');
+  }
+  if (iosLegacyNextPrayer.includes('.configurationDisplayName("مواقيت الصلاة")')) {
+    fail(errors, 'iOS legacy next-prayer widget: picker title must be الصلاة القادمة');
+  }
   assertContains(errors, appLayout, "AsyncStorage.setItem(APP_OPENED_ONCE_KEY, 'true')", 'App opened marker');
 
   if (errors.length > 0) {

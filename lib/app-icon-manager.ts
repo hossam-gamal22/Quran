@@ -607,8 +607,20 @@ export async function checkForIconUpdate(): Promise<void> {
       : null;
     const targetIcon = resolveActiveIcon(data, seasonalType, lang);
 
+    // Detect whether this version bump actually changes the visible icon BEFORE
+    // applying it. If the resolved icon is already active (e.g. an Arabic user
+    // with no active season stays on the default icon), showing an "icon updated"
+    // alert is misleading — the icon did not change. In that case we silently
+    // record the new version and skip the announcement.
+    const iconAlreadyActive = await isIconAlreadyActive(targetIcon);
+
     // Always trigger the switch — setSeasonalIcon will no-op if already active.
     await setSeasonalIcon(targetIcon);
+
+    if (iconAlreadyActive) {
+      await AsyncStorage.setItem(ICON_VERSION_KEY, String(data.version));
+      return;
+    }
 
     const usesSeasonalIcon = targetIcon !== 'default_ar' && targetIcon !== 'default_en';
     const seasonalTitle = usesSeasonalIcon

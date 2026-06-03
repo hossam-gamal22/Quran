@@ -21,11 +21,12 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
+import { Asset } from 'expo-asset';
 import { useRouter, Stack } from 'expo-router';
 import { fetchTafsir, getDefaultTranslationForLanguage } from '@/lib/quran-api';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
-import { getDailyAyahOverride } from '@/lib/daily-content-override';
+import { resolveDailyVerse, resolveDailyVerseSync, withFullArabic } from '@/lib/seasonal-ayah';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { localizeNumber } from '@/lib/format-number';
@@ -129,18 +130,33 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
   const { Image: RNImage } = require('react-native');
   const { logoSource } = useAppIdentity();
   const isSolidBg = isSolidColor(bgUrl);
-  const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
+
+  // Preload the bundled background so the very first paint isn't a black flash
+  // while the (up to ~1MB) PNG decodes.
+  const [bgReady, setBgReady] = useState(isSolidBg);
+  useEffect(() => {
+    if (isSolidBg) { setBgReady(true); return; }
+    let cancelled = false;
+    Asset.fromModule(bgUrl as number)
+      .downloadAsync()
+      .then(() => { if (!cancelled) setBgReady(true); })
+      .catch(() => { if (!cancelled) setBgReady(true); });
+    return () => { cancelled = true; };
+  }, [bgUrl, isSolidBg]);
 
   return (
     <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}>
-      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: isSolidBg ? (bgUrl as string) : '#000' }}>
+      {/* Deep-teal placeholder instead of pure black while the image decodes */}
+      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: isSolidBg ? (bgUrl as string) : '#0d2620' }}>
         {/* Background image with subtle blur for elegant readability */}
         {!isSolidBg && (
           <RNImage
             source={resolveImageSource(bgUrl)}
-            style={{ width: '100%', height: '100%', position: 'absolute' }}
+            style={{ width: '100%', height: '100%', position: 'absolute', opacity: bgReady ? 1 : 0 }}
             resizeMode="cover"
-            blurRadius={Platform.OS === 'ios' ? 2 : 1.5}
+            blurRadius={Platform.OS === 'ios' ? 2 : 0}
+            fadeDuration={300}
+            onLoad={() => setBgReady(true)}
           />
         )}
         {/* Color overlay */}
@@ -203,29 +219,27 @@ export default function DailyAyahVideoScreen() {
   const startOfYear = new Date(today.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
 
-  const ayahIdx = dayOfYear % DAILY_AYAHS.length;
   // Nature category (index 2) as default
   const natureCat = BG_CATEGORIES.find(c => c.id === 'nature') || BG_CATEGORIES[2];
-  const [selectedCat, setSelectedCat] = useState(natureCat);
-  const [selectedBgIdx, setSelectedBgIdx] = useState(dayOfYear % natureCat.images.length);
+  const [selectedCat] = useState(natureCat);
+  const [selectedBgIdx] = useState(dayOfYear % natureCat.images.length);
   // Always use dark overlay — no green/colored tints
   const selectedCardStyle = CARD_STYLES[0];
-  // Full-page background image (blurred nature)
-  const pageBgUrl = natureCat.images[dayOfYear % natureCat.images.length];
   const [showTranslation, setShowTranslation] = useState(!isArabic);
   const isEnglish = language === 'en';
   const [showTafsir, setShowTafsir] = useState(false);
   const [tafsirText, setTafsirText] = useState<string | null>(null);
   const [tafsirLoading, setTafsirLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [bgLoaded, setBgLoaded] = useState(false);
   const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
   const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
-  const [overrideAyah, setOverrideAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
+  // Verse of the day — resolved through the shared picker so the screen always
+  // matches widgets/notifications. Seed synchronously to avoid a fragment flash.
+  const [resolvedAyah, setResolvedAyah] = useState<typeof DAILY_AYAHS[0]>(() => resolveDailyVerseSync());
   const [randomAyah, setRandomAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
 
-  const currentAyah = randomAyah || overrideAyah || DAILY_AYAHS[ayahIdx];
+  const currentAyah = randomAyah || resolvedAyah;
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
@@ -242,19 +256,15 @@ export default function DailyAyahVideoScreen() {
     }),
   );
 
-  // Check for admin override
+  // Resolve the verse of the day through the shared picker (override →
+  // seasonal → verse-pool → rolling fallback) so it stays in sync with the
+  // widgets and notifications.
   useEffect(() => {
-    getDailyAyahOverride().then(({ data }) => {
-      if (data) {
-        setOverrideAyah({
-          arabic: data.text,
-          ref: data.surahName || '',
-          trans: '',
-          surah: data.surah,
-          ayah: data.ayah,
-        });
-      }
-    });
+    let cancelled = false;
+    resolveDailyVerse()
+      .then(({ ayah }) => { if (!cancelled) setResolvedAyah(ayah); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
   const currentBg = selectedCat.images[selectedBgIdx];
 
@@ -345,13 +355,13 @@ export default function DailyAyahVideoScreen() {
     );
     const randomPoolSize = currentIndex >= 0 ? DAILY_AYAHS.length - 1 : DAILY_AYAHS.length;
     if (randomPoolSize <= 0) {
-      setRandomAyah(DAILY_AYAHS[0]);
+      setRandomAyah(withFullArabic(DAILY_AYAHS[0]));
       return;
     }
 
     let nextIndex = Math.floor(Math.random() * randomPoolSize);
     if (currentIndex >= 0 && nextIndex >= currentIndex) nextIndex += 1;
-    setRandomAyah(DAILY_AYAHS[nextIndex]);
+    setRandomAyah(withFullArabic(DAILY_AYAHS[nextIndex]));
   }, [currentAyah.ayah, currentAyah.surah]);
 
   const handleSaveImage = useCallback(async () => {

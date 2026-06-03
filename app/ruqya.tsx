@@ -674,43 +674,38 @@ function QuranSlideBody({ slide, textColor, darkMode, fontsReady }: QuranSlideBo
 
   return (
     <View style={qcfStyles.container}>
-      {!slide.showBanner && (
-        <Text style={[qcfStyles.slideLabel, { color: ornamentColor }]} allowFontScaling={false}>
-          {slide.labelAr}
-        </Text>
-      )}
-
       {groups.map((group, idx) => {
         const fontFamily = getPageFontFamily(group.page, darkMode);
         const qcfLoaded = renderReady && Font.isLoaded(fontFamily);
         const fontSize = getQcfFontSize(group.page, SCREEN_WIDTH - 64);
         const lineHeight = fontSize * 1.95;
+        // Real surahs show their Mushaf name; partial slides (e.g. آية الكرسي)
+        // show their custom label inside the same ornamental frame.
+        const bannerLabel = slide.showBanner ? getSurahName(group.surah) : slide.labelAr;
 
         return (
           <View
             key={`${slide.id}-${group.surah}-${idx}`}
             style={groups.length > 1 ? qcfStyles.surahBlock : undefined}
           >
-            {slide.showBanner && (
-              <View style={qcfStyles.bannerWrap}>
-                <ImageBackground
-                  source={surahOrnament}
-                  style={qcfStyles.bannerOrnament}
-                  resizeMode="contain"
-                  tintColor={ornamentColor}
-                >
-                  <View style={qcfStyles.bannerOverlay}>
-                    <Text
-                      style={[qcfStyles.bannerText, { color: ornamentColor }]}
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                    >
-                      {getSurahName(group.surah)}
-                    </Text>
-                  </View>
-                </ImageBackground>
-              </View>
-            )}
+            <View style={qcfStyles.bannerWrap}>
+              <ImageBackground
+                source={surahOrnament}
+                style={qcfStyles.bannerOrnament}
+                resizeMode="contain"
+                tintColor={ornamentColor}
+              >
+                <View style={qcfStyles.bannerOverlay}>
+                  <Text
+                    style={[qcfStyles.bannerText, { color: ornamentColor }]}
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                  >
+                    {bannerLabel}
+                  </Text>
+                </View>
+              </ImageBackground>
+            </View>
 
             {qcfLoaded ? (
               <Text
@@ -932,12 +927,12 @@ const qcfStyles = StyleSheet.create({
   },
   bannerWrap: {
     marginBottom: 6,
-    height: 48,
+    height: 54,
     width: '100%',
   },
   bannerOrnament: {
     width: '100%',
-    height: 46,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -946,21 +941,16 @@ const qcfStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    height: 46,
+    height: 50,
   },
+  // Surah name over the ornament — identical to the Mushaf reader's SurahBanner
   bannerText: {
     fontSize: 17,
     fontFamily: 'Amiri-Bold',
     textAlign: 'center',
     lineHeight: 28,
+    width: '100%',
     includeFontPadding: false,
-  },
-  slideLabel: {
-    fontSize: 18,
-    fontFamily: 'Amiri-Bold',
-    textAlign: 'center',
-    marginBottom: 12,
-    writingDirection: 'rtl',
   },
   surahBlock: {
     alignItems: 'center',

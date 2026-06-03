@@ -41,6 +41,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { getLanguage, getTranslations, t } from '@/lib/i18n';
 import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
+import { AppModal } from '@/components/ui/AppModal';
 import { copyToClipboard } from '../../lib/clipboard';
 import { APP_CONFIG } from '../../constants/app';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
@@ -1829,37 +1830,31 @@ export default function TasbihScreen() {
       </Modal>
 
       {/* ===== SETTINGS MODAL ===== */}
-      <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
-        <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { height: 'auto', backgroundColor: colors.modalSurface, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-            <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[s.modalTitle, { color: C.text }]}>{t('common.settings')}</Text>
-              <TouchableOpacity onPress={() => { saveSettings(); setShowSettings(false); }} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
-                <MaterialCommunityIcons name="close" size={18} color={C.text} />
-              </TouchableOpacity>
-            </View>
-            <GlassToggle label={t('tasbih.vibration')} icon="cellphone" enabled={vibrationEnabled} onToggle={setVibrationEnabled} />
-            <GlassToggle label={t('tasbih.showVirtue')} icon="star-outline" enabled={showVirtue} onToggle={setShowVirtue} />
-            <GlassToggle label={t('tasbih.autoAdvance')} icon="arrow-right-circle-outline" enabled={autoAdvance} onToggle={setAutoAdvance} subtitle={t('tasbih.autoAdvanceDesc')} />
-            <GlassToggle label={isArabic ? t('tasbih.showTranslation') : t('tasbih.showArabicOriginal')} icon="translate" enabled={showTranslation} onToggle={setShowTranslation} />
-            <TouchableOpacity style={[s.saveBtn, { backgroundColor: '#EF4444', marginTop: 20 }]} onPress={() => { handleResetAll(); setShowSettings(false); }}>
-              <Text style={s.saveBtnText}>{t('tasbih.resetAll')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <AppModal
+        visible={showSettings}
+        onClose={() => { saveSettings(); setShowSettings(false); }}
+        title={t('common.settings')}
+        position="center"
+      >
+        <GlassToggle label={t('tasbih.vibration')} icon="cellphone" enabled={vibrationEnabled} onToggle={setVibrationEnabled} />
+        <GlassToggle label={t('tasbih.showVirtue')} icon="star-outline" enabled={showVirtue} onToggle={setShowVirtue} />
+        <GlassToggle label={t('tasbih.autoAdvance')} icon="arrow-right-circle-outline" enabled={autoAdvance} onToggle={setAutoAdvance} subtitle={t('tasbih.autoAdvanceDesc')} />
+        <GlassToggle label={isArabic ? t('tasbih.showTranslation') : t('tasbih.showArabicOriginal')} icon="translate" enabled={showTranslation} onToggle={setShowTranslation} />
+        <TouchableOpacity style={[s.saveBtn, { backgroundColor: '#EF4444', marginTop: 12 }]} onPress={() => { handleResetAll(); setShowSettings(false); }}>
+          <Text style={s.saveBtnText}>{t('tasbih.resetAll')}</Text>
+        </TouchableOpacity>
+      </AppModal>
 
       {/* ===== STATS MODAL ===== */}
-      <Modal visible={showStatsModal} animationType="slide" transparent onRequestClose={() => setShowStatsModal(false)}>
-        <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { backgroundColor: colors.modalSurface, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-            <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.myStats')}</Text>
-              <TouchableOpacity onPress={() => setShowStatsModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
-                <MaterialCommunityIcons name="close" size={18} color={C.text} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <AppModal
+        visible={showStatsModal}
+        onClose={() => setShowStatsModal(false)}
+        title={t('tasbih.myStats')}
+        position="center"
+        scroll
+        sheetStyle={{ maxHeight: '85%' }}
+      >
+        <View>
               {/* Summary cards */}
               <View style={s.statsGrid}>
                 <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' }]}>
@@ -1923,10 +1918,8 @@ export default function TasbihScreen() {
                 );
               })}
               <View style={{ height: 20 }} />
-            </ScrollView>
-          </View>
         </View>
-      </Modal>
+      </AppModal>
     </BackgroundWrapper>
   );
 }

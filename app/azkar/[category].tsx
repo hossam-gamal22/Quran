@@ -2344,7 +2344,7 @@ export default function CategoryAzkarScreen() {
       {categoryLocked && (
         <Modal visible={categoryLocked} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
+            <View style={[styles.modalContent, { backgroundColor: darkMode ? '#0f1a14' : '#FFFFFF' }]}>
               <MaterialCommunityIcons name="check-decagram" size={46} color={categoryInfo?.color || '#10B981'} />
               <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
                 {isArabic ? 'قرأت أذكار اليوم' : 'Today\'s adhkar are done'}
@@ -2384,7 +2384,7 @@ export default function CategoryAzkarScreen() {
         onRequestClose={() => setShowAddModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF', width: '100%' }]}>
+          <View style={[styles.modalContent, { backgroundColor: darkMode ? '#0f1a14' : '#FFFFFF', width: '100%' }]}>
             <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', marginBottom: 20 }]}>
               {t('azkar.addCustomDhikr')}
             </Text>

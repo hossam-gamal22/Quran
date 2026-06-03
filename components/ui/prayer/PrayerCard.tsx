@@ -43,6 +43,7 @@ interface PrayerCardProps {
   language?: string;
   isDarkMode?: boolean;
   show24Hour?: boolean;
+  timezone?: string;
 }
 
 export const PrayerCard: React.FC<PrayerCardProps> = ({
@@ -52,6 +53,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
   language = 'ar',
   isDarkMode = false,
   show24Hour = false,
+  timezone,
 }) => {
   const { t } = useSettings();
   const isRTL = useIsRTL();
@@ -94,16 +96,16 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
     if (!prayerTimes) return;
 
     const updateCountdown = () => {
-      const next = getNextPrayer(prayerTimes);
+      const next = getNextPrayer(prayerTimes, { timezone });
       setNextPrayer(next);
-      const remaining = getTimeRemaining(prayerTimes);
+      const remaining = getTimeRemaining(prayerTimes, { timezone });
       setTimeRemaining(remaining);
     };
 
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimes]);
+  }, [prayerTimes, timezone]);
 
   const pulseAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],

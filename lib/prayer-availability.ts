@@ -4,6 +4,7 @@
 // what status is appropriate, and when should it auto-flip to "missed".
 
 import type { DailyPrayerRecord, PrayerName, PrayerStatus } from '@/lib/worship-storage';
+import { partsInTimeZone } from './widget-timezone';
 
 export type TrackedPrayer = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 
@@ -59,7 +60,11 @@ export const parseTimeToMinutes = (timeValue?: string | null): number | null => 
   return null;
 };
 
-const nowMinutesFromDate = (now: Date): number => now.getHours() * 60 + now.getMinutes();
+const nowMinutesFromDate = (now: Date, timezone?: string): number => {
+  if (!timezone) return now.getHours() * 60 + now.getMinutes();
+  const parts = partsInTimeZone(now, timezone);
+  return parts.hour * 60 + parts.minute;
+};
 
 /**
  * Compute the smart window state for a given prayer using today's prayer times
@@ -69,9 +74,10 @@ const nowMinutesFromDate = (now: Date): number => now.getHours() * 60 + now.getM
 export const getPrayerWindowState = (
   prayer: TrackedPrayer,
   prayerTimes: PrayerTimesMap,
-  now: Date = new Date()
+  now: Date = new Date(),
+  timezone?: string,
 ): PrayerWindowState => {
-  const nowMin = nowMinutesFromDate(now);
+  const nowMin = nowMinutesFromDate(now, timezone);
   const fajrMin = parseTimeToMinutes(prayerTimes.fajr);
   const prayerMin = parseTimeToMinutes(prayerTimes[prayer]);
 

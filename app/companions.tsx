@@ -37,13 +37,8 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { SourcesList } from '@/components/ui/SourcesList';
 import { getCompanionSources } from '@/data/companions-extra';
 import { NativeTabs } from '@/components/ui/NativeTabs';
-import { showAdThenExport } from '@/lib/pdf-export';
-import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
-import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
-import type { IslamicPdfSection } from '@/lib/pdf/islamicPdfTemplate';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { useCompanionsContent } from '@/lib/content-api';
 import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
@@ -1211,13 +1206,6 @@ function getCompanionAudioTitle(companion: Companion): string {
   return getCompanionName(companion);
 }
 
-function splitStoryParagraphs(text: string): string[] {
-  return text
-    .split(/\n{2,}/)
-    .map(part => part.trim())
-    .filter(Boolean);
-}
-
 function getCompanionTranscript(companion: Companion): string {
   const lang = getLanguage();
   if (lang === 'ar') {
@@ -1228,116 +1216,6 @@ function getCompanionTranscript(companion: Companion): string {
   const transcript = companion.transcriptEn?.trim() || '';
   const storyText = companion.storyEn.join('\n\n').trim();
   return transcript.length >= storyText.length ? transcript : storyText;
-}
-
-function getCompanionStoryParagraphs(companion: Companion): string[] {
-  const transcript = getCompanionTranscript(companion);
-  const paragraphs = splitStoryParagraphs(transcript);
-  if (paragraphs.length) return paragraphs;
-  return getLanguage() === 'ar' ? companion.story : companion.storyEn;
-}
-
-const COMPANION_PDF_CHARS_PER_LINE = 50;
-const COMPANION_PDF_FIRST_PAGE_LINES = 15;
-const COMPANION_PDF_CONTINUATION_LINES = 15;
-
-function estimateCompanionPdfLines(paragraph: string): number {
-  return Math.max(1, Math.ceil(Array.from(paragraph).length / COMPANION_PDF_CHARS_PER_LINE));
-}
-
-function splitCompanionPdfParagraph(paragraph: string, maxLines: number): string[] {
-  const maxChars = COMPANION_PDF_CHARS_PER_LINE * maxLines;
-  if (Array.from(paragraph).length <= maxChars) return [paragraph];
-
-  const parts: string[] = [];
-  let remaining = paragraph.trim();
-  while (Array.from(remaining).length > maxChars) {
-    const chars = Array.from(remaining);
-    const windowText = chars.slice(0, maxChars).join('');
-    const punctuationCut = Math.max(
-      windowText.lastIndexOf('،'),
-      windowText.lastIndexOf('؛'),
-      windowText.lastIndexOf('.'),
-      windowText.lastIndexOf('؟'),
-      windowText.lastIndexOf('!'),
-    );
-    const spaceCut = windowText.lastIndexOf(' ');
-    const cutIndex = punctuationCut > maxChars * 0.55
-      ? punctuationCut + 1
-      : Math.max(spaceCut, Math.floor(maxChars * 0.75));
-    parts.push(chars.slice(0, cutIndex).join('').trim());
-    remaining = chars.slice(cutIndex).join('').trim();
-  }
-  if (remaining) parts.push(remaining);
-  return parts;
-}
-
-function buildCompanionPdfStorySections(story: string[], storyTitle: string): IslamicPdfSection[] {
-  const sections: IslamicPdfSection[] = [];
-  let currentBody: string[] = [];
-  let currentLines = 0;
-
-  const flush = () => {
-    if (!currentBody.length) return;
-    sections.push({
-      title: sections.length === 0 ? storyTitle : undefined,
-      body: currentBody,
-      continuation: sections.length > 0,
-      keepTogether: true,
-      largeText: true,
-    });
-    currentBody = [];
-    currentLines = 0;
-  };
-
-  const pushParagraph = (paragraph: string) => {
-    let remaining = paragraph.trim();
-    while (remaining) {
-      const limit = sections.length === 0 ? COMPANION_PDF_FIRST_PAGE_LINES : COMPANION_PDF_CONTINUATION_LINES;
-      const availableLines = limit - currentLines;
-
-      if (availableLines <= 0) {
-        flush();
-        continue;
-      }
-
-      const remainingLines = estimateCompanionPdfLines(remaining);
-      if (remainingLines <= availableLines) {
-        currentBody.push(remaining);
-        currentLines += remainingLines;
-        remaining = '';
-        continue;
-      }
-
-      if (currentBody.length && availableLines >= 1) {
-        const [head, ...tail] = splitCompanionPdfParagraph(remaining, availableLines);
-        if (head) {
-          currentBody.push(head);
-          currentLines += estimateCompanionPdfLines(head);
-          remaining = tail.join(' ').trim();
-          flush();
-          continue;
-        }
-      }
-
-      if (currentBody.length) {
-        flush();
-        continue;
-      }
-
-      const [head, ...tail] = splitCompanionPdfParagraph(remaining, limit);
-      if (!head) break;
-      currentBody.push(head);
-      currentLines += estimateCompanionPdfLines(head);
-      remaining = tail.join(' ').trim();
-      flush();
-    }
-  };
-
-  story.forEach(pushParagraph);
-
-  flush();
-  return sections.length ? sections : [{ title: storyTitle, body: story, keepTogether: true, largeText: true }];
 }
 
 function getListenCopy() {
@@ -1511,14 +1389,13 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
 interface StoryListeningProps {
   companion: Companion;
   onBack: () => void;
-  onShare?: () => void;
   onToggleFav?: () => void;
   isFav?: boolean;
   isDarkMode: boolean;
   colors: ReturnType<typeof useColors>;
 }
 
-function StoryListening({ companion, onBack, onShare, onToggleFav, isFav = false, isDarkMode, colors }: StoryListeningProps) {
+function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkMode, colors }: StoryListeningProps) {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_s, colors.fs);
   const copy = getListenCopy();
@@ -1916,8 +1793,6 @@ function StoryListening({ companion, onBack, onShare, onToggleFav, isFav = false
           />
         </View>
 
-        <InlineMrecAd screen="companions" darkMode={isDarkMode} />
-
         <View style={s.detailSectionOuter}>
           <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
@@ -1926,7 +1801,6 @@ function StoryListening({ companion, onBack, onShare, onToggleFav, isFav = false
             <Text style={[s.detailSectionTitle, { flex: 1, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {copy.transcript}
             </Text>
-            {onShare && <PdfShareButton onPress={onShare} />}
           </View>
           <View style={s.transcriptOuter}>
             <BlurView
@@ -2002,8 +1876,6 @@ function StoryListening({ companion, onBack, onShare, onToggleFav, isFav = false
         </View>
 
         <SourcesList sources={getCompanionSources((companion as { id?: string }).id)} />
-
-        <InlineMrecAd screen="companions" darkMode={isDarkMode} />
       </ScrollView>
 
       <AudioStatusModal
@@ -2032,7 +1904,6 @@ export default function CompanionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanion, setSelectedCompanion] = useState<Companion | null>(null);
   const [companionFav, setCompanionFav] = useState(false);
-  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const { id: companionIdParam } = useLocalSearchParams<{ id?: string }>();
@@ -2086,30 +1957,6 @@ export default function CompanionsScreen() {
     setSelectedCompanion(null);
   }, []);
 
-  const handleShare = useCallback(async () => {
-    if (!selectedCompanion) return;
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const lang = getLanguage();
-      const brief = lang === 'ar' ? selectedCompanion.brief : selectedCompanion.briefEn;
-      const story = getCompanionStoryParagraphs(selectedCompanion);
-      const virtues = lang === 'ar' ? selectedCompanion.virtues : selectedCompanion.virtuesEn;
-      const storySections = buildCompanionPdfStorySections(story, t('companions.story'));
-      await showAdThenExport(() => shareIslamicPdf({
-        title: getCompanionName(selectedCompanion),
-        subtitle: lang === 'ar' ? undefined : selectedCompanion.nameAr,
-        shortDescription: brief,
-        category: t('companions.title'),
-        footerTitle: 'رُوح المسلم',
-        sections: storySections,
-        virtues,
-      }));
-    } catch (pdfError) {
-      setPdfErrorVisible(true);
-      console.log('Companion PDF sharing failed', pdfError);
-    }
-  }, [selectedCompanion, t]);
-
   const handleToggleFav = useCallback(async () => {
     if (!selectedCompanion) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2131,19 +1978,10 @@ export default function CompanionsScreen() {
         <StoryListening
           companion={selectedCompanion}
           onBack={handleBack}
-          onShare={handleShare}
           onToggleFav={handleToggleFav}
           isFav={companionFav}
           isDarkMode={isDarkMode}
           colors={colors}
-        />
-        <PdfShareErrorModal
-          visible={pdfErrorVisible}
-          onRetry={() => {
-            setPdfErrorVisible(false);
-            handleShare();
-          }}
-          onClose={() => setPdfErrorVisible(false)}
         />
       </ScreenContainer>
     );

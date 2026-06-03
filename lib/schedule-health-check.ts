@@ -16,6 +16,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getScheduledNotificationFireMs } from './notification-trigger-time';
 
 const HEALTH_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // كل 6 ساعات
 const LAST_HEALTH_CHECK_KEY = '@last_schedule_health_check';
@@ -113,7 +114,7 @@ export async function inspectScheduleHealth(): Promise<ScheduleHealthReport> {
   let expiredCount = 0;
   for (const s of scheduled) {
     const trig: any = s.trigger;
-    const dateMs = trig?.value ?? trig?.date ?? trig?.timestamp ?? null;
+    const dateMs = getScheduledNotificationFireMs(trig);
     if (typeof dateMs === 'number' && dateMs < now) expiredCount++;
   }
 

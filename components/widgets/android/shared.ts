@@ -157,6 +157,23 @@ export function applyNumerals(
   return arFallback ? toArabicIndic(value) : String(value);
 }
 
+export function usesArabicNumerals(
+  pref: 'auto' | 'arabic' | 'western' | undefined,
+  arFallback: boolean,
+): boolean {
+  if (pref === 'arabic') return true;
+  if (pref === 'western') return false;
+  return arFallback;
+}
+
+export function watermarkFontFor(
+  pref: 'auto' | 'arabic' | 'western' | undefined,
+  arFallback: boolean,
+  calligraphyFont: string,
+): string {
+  return usesArabicNumerals(pref, arFallback) ? calligraphyFont : FONT.rubikBold;
+}
+
 // ========================================
 // Language resolver — pulls explicit preference, else falls back to the data lang.
 // ========================================

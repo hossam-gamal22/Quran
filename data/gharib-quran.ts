@@ -145,18 +145,19 @@ export function normalizeForSearch(text: string): string {
  * كلمة اليوم الغريبة — اختيار حتميّ بناءً على يوم السنة،
  * فتظهر نفس الكلمة طوال اليوم وتتغيّر كل يوم. (أساس جاهز للإشعار اليومي لاحقًا)
  */
-export function getGharibWordOfTheDay(date: Date = new Date()): GharibWord {
+export function getGharibWordOfTheDay(date: Date = new Date(), words: GharibWord[] = GHARIB_WORDS): GharibWord {
+  const list = words.length ? words : GHARIB_WORDS;
   const start = new Date(date.getFullYear(), 0, 0);
   const diff = date.getTime() - start.getTime();
   const dayOfYear = Math.floor(diff / 86_400_000);
-  return GHARIB_WORDS[dayOfYear % GHARIB_WORDS.length];
+  return list[dayOfYear % list.length];
 }
 
 /** البحث في الكلمات الغريبة بالكلمة أو بجزء من المعنى (مع تطبيع عربي) */
-export function searchGharib(query: string): GharibWord[] {
+export function searchGharib(query: string, words: GharibWord[] = GHARIB_WORDS): GharibWord[] {
   const q = normalizeForSearch(query);
-  if (!q) return GHARIB_WORDS;
-  return GHARIB_WORDS.filter(
+  if (!q) return words;
+  return words.filter(
     (w) =>
       normalizeForSearch(w.word).includes(q) ||
       normalizeForSearch(w.meaning).includes(q) ||
@@ -168,6 +169,42 @@ export interface GharibSurahGroup {
   surah: number;
   surahName: string;
   words: GharibWord[];
+}
+
+/**
+ * بناء فهرس سريع للبحث عن معنى كلمة بموضعها في المصحف.
+ * المفتاح: `${surah}:${ayah}:${normalizedToken}`. القيمة: الإدخال كاملًا.
+ * الإدخالات متعددة الكلمات (مثل «المنّ والسلوى») تُفهرس بكل كلمة فيها،
+ * فأي كلمة منها تفتح معنى العبارة كاملة. (يُبنى مرة واحدة ويُخزَّن)
+ */
+let _gharibLookup: Map<string, GharibWord> | null = null;
+let _gharibLookupSource: GharibWord[] = GHARIB_WORDS;
+
+/** إعادة بناء الفهرس من قائمة معيّنة (مثلًا بعد دمج الكلمات البعيدة من Firestore) */
+export function setGharibLookupSource(words: GharibWord[]): void {
+  _gharibLookupSource = words.length ? words : GHARIB_WORDS;
+  _gharibLookup = null; // يُعاد بناؤه عند الطلب التالي
+}
+
+export function getGharibWordLookup(): Map<string, GharibWord> {
+  if (_gharibLookup) return _gharibLookup;
+  const map = new Map<string, GharibWord>();
+  for (const entry of _gharibLookupSource) {
+    const tokens = normalizeForSearch(entry.word).split(' ').filter(Boolean);
+    for (const tok of tokens) {
+      const key = `${entry.surah}:${entry.ayah}:${tok}`;
+      if (!map.has(key)) map.set(key, entry);
+    }
+  }
+  _gharibLookup = map;
+  return map;
+}
+
+/** إرجاع الإدخال الغريب المطابق لكلمة بموضعها، أو null إن لم يوجد */
+export function lookupGharibWord(surah: number, ayah: number, word: string): GharibWord | null {
+  const tok = normalizeForSearch(word);
+  if (!tok) return null;
+  return getGharibWordLookup().get(`${surah}:${ayah}:${tok}`) ?? null;
 }
 
 /** تجميع الكلمات حسب السورة مرتّبةً بترتيب المصحف */

@@ -30,6 +30,7 @@ import Animated, {
 import { useQuran } from '../../contexts/QuranContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { AppModal } from '@/components/ui/AppModal';
 import { useAppConfig } from '@/lib/app-config-context';
 import { useColors } from '../../hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -1244,37 +1245,15 @@ export default function QuranScreen() {
         </Modal>
 
         {/* نافذة إعدادات القرآن */}
-        <Modal
+        <AppModal
           visible={showSettings}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowSettings(false)}
+          onClose={() => setShowSettings(false)}
+          title={t('quran.quranSettings')}
+          position="center"
+          scroll
+          sheetStyle={{ maxHeight: '85%' }}
         >
-          <View style={styles.settingsOverlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={() => setShowSettings(false)}
-            />
-            <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', height: Dimensions.get('window').height * 0.7 }}>
-              <BlurView
-                intensity={Platform.OS === 'ios' ? 80 : 40}
-                tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: androidSheetSurface ?? (isLightBg ? 'rgba(255,255,255,0.97)' : '#0f1a14'), borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)' }]} />
-              <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: Spacing.xl + 20 }}>
-              <View style={[styles.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <Text style={[styles.settingsTitle, { color: colors.text }]}>{t('quran.quranSettings')}</Text>
-                <TouchableOpacity
-                  onPress={() => setShowSettings(false)}
-                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isLightBg ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.24)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
+              <View>
                 {/* ─── 1. إعدادات الخط (Font Settings) ─── */}
                 <View style={{ marginBottom: 16 }}>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
@@ -1481,11 +1460,8 @@ export default function QuranScreen() {
                     }}
                   />
                 </View>
-              </ScrollView>
               </View>
-            </View>
-          </View>
-        </Modal>
+        </AppModal>
       </SafeAreaView>
     </View>
     </BackgroundWrapper>

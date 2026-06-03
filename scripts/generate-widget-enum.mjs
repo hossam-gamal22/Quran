@@ -145,7 +145,7 @@ function fallbackEnglishLabel(def, size) {
     monthThuluth: 'Month Thuluth',
     prayerSingle: 'Next Prayer',
     prayerTable: 'Prayer Table',
-    prayerNextPrevious: 'Previous & Next Prayer',
+    prayerNextPrevious: 'الصلاة السابقة والقادمة',
     verseOfDay: 'Verse of the Day',
     azkarMorning: 'Morning Azkar',
     azkarEvening: 'Evening Azkar',

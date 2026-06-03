@@ -138,3 +138,102 @@ export function getFallbackDailyAyahForDate(date: Date = new Date()): DailyAyah 
   const dayOfYear = Math.floor((current - start) / 86400000);
   return DAILY_AYAHS[((dayOfYear % DAILY_AYAHS.length) + DAILY_AYAHS.length) % DAILY_AYAHS.length];
 }
+
+/**
+ * Ensure the verse carries the COMPLETE Uthmani text. Several sources
+ * (`DAILY_AYAHS`, admin overrides) only store a short fragment of the verse,
+ * which renders incompletely whenever the per-page QCF font fails to load
+ * (notably on Android). Whenever surah/ayah are known we replace the fragment
+ * with the full verse pulled from the bundled `quran-uthmani.json`.
+ */
+export function withFullArabic(base: DailyAyah): DailyAyah {
+  if (base.surah > 0 && base.ayah > 0) {
+    const full = getAyahFromBundledQuran({ surah: base.surah, ayah: base.ayah });
+    if (full?.arabic) {
+      return {
+        ...base,
+        arabic: full.arabic,
+        trans: base.trans || full.trans,
+        ref: base.ref || full.ref,
+      };
+    }
+  }
+  return base;
+}
+
+export interface ResolvedDailyVerse {
+  ayah: DailyAyah;
+  isOverride: boolean;
+}
+
+/**
+ * Synchronous best-guess for the verse of the day — used for the first paint
+ * so the screen never flashes a short fragment or an empty card. Mirrors the
+ * non-async tail of {@link resolveDailyVerse} (seasonal → rolling pool).
+ */
+export function resolveDailyVerseSync(date: Date = new Date()): DailyAyah {
+  try {
+    const seasonal = getSeasonalAyahForDate(date);
+    if (seasonal) return withFullArabic(seasonal);
+  } catch {}
+  return withFullArabic(getFallbackDailyAyahForDate(date));
+}
+
+/**
+ * Single source of truth for "Verse of the Day" across the in-app screen,
+ * widgets and notifications. Selection order (must stay identical everywhere):
+ *   1. Admin override (Firestore `dailyContent/ayah`)
+ *   2. Seasonal verse (Ramadan, Dhul Hijjah, Hajj, Eid, …)
+ *   3. Rotating verse pool
+ *   4. Rolling `DAILY_AYAHS` fallback
+ * The result always carries the complete Uthmani text.
+ */
+export async function resolveDailyVerse(date: Date = new Date()): Promise<ResolvedDailyVerse> {
+  // 1. Admin override (required lazily to avoid a load-time Firebase cycle)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getDailyAyahOverride } = require('@/lib/daily-content-override');
+    const ov = await getDailyAyahOverride();
+    if (ov?.data && typeof ov.data.text === 'string') {
+      const base: DailyAyah = {
+        arabic: ov.data.text,
+        ref: ov.data.surahName || '',
+        trans: '',
+        surah: Number(ov.data.surah) || 0,
+        ayah: Number(ov.data.ayah) || 0,
+      };
+      return { ayah: withFullArabic(base), isOverride: true };
+    }
+  } catch {}
+
+  // 2. Seasonal verse
+  try {
+    const seasonal = getSeasonalAyahForDate(date);
+    if (seasonal) return { ayah: withFullArabic(seasonal), isOverride: false };
+  } catch {}
+
+  // 3. Rotating verse pool
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ensureVersePool, daysSinceSeed } = require('@/lib/verse-pool');
+    const pool = await ensureVersePool();
+    if (pool?.entries?.length) {
+      const elapsed = Math.max(0, daysSinceSeed(pool));
+      const idx = ((elapsed % pool.entries.length) + pool.entries.length) % pool.entries.length;
+      const entry = pool.entries[idx];
+      if (entry) {
+        const base: DailyAyah = {
+          arabic: entry.arabic,
+          ref: `${entry.surahName} ${entry.ayahNumber}`,
+          trans: entry.translation || '',
+          surah: entry.surahNumber,
+          ayah: entry.ayahNumber,
+        };
+        return { ayah: withFullArabic(base), isOverride: false };
+      }
+    }
+  } catch {}
+
+  // 4. Rolling fallback
+  return { ayah: withFullArabic(getFallbackDailyAyahForDate(date)), isOverride: false };
+}

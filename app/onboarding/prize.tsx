@@ -83,7 +83,7 @@ export default function PrizeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" translucent />
-      <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
+      <View style={[styles.gradient, { backgroundColor: '#0f1a14' }]}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           {/* Header */}
           <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>

@@ -142,8 +142,8 @@
           "fontFamily": "Rubik-Medium",
           "align": "center",
           "color": "muted",
-          "clearWidth": 140,
-          "clearHeight": 14
+          "clearWidth": 118,
+          "clearHeight": 18
         }
       }
     }
@@ -173,32 +173,32 @@
       "anchors": {
         "small": {
           "x": 44,
-          "y": 24,
+          "y": 18,
           "fontSize": 9,
           "fontFamily": "Rubik-Medium",
           "align": "left",
           "color": "muted",
           "clearWidth": 82,
-          "clearHeight": 12
+          "clearHeight": 16
         },
         "medium": {
-          "x": 246,
-          "y": 130,
+          "x": 247,
+          "y": 128,
           "fontSize": 9,
           "fontFamily": "Rubik-Medium",
           "align": "center",
           "color": "muted",
           "clearWidth": 112,
-          "clearHeight": 12
+          "clearHeight": 16
         },
         "large": {
-          "x": 246,
-          "y": 126,
-          "fontSize": 12,
+          "x": 236,
+          "y": 106,
+          "fontSize": 10,
           "fontFamily": "Rubik-Medium",
           "align": "center",
           "color": "muted",
-          "clearWidth": 180,
+          "clearWidth": 190,
           "clearHeight": 18
         }
       }

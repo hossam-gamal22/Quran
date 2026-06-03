@@ -68,8 +68,8 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
 
   const animSize = ANIMATION_SIZES[type];
   
-  // Clear, high-contrast backgrounds
-  const cardBg = colors.isDarkMode ? '#1C1C1E' : '#FFFFFF';
+  // Clear, high-contrast backgrounds (match shared AppModal surface)
+  const cardBg = colors.isDarkMode ? '#0f1a14' : '#FFFFFF';
   const cardTextColor = colors.isDarkMode ? '#FFFFFF' : '#1C1C1E';
   const subtitleColor = colors.isDarkMode ? '#4ADE80' : '#0d8e62';
   const buttonBg = colors.isDarkMode ? '#22C55E' : '#0d8e62';

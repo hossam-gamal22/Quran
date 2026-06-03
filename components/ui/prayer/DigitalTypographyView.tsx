@@ -34,6 +34,7 @@ interface DigitalTypographyViewProps {
   language?: string;
   isDarkMode?: boolean;
   show24Hour?: boolean;
+  timezone?: string;
 }
 
 const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
@@ -41,6 +42,7 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   language = 'ar',
   isDarkMode = false,
   show24Hour = false,
+  timezone,
 }) => {
   const isRTL = useIsRTL();
   const { fs } = useColors();
@@ -71,13 +73,13 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   useEffect(() => {
     if (!prayerTimes) return;
     const update = () => {
-      setNextPrayer(getNextPrayer(prayerTimes));
-      setTimeRemaining(getTimeRemaining(prayerTimes));
+      setNextPrayer(getNextPrayer(prayerTimes, { timezone }));
+      setTimeRemaining(getTimeRemaining(prayerTimes, { timezone }));
     };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimes]);
+  }, [prayerTimes, timezone]);
 
   const colonStyle = useAnimatedStyle(() => ({
     opacity: colonOpacity.value,

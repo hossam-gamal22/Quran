@@ -50,6 +50,7 @@ interface PrayerListProps {
   showNotificationToggle?: boolean;
   showSunrise?: boolean;
   show24Hour?: boolean;
+  timezone?: string;
   prayerStatuses?: Record<string, PrayerStatus>;
   /**
    * Called when the user long-presses a prayer row. The host opens a modal with
@@ -100,6 +101,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   showNotificationToggle = false,
   showSunrise = true,
   show24Hour = false,
+  timezone,
   prayerStatuses,
   onPrayerLongPress,
 }) => {
@@ -128,7 +130,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
     );
   }
 
-  const nextPrayer = getNextPrayer(prayerTimes);
+  const nextPrayer = getNextPrayer(prayerTimes, { timezone });
   const prayers: { name: PrayerName; time: string }[] = [
     { name: 'fajr', time: prayerTimes.fajr },
     ...(showSunrise ? [{ name: 'sunrise' as PrayerName, time: prayerTimes.sunrise }] : []),
@@ -153,14 +155,14 @@ export const PrayerList: React.FC<PrayerListProps> = ({
               asr: prayerTimes.asr,
               maghrib: prayerTimes.maghrib,
               isha: prayerTimes.isha,
-            });
+            }, new Date(), timezone);
         return (
           <PrayerItem
             key={prayer.name}
             name={prayer.name}
             time={prayer.time}
             isNext={nextPrayer?.name === prayer.name}
-            isPassed={isPrayerPassed(prayer.time)}
+            isPassed={isPrayerPassed(prayer.time, { timezone })}
             isDarkMode={isDarkMode}
             notificationEnabled={notificationSettings[prayer.name]}
             onToggleNotification={

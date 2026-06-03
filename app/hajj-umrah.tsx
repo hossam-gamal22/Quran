@@ -11,6 +11,8 @@ import {
   Animated,
   LayoutAnimation,
   UIManager,
+  findNodeHandle,
+  type ScrollView,
 } from 'react-native';
 import { fontRegular } from '@/lib/fonts';
 import { ScreenContainer } from '@/components/screen-container';
@@ -630,6 +632,30 @@ const DUAS_BY_RITUAL: DuaRitualGroup[] = [
 
 
 // ========================================
+// التمرير التلقائي عند فتح القسم — يجلب القسم إلى أعلى الشاشة مباشرة
+// ========================================
+
+function useExpandAutoScroll(scrollRef?: React.RefObject<ScrollView | null>) {
+  const rootRef = useRef<View>(null);
+  const scrollIntoView = useCallback(() => {
+    const scrollNode = scrollRef?.current;
+    const root = rootRef.current;
+    if (!scrollNode || !root) return;
+    const handle = findNodeHandle(scrollNode);
+    if (handle == null) return;
+    // Measure after a frame so the freshly-expanded content is laid out.
+    requestAnimationFrame(() => {
+      root.measureLayout(
+        handle,
+        (_x, y) => scrollNode.scrollTo({ y: Math.max(0, y - 12), animated: true }),
+        () => {},
+      );
+    });
+  }, [scrollRef]);
+  return { rootRef, scrollIntoView };
+}
+
+// ========================================
 // مكون بطاقة أدعية المنسك (التبويب الثالث)
 // ========================================
 
@@ -638,13 +664,15 @@ const DuaRitualCard: React.FC<{
   isDarkMode: boolean;
   colors: ReturnType<typeof useColors>;
   initiallyExpanded?: boolean;
-}> = ({ group, isDarkMode, colors, initiallyExpanded = false }) => {
+  scrollRef?: React.RefObject<ScrollView | null>;
+}> = ({ group, isDarkMode, colors, initiallyExpanded = false, scrollRef }) => {
   const isRTL = useIsRTL();
   const s = useScaledStyles(_sharedS, colors.fs);
   const lang = getLanguage();
   const isArabic = lang === 'ar';
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const rotateAnim = useRef(new Animated.Value(initiallyExpanded ? 1 : 0)).current;
+  const { rootRef, scrollIntoView } = useExpandAutoScroll(scrollRef);
 
   const toggleExpand = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -655,8 +683,9 @@ const DuaRitualCard: React.FC<{
       stiffness: 240,
       useNativeDriver: true,
     }).start();
+    if (!expanded) scrollIntoView();
     setExpanded((prev) => !prev);
-  }, [expanded, rotateAnim]);
+  }, [expanded, rotateAnim, scrollIntoView]);
 
   const chevronRotation = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -664,7 +693,7 @@ const DuaRitualCard: React.FC<{
   });
 
   return (
-    <View style={s.sectionOuter}>
+    <View ref={rootRef} style={s.sectionOuter}>
       <Pressable onPress={toggleExpand} style={[s.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={[s.sectionIconWrap, { backgroundColor: ACCENT }]}>
           <MaterialCommunityIcons name={group.icon} size={22} color="#fff" />
@@ -764,9 +793,11 @@ const GlassSection: React.FC<{
   isDarkMode: boolean;
   colors: ReturnType<typeof useColors>;
   initiallyExpanded?: boolean;
-}> = ({ section, sectionIndex, isDarkMode, colors, initiallyExpanded = false }) => {
+  scrollRef?: React.RefObject<ScrollView | null>;
+}> = ({ section, sectionIndex, isDarkMode, colors, initiallyExpanded = false, scrollRef }) => {
   const isRTL = useIsRTL();  const s = useScaledStyles(_sharedS, colors.fs);  const { t } = useSettings();  const lang = getLanguage();  const isArabic = lang === 'ar';  const [expanded, setExpanded] = useState(initiallyExpanded);
   const rotateAnim = useRef(new Animated.Value(initiallyExpanded ? 1 : 0)).current;
+  const { rootRef, scrollIntoView } = useExpandAutoScroll(scrollRef);
 
   const toggleExpand = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -779,8 +810,9 @@ const GlassSection: React.FC<{
       useNativeDriver: true,
     }).start();
 
+    if (!expanded) scrollIntoView();
     setExpanded((prev) => !prev);
-  }, [expanded, rotateAnim]);
+  }, [expanded, rotateAnim, scrollIntoView]);
 
   const chevronRotation = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -788,7 +820,7 @@ const GlassSection: React.FC<{
   });
 
   return (
-    <View style={s.sectionOuter}>
+    <View ref={rootRef} style={s.sectionOuter}>
       {/* Section header — pressable to expand/collapse */}
       <Pressable onPress={toggleExpand} style={[s.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={[s.sectionIconWrap, { backgroundColor: ACCENT }]}>

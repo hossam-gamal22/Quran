@@ -23,7 +23,6 @@ import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
-import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
 import { Spacing, ModalColors } from '@/constants/theme';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
@@ -41,8 +40,6 @@ import { expandProphetEnglishTranscript, expandProphetTranscript } from '@/data/
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { SourcesList } from '@/components/ui/SourcesList';
 import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
-import { shareIslamicPdf } from '@/lib/pdf/shareIslamicPdf';
-import type { IslamicPdfSection } from '@/lib/pdf/islamicPdfTemplate';
 import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
 
 const ACCENT = '#0d8e62';
@@ -77,9 +74,6 @@ function copy() {
         listen: 'استمع للقصة',
         storyText: 'نص القصة',
         audio: 'الصوت',
-        sharePdf: 'مشاركة PDF',
-        pdfErrorTitle: 'تعذرت مشاركة القصة',
-        pdfErrorBody: 'حاول مرة أخرى بعد لحظات.',
         searchPlaceholder: 'ابحث باسم القصة...',
         noSearchResults: 'لا توجد نتائج مطابقة.',
       }
@@ -108,9 +102,6 @@ function copy() {
         listen: 'Listen to the story',
         storyText: 'Story text',
         audio: 'Audio',
-        sharePdf: 'Share PDF',
-        pdfErrorTitle: 'Story could not be shared',
-        pdfErrorBody: 'Please try again in a moment.',
         searchPlaceholder: 'Search stories...',
         noSearchResults: 'No matching stories.',
       };
@@ -179,115 +170,6 @@ function getTranscript(story: CMSReligiousStory) {
   const base = story.transcriptEn || getStoryEnglishFields(story)?.transcriptEn || '';
   const expanded = story.id?.startsWith('prophet-') ? expandProphetEnglishTranscript(story.id, base) : base;
   return preferLongerText(expanded, complete?.transcriptEn || '');
-}
-
-function splitPdfStoryParagraphs(text: string): string[] {
-  return text
-    .split(/\n{2,}/)
-    .map(part => part.trim())
-    .filter(Boolean);
-}
-
-const RELIGIOUS_STORY_PDF_CHARS_PER_LINE = 50;
-const RELIGIOUS_STORY_PDF_PAGE_LINES = 15;
-
-function estimateReligiousStoryPdfLines(paragraph: string): number {
-  return Math.max(1, Math.ceil(Array.from(paragraph).length / RELIGIOUS_STORY_PDF_CHARS_PER_LINE));
-}
-
-function splitReligiousStoryPdfParagraph(paragraph: string, maxLines = RELIGIOUS_STORY_PDF_PAGE_LINES): string[] {
-  const maxChars = RELIGIOUS_STORY_PDF_CHARS_PER_LINE * maxLines;
-  if (Array.from(paragraph).length <= maxChars) return [paragraph];
-
-  const parts: string[] = [];
-  let remaining = paragraph.trim();
-  while (Array.from(remaining).length > maxChars) {
-    const chars = Array.from(remaining);
-    const windowText = chars.slice(0, maxChars).join('');
-    const punctuationCut = Math.max(
-      windowText.lastIndexOf('،'),
-      windowText.lastIndexOf('؛'),
-      windowText.lastIndexOf('.'),
-      windowText.lastIndexOf('؟'),
-      windowText.lastIndexOf('!'),
-    );
-    const spaceCut = windowText.lastIndexOf(' ');
-    const cutIndex = punctuationCut > maxChars * 0.55
-      ? punctuationCut + 1
-      : Math.max(spaceCut, Math.floor(maxChars * 0.75));
-    parts.push(chars.slice(0, cutIndex).join('').trim());
-    remaining = chars.slice(cutIndex).join('').trim();
-  }
-  if (remaining) parts.push(remaining);
-  return parts;
-}
-
-function buildReligiousStoryPdfSections(transcript: string, storyTitle: string): IslamicPdfSection[] {
-  const paragraphs = splitPdfStoryParagraphs(transcript);
-  const sections: IslamicPdfSection[] = [];
-  let currentBody: string[] = [];
-  let currentLines = 0;
-
-  const flush = () => {
-    if (!currentBody.length) return;
-    sections.push({
-      title: sections.length === 0 ? storyTitle : undefined,
-      body: currentBody,
-      continuation: sections.length > 0,
-      keepTogether: true,
-      largeText: true,
-    });
-    currentBody = [];
-    currentLines = 0;
-  };
-
-  const pushParagraph = (paragraph: string) => {
-    let remaining = paragraph.trim();
-    while (remaining) {
-      const availableLines = RELIGIOUS_STORY_PDF_PAGE_LINES - currentLines;
-
-      if (availableLines <= 0) {
-        flush();
-        continue;
-      }
-
-      const remainingLines = estimateReligiousStoryPdfLines(remaining);
-      if (remainingLines <= availableLines) {
-        currentBody.push(remaining);
-        currentLines += remainingLines;
-        remaining = '';
-        continue;
-      }
-
-      if (currentBody.length && availableLines >= 1) {
-        const [head, ...tail] = splitReligiousStoryPdfParagraph(remaining, availableLines);
-        if (head) {
-          currentBody.push(head);
-          currentLines += estimateReligiousStoryPdfLines(head);
-          remaining = tail.join(' ').trim();
-          flush();
-          continue;
-        }
-      }
-
-      if (currentBody.length) {
-        flush();
-        continue;
-      }
-
-      const [head, ...tail] = splitReligiousStoryPdfParagraph(remaining);
-      if (!head) break;
-      currentBody.push(head);
-      currentLines += estimateReligiousStoryPdfLines(head);
-      remaining = tail.join(' ').trim();
-      flush();
-    }
-  };
-
-  paragraphs.forEach(pushParagraph);
-
-  flush();
-  return sections.length ? sections : [{ title: storyTitle, body: transcript, keepTogether: true, largeText: true }];
 }
 
 function LanguageNotice({ colors }: { colors: ReturnType<typeof useColors> }) {
@@ -496,7 +378,6 @@ function StoryListening({
   const [audioAttempted, setAudioAttempted] = useState(false);
   const [audioStartError, setAudioStartError] = useState(false);
   const [audioModalDismissed, setAudioModalDismissed] = useState(false);
-  const [pdfErrorVisible, setPdfErrorVisible] = useState(false);
   const [isFav, setIsFav] = useState(false);
   const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
@@ -756,25 +637,6 @@ function StoryListening({
     }
   }, [audioDownloadState, labels.downloadFailed, story.audioUrl, story.id]);
 
-  const handleSharePdf = useCallback(async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const title = getTitle(story);
-      const storySections = buildReligiousStoryPdfSections(transcript, labels.storyText);
-      await shareIslamicPdf({
-        title,
-        subtitle: labels.title,
-        shortDescription: getBrief(story),
-        category: labels.title,
-        footerTitle: 'رُوح المسلم',
-        sections: storySections,
-      });
-    } catch (pdfError) {
-      setPdfErrorVisible(true);
-      console.log('Religious story PDF sharing failed', pdfError);
-    }
-  }, [labels.storyText, labels.title, story, transcript]);
-
   return (
     <View style={s.container}>
       <UniversalHeader
@@ -908,7 +770,6 @@ function StoryListening({
                 <Text style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                   {labels.storyText}
                 </Text>
-                <PdfShareButton onPress={handleSharePdf} />
               </View>
             </View>
 
@@ -941,14 +802,6 @@ function StoryListening({
         colors={colors}
         onRetry={handlePlayPress}
         onClose={() => setAudioModalDismissed(true)}
-      />
-      <PdfShareErrorModal
-        visible={pdfErrorVisible}
-        onRetry={() => {
-          setPdfErrorVisible(false);
-          handleSharePdf();
-        }}
-        onClose={() => setPdfErrorVisible(false)}
       />
       <BannerAdComponent screen={SCREEN_KEY} />
     </View>

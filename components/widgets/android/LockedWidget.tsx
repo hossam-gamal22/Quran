@@ -1,15 +1,28 @@
 // components/widgets/android/LockedWidget.tsx
-// Locked widget shown to non-premium users — pure glass shell.
+// Premium gate shown to non-premium users. Mirrors iOS PremiumLockedView.
 
 import React from 'react';
-import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
-import { GLASS, FONT, APP_ICON } from './shared';
+import { Appearance } from 'react-native';
+import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
+import type { SharedWidgetData } from '@/lib/widget-data';
+import { resolveWidgetTheme } from '@/lib/widgets/snapshot';
+import { FONT, paletteFor } from './shared';
 
 interface LockedWidgetProps {
   widgetName: string;
+  data?: SharedWidgetData | null;
 }
 
-export function LockedWidget({ widgetName: _widgetName }: LockedWidgetProps) {
+function lockSvg(color: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24">
+  <path fill="${color}" d="M17 8h-1V6a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Zm3 9.73V17a1 1 0 1 1-2 0v-1.27a2 2 0 1 1 2 0Z"/>
+</svg>`;
+}
+
+export function LockedWidget({ widgetName: _widgetName, data }: LockedWidgetProps) {
+  const theme = resolveWidgetTheme(data?.widgetTheme, Appearance.getColorScheme());
+  const p = paletteFor(theme);
+
   return (
     <FlexWidget
       style={{
@@ -18,22 +31,27 @@ export function LockedWidget({ widgetName: _widgetName }: LockedWidgetProps) {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        // Use fully opaque dark background — some Android launchers strip alpha
-        // from widget backgrounds causing the "no background" bug.
-        backgroundColor: '#1A1A2E',
-        borderRadius: GLASS.radius,
-        padding: GLASS.padding,
+        backgroundColor: p.bg,
+        borderRadius: 32,
+        padding: 14,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://subscription' }}
     >
-      <ImageWidget image={APP_ICON} imageWidth={36} imageHeight={36} radius={8} />
-      <TextWidget text="🔒" style={{ fontSize: 22, color: GLASS.text, marginTop: 8 }} />
+      <SvgWidget svg={lockSvg(p.muted)} style={{ width: 28, height: 28, marginBottom: 6 }} />
       <TextWidget
-        text="اشترك للحصول على هذه الودجت"
-        style={{ fontSize: 11, color: GLASS.textMuted, marginTop: 6, textAlign: 'center' }}
-        maxLines={2}
+        text="اشترك للوصول"
+        style={{ fontFamily: FONT.rubikBold, fontSize: 14, color: p.text, textAlign: 'center' }}
+        maxLines={1}
         truncate="END"
+        allowFontScaling={false}
+      />
+      <TextWidget
+        text="افتح التطبيق للاشتراك"
+        style={{ fontFamily: FONT.rubikMedium, fontSize: 11, color: p.muted, marginTop: 4, textAlign: 'center' }}
+        maxLines={1}
+        truncate="END"
+        allowFontScaling={false}
       />
     </FlexWidget>
   );
