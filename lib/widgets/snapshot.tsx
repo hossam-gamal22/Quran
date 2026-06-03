@@ -1086,7 +1086,11 @@ const prayerNameEn = (key: PrayerStateKey, date: Date) =>
 const BAKE_TIMES: Record<PrayerStateKey, string> = {
   fajr: '04:14', sunrise: '05:35', dhuhr: '12:17', asr: '15:33', maghrib: '18:42', isha: '20:19',
 };
-const ANDROID_PRAYER_TEMPLATE_SCHEMA = 3;
+// v4: prayer previews now wrap the small/large/single time, name and countdown
+// in AnchorReporter (was plain Text/placeholder), so the chrome layout shifted
+// slightly — re-bake the static templates so their blank slots line up with the
+// new captured anchor positions the live overlay draws into.
+const ANDROID_PRAYER_TEMPLATE_SCHEMA = 4;
 const ANDROID_PRAYER_TEMPLATE_HASH_KEY = '@widget_android_prayer_template_hash_v1';
 const ANDROID_PRAYER_TEMPLATE_DIR = `${FileSystem.documentDirectory}prayer-static/`;
 const androidPrayerTemplatePromises = new Map<string, Promise<{ generated: number; skipped: boolean; errors: string[] }>>();
