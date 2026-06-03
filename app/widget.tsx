@@ -29,12 +29,19 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
+import { ModalColors } from '@/constants/theme';
+import { AppModal } from '@/components/ui/AppModal';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { t, getLanguage } from '@/lib/i18n';
 import { requestAddWidget } from '@/lib/widget-add-helper';
-import { updateWidgetData, refreshWidgetsNow } from '@/lib/widget-data-bridge';
+import { updateWidgetData, refreshWidgetDisplayNow } from '@/lib/widget-data-bridge';
+import { getWidgetHowToSteps } from '@/lib/widget-how-to-steps';
+import {
+  coerceWidgetDateFormatForCalendar,
+  widgetDateFormatOptionsForCalendar,
+} from '@/lib/widget-settings-options';
 import type { PreviewSize, WidgetDateFormat } from '@/components/widgets/previews/shared';
 import { formatDateSample } from '@/components/widgets/previews/shared';
 import { WidgetPreviewDataContext } from '@/components/widgets/previews/snapshot-capture-context';
@@ -457,7 +464,6 @@ function SettingsTab({
   const styles = useScaledStyles(_styles, colors.fs);
   const { settings, updateDisplay } = useSettings();
   const [perms, setPerms] = useState<PermissionState>({ background: 'unknown', location: 'undetermined' });
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -489,47 +495,42 @@ function SettingsTab({
   const applyWidgetSetting = useCallback(
     async (patch: Parameters<typeof updateDisplay>[0]) => {
       if (__DEV__) console.log('[WidgetTheme] passed to updateDisplay:', patch);
-      await updateDisplay(patch);
+      const displayOnlySync = refreshWidgetDisplayNow(patch as any);
+      if (__DEV__) console.log('[WidgetTheme] immediate widget sync queued:', patch);
       try {
-        await updateWidgetData();
-      } catch {}
+        await updateDisplay(patch);
+        await displayOnlySync;
+        updateWidgetData(undefined, undefined, { displayOverride: patch as any }).catch((e) => {
+          if (__DEV__) console.warn('[WidgetTheme] full widget sync failed:', e);
+        });
+      } catch (e) {
+        if (__DEV__) console.warn('[WidgetTheme] immediate widget sync failed:', e);
+      }
     },
     [updateDisplay],
   );
 
-  const forceRefreshWidgets = useCallback(async () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    try {
-      const result = await refreshWidgetsNow();
-      if (__DEV__) {
-        console.log(
-          `[widget/app] refresh proof complete version=${result.snapshotVersion ?? 'n/a'} updatedAt=${result.snapshotUpdatedAt ?? 'n/a'} manifestEntries=${result.snapshotCount}`,
-        );
-      }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch (e) {
-      console.warn('⚠️ Widget refresh failed:', e);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [isRefreshing]);
-
   // Live computed sample values for the date-format dropdown — mirrors Glassify
   // (e.g. "٢٠٢٦ / ٠٥ / ٠٩", "09 / 05 / 2026"). Recomputed once per mount.
+  const widgetCalendar = settings.display.widgetCalendar ?? 'auto';
+  const selectedDateFormat = coerceWidgetDateFormatForCalendar(
+    widgetCalendar,
+    settings.display.widgetDateFormat,
+  );
+  useEffect(() => {
+    if (selectedDateFormat !== settings.display.widgetDateFormat) {
+      applyWidgetSetting({ widgetDateFormat: selectedDateFormat as any });
+    }
+  }, [applyWidgetSetting, selectedDateFormat, settings.display.widgetDateFormat]);
+
   const dateFormatOptions = useMemo(() => {
     const today = new Date();
-    const variants: Array<{ key: WidgetDateFormat; label: string }> = [
-      { key: 'none', label: t('widgetPage.dateFormatNone') },
-      { key: 'gregorian-ar', label: formatDateSample(today, 'gregorian-ar') },
-      { key: 'hijri-ar', label: formatDateSample(today, 'hijri-ar') },
-      { key: 'gregorian-en', label: formatDateSample(today, 'gregorian-en') },
-      { key: 'hijri-en', label: formatDateSample(today, 'hijri-en') },
-    ];
-    return variants;
-  }, []);
+    return widgetDateFormatOptionsForCalendar(widgetCalendar).map((key) => ({
+      key,
+      label: key === 'none' ? t('widgetPage.dateFormatNone') : formatDateSample(today, key),
+    }));
+  }, [widgetCalendar]);
+  const settingDescriptions = useMemo(() => getWidgetSettingDescriptions(isRTL), [isRTL]);
 
   return (
     <ScrollView
@@ -549,15 +550,31 @@ function SettingsTab({
             { key: 'gregorian', label: t('widgetPage.calendarGregorian') },
             { key: 'hijri', label: t('widgetPage.calendarHijri') },
           ]}
-          onChange={(v) => applyWidgetSetting({ widgetCalendar: v as any, widgetDayCalendar: v as any, widgetMonthCalendar: v as any })}
+          description={settingDescriptions.calendar}
+          onChange={(v) => {
+            const nextDateFormat = coerceWidgetDateFormatForCalendar(v, settings.display.widgetDateFormat);
+            applyWidgetSetting({
+              widgetCalendar: v as any,
+              widgetDayCalendar: v as any,
+              widgetMonthCalendar: v as any,
+              ...(nextDateFormat !== settings.display.widgetDateFormat ? { widgetDateFormat: nextDateFormat as any } : {}),
+            });
+          }}
         />
-        <WidgetOptionRow
-          isRTL={isRTL}
-          label={t('widgetPage.dateFormat')}
-          value={settings.display.widgetDateFormat}
-          options={dateFormatOptions}
-          onChange={(v) => applyWidgetSetting({ widgetDateFormat: v as any })}
-        />
+        {/* Date-format is only meaningful for an explicit Gregorian calendar.
+            For Auto/Hijri the date widgets render the natural live Hijri date
+            ("١٦ من ذي الحجة ١٤٤٧") automatically and ignore this setting, so a
+            Gregorian-style format row here would be misleading. */}
+        {widgetCalendar === 'gregorian' ? (
+          <WidgetOptionRow
+            isRTL={isRTL}
+            label={t('widgetPage.dateFormat')}
+            value={selectedDateFormat}
+            options={dateFormatOptions}
+            description={settingDescriptions.dateFormat}
+            onChange={(v) => applyWidgetSetting({ widgetDateFormat: v as any })}
+          />
+        ) : null}
         <WidgetOptionRow
           isRTL={isRTL}
           label={t('widgetPage.numerals')}
@@ -567,6 +584,7 @@ function SettingsTab({
             { key: 'arabic', label: t('widgetPage.numeralsArabic') },
             { key: 'western', label: t('widgetPage.numeralsWestern') },
           ]}
+          description={settingDescriptions.numerals}
           onChange={(v) => applyWidgetSetting({ widgetNumerals: v as any })}
         />
         <WidgetOptionRow
@@ -583,31 +601,9 @@ function SettingsTab({
             { key: 'desert', label: t('widgetPage.themeDesert') },
             { key: 'slate', label: t('widgetPage.themeSlate') },
           ]}
+          description={settingDescriptions.theme}
           onChange={(v) => applyWidgetSetting({ widgetTheme: v as any })}
         />
-      </SettingsGroup>
-
-      {/* Force refresh — regenerates all widget snapshots and pushes to home screen */}
-      <SettingsGroup title={t('widgetPage.refreshTitle')} isRTL={isRTL}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          disabled={isRefreshing}
-          onPress={forceRefreshWidgets}
-          style={[
-            styles.refreshBtn,
-            { opacity: isRefreshing ? 0.5 : 1, flexDirection: isRTL ? 'row-reverse' : 'row' },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={isRefreshing ? 'loading' : 'refresh'}
-            size={20}
-            color="#fff"
-            style={isRefreshing ? { transform: [{ rotate: '45deg' }] } : undefined}
-          />
-          <Text style={[styles.refreshBtnText, { fontFamily: fontSemiBold() }]}>
-            {isRefreshing ? t('widgetPage.refreshing') : t('widgetPage.refreshBtn')}
-          </Text>
-        </TouchableOpacity>
       </SettingsGroup>
 
       {/* Permissions */}
@@ -655,6 +651,23 @@ function SettingsTab({
       <View style={{ height: 60 }} />
     </ScrollView>
   );
+}
+
+function getWidgetSettingDescriptions(isRTL: boolean) {
+  if (isRTL || getLanguage() === 'ar') {
+    return {
+      calendar: 'يظهر في ودجات اليوم والشهر واليوم الرقمي. ودجة التاريخ الهجري تظل هجريًا دائمًا.',
+      dateFormat: 'يغيّر سطر التاريخ المختصر في ودجات اليوم الرقمي والشهر فقط.',
+      numerals: 'يغيّر شكل الأرقام في ودجات التاريخ ومواقيت الصلاة والعدادات.',
+      theme: 'يغيّر ألوان كل الودجات في المعرض وعلى شاشة الهاتف.',
+    };
+  }
+  return {
+    calendar: 'Applies to day, month, and digital day widgets. Hijri date widgets always stay Hijri.',
+    dateFormat: 'Changes the compact date line in digital day and month widgets only.',
+    numerals: 'Changes digits in date, prayer-time, and countdown widgets.',
+    theme: 'Changes colors for all gallery and home-screen widgets.',
+  };
 }
 
 function SettingsGroup({ title, children, isRTL }: { title: string; children: React.ReactNode; isRTL: boolean }) {
@@ -714,17 +727,20 @@ function WidgetOptionRow({
   label,
   value,
   options,
+  description,
   onChange,
 }: {
   isRTL: boolean;
   label: string;
   value: string;
   options: { key: string; label: string }[];
+  description?: string;
   onChange: (key: string) => void;
 }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const [open, setOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const current = options.find((o) => o.key === value) ?? options[0];
   return (
     <>
@@ -739,10 +755,33 @@ function WidgetOptionRow({
           { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border },
         ]}
       >
-        <Text style={[styles.rowLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-          {label}
-        </Text>
-        <Text style={{ fontFamily: fontMedium(), fontSize: 14, color: colors.primary }}>
+        <View style={[styles.optionTextBlock, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }]}>
+          <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {label}
+          </Text>
+          {description ? (
+            <TouchableOpacity
+              hitSlop={10}
+              onPress={(e) => {
+                e.stopPropagation();
+                Haptics.selectionAsync();
+                setInfoOpen(true);
+              }}
+            >
+              <MaterialCommunityIcons
+                name="information-outline"
+                size={18}
+                color={colors.textLight}
+              />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          style={[styles.optionValue, { color: colors.primary, textAlign: isRTL ? 'left' : 'right' }]}
+        >
           {current.label}
         </Text>
       </TouchableOpacity>
@@ -759,6 +798,27 @@ function WidgetOptionRow({
         }}
         isRTL={isRTL}
       />
+      {description ? (
+        <AppModal
+          visible={infoOpen}
+          onClose={() => setInfoOpen(false)}
+          title={label}
+          position="center"
+        >
+          <Text
+            style={{
+              fontFamily: fontMedium(),
+              fontSize: 14,
+              lineHeight: 24,
+              color: colors.text,
+              textAlign: isRTL ? 'right' : 'left',
+              writingDirection: isRTL ? 'rtl' : 'ltr',
+            }}
+          >
+            {description}
+          </Text>
+        </AppModal>
+      ) : null}
     </>
   );
 }
@@ -783,8 +843,8 @@ function OptionPickerModal({
   const colors = useColors();
   const { isDarkMode } = useSettings();
   // Solid (non-translucent) surface so the page behind never bleeds through.
-  const cardBg = isDarkMode ? '#1F1F22' : '#FFFFFF';
-  const cardBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  const cardBg = isDarkMode ? ModalColors.cardDark : ModalColors.cardLight;
+  const cardBorder = isDarkMode ? ModalColors.borderDark : ModalColors.borderLight;
   const divider = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -853,21 +913,27 @@ function OptionPickerModal({
 
 function HowToAddModal({ visible, onClose, isRTL }: { visible: boolean; onClose: () => void; isRTL: boolean }) {
   const colors = useColors();
+  const { isDarkMode } = useSettings();
+  const cardBg = isDarkMode ? ModalColors.cardDark : ModalColors.cardLight;
+  const cardBorder = isDarkMode ? ModalColors.borderDark : ModalColors.borderLight;
+  const language = getLanguage();
+  const instructionPlatform = Platform.OS === 'ios' ? 'ios' : 'android';
   const steps = useMemo(
-    () =>
-      Platform.OS === 'ios'
-        ? [t('widgets.widgetStep1'), t('widgets.widgetStep2Ios'), t('widgets.widgetStep3'), t('widgets.widgetStep4Ios'), t('widgets.widgetStep5Ios')]
-        : [t('widgets.widgetStep1'), t('widgets.widgetStep2Android'), t('widgets.widgetStep3'), t('widgets.widgetStep4Android')],
-    []
+    () => getWidgetHowToSteps(instructionPlatform, language),
+    [instructionPlatform, language]
   );
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={modalStyles.backdrop} onPress={onClose}>
-        <Pressable style={[modalStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
+        <Pressable style={[modalStyles.card, { backgroundColor: cardBg, borderColor: cardBorder }]} onPress={() => {}}>
           <Text style={[modalStyles.title, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('widgetPage.howToAddTitle')}
           </Text>
-          <View style={{ marginTop: 12 }}>
+          <ScrollView
+            style={modalStyles.stepsScroll}
+            contentContainerStyle={modalStyles.stepsContent}
+            showsVerticalScrollIndicator={false}
+          >
             {steps.map((step, idx) => (
               <View
                 key={idx}
@@ -881,7 +947,7 @@ function HowToAddModal({ visible, onClose, isRTL }: { visible: boolean; onClose:
                 </Text>
               </View>
             ))}
-          </View>
+          </ScrollView>
           <TouchableOpacity onPress={onClose} style={[modalStyles.closeBtn, { backgroundColor: colors.primary }]}>
             <Text style={modalStyles.closeText}>{t('common.ok')}</Text>
           </TouchableOpacity>
@@ -910,6 +976,7 @@ const modalStyles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '86%',
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 22,
@@ -918,6 +985,13 @@ const modalStyles = StyleSheet.create({
     fontFamily: fontBold(),
     fontSize: 18,
     lineHeight: 26,
+  },
+  stepsScroll: {
+    marginTop: 12,
+    maxHeight: 420,
+  },
+  stepsContent: {
+    paddingBottom: 2,
   },
   stepRow: {
     alignItems: 'center',
@@ -1046,18 +1120,25 @@ const _styles = StyleSheet.create({
     fontFamily: fontMedium(),
     fontSize: 14,
   },
-  refreshBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#0f987f',
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    margin: 12,
+  optionTextBlock: {
+    flex: 1,
+    gap: 3,
+    paddingEnd: 12,
   },
-  refreshBtnText: {
-    color: '#fff',
+  optionLabel: {
+    fontFamily: fontMedium(),
     fontSize: 15,
+    lineHeight: 22,
+  },
+  optionDescription: {
+    fontFamily: fontRegular(),
+    fontSize: 11.5,
+    lineHeight: 17,
+  },
+  optionValue: {
+    flexShrink: 1,
+    maxWidth: '42%',
+    fontFamily: fontMedium(),
+    fontSize: 14,
   },
 });

@@ -1,0 +1,107 @@
+{
+  "dayDigital_small": [
+    {
+      "kind": "currentTime",
+      "x": 78,
+      "y": 70,
+      "width": 120,
+      "fontSize": 44,
+      "fontKey": "rubikBold",
+      "textAlign": "center",
+      "lineHeight": 54
+    }
+  ],
+  "prayerSingle_small": [
+    {
+      "kind": "prayerNextCountdown",
+      "x": 78,
+      "y": 130,
+      "width": 118,
+      "fontSize": 10,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 18
+    }
+  ],
+  "prayerTable_small": [
+    {
+      "kind": "prayerNextCountdown",
+      "x": 44,
+      "y": 18,
+      "width": 82,
+      "fontSize": 9,
+      "fontKey": "rubikMedium",
+      "textAlign": "left",
+      "compact": true,
+      "lineHeight": 16
+    }
+  ],
+  "prayerTable_medium": [
+    {
+      "kind": "prayerNextCountdown",
+      "x": 247,
+      "y": 128,
+      "width": 112,
+      "fontSize": 9,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 16
+    }
+  ],
+  "prayerTable_large": [
+    {
+      "kind": "prayerNextCountdownWithLabel",
+      "x": 236,
+      "y": 106,
+      "width": 190,
+      "fontSize": 10,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 18
+    }
+  ],
+  "prayerNextPrevious_medium_ar": [
+    {
+      "kind": "prayerNextCountdown",
+      "x": 91,
+      "y": 126,
+      "width": 118,
+      "fontSize": 9,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 16
+    },
+    {
+      "kind": "prayerPreviousCountdown",
+      "x": 238,
+      "y": 126,
+      "width": 118,
+      "fontSize": 9,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 16
+    }
+  ],
+  "prayerNextPrevious_medium_en": [
+    {
+      "kind": "prayerPreviousCountdown",
+      "x": 91,
+      "y": 126,
+      "width": 118,
+      "fontSize": 9,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 16
+    },
+    {
+      "kind": "prayerNextCountdown",
+      "x": 238,
+      "y": 126,
+      "width": 118,
+      "fontSize": 9,
+      "fontKey": "rubikMedium",
+      "textAlign": "center",
+      "lineHeight": 16
+    }
+  ]
+}

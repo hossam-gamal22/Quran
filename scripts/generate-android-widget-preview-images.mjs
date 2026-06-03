@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
+import sharp from 'sharp';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -17,6 +18,8 @@ const OUT_DIR = resolve(ROOT, 'android/app/src/main/res/drawable-nodpi');
 const DEFAULT_IN_DIR = resolve(ROOT, 'tmp/widget-previews');
 const IN_DIR = process.argv[2] ? resolve(ROOT, process.argv[2]) : DEFAULT_IN_DIR;
 const THEME = process.argv[3] ?? 'light';
+const SKIP_DYNAMIC_OVERLAY = process.env.ROOH_SKIP_PICKER_DYNAMIC_OVERLAY === '1';
+const ANDROID_OVERLAY_ANCHORS = JSON.parse(readFileSync(resolve(ROOT, 'lib/widgets/android-overlay-anchors.json'), 'utf8'));
 
 const SIZE_DIMS = {
   small: { width: 155, height: 155 },
@@ -101,30 +104,27 @@ function fillRect(png, x0, y0, w, h, rgba) {
 
 function addPremiumBadge(png) {
   const scale = Math.min(png.width, png.height) / 155;
-  const r = Math.max(13, Math.round(14 * scale));
-  const cx = png.width - r - Math.round(10 * scale);
-  const cy = r + Math.round(10 * scale);
+  const r = Math.max(9, Math.round(10 * scale));
+  const cx = png.width - r - Math.round(8 * scale);
+  const cy = r + Math.round(8 * scale);
   fillCircle(png, cx, cy, r, [218, 165, 32, 255]);
   const white = [255, 255, 255, 255];
-  const w = r * 1.2;
-  const h = r * 0.8;
-  const left = cx - w / 2;
-  const top = cy - h / 2;
-  fillPolygon(png, [
-    [left, top + h * 0.35],
-    [left + w * 0.22, top + h * 0.58],
-    [left + w * 0.36, top + h * 0.2],
-    [left + w * 0.5, top + h * 0.55],
-    [left + w * 0.64, top + h * 0.2],
-    [left + w * 0.78, top + h * 0.58],
-    [left + w, top + h * 0.35],
-    [left + w * 0.86, top + h],
-    [left + w * 0.14, top + h],
-  ], white);
-  fillRect(png, left + w * 0.18, top + h * 1.06, w * 0.64, Math.max(2, scale * 2), white);
+  const bodyW = Math.max(8, Math.round(r * 0.95));
+  const bodyH = Math.max(6, Math.round(r * 0.72));
+  const bodyLeft = cx - bodyW / 2;
+  const bodyTop = cy - bodyH * 0.05;
+  fillRect(png, bodyLeft, bodyTop, bodyW, bodyH, white);
+  const shackleW = Math.max(7, Math.round(r * 0.78));
+  const shackleH = Math.max(7, Math.round(r * 0.78));
+  const stroke = Math.max(2, Math.round(scale * 2));
+  const shackleLeft = cx - shackleW / 2;
+  const shackleTop = bodyTop - shackleH * 0.62;
+  fillRect(png, shackleLeft, shackleTop + shackleH * 0.5, stroke, shackleH * 0.5, white);
+  fillRect(png, shackleLeft + shackleW - stroke, shackleTop + shackleH * 0.5, stroke, shackleH * 0.5, white);
+  fillRect(png, shackleLeft + stroke, shackleTop, shackleW - stroke * 2, stroke, white);
 }
 
-function fallbackPng(size, premium) {
+function fallbackPng(size) {
   const dims = SIZE_DIMS[size];
   const png = new PNG(dims);
   for (let y = 0; y < png.height; y++) {
@@ -146,17 +146,90 @@ function fallbackPng(size, premium) {
     fillRect(png, 42, 55, png.width - 84, 16, fg);
     fillRect(png, 82, 91, png.width - 164, 10, [190, 190, 190, 220]);
   }
-  if (premium) addPremiumBadge(png);
   return png;
 }
 
-function loadSnapshot(id, size, premium, outPath) {
-  const src = resolve(IN_DIR, `${id}_${size}_${THEME}.png`);
-  if (!existsSync(src)) {
-    if (existsSync(outPath)) return PNG.sync.read(readFileSync(outPath));
-    return fallbackPng(size, premium);
+function escapeSvg(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function pickerOverlayKey(id, size) {
+  const key = `${id}_${size}`;
+  return key === 'prayerNextPrevious_medium' ? `${key}_ar` : key;
+}
+
+function pickerOverlayText(kind, compact) {
+  // dayDigital bakes its time directly into the gallery PNG, so overlaying a
+  // sample time here would double-draw and produce overlapping digits. Skip it.
+  if (kind === 'currentTime') return '';
+  if (kind === 'prayerPreviousCountdown') return 'منذ ٤ س ١ د';
+  if (kind === 'prayerNextCountdownWithLabel') return 'الصلاة القادمة بعد ٢ س ٢٧ د';
+  if (kind === 'prayerNextCountdown') {
+    const value = 'بعد ٢ س ٢٧ د';
+    return compact ? value.replace(/\s/g, '') : value;
   }
-  const png = PNG.sync.read(readFileSync(src));
+  return '';
+}
+
+function pickerTextAnchor(align) {
+  if (align === 'left') return 'start';
+  if (align === 'right') return 'end';
+  return 'middle';
+}
+
+function pickerDynamicOverlaySvg(id, size, width, height) {
+  if (THEME !== 'light') return null;
+  const foreground = '#403E3A';
+  const muted = '#6B6862';
+  const anchors = ANDROID_OVERLAY_ANCHORS[pickerOverlayKey(id, size)] ?? [];
+  if (!anchors.length) return null;
+  const nodes = anchors
+    .map((anchor) => {
+      const value = pickerOverlayText(anchor.kind, anchor.compact === true);
+      if (!value) return '';
+      const color = anchor.kind === 'currentTime' ? foreground : muted;
+      const weight = anchor.fontKey === 'rubikBold' ? 700 : 500;
+      return `<text x="${anchor.x}" y="${anchor.y}" text-anchor="${pickerTextAnchor(anchor.textAlign)}" direction="rtl" dominant-baseline="central" font-family="Rubik, Rubik-Medium, sans-serif" font-size="${anchor.fontSize}" font-weight="${weight}" fill="${color}">${escapeSvg(value)}</text>`;
+    })
+    .join('\n  ');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  ${nodes}
+</svg>`;
+}
+
+async function applyPickerDynamicOverlay(png, id, size) {
+  if (SKIP_DYNAMIC_OVERLAY) return png;
+  const overlay = pickerDynamicOverlaySvg(id, size, png.width, png.height);
+  if (!overlay) return png;
+  const composited = await sharp(PNG.sync.write(png))
+    .composite([{ input: Buffer.from(overlay) }])
+    .png()
+    .toBuffer();
+  return PNG.sync.read(composited);
+}
+
+async function loadSnapshot(id, size, premium, outPath) {
+  const src = resolve(IN_DIR, `${id}_${size}_${THEME}.png`);
+  let png;
+  if (!existsSync(src)) {
+    png = existsSync(outPath)
+      ? PNG.sync.read(readFileSync(outPath))
+      : fallbackPng(size);
+  } else {
+    png = PNG.sync.read(readFileSync(src));
+  }
+  const dims = SIZE_DIMS[size];
+  if (png.width !== dims.width || png.height !== dims.height) {
+    const resized = await sharp(PNG.sync.write(png))
+      .resize(dims.width, dims.height, { fit: 'fill' })
+      .png()
+      .toBuffer();
+    png = PNG.sync.read(resized);
+  }
+  png = await applyPickerDynamicOverlay(png, id, size);
   if (premium) addPremiumBadge(png);
   return png;
 }
@@ -182,7 +255,7 @@ for (const def of registry) {
     if (!SIZE_DIMS[size]) continue;
     const premium = premiumRequired(def, size);
     const out = resolve(OUT_DIR, previewDrawableName(def.id, size));
-    const png = loadSnapshot(def.id, size, premium, out);
+    const png = await loadSnapshot(def.id, size, premium, out);
     writeFileSync(out, PNG.sync.write(png));
     count += 1;
   }

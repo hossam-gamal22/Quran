@@ -16,20 +16,62 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Appearance } from 'react-native';
 import { FlexWidget, ImageWidget, OverlapWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
+import androidOverlayAnchors from '@/lib/widgets/android-overlay-anchors.json';
 import { androidWidgetProviderTarget } from '@/lib/widgets/registry';
 import { resolveWidgetTheme, type ResolvedWidgetTheme } from '@/lib/widgets/snapshot';
 import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
-import { APP_ICON, FONT, paletteFor, applyNumerals, resolveIsArabic } from './shared';
-import { getLocalizedHijriDate } from '@/lib/hijri-date';
+import { resolvePrayerTableState } from '@/lib/widget-prayer-table-state';
+import { APP_ICON, FONT, paletteFor, applyNumerals, resolveIsArabic, watermarkFontFor } from './shared';
+// Pure-math Hijri converter (NO i18n dependency) — safe inside the headless
+// RNAW widget process where the app's i18n module may be uninitialised. Using
+// getLocalizedHijriDate here previously threw and silently fell back to the
+// Gregorian day/month, which is why placed date widgets showed "٢ يونيو"
+// instead of the gallery's "١٦ ذي الحجة".
+import { getHijriDate } from '@/lib/hijri-date';
+import { formatDateSample, type WidgetDateFormat } from '@/components/widgets/previews/shared';
 
 // ─── Live date widget (no PNG — always reads new Date()) ─────────────────────
 
 const DATE_WIDGET_IDS = new Set(['daySimple', 'dayThuluth', 'dayDigital', 'monthSimple', 'monthThuluth']);
 
-const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-const WEEKDAYS_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const WEEKDAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+// Full English weekday names to match the gallery preview (WEEKDAYS_EN in
+// components/widgets/previews/shared.ts uses the long form, e.g. "Tuesday").
+const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-const HIJRI_MONTHS_AR = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني', 'جمادى الأولى', 'جمادى الثانية', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذي الحجة'];
+const HIJRI_MONTHS_AR = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني', 'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذي الحجة'];
+// Clean Latin transliterations — mirrors HIJRI_MONTHS_EN_CLEAN in previews/index.tsx.
+const HIJRI_MONTHS_EN_CLEAN = [
+  'Muharram', 'Safar', "Rabi' al-Awwal", "Rabi' al-Thani",
+  "Jumada al-Awwal", "Jumada al-Thani", 'Rajab', "Sha'ban",
+  'Ramadan', 'Shawwal', "Dhu al-Qi'dah", 'Dhu al-Hijjah',
+];
+
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function parseHex6(hex: string): { r: number; g: number; b: number } | null {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+}
+
+const to2 = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+
+/**
+ * Alpha-blend `fg` over `bg` at `opacity` and return a SOLID #RRGGBB. Live RNAW
+ * TextViews render blank when given an 8-digit ARGB colour, so translucent
+ * preview tones (faint watermark / strong calligraphy) must be pre-flattened.
+ */
+function blendOver(fg: string, opacity: number, bg: string): `#${string}` {
+  const f = parseHex6(fg);
+  const b = parseHex6(bg);
+  if (!f || !b) return (fg.startsWith('#') ? fg : `#${fg}`) as `#${string}`;
+  const a = Math.max(0, Math.min(1, opacity));
+  return `#${to2(b.r + (f.r - b.r) * a)}${to2(b.g + (f.g - b.g) * a)}${to2(b.b + (f.b - b.b) * a)}`;
+}
 
 function LiveDateWidget({
   widgetId,
@@ -37,12 +79,16 @@ function LiveDateWidget({
   data,
   clickAction,
   clickUri,
+  widgetWidth,
+  widgetHeight,
 }: {
   widgetId: string;
   size: AndroidSize;
   data: SharedWidgetData;
   clickAction?: 'OPEN_APP' | 'OPEN_URI';
   clickUri?: string;
+  widgetWidth?: number;
+  widgetHeight?: number;
 }) {
   const now = new Date();
   const resolvedTheme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
@@ -54,19 +100,25 @@ function LiveDateWidget({
   const monthCalPref = calPref;
   const radius = TILE_RADIUS[size];
 
-  // Hijri date (safe — falls back to Gregorian on error)
+  // Hijri date via pure-math converter — never throws, never silently falls
+  // back to Gregorian (mirrors getLocalizedHijriDate's numbers without the i18n
+  // dependency). HIJRI_MONTHS_* are resolved locally per language/script.
   let hijriDay = now.getDate();
-  let hijriMonthName = MONTHS_AR[now.getMonth()];
+  let hijriMonthIdx = now.getMonth();
   let hijriYear = now.getFullYear();
   try {
-    const h = getLocalizedHijriDate(now);
+    const h = getHijriDate(now);
     if (h) {
       hijriDay = h.day;
-      hijriMonthName = HIJRI_MONTHS_AR[h.month - 1] ?? h.monthName;
+      hijriMonthIdx = h.month - 1;
       hijriYear = h.year;
     }
   } catch {}
+  const hijriMonthName = isAr
+    ? (HIJRI_MONTHS_AR[hijriMonthIdx] ?? '')
+    : (HIJRI_MONTHS_EN_CLEAN[hijriMonthIdx] ?? '');
 
+  // `resolveCalendar` semantics: gregorian → Gregorian; auto/hijri → Hijri.
   const useHijri = calPref !== 'gregorian';
   const useMonthHijri = monthCalPref !== 'gregorian';
 
@@ -75,95 +127,193 @@ function LiveDateWidget({
     ? hijriMonthName
     : (isAr ? MONTHS_AR[now.getMonth()] : now.toLocaleDateString('en', { month: 'long' }));
   const displayWeekday = isAr ? WEEKDAYS_AR[now.getDay()] : WEEKDAYS_EN[now.getDay()];
+  // RemoteViews TextViews must use SOLID (6-digit) colours — an 8-digit ARGB
+  // text colour renders blank on the live widget. The previews use a translucent
+  // fillStrong/fillFaint; reproduce that here by blending over the tile bg so the
+  // text/watermark land on the exact same RGB without an alpha channel.
+  const strongText = p.text;
+  const faintWatermark = blendOver(p.isLight ? '#000000' : '#FFFFFF', 0.1, p.bg);
 
   const widgetFont = (data.widgetFontVariant ?? 'widget1') === 'widget2' ? FONT.widget2 : FONT.widget;
+  const configuredDateFormat = (data.widgetDateFormat ?? 'gregorian-ar') as WidgetDateFormat;
+  const { width: logicalWidth, height: logicalHeight } = SIZE_DIMS[size];
+  const targetWidth = Number.isFinite(widgetWidth) && (widgetWidth ?? 0) > 0 ? widgetWidth! : logicalWidth;
+  const targetHeight = Number.isFinite(widgetHeight) && (widgetHeight ?? 0) > 0 ? widgetHeight! : logicalHeight;
+  const renderScale = Math.min(targetWidth / logicalWidth, targetHeight / logicalHeight);
+  const tileWidth = logicalWidth * renderScale;
+  const tileHeight = logicalHeight * renderScale;
+  const s = (value: number) => value * renderScale;
+  const tileRadius = s(radius);
+  const frame = (child: React.ReactElement) => (
+    <FlexWidget
+      style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000000' }}
+      clickAction={clickAction}
+      clickActionData={clickUri ? { uri: clickUri } : undefined}
+    >
+      {child}
+    </FlexWidget>
+  );
+
+  // Faint watermark digit. The preview draws it with SvgText, but the calligraphy
+  // font's metrics don't map cleanly to a baseline formula on RNAW, so we position
+  // it by vertical anchor (matching where the preview visually lands it) plus a
+  // small offset: monthSimple sits centred behind the calligraphy; the Thuluth
+  // widgets push the digit low so only its top edge shows ("shadow" effect).
+  const watermarkLayer = (
+    text: string,
+    font: string,
+    fsLogical: number,
+    justify: 'center' | 'flex-end' | 'flex-start',
+    offsetLogical: number = 0,
+  ) => (
+    <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: justify }}>
+      <TextWidget
+        text={text}
+        style={{ fontFamily: font, fontSize: s(fsLogical), color: faintWatermark, textAlign: 'center', width: 'match_parent', marginTop: s(offsetLogical) }}
+        allowFontScaling={false}
+        maxLines={1}
+      />
+    </FlexWidget>
+  );
 
   if (widgetId === 'dayDigital') {
+    // Mirrors DayDigitalPreview: HH:MM in Rubik-Bold, plus a date subtitle that
+    // prefers the natural Hijri "DD من MONTH YEAR" form for Arabic/Hijri, else
+    // the configured slash-style sample.
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
     const timeStr = applyNumerals(`${hh}:${mm}`, numerals, isAr);
-    const dateStr = useHijri
-      ? `${applyNumerals(hijriDay, numerals, isAr)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, isAr)}`
-      : `${applyNumerals(now.getDate(), numerals, isAr)}/${applyNumerals(now.getMonth() + 1, numerals, isAr)}/${applyNumerals(now.getFullYear(), numerals, isAr)}`;
-    return (
+    let dateStr = '';
+    if (useHijri && isAr) {
+      dateStr = `${applyNumerals(hijriDay, numerals, true)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, true)}`;
+    }
+    if (!dateStr) {
+      const slash = `${String(now.getDate()).padStart(2, '0')} / ${String(now.getMonth() + 1).padStart(2, '0')} / ${now.getFullYear()}`;
+      dateStr = formatDateSample(now, configuredDateFormat, numerals, isAr) || applyNumerals(slash, numerals, isAr);
+    }
+    return frame(
       <FlexWidget
-        style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: radius }}
-        clickAction={clickAction}
-        clickActionData={clickUri ? { uri: clickUri } : undefined}
+        style={{ width: tileWidth, height: tileHeight, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: tileRadius }}
       >
-        <TextWidget text={timeStr} style={{ fontFamily: FONT.rubikBold, fontSize: 44, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-        <TextWidget text={dateStr} style={{ fontFamily: FONT.rubik, fontSize: 12, color: p.muted, textAlign: 'center', marginTop: 8 }} allowFontScaling={false} maxLines={1} />
+        <TextWidget text={timeStr} style={{ fontFamily: FONT.rubikBold, fontSize: s(size === 'small' ? 44 : 58), color: p.text, textAlign: 'center', letterSpacing: -1 }} allowFontScaling={false} maxLines={1} />
+        {dateStr ? <TextWidget text={dateStr} style={{ fontFamily: FONT.rubik, fontSize: s(size === 'small' ? 12 : 14), color: p.muted, textAlign: 'center', marginTop: s(10) }} allowFontScaling={false} maxLines={1} /> : null}
       </FlexWidget>
     );
   }
 
   if (widgetId === 'dayThuluth') {
-    const wmDay = applyNumerals(useHijri ? hijriDay : now.getDate(), numerals, true);
-    // Faint watermark color: low-alpha text — ARGB hex (#1A = ~10% opacity)
-    const wmColor = p.isLight ? '#1A000000' : '#1AFFFFFF';
-    return (
+    // Mirrors DayThuluthPreview: calligraphy weekday over a faint watermark digit
+    // (medium only). Weekday uses fillStrong + an Arabic top-padding nudge.
+    const wmDay = applyNumerals(useHijri ? hijriDay : now.getDate(), numerals, isAr);
+    const watermarkFont = watermarkFontFor(numerals, isAr, widgetFont);
+    const weekdayFs = size === 'small' ? 34 : 52;
+    const weekday = (
+      <TextWidget
+        text={isAr ? WEEKDAYS_AR[now.getDay()] : WEEKDAYS_EN[now.getDay()]}
+        style={{ fontFamily: isAr ? widgetFont : FONT.rubikBold, fontSize: s(weekdayFs), color: strongText, textAlign: 'center', paddingTop: isAr ? s(Math.round(weekdayFs * 0.55)) : 0 }}
+        allowFontScaling={false}
+        maxLines={1}
+      />
+    );
+    // Small has no watermark — render a plain FlexWidget. An OverlapWidget with a
+    // `null` child renders blank on RNAW, so never feed it a conditional null.
+    if (size === 'small') {
+      return frame(
+        <FlexWidget style={{ width: tileWidth, height: tileHeight, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: tileRadius, paddingTop: s(14), paddingBottom: s(6) }}>
+          {weekday}
+        </FlexWidget>
+      );
+    }
+    return frame(
       <OverlapWidget
-        style={{ width: 'match_parent', height: 'match_parent', backgroundColor: p.bg, borderRadius: radius }}
-        clickAction={clickAction}
-        clickActionData={clickUri ? { uri: clickUri } : undefined}
+        style={{ width: tileWidth, height: tileHeight, backgroundColor: p.bg, borderRadius: tileRadius }}
       >
-        {/* Watermark digit — medium size only (mirrors DayThuluthView SwiftUI) */}
-        {size !== 'small' ? (
-          <TextWidget
-            text={wmDay}
-            style={{ fontFamily: widgetFont, fontSize: 130, color: wmColor, textAlign: 'center', width: 'match_parent', marginTop: 30 }}
-            allowFontScaling={false}
-            maxLines={1}
-          />
-        ) : null}
-        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center' }}>
-          <TextWidget text={WEEKDAYS_AR[now.getDay()]} style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 34 : 52, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+        {/* Watermark digit — baseline near the bottom edge (mirrors the SvgText y=H*1.1). */}
+        {watermarkLayer(wmDay, watermarkFont, 130, 'flex-end')}
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', paddingTop: s(18), paddingBottom: s(8) }}>
+          {weekday}
         </FlexWidget>
       </OverlapWidget>
     );
   }
 
-  if (widgetId === 'monthSimple' || widgetId === 'monthThuluth') {
-    const mDay = applyNumerals(useMonthHijri ? hijriDay : now.getDate(), numerals, isAr);
-    const wmDay = applyNumerals(useMonthHijri ? hijriDay : now.getDate(), numerals, true);
-    const wmColor = p.isLight ? '#1A000000' : '#1AFFFFFF';
+  if (widgetId === 'monthSimple') {
+    // Mirrors MonthSimplePreview: faint watermark digit, centered calligraphy
+    // month label, and a Hijri-natural subtitle pinned near the bottom edge.
+    const wmDay = applyNumerals(useMonthHijri ? hijriDay : now.getDate(), numerals, isAr);
+    const watermarkFont = watermarkFontFor(numerals, isAr, widgetFont);
     const mName = useMonthHijri
       ? hijriMonthName
       : (isAr ? MONTHS_AR[now.getMonth()] : now.toLocaleDateString('en', { month: 'long' }));
-    const mSubtitle = useMonthHijri
-      ? `${applyNumerals(hijriDay, numerals, isAr)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, isAr)}`
-      : `${applyNumerals(now.getDate(), numerals, isAr)} / ${applyNumerals(now.getMonth() + 1, numerals, isAr)} / ${applyNumerals(now.getFullYear(), numerals, isAr)}`;
-    return (
+    const mSubtitle = useMonthHijri && isAr
+      ? `${applyNumerals(hijriDay, numerals, true)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, true)}`
+      : formatDateSample(now, configuredDateFormat, numerals, isAr);
+    const monthLabelFont = isAr ? widgetFont : FONT.rubikBold;
+    const monthFs = size === 'small' ? 26 : 38;
+    const wmFs = size === 'small' ? 90 : 140;
+    const subtitleFs = size === 'small' ? 11 : 13;
+    const dateBottom = size === 'small' ? 16 : 22;
+    return frame(
       <OverlapWidget
-        style={{ width: 'match_parent', height: 'match_parent', backgroundColor: p.bg, borderRadius: radius }}
-        clickAction={clickAction}
-        clickActionData={clickUri ? { uri: clickUri } : undefined}
+        style={{ width: tileWidth, height: tileHeight, backgroundColor: p.bg, borderRadius: tileRadius }}
       >
-        {/* Watermark day digit behind the month name */}
-        <TextWidget
-          text={wmDay}
-          style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 90 : 140, color: wmColor, textAlign: 'center', width: 'match_parent', marginTop: size === 'small' ? 30 : 20 }}
-          allowFontScaling={false}
-          maxLines={1}
-        />
-        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <TextWidget text={mName} style={{ fontFamily: widgetFont, fontSize: size === 'small' ? 26 : 38, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-          <TextWidget text={mSubtitle} style={{ fontFamily: FONT.rubik, fontSize: 11, color: p.muted, textAlign: 'center', marginTop: 6 }} allowFontScaling={false} maxLines={1} />
+        {watermarkLayer(wmDay, watermarkFont, wmFs, 'center')}
+        {/* Month label centered in the region above the pinned subtitle. */}
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', paddingLeft: s(12), paddingRight: s(12), paddingBottom: s(dateBottom + (size === 'small' ? 18 : 22)) }}>
+          <TextWidget
+            text={mName}
+            style={{ fontFamily: monthLabelFont, fontSize: s(monthFs), color: strongText, textAlign: 'center', paddingTop: isAr ? s(Math.round(monthFs * 0.55)) : 0 }}
+            allowFontScaling={false}
+            maxLines={1}
+          />
+        </FlexWidget>
+        {mSubtitle ? (
+          <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'flex-end', paddingLeft: s(12), paddingRight: s(12), paddingBottom: s(dateBottom) }}>
+            <TextWidget text={mSubtitle} style={{ fontFamily: FONT.rubikMedium, fontSize: s(subtitleFs), color: p.muted, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+          </FlexWidget>
+        ) : null}
+      </OverlapWidget>
+    );
+  }
+
+  if (widgetId === 'monthThuluth') {
+    // Mirrors MonthThuluthPreview: calligraphy month name over a faint watermark
+    // digit whose baseline sits near (medium) the bottom edge.
+    const wmDay = applyNumerals(useMonthHijri ? hijriDay : now.getDate(), numerals, isAr);
+    const watermarkFont = watermarkFontFor(numerals, isAr, widgetFont);
+    const mName = useMonthHijri
+      ? hijriMonthName
+      : (isAr ? MONTHS_AR[now.getMonth()] : now.toLocaleDateString('en', { month: 'long' }));
+    const mainFs = size === 'small' ? 34 : 52;
+    const wmFs = size === 'small' ? 64 : 130;
+    return frame(
+      <OverlapWidget
+        style={{ width: tileWidth, height: tileHeight, backgroundColor: p.bg, borderRadius: tileRadius }}
+      >
+        {watermarkLayer(wmDay, watermarkFont, wmFs, size === 'small' ? 'center' : 'flex-end')}
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', paddingLeft: s(10), paddingRight: s(10), paddingTop: s(size === 'small' ? 14 : 18), paddingBottom: s(size === 'small' ? 6 : 8) }}>
+          <TextWidget text={mName} style={{ fontFamily: isAr ? widgetFont : FONT.rubikBold, fontSize: s(mainFs), color: strongText, textAlign: 'center', paddingTop: isAr ? s(Math.round(mainFs * 0.55)) : 0 }} allowFontScaling={false} maxLines={1} />
         </FlexWidget>
       </OverlapWidget>
     );
   }
 
-  // Default: daySimple
-  return (
+  // Default: daySimple — mirrors DaySimplePreview (weekday / big day / month).
+  // The preview shrinks the big day via adjustsFontSizeToFit (RNAW can't), so the
+  // day font is sized to the value the preview EFFECTIVELY renders once weekday +
+  // month claim their lines. RNAW line metrics add ~30% on top of fontSize, so
+  // weekday + day + month must stay well under the 155 logical tile height or the
+  // bottom month row clips ("مقطوع"). 16+50+14 ≈ 104 rendered → safe margin.
+  const daySimpleWeekdayFs = size === 'small' ? 15 : 17;
+  const daySimpleDayFs = size === 'small' ? 46 : 50;
+  const daySimpleMonthFs = size === 'small' ? 13 : 15;
+  return frame(
     <FlexWidget
-      style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: radius }}
-      clickAction={clickAction}
-      clickActionData={clickUri ? { uri: clickUri } : undefined}
+      style={{ width: tileWidth, height: tileHeight, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: tileRadius }}
     >
-      <TextWidget text={displayWeekday} style={{ fontFamily: isAr ? 'Amiri-Bold' : FONT.rubik, fontSize: isAr ? 16 : 13, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-      <TextWidget text={displayDay} style={{ fontFamily: FONT.rubikBold, fontSize: 52, color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-      <TextWidget text={displayMonth} style={{ fontFamily: isAr ? widgetFont : FONT.rubik, fontSize: 14, color: p.muted, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+      <TextWidget text={displayWeekday} style={{ fontFamily: FONT.rubikBold, fontSize: s(daySimpleWeekdayFs), color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+      <TextWidget text={displayDay} style={{ fontFamily: FONT.rubikBold, fontSize: s(daySimpleDayFs), color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+      <TextWidget text={displayMonth} style={{ fontFamily: FONT.rubikMedium, fontSize: s(daySimpleMonthFs), color: p.muted, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
     </FlexWidget>
   );
 }
@@ -194,6 +344,9 @@ export interface SnapshotWidgetProps {
   snapshotPath?: string;
   /** Diagnostic fallback reason when native could not load the PNG. */
   fallbackReason?: string;
+  /** True when the PNG is a gallery-captured prayer-state template whose
+   *  changing numeric fields are intentionally blank and drawn live below. */
+  isPrayerStaticTemplate?: boolean;
   /** Launcher-reported Android widget bounds in dp. Mirrors iOS GeometryReader scaling. */
   widgetWidth?: number;
   widgetHeight?: number;
@@ -205,7 +358,7 @@ export interface SnapshotWidgetProps {
  * the widget's rendered size (155×155 / 329×155 / 329×345). RNAW's coordinate
  * system uses dp; for our purposes points ≈ dp on standard mdpi.
  */
-type OverlayKind = 'none' | 'prayerNextCountdown' | 'prayerPreviousCountdown' | 'currentTime';
+type OverlayKind = 'none' | 'prayerNextCountdown' | 'prayerNextCountdownWithLabel' | 'prayerPreviousCountdown' | 'currentTime';
 
 interface OverlayAnchor {
   kind: OverlayKind;
@@ -214,42 +367,161 @@ interface OverlayAnchor {
   width: number;
   fontSize: number;
   fontFamily: string;
+  fontKey?: keyof typeof FONT;
+  lineHeight?: number;
   textAlign?: 'center' | 'left' | 'right';
   compact?: boolean;
 }
 
-function overlaysFor(widgetId: string, size: AndroidSize, isAr: boolean = true): OverlayAnchor[] {
+type OverlayAnchorSpec = Omit<OverlayAnchor, 'fontFamily'> & { fontKey?: keyof typeof FONT };
+
+const ANDROID_OVERLAY_ANCHORS = androidOverlayAnchors as Record<string, OverlayAnchorSpec[]>;
+const NATIVE_TEXT_VERTICAL_SAFETY = 12;
+
+interface NativePrayerTextOverlay {
+  text: string;
+  targetEpochMs?: number;
+  epochCandidates: number[];
+  direction: 'until' | 'since';
+  labelKind: 'duration' | 'nextPrayer';
+  language: 'ar' | 'en';
+  arabicNumerals: boolean;
+  compact: boolean;
+  leftFraction: number;
+  topFraction: number;
+  rightFraction: number;
+  bottomFraction: number;
+  widgetWidth: number;
+  widgetHeight: number;
+  fontSize: number;
+  color: string;
+  textAlign: 'center' | 'left' | 'right';
+}
+
+function isNativePrayerTextOverlay(kind: OverlayKind): boolean {
+  return kind === 'prayerNextCountdown'
+    || kind === 'prayerNextCountdownWithLabel'
+    || kind === 'prayerPreviousCountdown';
+}
+
+function overlayAnchorKey(widgetId: string, size: AndroidSize, isAr: boolean): string {
   const key = `${widgetId}_${size}`;
-  switch (key) {
-    case 'dayDigital_small':
-      return [{ kind: 'currentTime', x: 78, y: 70, width: 120, fontSize: 44, fontFamily: FONT.rubikBold, textAlign: 'center' }];
-    case 'prayerSingle_small':
-      return [{ kind: 'prayerNextCountdown', x: 78, y: 130, width: 110, fontSize: 10, fontFamily: FONT.rubikMedium, textAlign: 'center' }];
-    case 'prayerTable_small':
-      return [{ kind: 'prayerNextCountdown', x: 44, y: 24, width: 82, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'left', compact: true }];
-    case 'prayerTable_medium':
-      return [{ kind: 'prayerNextCountdown', x: 246, y: 130, width: 112, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' }];
-    case 'prayerTable_large':
-      return [{ kind: 'prayerNextCountdown', x: 213, y: 114, width: 176, fontSize: 12, fontFamily: FONT.rubikMedium, textAlign: 'right' }];
-    case 'prayerNextPrevious_medium':
-      // Mirror PrayerNextPrevPreview's language-conditional layout:
-      //   Arabic: next-LEFT (x=91), previous-RIGHT (x=238)
-      //   English: previous-LEFT (x=91), next-RIGHT (x=238)
-      // Swapping the overlay KINDS instead of the coordinates keeps the
-      // baked PNG card boundaries (which are at fixed positions) aligned
-      // with the live countdown text drawn on top of them.
-      return isAr
-        ? [
-            { kind: 'prayerNextCountdown', x: 91, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
-            { kind: 'prayerPreviousCountdown', x: 238, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
-          ]
-        : [
-            { kind: 'prayerPreviousCountdown', x: 91, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
-            { kind: 'prayerNextCountdown', x: 238, y: 118, width: 118, fontSize: 9, fontFamily: FONT.rubikMedium, textAlign: 'center' },
-          ];
-    default:
-      return [];
+  return key === 'prayerNextPrevious_medium' ? `${key}_${isAr ? 'ar' : 'en'}` : key;
+}
+
+function overlaysFor(widgetId: string, size: AndroidSize, isAr: boolean = true): OverlayAnchor[] {
+  const specs = ANDROID_OVERLAY_ANCHORS[overlayAnchorKey(widgetId, size, isAr)] ?? [];
+  return specs.map((spec) => ({
+    ...spec,
+    fontFamily: FONT[spec.fontKey ?? 'rubikMedium'] ?? FONT.rubikMedium,
+  }));
+}
+
+interface TemplateTextOverlay {
+  key: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  textAlign?: 'center' | 'left' | 'right';
+}
+
+/**
+ * Numeric prayer values are deliberately absent from the captured template.
+ * Draw them from the locally recomputed adhan snapshot so a placed widget can
+ * move through future days without reopening the app while its chrome remains
+ * the exact gallery PNG.
+ */
+function prayerTemplateTextOverlays(
+  widgetId: string,
+  size: AndroidSize,
+  data: SharedWidgetData,
+  isAr: boolean,
+  numerals: 'auto' | 'arabic' | 'western' | undefined,
+  textColor: string,
+  mutedColor: string,
+): TemplateTextOverlay[] {
+  const tableState = resolvePrayerTableState(data.prayer);
+  const rows = tableState.rows;
+  const next = tableState.nextRow ?? rows[0];
+  const previous = tableState.previousRow ?? rows[rows.length - 1];
+  const fmt = (value?: string) => applyNumerals(value ?? '--:--', numerals, isAr);
+  const item = (
+    key: string,
+    text: string,
+    x: number,
+    y: number,
+    width: number,
+    fontSize: number,
+    color: string,
+    textAlign: 'center' | 'left' | 'right' = 'center',
+  ): TemplateTextOverlay => ({ key, text, x, y, width, fontSize, fontFamily: FONT.rubikBold, color, textAlign });
+
+  if (widgetId === 'prayerSingle') {
+    return [item('hero', fmt(next?.time ?? data.prayer?.nextPrayerTime), 78, 96, 124, 38, textColor)];
   }
+
+  if (widgetId === 'prayerNextPrevious') {
+    const nextX = isAr ? 91 : 238;
+    const previousX = isAr ? 238 : 91;
+    return [
+      item('next', fmt(next?.time ?? data.prayer?.nextPrayerTime), nextX, 88, 118, 24, textColor),
+      item('previous', fmt(previous?.time), previousX, 88, 118, 24, textColor),
+    ];
+  }
+
+  if (size === 'small') {
+    const rowY = [48, 62, 76, 90, 104, 118];
+    return rows.map((row, index) => item(
+      `row-${row.name}`,
+      fmt(row.time),
+      39,
+      rowY[index] ?? 48,
+      54,
+      9.5,
+      row.isNext ? textColor : mutedColor,
+      isAr ? 'left' : 'right',
+    ));
+  }
+
+  if (size === 'large') {
+    // PrayerTablePreview uses a flex list with `justifyContent: 'space-between'`
+    // in the large Android tile. Keep the native numeric layer centered on
+    // those expanded rows; the old compact coordinates shifted every time
+    // into the prayer name below it.
+    const rowY = [139, 175, 211, 247, 283, 319];
+    return [
+      item('hero', fmt(next?.time ?? data.prayer?.nextPrayerTime), isAr ? 243 : 86, 78, 152, 34, textColor),
+      ...rows.map((row, index) => item(
+        `row-${row.name}`,
+        fmt(row.time),
+        isAr ? 53 : 276,
+        rowY[index] ?? 184,
+        66,
+        16,
+        row.isNext ? textColor : mutedColor,
+        isAr ? 'left' : 'right',
+      )),
+    ];
+  }
+
+  const rowY = [43, 57, 71, 85, 99, 113];
+  return [
+    item('hero', fmt(next?.time ?? data.prayer?.nextPrayerTime), 246, 98, 126, 29, textColor),
+    ...rows.map((row, index) => item(
+      `row-${row.name}`,
+      fmt(row.time),
+      39,
+      rowY[index] ?? 43,
+      54,
+      9.5,
+      row.isNext ? textColor : mutedColor,
+      isAr ? 'left' : 'right',
+    )),
+  ];
 }
 
 function liveText(
@@ -269,6 +541,10 @@ function liveText(
     }
     case 'prayerNextCountdown':
       return formatCountdownFromEpoch(resolveNextPrayerEpoch(data, now), isAr, numerals, now, data.prayer?.prayerDataUpdatedAt);
+    case 'prayerNextCountdownWithLabel': {
+      const countdown = formatCountdownFromEpoch(resolveNextPrayerEpoch(data, now), isAr, numerals, now, data.prayer?.prayerDataUpdatedAt);
+      return isAr ? `الصلاة القادمة ${countdown}` : `Next prayer ${countdown}`;
+    }
     case 'prayerPreviousCountdown':
       return formatPreviousFromEpoch(resolvePreviousPrayerEpoch(data, now), isAr, numerals, now);
   }
@@ -290,12 +566,16 @@ function prayerEpochRows(data: SharedWidgetData): Array<{ epochMs: number }> {
 }
 
 function resolveNextPrayerEpoch(data: SharedWidgetData, now: Date): number | undefined {
+  const tableState = resolvePrayerTableState(data.prayer, now.getTime());
+  if (tableState.nextEpochMs) return tableState.nextEpochMs;
   const rows = prayerEpochRows(data);
   const nowMs = now.getTime();
   return rows.find((row) => row.epochMs > nowMs)?.epochMs ?? data.prayer?.nextPrayerAtEpochMs;
 }
 
 function resolvePreviousPrayerEpoch(data: SharedWidgetData, now: Date): number | undefined {
+  const tableState = resolvePrayerTableState(data.prayer, now.getTime());
+  if (tableState.previousEpochMs) return tableState.previousEpochMs;
   const rows = prayerEpochRows(data);
   const nowMs = now.getTime();
   return [...rows].reverse().find((row) => row.epochMs <= nowMs)?.epochMs ?? data.prayer?.previousPrayerAtEpochMs;
@@ -382,13 +662,25 @@ export function SnapshotWidget({
   snapshotKey,
   snapshotPath,
   fallbackReason,
+  isPrayerStaticTemplate = false,
   widgetWidth,
   widgetHeight,
 }: SnapshotWidgetProps) {
-  // Date widgets bypass the PNG entirely — they always read new Date() directly
-  // so the date/time stays accurate indefinitely without app opens.
+  // Date widgets: prefer the baked gallery PNG when it was generated TODAY so the
+  // home tile is pixel-identical to the gallery/picker (same render). When the PNG
+  // is missing or stale (app not opened today), fall back to the live native
+  // re-render so the date stays correct indefinitely offline. dayDigital is always
+  // live because its baked time goes stale within a minute.
   if (DATE_WIDGET_IDS.has(widgetId)) {
-    return <LiveDateWidget widgetId={widgetId} size={size} data={data} clickAction={clickAction} clickUri={clickUri} />;
+    const liveDate = (
+      <LiveDateWidget widgetId={widgetId} size={size} data={data} clickAction={clickAction} clickUri={clickUri} widgetWidth={widgetWidth} widgetHeight={widgetHeight} />
+    );
+    if (widgetId === 'dayDigital') return liveDate;
+    const dateTheme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
+    const dateEntry = data.snapshotManifest?.[snapshotRouteKeyForPlacement(widgetId, size, dateTheme)];
+    const bakedToday = !!dateEntry?.updatedAt && isSameLocalDay(new Date(dateEntry.updatedAt), new Date());
+    if (!hasSnapshot || !bakedToday) return liveDate;
+    // else: fall through to the shared PNG rendering path (ImageWidget) below.
   }
   const { width, height } = SIZE_DIMS[size];
   const targetWidth = Number.isFinite(widgetWidth) && (widgetWidth ?? 0) > 0 ? widgetWidth! : width;
@@ -410,6 +702,49 @@ export function SnapshotWidget({
   const p = paletteFor(resolvedTheme);
   const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
   const overlays = overlaysFor(widgetId, size, isAr);
+  const templateTextOverlays = isPrayerStaticTemplate
+    ? prayerTemplateTextOverlays(widgetId, size, data, isAr, numerals, p.text, p.muted)
+    : [];
+  const overlayNow = new Date();
+  const prayerEpochCandidates = prayerEpochRows(data).map((row) => row.epochMs);
+  const nativeTextOverlays: NativePrayerTextOverlay[] = overlays
+    .filter((ov) => isNativePrayerTextOverlay(ov.kind))
+    .map((ov) => {
+      const overlayText = liveText(ov.kind, data, isAr, numerals, overlayNow);
+      const scaledX = imageOffsetX + ov.x * renderScale;
+      const scaledY = imageOffsetY + ov.y * renderScale;
+      const scaledWidth = ov.width * renderScale;
+      const scaledFontSize = ov.fontSize * renderScale;
+      const height = (ov.lineHeight ?? ov.fontSize * 2) * renderScale;
+      const top = scaledY - height / 2 - NATIVE_TEXT_VERTICAL_SAFETY;
+      const safeHeight = height + NATIVE_TEXT_VERTICAL_SAFETY * 2;
+      const isPrevious = ov.kind === 'prayerPreviousCountdown';
+      return {
+        text: overlayText,
+        targetEpochMs: isPrevious
+          ? resolvePreviousPrayerEpoch(data, overlayNow)
+          : resolveNextPrayerEpoch(data, overlayNow),
+        epochCandidates: prayerEpochCandidates,
+        direction: isPrevious ? 'since' : 'until',
+        labelKind: ov.kind === 'prayerNextCountdownWithLabel' ? 'nextPrayer' : 'duration',
+        language: isAr ? 'ar' : 'en',
+        arabicNumerals: numerals === 'arabic' || (numerals !== 'western' && isAr),
+        compact: ov.compact === true,
+        leftFraction: Math.max(0, scaledX - scaledWidth / 2) / targetWidth,
+        topFraction: Math.max(0, top) / targetHeight,
+        rightFraction: Math.max(0, targetWidth - (scaledX + scaledWidth / 2)) / targetWidth,
+        bottomFraction: Math.max(0, targetHeight - (top + safeHeight)) / targetHeight,
+        widgetWidth: targetWidth,
+        widgetHeight: targetHeight,
+        fontSize: scaledFontSize,
+        color: ov.kind === 'currentTime' ? p.text : p.muted,
+        textAlign: ov.textAlign ?? 'center',
+      };
+    });
+  const rootClickActionData = {
+    ...(clickUri ? { uri: clickUri } : {}),
+    ...(nativeTextOverlays.length ? { nativeTextOverlays } : {}),
+  };
 
   // Branded loading state — rendered ONLY when no PNG is on disk.
   if (!hasSnapshot) {
@@ -485,7 +820,7 @@ export function SnapshotWidget({
         overflow: 'hidden',
       }}
       clickAction={clickAction}
-      clickActionData={clickUri ? { uri: clickUri } : undefined}
+      clickActionData={rootClickActionData}
     >
       <ImageWidget
         // RNAW's TS type for `image` only lists http/https/data/require, but the
@@ -506,13 +841,43 @@ export function SnapshotWidget({
         imageHeight={renderedImageHeight}
         radius={0}
       />
-      {overlays.map((ov, index) => {
+      {templateTextOverlays.map((ov) => {
+        const scaledWidth = ov.width * renderScale;
+        const scaledFontSize = ov.fontSize * renderScale;
+        const lineHeight = scaledFontSize * 1.4;
+        const textTopOffset = widgetId === 'prayerSingle' && ov.key === 'hero'
+          ? lineHeight / 2
+          : scaledFontSize;
+        return (
+          <TextWidget
+            key={`template-${ov.key}`}
+            text={ov.text}
+            style={{
+              width: scaledWidth,
+              height: lineHeight,
+              fontSize: scaledFontSize,
+              color: ov.color as any,
+              fontFamily: ov.fontFamily,
+              textAlign: ov.textAlign ?? 'center',
+              marginLeft: imageOffsetX + ov.x * renderScale - scaledWidth / 2,
+              marginTop: imageOffsetY + ov.y * renderScale - textTopOffset,
+            }}
+            allowFontScaling={false}
+            maxLines={1}
+          />
+        );
+      })}
+      {overlays.filter((ov) => !isNativePrayerTextOverlay(ov.kind)).map((ov, index) => {
+        // Prayer timers are painted by the native RemoteViews shell. Keeping
+        // them outside the bitmap lets AlarmManager update the compact text
+        // while React Native is cold or the app process has been reclaimed.
         const overlayStr = liveText(ov.kind, data, isAr, numerals, new Date());
-        const renderedOverlayStr = ov.compact ? overlayStr.replace(/\s/g, '') : overlayStr;
+        const renderedOverlayStr = overlayStr;
         const scaledX = imageOffsetX + ov.x * renderScale;
         const scaledY = imageOffsetY + ov.y * renderScale;
         const scaledWidth = ov.width * renderScale;
         const scaledFontSize = ov.fontSize * renderScale;
+        const lineHeight = (ov.lineHeight ?? ov.fontSize * 2) * renderScale;
         return renderedOverlayStr ? (
           <TextWidget
             key={`${ov.kind}-${index}`}
@@ -524,7 +889,7 @@ export function SnapshotWidget({
               fontFamily: ov.fontFamily,
               textAlign: ov.textAlign ?? 'center',
               marginLeft: scaledX - scaledWidth / 2,
-              marginTop: scaledY - scaledFontSize,
+              marginTop: scaledY - lineHeight / 2,
             }}
             allowFontScaling={false}
             maxLines={1}
