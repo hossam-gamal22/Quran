@@ -51,6 +51,19 @@ function isSameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+/**
+ * Mimic the preview's `adjustsFontSizeToFit` for the live calligraphy fallback:
+ * shrink the font when the label is longer than the tile comfortably fits, down
+ * to the same floor the preview uses (minimumFontScale ≈ 0.75). Without this,
+ * long Hijri month names (e.g. "جمادى الآخرة") clip in the native re-render the
+ * widget falls back to when its fresh gallery PNG is unavailable offline.
+ */
+function fitCalligraphyFs(baseFs: number, text: string, budgetChars: number): number {
+  const len = (text ?? '').trim().length;
+  if (len <= budgetChars) return baseFs;
+  return Math.max(Math.round(baseFs * 0.75), Math.round((baseFs * budgetChars) / len));
+}
+
 function parseHex6(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
   if (!m) return null;
@@ -206,7 +219,8 @@ function LiveDateWidget({
     // (medium only). Weekday uses fillStrong + an Arabic top-padding nudge.
     const wmDay = applyNumerals(useHijri ? hijriDay : now.getDate(), numerals, isAr);
     const watermarkFont = watermarkFontFor(numerals, isAr, widgetFont);
-    const weekdayFs = size === 'small' ? 34 : 52;
+    const weekdayText = isAr ? WEEKDAYS_AR[now.getDay()] : WEEKDAYS_EN[now.getDay()];
+    const weekdayFs = fitCalligraphyFs(size === 'small' ? 34 : 52, weekdayText, size === 'small' ? 6 : 8);
     const weekday = (
       <TextWidget
         text={isAr ? WEEKDAYS_AR[now.getDay()] : WEEKDAYS_EN[now.getDay()]}
@@ -249,7 +263,7 @@ function LiveDateWidget({
       ? `${applyNumerals(hijriDay, numerals, true)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, true)}`
       : formatDateSample(now, configuredDateFormat, numerals, isAr);
     const monthLabelFont = isAr ? widgetFont : FONT.rubikBold;
-    const monthFs = size === 'small' ? 26 : 38;
+    const monthFs = fitCalligraphyFs(size === 'small' ? 26 : 38, mName, size === 'small' ? 6 : 9);
     const wmFs = size === 'small' ? 90 : 140;
     const subtitleFs = size === 'small' ? 11 : 13;
     const dateBottom = size === 'small' ? 16 : 22;
@@ -284,7 +298,7 @@ function LiveDateWidget({
     const mName = useMonthHijri
       ? hijriMonthName
       : (isAr ? MONTHS_AR[now.getMonth()] : now.toLocaleDateString('en', { month: 'long' }));
-    const mainFs = size === 'small' ? 34 : 52;
+    const mainFs = fitCalligraphyFs(size === 'small' ? 34 : 52, mName, size === 'small' ? 6 : 8);
     const wmFs = size === 'small' ? 64 : 130;
     return frame(
       <OverlapWidget
