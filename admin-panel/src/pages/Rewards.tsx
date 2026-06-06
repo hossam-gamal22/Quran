@@ -563,7 +563,7 @@ export default function Rewards() {
               <button
                 onClick={loadLeaderboard}
                 disabled={loadingBoard}
-                className="px-3 py-1.5 text-sm bg-admin-surface-light text-slate-200 border border-admin-border rounded-lg hover:bg-slate-700"
+                className="px-3 py-1.5 text-sm font-medium bg-admin-surface-light text-white border border-admin-border rounded-lg hover:bg-slate-700"
                 aria-label="تحديث لوحة المتصدرين"
                 title="تحديث لوحة المتصدرين"
               >
@@ -650,15 +650,15 @@ export default function Rewards() {
                 <table className="w-full">
                   <thead className="bg-admin-surface-light/60">
                     <tr>
-                      <th className="px-4 py-3 text-right text-sm text-slate-300">#</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-300">المستخدم</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-300">الجهاز</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-300">نقاط</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-300">المنصة</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-300">آخر نشاط</th>
-                      <th className="px-4 py-3 text-center text-sm text-slate-300">إخفاء</th>
-                      <th className="px-4 py-3 text-center text-sm text-slate-300">دمج</th>
-                      <th className="px-4 py-3 text-center text-sm text-slate-300">فائز</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-200">#</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-200">المستخدم</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-200">الجهاز</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-200">نقاط</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-200">المنصة</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-200">آخر نشاط</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-200">إخفاء</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-200">دمج</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-200">فائز</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -716,17 +716,17 @@ export default function Rewards() {
                             {user.hidden && <span className="text-xs text-red-300 mr-2">(مخفي)</span>}
                           </div>
                           {user.email && (
-                            <div className="text-xs text-slate-300">{user.email}</div>
+                            <div className="text-xs text-slate-200">{user.email}</div>
                           )}
-                          <div className="text-[10px] text-slate-400 font-mono truncate max-w-[140px]" title={user.id}>{user.id}</div>
+                          <div className="text-[10px] text-slate-300 font-mono truncate max-w-[140px]" title={user.id}>{user.id}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-xs text-slate-200">{user.deviceBrand || ''} {user.deviceName || '-'}</div>
-                          <div className="text-[10px] text-slate-400">{user.installSource || '-'}</div>
+                          <div className="text-xs text-slate-100">{user.deviceBrand || ''} {user.deviceName || '-'}</div>
+                          <div className="text-[10px] text-slate-300">{user.installSource || '-'}</div>
                         </td>
                         <td className="px-4 py-3 font-bold text-amber-300">{user.score}</td>
-                        <td className="px-4 py-3 text-sm text-slate-300">{user.platform || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-300">{user.lastActive || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-200">{user.platform || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-200">{user.lastActive || '-'}</td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => toggleUserVisibility(user.id)}
@@ -814,7 +814,7 @@ export default function Rewards() {
                       <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                       <span className="font-medium text-white">{w.displayName || w.userId.slice(0, 8)}</span>
                     </div>
-                    <div className="text-sm text-slate-300">
+                    <div className="text-sm text-slate-200">
                       {w.score} نقطة — ينتهي: {new Date(w.premiumExpiresAt).toLocaleDateString('ar-EG')}
                     </div>
                   </div>

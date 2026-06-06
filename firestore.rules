@@ -29,8 +29,12 @@ service cloud.firestore {
     }
 
     function safeUserCreate() {
-      return signedIn()
-        && boundedDoc(80)
+      // TEMPORARY (2026-06-06): `signedIn()` dropped because the published app
+      // is not establishing a Firebase Auth session at write time, so every
+      // user-doc write was being denied and monthly engagement stopped rolling
+      // over. Privilege-escalation + score-monotonicity guards stay in force.
+      // Re-add `signedIn()` once the auth fix ships in the app build.
+      return boundedDoc(80)
         && !request.resource.data.keys().hasAny([
           'adminPremium',
           'role',
@@ -74,8 +78,11 @@ service cloud.firestore {
     }
 
     function safeUserUpdate() {
-      return signedIn()
-        && boundedDoc(100)
+      // TEMPORARY (2026-06-06): `signedIn()` dropped — see safeUserCreate note.
+      // Restores the pre-2026-05-26 ability for the published app to write its
+      // own user doc (monthly engagement) without a guaranteed auth session.
+      // Re-add `signedIn()` once the auth fix ships in the app build.
+      return boundedDoc(100)
         && noUserPrivilegeEscalation()
         && noMonthlyScoreDecrease();
     }

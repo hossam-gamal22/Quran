@@ -106,15 +106,22 @@ const initAuth = (): Auth | null => {
     }
   }
 
-  // Native (iOS/Android): use the RN entry-point for persistence support
+  // Native (iOS/Android): initialize Auth with AsyncStorage persistence.
+  // firebase v10 exposes `initializeAuth` + `getReactNativePersistence` from
+  // the main `firebase/auth` entry (Metro resolves the react-native build).
+  // The old v9 `firebase/auth/react-native` subpath no longer resolves and
+  // was silently falling back to a persistence-less / null auth, which broke
+  // anonymous sign-in and (via the auth-gated rules) all user-doc writes.
   try {
     const {
       initializeAuth: initializeAuthRN,
       getReactNativePersistence,
-    } = require('firebase/auth/react-native');
+    } = require('firebase/auth') as typeof import('firebase/auth') & {
+      getReactNativePersistence: (storage: unknown) => unknown;
+    };
 
     return initializeAuthRN(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
+      persistence: getReactNativePersistence(AsyncStorage) as any,
     });
   } catch (error: any) {
     const message = String(error?.message || '');

@@ -4,3 +4,4 @@
 
 export { default, default as app } from '@/config/firebase';
 export { db, storage } from '@/config/firebase';
+export { ensureFirebaseUser, getFirebaseUid } from '@/config/firebase';

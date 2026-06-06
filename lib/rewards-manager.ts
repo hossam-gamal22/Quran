@@ -3,7 +3,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where, getCountFromServer } from 'firebase/firestore';
-import { db } from './firebase-config';
+import { db, ensureFirebaseUser, getFirebaseUid } from './firebase-config';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
 import { getMonthlyActivityStats, getTodayDate } from '@/lib/worship-storage';
 
@@ -342,6 +342,10 @@ export const updateMonthlyScore = async (
 
     // 3. Try to sync to Firestore
     try {
+      // Establish the anonymous auth session first — the user-doc write rules
+      // require `signedIn()`; otherwise the write is denied and points only
+      // ever live in local pending until the next forced reconcile.
+      await ensureFirebaseUser().catch(() => {});
       const userRef = doc(db, 'users', userId);
       const userSnap = await getDoc(userRef);
       const docExists = userSnap.exists();
@@ -564,6 +568,19 @@ export const syncMonthlyEngagementFromLocalWorship = async (
         displayName: getVisibleDisplayName(data || {}),
       };
     }
+
+    // Ensure an anonymous Firebase Auth session exists BEFORE writing. The
+    // Firestore rules gate user-doc writes on `signedIn()`; without awaiting
+    // this the write races ahead of auth and is denied (request.auth == null),
+    // which previously froze all monthly-engagement updates. Persist authUid
+    // so the doc-ownership rules (self-delete) can match this session later.
+    try {
+      await ensureFirebaseUser();
+      const uid = getFirebaseUid();
+      if (uid && data?.authUid !== uid) {
+        engagementUpdate.authUid = uid;
+      }
+    } catch {}
 
     if (docExists) {
       await updateDoc(userRef, engagementUpdate);
