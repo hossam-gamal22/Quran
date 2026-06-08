@@ -33,13 +33,14 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processEngagementTriggers = exports.runEngagementNotifications = exports.cleanupFcmPrayerDedupe = exports.sendPrayerPushFallback = exports.processScheduledAdminNotifications = exports.validateAdminSession = exports.verifyAdminPassword = exports.cleanupActivityDaily = exports.cacheLeaderboardSnapshot = exports.selectMonthlyWinners = exports.guardMonthlyEngagementRegression = exports.answerUserQuestionAutomatically = void 0;
+exports.processEngagementTriggers = exports.runEngagementNotifications = exports.cleanupFcmPrayerDedupe = exports.sendPrayerPushFallback = exports.processScheduledAdminNotifications = exports.validateAdminSession = exports.verifyAdminPassword = exports.cleanupActivityDaily = exports.recomputeScoresOnWeightsChange = exports.cacheLeaderboardSnapshot = exports.selectMonthlyWinners = exports.guardMonthlyEngagementRegression = exports.answerUserQuestionAutomatically = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const params_1 = require("firebase-functions/params");
 const crypto = __importStar(require("crypto"));
 const engagement_guard_1 = require("./engagement-guard");
+const score_weights_1 = require("./score-weights");
 // Expo Access Token for authenticated push API calls
 const expoAccessToken = (0, params_1.defineSecret)('EXPO_ACCESS_TOKEN');
 // Initialize Firebase Admin
@@ -2083,6 +2084,104 @@ exports.cacheLeaderboardSnapshot = (0, scheduler_1.onSchedule)({ schedule: 'ever
     }
     catch (error) {
         logger.error('❌ cacheLeaderboardSnapshot failed:', error);
+    }
+});
+/**
+ * Rebuild `cache/leaderboard-current` immediately (same shape as the scheduled
+ * cacheLeaderboardSnapshot). Used right after a weights-change recompute so the
+ * in-app board does not wait up to 15 minutes for the next schedule tick.
+ */
+async function rebuildLeaderboardCache(currentMonth) {
+    const snapshot = await db.collection('users')
+        .where('monthlyEngagement.month', '==', currentMonth)
+        .orderBy('monthlyEngagement.score', 'desc')
+        .limit(50)
+        .get();
+    const entries = [];
+    snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const engagement = data.monthlyEngagement;
+        const displayName = String(data.displayName || '').trim();
+        if (engagement?.score > 0 && displayName && !data.hiddenFromLeaderboard && !data.placeholder) {
+            entries.push({ userId: docSnap.id, displayName, score: Number(engagement.score) || 0 });
+        }
+    });
+    const totalCountSnap = await db.collection('users')
+        .where('monthlyEngagement.month', '==', currentMonth)
+        .where('monthlyEngagement.score', '>', 0)
+        .count()
+        .get();
+    await db.doc('cache/leaderboard-current').set({
+        month: currentMonth,
+        entries,
+        lowestCachedScore: entries.length > 0 ? entries[entries.length - 1].score : null,
+        totalEligibleCount: totalCountSnap.data().count,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+}
+/**
+ * When the admin changes the point weights (scoreWeightsVersion bumps), recompute
+ * every current-month user's score from their stored activities × the new weights
+ * and refresh the leaderboard cache — so a weight edit in the admin panel takes
+ * effect for everyone immediately, instead of waiting for each device to sync.
+ *
+ * Score is recomputed from `monthlyEngagement.activities` (already on the doc);
+ * the raw worship logs live only on-device, but the per-activity counts are
+ * denormalised here, so the server can re-weight them faithfully. A lowered
+ * score is written with a fresh `engagementCorrection.correctedAt` so
+ * guardMonthlyEngagementRegression accepts the same-month decrease.
+ */
+exports.recomputeScoresOnWeightsChange = functions
+    .runWith({ timeoutSeconds: 540, memory: '512MB' })
+    .firestore.document('config/rewards-settings')
+    .onUpdate(async (change) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    const beforeVersion = Number(before.scoreWeightsVersion) || 0;
+    const afterVersion = Number(after.scoreWeightsVersion) || 0;
+    if (afterVersion <= beforeVersion)
+        return; // only react to a weights bump
+    const weights = (0, score_weights_1.normalizeWeights)(after.scoreWeights || {});
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
+    const snap = await db.collection('users')
+        .where('monthlyEngagement.month', '==', currentMonth)
+        .get();
+    let updated = 0;
+    // Sequential updates keep each user-doc onUpdate (the regression guard)
+    // well-behaved; current-month cohorts are small. Chunked awaits avoid
+    // overwhelming Firestore if the cohort grows.
+    for (const doc of snap.docs) {
+        const me = doc.data().monthlyEngagement || {};
+        const oldScore = Number(me.score) || 0;
+        const newScore = (0, score_weights_1.computeScore)(me.activities || {}, weights);
+        if (newScore === oldScore && Number(me.weightsVersion) === afterVersion)
+            continue;
+        const update = {
+            'monthlyEngagement.score': newScore,
+            'monthlyEngagement.weightsVersion': afterVersion,
+        };
+        if (newScore < oldScore) {
+            update.engagementCorrection = {
+                type: 'weights_recompute',
+                weightsVersion: afterVersion,
+                correctedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+        }
+        await doc.ref.update(update);
+        updated += 1;
+    }
+    logger.info('[honor-board] recomputed scores on weights change', {
+        from: beforeVersion,
+        to: afterVersion,
+        cohort: snap.size,
+        updated,
+    });
+    try {
+        await rebuildLeaderboardCache(currentMonth);
+    }
+    catch (e) {
+        logger.warn('[honor-board] cache rebuild after recompute failed:', e);
     }
 });
 /**
