@@ -77,7 +77,7 @@ const DEFAULT_CONFIG: RewardsConfig = {
     azkar: 2,
     quran: 3,
     prayer: 5,
-    tasbih: 1,
+    tasbih: 0.5, // every 2 tasbih = 1 point
     khatma: 100,
     fasting: 4,
   },
@@ -267,12 +267,13 @@ export default function Rewards() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Open the newest history month by default (once, when history first loads).
+  // Open the newest auto-selected history month by default (once).
   const [historyInitialized, setHistoryInitialized] = useState(false);
   useEffect(() => {
-    if (historyInitialized || config.history.length === 0) return;
-    const newest = monthSortKey(config.history[0].month);
-    setOpenMonths(new Set([newest]));
+    if (historyInitialized) return;
+    const firstAuto = config.history.find(h => h.selectedBy === 'auto');
+    if (!firstAuto) return;
+    setOpenMonths(new Set([monthSortKey(firstAuto.month)]));
     setHistoryInitialized(true);
   }, [config.history, historyInitialized]);
 
@@ -584,9 +585,12 @@ export default function Rewards() {
 
   // Group history by calendar month so duplicate selections and legacy -v1/-v2
   // keys fold under a single readable "مايو 2026" card, newest month first.
+  // Only the automatic month-end selection is shown — manual/test selections
+  // (selectedBy === 'admin') are hidden from the supervisor's log.
   const historyByMonth = useMemo(() => {
     const groups = new Map<string, { key: string; label: string; entries: typeof config.history }>();
     for (const entry of config.history) {
+      if (entry.selectedBy !== 'auto') continue;
       const key = monthSortKey(entry.month);
       if (!groups.has(key)) {
         groups.set(key, { key, label: formatMonthLabel(entry.month), entries: [] });
@@ -988,7 +992,8 @@ export default function Rewards() {
                   <input
                     type="range"
                     min={0}
-                    max={10}
+                    max={100}
+                    step={0.5}
                     value={value}
                     onChange={e => updateWeight(key, Number(e.target.value))}
                     className="flex-1 accent-amber-500"
@@ -1028,7 +1033,7 @@ export default function Rewards() {
       {/* History Tab */}
       {activeTab === 'history' && (
         <div>
-          {config.history.length === 0 ? (
+          {historyByMonth.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>لا يوجد سجل سابق</p>

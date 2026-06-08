@@ -2,7 +2,7 @@
 // نظام المكافآت الشهرية — إدارة النقاط والفائزين
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where, getCountFromServer } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where, getCountFromServer, serverTimestamp } from 'firebase/firestore';
 import { db, ensureFirebaseUser, getFirebaseUid } from './firebase-config';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
 import { getMonthlyActivityStats, getTodayDate } from '@/lib/worship-storage';
@@ -42,7 +42,7 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
   azkar: 2,
   quran: 3,
   prayer: 5,
-  tasbih: 1,
+  tasbih: 0.5, // every 2 tasbih = 1 point
   khatma: 100,
   fasting: 4,
 };
@@ -111,7 +111,9 @@ export const calculateMonthlyScore = (
   for (const [key, count] of Object.entries(activities)) {
     score += (Number(count) || 0) * (weights[key as ActivityType] || 1);
   }
-  return score;
+  // Floor so fractional weights (e.g. tasbih = 0.5 → "every 2 tasbih = 1 pt")
+  // always yield whole-number, comparable scores.
+  return Math.floor(score);
 };
 
 export const orderLeaderboard = (
@@ -525,10 +527,29 @@ export const syncMonthlyEngagementFromLocalWorship = async (
     );
 
     const calculatedScore = calculateMonthlyScore(activities, weights);
-    const score = Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
+
+    // When the admin changes the point weights, scoreWeightsVersion bumps. The
+    // usual `Math.max(calculated, cloudFloor)` floor (which guards against a
+    // reinstalled device wiping the cloud score) would otherwise pin the OLD
+    // higher score forever after a weight DECREASE (e.g. tasbih 1 → 0.5). So
+    // when this device's stored weightsVersion is older than the config, the
+    // fresh recompute is authoritative and may lower the score. We stamp a
+    // fresh engagementCorrection so the server guard accepts the same-month
+    // decrease, exactly like the admin remediation script does.
+    const configWeightsVersion = Number((config as any).scoreWeightsVersion) || 0;
+    const cloudWeightsVersion = engagement.month === currentMonth
+      ? Number((engagement as any).weightsVersion) || 0
+      : 0;
+    const weightsChanged = configWeightsVersion > cloudWeightsVersion;
+    const score = weightsChanged
+      ? calculatedScore
+      : Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
 
     const monthIsCurrent = engagement.month === currentMonth;
-    const scoreUnchanged = monthIsCurrent && Number(engagement.score) === score;
+    const scoreUnchanged =
+      monthIsCurrent &&
+      Number(engagement.score) === score &&
+      cloudWeightsVersion === configWeightsVersion;
     const willArchivePrevMonth =
       docExists && engagement.month && engagement.month !== currentMonth && engagement.score > 0;
 
@@ -551,8 +572,21 @@ export const syncMonthlyEngagementFromLocalWorship = async (
         month: currentMonth,
         score,
         activities,
+        // Stamp the weights version this score was computed with so a later
+        // weight change is detected and allowed to re-lower the score.
+        weightsVersion: configWeightsVersion,
       },
     };
+    // If a weight change lowered the score below the cloud value, mark this as a
+    // deliberate correction so guardMonthlyEngagementRegression accepts the
+    // same-month decrease (otherwise the server would revert it).
+    if (weightsChanged && monthIsCurrent && score < (Number(engagement.score) || 0)) {
+      engagementUpdate.engagementCorrection = {
+        type: 'weights_recompute',
+        weightsVersion: configWeightsVersion,
+        correctedAt: serverTimestamp(),
+      };
+    }
     if (willArchivePrevMonth) {
       engagementUpdate[`engagementHistory.${engagement.month}`] = {
         score: engagement.score,
@@ -796,7 +830,16 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
     // Recalculate score from merged activities × weights for consistency
     const weights = config.scoreWeights || DEFAULT_WEIGHTS;
     const calculatedScore = calculateMonthlyScore(activities, weights);
-    const score = Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
+    // Mirror the sync floor logic: after a weight change (newer config version
+    // than the score was stamped with) the recompute is authoritative and may
+    // be lower; otherwise keep the anti-regression floor.
+    const configWeightsVersion = Number((config as any).scoreWeightsVersion) || 0;
+    const cloudWeightsVersion = engagement && engagement.month === currentMonth
+      ? Number((engagement as any).weightsVersion) || 0
+      : 0;
+    const score = configWeightsVersion > cloudWeightsVersion
+      ? calculatedScore
+      : Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
 
     return { score, month: currentMonth, activities, mergeBonus };
   } catch {

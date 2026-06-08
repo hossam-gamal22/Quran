@@ -151,6 +151,8 @@ vi.mock('firebase/firestore', () => {
 
 import {
   autoSelectMonthlyWinners,
+  calculateMonthlyScore,
+  DEFAULT_WEIGHTS,
   getCurrentMonth,
   getMonthlyLeaderboard,
   getUserMonthlyInfo,
@@ -159,6 +161,27 @@ import {
   syncPendingScores,
   updateMonthlyScore,
 } from '../lib/rewards-manager';
+
+describe('calculateMonthlyScore — fractional tasbih weight', () => {
+  it('defaults tasbih to 0.5 (every 2 tasbih = 1 point)', () => {
+    expect(DEFAULT_WEIGHTS.tasbih).toBe(0.5);
+  });
+
+  it('floors the total so odd tasbih counts give whole points', () => {
+    // 19687 tasbih × 0.5 = 9843.5 → floored to 9843, plus prayer/quran.
+    const score = calculateMonthlyScore(
+      { tasbih: 19687, prayer: 2, quran: 57 },
+      DEFAULT_WEIGHTS,
+    );
+    expect(score).toBe(Math.floor(19687 * 0.5) + 2 * 5 + 57 * 3);
+    expect(score).toBe(9843 + 10 + 171);
+    expect(Number.isInteger(score)).toBe(true);
+  });
+
+  it('halves an even tasbih count exactly', () => {
+    expect(calculateMonthlyScore({ tasbih: 100 }, DEFAULT_WEIGHTS)).toBe(50);
+  });
+});
 
 describe('rewards-manager monthly sync', () => {
   beforeEach(() => {

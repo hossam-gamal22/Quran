@@ -9,7 +9,7 @@ const DEFAULT_WEIGHTS = {
   azkar: 2,
   quran: 3,
   prayer: 5,
-  tasbih: 1,
+  tasbih: 0.5, // every 2 tasbih = 1 point
   khatma: 100,
   fasting: 4,
 };

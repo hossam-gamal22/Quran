@@ -40,11 +40,20 @@ export interface RewardsConfig {
   processedMonth?: string; // YYYY-MM-v2; set by automatic winner selection guards
   currentWinners: Winner[];
   history: RewardHistoryEntry[];
+  // Incremented by the admin panel every time the score weights actually change.
+  // The app compares it to the last value it showed the user to decide whether
+  // to surface the "points recalculated" banner on the honor board.
+  scoreWeightsVersion?: number;
+  scoreWeightsUpdatedAt?: string; // ISO timestamp of the last weight change
 }
 
 export interface MonthlyEngagement {
   month: string; // YYYY-MM
   score: number;
+  // scoreWeightsVersion this score was last computed with. When the admin
+  // changes weights, the config version bumps past this and the client is
+  // allowed to recompute (and lower) the score for the current month.
+  weightsVersion?: number;
   activities?: {
     app_open?: number;
     azkar?: number;

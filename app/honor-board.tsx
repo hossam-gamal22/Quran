@@ -1,7 +1,7 @@
 // app/honor-board.tsx
 // لوحة الشرف — عرض الفائزين الشهريين ورتبة المستخدم
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -19,7 +20,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { GlassCard } from '@/components/ui';
 import { ModalColors } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncMonthlyEngagementFromLocalWorship, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS, mergeCurrentUserIntoLeaderboard } from '@/lib/rewards-manager';
+import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncMonthlyEngagementFromLocalWorship, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS, mergeCurrentUserIntoLeaderboard, subscribeToRewardsConfig } from '@/lib/rewards-manager';
 import { getUserId, getDisplayName } from '@/lib/firebase-user';
 import type { RewardsConfig } from '@/types/rewards';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -39,6 +40,11 @@ const MEDAL_STYLES = (isDark: boolean) => [
 
 const LEADERBOARD_PREVIEW_COUNT = 5;
 const LEADERBOARD_MAX_VISIBLE_COUNT = 50;
+
+// Tracks the last scoreWeightsVersion the user has already seen on this device.
+// When the admin changes the point weights, the version bumps and we show a
+// one-time banner so the user knows their score was recalculated.
+const WEIGHTS_VERSION_SEEN_KEY = '@rewards_weights_version_seen';
 
 // Detect Arabic/Persian/Urdu script so writingDirection follows the name's own
 // script (iOS left-aligns a Latin string when writingDirection is forced to 'rtl').
@@ -89,6 +95,7 @@ export default function HonorBoard() {
   const [hasDisplayName, setHasDisplayName] = useState(true);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [selectedPointInfo, setSelectedPointInfo] = useState<SelectedPointInfo | null>(null);
+  const [showWeightsBanner, setShowWeightsBanner] = useState(false);
   const isArabic = (settings.language || 'ar') === 'ar';
 
   useFocusEffect(
@@ -96,6 +103,29 @@ export default function HonorBoard() {
       loadData();
     }, []),
   );
+
+  // Re-evaluate the "points recalculated" banner against the latest seen
+  // version. Shared by loadData and the live config subscription below.
+  const evaluateWeightsBanner = useCallback(async (weightsVersion: number) => {
+    if (!weightsVersion || weightsVersion <= 0) {
+      setShowWeightsBanner(false);
+      return;
+    }
+    const seenRaw = await AsyncStorage.getItem(WEIGHTS_VERSION_SEEN_KEY).catch(() => null);
+    const seenVersion = Number(seenRaw) || 0;
+    setShowWeightsBanner(weightsVersion > seenVersion);
+  }, []);
+
+  // Live-subscribe so a weight change made while the screen is open (or right
+  // before the user taps the deep-linked push) reliably flips the banner on,
+  // bypassing the cached-config read in fetchRewardsConfig.
+  useEffect(() => {
+    const unsubscribe = subscribeToRewardsConfig((latest) => {
+      setConfig(latest);
+      evaluateWeightsBanner(Number(latest.scoreWeightsVersion) || 0);
+    });
+    return unsubscribe;
+  }, [evaluateWeightsBanner]);
 
   const loadData = async () => {
     // Wrap Firestore work with a hard timeout so the screen never hangs
@@ -114,6 +144,11 @@ export default function HonorBoard() {
         getUserId(),
       ]));
       setConfig(rewardsConfig);
+
+      // Show the "points recalculated" banner once per weight change. The admin
+      // bumps scoreWeightsVersion whenever the point weights change; if it's
+      // newer than what this device last acknowledged, surface the banner.
+      await evaluateWeightsBanner(Number(rewardsConfig.scoreWeightsVersion) || 0);
 
       let syncedInfo: Awaited<ReturnType<typeof syncMonthlyEngagementFromLocalWorship>> = null;
       if (userId) {
@@ -207,6 +242,14 @@ export default function HonorBoard() {
     const now = new Date();
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return lastDay.getDate() - now.getDate();
+  };
+
+  const dismissWeightsBanner = async () => {
+    setShowWeightsBanner(false);
+    const version = Number(config?.scoreWeightsVersion) || 0;
+    if (version > 0) {
+      await AsyncStorage.setItem(WEIGHTS_VERSION_SEEN_KEY, String(version)).catch(() => {});
+    }
   };
 
   const bgColor = settings.display.appBackground !== 'none' ? 'transparent' : colors.background;
@@ -336,6 +379,41 @@ export default function HonorBoard() {
           </View>
         </GlassCard>
 
+        {/* Points recalculated banner — shown once after admin changes weights */}
+        {showWeightsBanner && (
+          <View
+            style={[
+              styles.weightsBanner,
+              {
+                backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)',
+                borderColor: isDarkMode ? 'rgba(245,158,11,0.35)' : 'rgba(181,114,0,0.3)',
+              },
+            ]}
+          >
+            <View style={[styles.weightsBannerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <MaterialCommunityIcons name="bell-ring-outline" size={20} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+              <Text
+                style={[
+                  styles.weightsBannerText,
+                  { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+                ]}
+              >
+                {isArabic
+                  ? 'تم تحديث طريقة حساب النقاط. تم إعادة حساب نقاطك وترتيبك بناءً على الأوزان الجديدة.'
+                  : 'The points system was updated. Your score and rank have been recalculated with the new weights.'}
+              </Text>
+              <TouchableOpacity
+                onPress={dismissWeightsBanner}
+                style={styles.weightsBannerClose}
+                activeOpacity={0.7}
+                accessibilityLabel={isArabic ? 'إغلاق' : 'Dismiss'}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Your Score */}
         <View
           style={[
@@ -399,7 +477,9 @@ export default function HonorBoard() {
                   {ACTIVITY_ROWS.map((item, i) => {
                     const weight = weights[item.weightKey] || DEFAULT_WEIGHTS[item.weightKey] || 1;
                     const count = monthlyActivities[item.key] || 0;
-                    const pts = count * weight;
+                    // Floor so fractional weights (e.g. tasbih = 0.5) still show
+                    // whole-number points, matching the scoring engine.
+                    const pts = Math.floor(count * weight);
                     return (
                       <View key={item.key}>
                         <View style={[styles.activityRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -472,11 +552,11 @@ export default function HonorBoard() {
 	              },
 	              {
 	                icon: 'counter' as const,
-	                labelAr: 'تسبيحة واحدة',
-	                labelEn: 'Tasbih count',
+	                labelAr: 'كل تسبيحتين = نقطة',
+	                labelEn: 'Every 2 tasbih = 1 point',
 	                weightKey: 'tasbih' as const,
-	                infoAr: 'كل ضغطة تسبيح تتحسب كتسبيحة واحدة في سجل اليوم. التراجع أو إعادة التعيين ينقص أو يمسح من نقاط اليوم لنفس التسبيح.',
-	                infoEn: 'Every tasbih tap counts as one entry in today’s record. Decrement and reset update today’s score record too.',
+	                infoAr: 'كل تسبيحتين تساويان نقطة واحدة (التسبيحة بنصف نقطة). تتحسب كل ضغطة تسبيح في سجل اليوم، ويُجبر إجمالي النقاط لأقرب عدد صحيح. التراجع أو إعادة التعيين ينقص من نقاط اليوم لنفس التسبيح.',
+	                infoEn: 'Every two tasbih equal one point (each tasbih is half a point). Each tap is recorded for the day and the total points are rounded down. Decrement and reset reduce today’s score too.',
 	              },
 	              {
 	                icon: 'food-off' as const,
@@ -942,6 +1022,31 @@ const _styles = StyleSheet.create({
   },
   countdownCard: {
     marginBottom: 12,
+  },
+  weightsBanner: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  weightsBannerRow: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  weightsBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  weightsBannerClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   countdownInner: {
     flexDirection: 'row',
