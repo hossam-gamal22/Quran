@@ -3,6 +3,7 @@ import * as functions from 'firebase-functions';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import * as crypto from 'crypto';
+import { shouldRevertRegression, isIntentionalCorrection } from './engagement-guard';
 
 // Expo Access Token for authenticated push API calls
 const expoAccessToken = defineSecret('EXPO_ACCESS_TOKEN');
@@ -1960,6 +1961,15 @@ export const answerUserQuestionAutomatically = functions.firestore
 /**
  * Protect monthly leaderboard scores from old app versions that recalculate
  * from empty local storage after reinstall and overwrite the cloud score.
+ *
+ * NOTE for any future bulk/offline engagement repair: ALWAYS write totals under
+ * the correct `monthlyEngagement.month` key and populate
+ * `engagementHistory`/`lastFinalizedMonth` for past months. Writing a previous
+ * month's totals into the *current* `monthlyEngagement` (as the
+ * `activity_logs_2026_05_bulk` repair did) makes prior activity surface as
+ * current-month leaderboard points, and this guard then freezes the bad value.
+ * To deliberately correct a same-month score, set a fresh
+ * `engagementCorrection.correctedAt` in the same write (see below).
  */
 export const guardMonthlyEngagementRegression = functions.firestore
   .document('users/{userId}')
@@ -1967,14 +1977,30 @@ export const guardMonthlyEngagementRegression = functions.firestore
     const before = change.before.data() || {};
     const after = change.after.data() || {};
     const beforeEngagement = before.monthlyEngagement || {};
-    const afterEngagement = after.monthlyEngagement || {};
     const beforeMonth = String(beforeEngagement.month || '');
-    const afterMonth = String(afterEngagement.month || '');
     const beforeScore = Number(beforeEngagement.score) || 0;
-    const afterScore = Number(afterEngagement.score) || 0;
+    const afterScore = Number((after.monthlyEngagement || {}).score) || 0;
 
-    if (!beforeMonth || beforeMonth !== afterMonth) return;
-    if (beforeScore <= 0 || afterScore >= beforeScore) return;
+    // `shouldRevertRegression` encapsulates the full decision (same-month,
+    // positive→lower, and the `engagementCorrection.correctedAt` escape hatch
+    // that lets a deliberate admin/script correction through). The escape hatch
+    // is self-limiting: only the single write advancing the marker is exempt.
+    if (!shouldRevertRegression(before, after)) {
+      if (
+        beforeMonth &&
+        beforeScore > 0 &&
+        afterScore < beforeScore &&
+        isIntentionalCorrection(before, after)
+      ) {
+        logger.info('[honor-board] allowed intentional score correction', {
+          userId: context.params.userId,
+          month: beforeMonth,
+          from: beforeScore,
+          to: afterScore,
+        });
+      }
+      return;
+    }
 
     logger.warn('[honor-board] prevented monthly score regression', {
       userId: context.params.userId,
@@ -3341,7 +3367,10 @@ function pickEngagementTranslation(
   translations: NotificationTranslations,
   language: string,
 ): { title: string; body: string } {
-  const lang = language as SupportedLanguage;
+  // Normalize empty/invalid language to 'ar' so orphan/legacy docs without a
+  // proper language never silently fall through to English when Arabic exists.
+  const normalized = String(language || '').trim().toLowerCase();
+  const lang = (normalized || 'ar') as SupportedLanguage;
   const exact = translations?.[lang];
   if (exact?.title && exact?.body) return { title: exact.title, body: exact.body };
   const ar = translations?.ar;
@@ -3365,6 +3394,37 @@ async function loadEngagementConfig(): Promise<EngagementConfigDoc | null> {
   }
 }
 
+interface EngagementCandidate {
+  id: string;
+  fcmToken: string;
+  language: string;
+  displayName: string;
+  platform: string;
+  lastActiveMs: number;
+  createdAtMs: number;
+}
+
+/**
+ * Multiple user docs can share one Expo push token (orphan/duplicate records
+ * minted when device-ID persistence was broken). Without collapsing them, each
+ * doc produces a separate push → the device gets N identical notifications, and
+ * stale orphan docs (with device-locale language) leak the wrong language.
+ *
+ * Pick one winner per token, mirroring pickBestRecord in the admin
+ * device-dedup util: a real displayName wins, then activity recency. The winner
+ * is the actively-used doc, which carries the user's chosen language.
+ */
+function pickBestEngagementCandidate(group: EngagementCandidate[]): EngagementCandidate {
+  if (group.length === 1) return group[0];
+  const score = (c: EngagementCandidate): number => {
+    let value = 0;
+    if (c.displayName && c.displayName !== '-') value += 1_000_000_000_000;
+    value += c.lastActiveMs || c.createdAtMs;
+    return value;
+  };
+  return [...group].sort((a, b) => score(b) - score(a))[0];
+}
+
 async function processEngagementType(
   type: EngagementType,
   cfg: EngagementConfig,
@@ -3374,10 +3434,7 @@ async function processEngagementType(
 
   const usersSnap = await db.collection('users').get();
   const storeSources = new Set(['play_store', 'app_store']);
-  const messages: ExpoPushMessage[] = [];
-  const userIdByIndex: string[] = [];
-  const recipientPreview: EngagementRecipientPreview[] = [];
-  const perLanguage: Record<string, number> = {};
+  const candidatesByToken = new Map<string, EngagementCandidate[]>();
 
   let matched = 0;
   let skipped = 0;
@@ -3397,23 +3454,47 @@ async function processEngagementType(
       return;
     }
 
-    const language = String(data.language || 'ar');
+    const group = candidatesByToken.get(fcmToken);
+    const candidate: EngagementCandidate = {
+      id: docSnap.id,
+      fcmToken,
+      language: String(data.language || 'ar'),
+      displayName: String(data.displayName || data.name || '').trim(),
+      platform: String(data.platform || data.devicePlatform || ''),
+      lastActiveMs: tsToMillis(data.lastActive),
+      createdAtMs: tsToMillis(data.createdAt) || tsToMillis(data.registrationDate),
+    };
+    if (group) group.push(candidate);
+    else candidatesByToken.set(fcmToken, [candidate]);
+  });
+
+  // Collapse duplicate docs sharing one push token into a single message.
+  const messages: ExpoPushMessage[] = [];
+  // For each message, the full set of doc IDs in that token group, so we gate
+  // every duplicate (not just the winner) against future sweeps.
+  const groupIdsByIndex: string[][] = [];
+  const recipientPreview: EngagementRecipientPreview[] = [];
+  const perLanguage: Record<string, number> = {};
+
+  for (const group of candidatesByToken.values()) {
+    const winner = pickBestEngagementCandidate(group);
+    const language = winner.language;
     const text = pickEngagementTranslation(cfg.translations || {}, language);
-    if (!text.title || !text.body) return;
+    if (!text.title || !text.body) continue;
     perLanguage[language] = (perLanguage[language] || 0) + 1;
 
-    userIdByIndex.push(docSnap.id);
+    groupIdsByIndex.push(group.map((c) => c.id));
     if (recipientPreview.length < ENGAGEMENT_RECIPIENT_PREVIEW_LIMIT) {
       recipientPreview.push({
-        userId: docSnap.id,
-        displayName: String(data.displayName || data.name || '').trim(),
+        userId: winner.id,
+        displayName: winner.displayName,
         language,
-        platform: String(data.platform || data.devicePlatform || ''),
-        lastActiveMs: tsToMillis(data.lastActive),
+        platform: winner.platform,
+        lastActiveMs: winner.lastActiveMs,
       });
     }
     messages.push({
-      to: fcmToken,
+      to: winner.fcmToken,
       title: text.title,
       body: text.body,
       sound: 'default',
@@ -3428,7 +3509,7 @@ async function processEngagementType(
         language,
       },
     });
-  });
+  }
 
   if (messages.length === 0) {
     return { matched, sent: 0, failed: 0, skipped };
@@ -3449,7 +3530,7 @@ async function processEngagementType(
     perLanguage,
     matchedCount: matched,
     skippedCount: skipped,
-    recipientCount: userIdByIndex.length,
+    recipientCount: groupIdsByIndex.length,
     recipientPreview,
     recipientPreviewLimit: ENGAGEMENT_RECIPIENT_PREVIEW_LIMIT,
     triggerDays: cfg.triggerDays,
@@ -3469,31 +3550,37 @@ async function processEngagementType(
   try {
     for (let i = 0; i < messages.length; i += 100) {
       const batchMessages = messages.slice(i, i + 100);
-      const batchUserIds = userIdByIndex.slice(i, i + 100);
+      const batchGroupIds = groupIdsByIndex.slice(i, i + 100);
       const okCount = await sendExpoBatch(batchMessages, expoToken);
       sent += okCount;
       failed += batchMessages.length - okCount;
 
-      // Mark all batch users as recently sent (Expo doesn't return per-token
-      // success in our wrapper; conservative approach is to mark all and let
-      // repeatDays gate the next attempt). We use a single write per user.
-      const writeBatch = db.batch();
+      // Mark ALL docs in each token group as recently sent (not just the
+      // winner), so duplicate orphan docs sharing this token aren't reconsidered
+      // next sweep. Expo doesn't return per-token success in our wrapper; the
+      // conservative approach is to mark all and let repeatDays gate the next
+      // attempt. Chunk well under Firestore's 500-op batch limit since each
+      // group can contain several duplicate docs.
       const now = admin.firestore.FieldValue.serverTimestamp();
-      for (const uid of batchUserIds) {
-        writeBatch.set(
-          db.doc(`users/${uid}`),
-          {
-            engagementPushSent: {
-              [type]: {
-                lastSentAt: now,
-                count: admin.firestore.FieldValue.increment(1),
+      const allUids = batchGroupIds.flat();
+      for (let j = 0; j < allUids.length; j += 400) {
+        const writeBatch = db.batch();
+        for (const uid of allUids.slice(j, j + 400)) {
+          writeBatch.set(
+            db.doc(`users/${uid}`),
+            {
+              engagementPushSent: {
+                [type]: {
+                  lastSentAt: now,
+                  count: admin.firestore.FieldValue.increment(1),
+                },
               },
             },
-          },
-          { merge: true },
-        );
+            { merge: true },
+          );
+        }
+        try { await writeBatch.commit(); } catch (e) { logger.warn('[engagement] tracking write failed:', e); }
       }
-      try { await writeBatch.commit(); } catch (e) { logger.warn('[engagement] tracking write failed:', e); }
     }
 
     await historyRef.update({

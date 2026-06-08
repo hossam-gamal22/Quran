@@ -1,11 +1,11 @@
 // admin-panel/src/pages/Rewards.tsx
 // صفحة إدارة المكافآت الشهرية — أفضل المستخدمين نشاطاً
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, updateDoc, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Trophy, Save, Loader2, Settings, History, Users, Gift, AlertTriangle, Search, X } from 'lucide-react';
-import { sendPrizeNotification } from '../services/pushNotifications';
+import { Trophy, Save, Loader2, Settings, History, Users, Gift, AlertTriangle, Search, X, Bell, ChevronDown, ChevronUp } from 'lucide-react';
+import { sendPrizeNotification, sendRewardsWeightsUpdateNotification } from '../services/pushNotifications';
 
 interface ScoreWeights {
   app_open: number;
@@ -43,6 +43,10 @@ interface RewardsConfig {
   currentMonth: string;
   currentWinners: Winner[];
   history: RewardHistoryEntry[];
+  // Bumped whenever scoreWeights change so the app can show users a
+  // "points recalculated" banner prompting them to re-check the honor board.
+  scoreWeightsVersion?: number;
+  scoreWeightsUpdatedAt?: string;
 }
 
 interface LeaderboardUser {
@@ -97,6 +101,28 @@ const getCurrentMonth = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
 };
 
+// Arabic month names for human-readable history labels.
+const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+// Strips the internal "-v2" reset marker and any day artifacts down to YYYY-MM
+// so duplicate/legacy entries for the same calendar month group together.
+const monthSortKey = (raw: string): string => {
+  const m = String(raw).match(/^(\d{4})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}` : String(raw);
+};
+
+// "2026-05-v2" → "مايو 2026"
+const formatMonthLabel = (raw: string): string => {
+  const m = String(raw).match(/^(\d{4})-(\d{2})/);
+  if (!m) return String(raw);
+  return `${AR_MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
+};
+
+const weightsEqual = (a?: Partial<ScoreWeights> | null, b?: Partial<ScoreWeights> | null): boolean => {
+  const keys: (keyof ScoreWeights)[] = ['app_open', 'azkar', 'quran', 'prayer', 'tasbih', 'khatma', 'fasting'];
+  return keys.every(k => Number(a?.[k] ?? NaN) === Number(b?.[k] ?? NaN));
+};
+
 const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsConfig => ({
   ...DEFAULT_CONFIG,
   ...(raw || {}),
@@ -114,6 +140,8 @@ const normalizeRewardsConfig = (raw?: Partial<RewardsConfig> | null): RewardsCon
 const isWinnerEligible = (user: LeaderboardUser): boolean => {
   return !user.hidden && !!user.displayName?.trim();
 };
+
+const hasName = (user: LeaderboardUser): boolean => !!user.displayName?.trim();
 
 const matchesLeaderboardSearch = (user: LeaderboardUser, rawTerm: string): boolean => {
   const term = rawTerm.trim().toLowerCase();
@@ -181,11 +209,15 @@ export default function Rewards() {
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'settings' | 'history'>('leaderboard');
   const [showHidden, setShowHidden] = useState(false);
+  const [hideUnnamed, setHideUnnamed] = useState(true);
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [merging, setMerging] = useState(false);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState('');
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
+  const [sendingNotif, setSendingNotif] = useState(false);
+  const [weightsJustChanged, setWeightsJustChanged] = useState(false);
 
   useEffect(() => {
     const unsubscribeConfig = onSnapshot(
@@ -234,6 +266,24 @@ export default function Rewards() {
     // Initial listeners only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Open the newest history month by default (once, when history first loads).
+  const [historyInitialized, setHistoryInitialized] = useState(false);
+  useEffect(() => {
+    if (historyInitialized || config.history.length === 0) return;
+    const newest = monthSortKey(config.history[0].month);
+    setOpenMonths(new Set([newest]));
+    setHistoryInitialized(true);
+  }, [config.history, historyInitialized]);
+
+  const toggleMonth = (key: string) => {
+    setOpenMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   /**
    * Save edited display name to Firestore and update local state
@@ -291,13 +341,55 @@ export default function Rewards() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'config', 'rewards-settings'), config);
+      // Read the currently-saved doc so we can tell whether the score weights
+      // actually changed. Only then do we bump scoreWeightsVersion — this is
+      // what triggers the in-app "points recalculated" banner for users, so we
+      // must NOT bump it for unrelated edits (winners count, duration, enable).
+      const ref = doc(db, 'config', 'rewards-settings');
+      const prevSnap = await getDoc(ref);
+      const prev = prevSnap.exists() ? (prevSnap.data() as Partial<RewardsConfig>) : null;
+      const weightsChanged = !weightsEqual(prev?.scoreWeights, config.scoreWeights);
+
+      const nextConfig: RewardsConfig = { ...config };
+      if (weightsChanged) {
+        nextConfig.scoreWeightsVersion = (Number(prev?.scoreWeightsVersion) || 0) + 1;
+        nextConfig.scoreWeightsUpdatedAt = new Date().toISOString();
+      }
+
+      await setDoc(ref, nextConfig);
+      setConfig(nextConfig);
+      setWeightsJustChanged(weightsChanged);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       console.error('Error saving:', err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Manually push a "points recalculated — check the honor board" notification
+   * to all users. Used after editing the score weights so active users come
+   * back and see their updated standing.
+   */
+  const handleSendUpdateNotification = async () => {
+    if (!confirm('سيتم إرسال إشعار لجميع المستخدمين يدعوهم لمراجعة نقاطهم بعد تحديث الأوزان. متابعة؟')) {
+      return;
+    }
+    setSendingNotif(true);
+    try {
+      const result = await sendRewardsWeightsUpdateNotification();
+      if (result.success) {
+        alert(`✅ تم إرسال التنبيه إلى ${result.sentCount} مستخدم`);
+      } else {
+        alert(`⚠️ تعذّر إرسال التنبيه: ${result.errors[0] || 'لا يوجد مستخدمون مطابقون'}`);
+      }
+    } catch (err) {
+      console.error('Error sending rewards update notification:', err);
+      alert('حدث خطأ أثناء إرسال التنبيه');
+    } finally {
+      setSendingNotif(false);
     }
   };
 
@@ -484,8 +576,25 @@ export default function Rewards() {
     setSaved(false);
   };
 
-  const visibleLeaderboard = leaderboard.filter(user => showHidden || !user.hidden);
+  const visibleLeaderboard = leaderboard.filter(
+    user => (showHidden || !user.hidden) && (!hideUnnamed || hasName(user))
+  );
   const filteredLeaderboard = visibleLeaderboard.filter(user => matchesLeaderboardSearch(user, leaderboardSearch));
+  const unnamedCount = leaderboard.filter(user => !hasName(user)).length;
+
+  // Group history by calendar month so duplicate selections and legacy -v1/-v2
+  // keys fold under a single readable "مايو 2026" card, newest month first.
+  const historyByMonth = useMemo(() => {
+    const groups = new Map<string, { key: string; label: string; entries: typeof config.history }>();
+    for (const entry of config.history) {
+      const key = monthSortKey(entry.month);
+      if (!groups.has(key)) {
+        groups.set(key, { key, label: formatMonthLabel(entry.month), entries: [] });
+      }
+      groups.get(key)!.entries.push(entry);
+    }
+    return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [config.history]);
 
   if (loading) {
     return (
@@ -557,7 +666,7 @@ export default function Rewards() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-white">
-              شهر {getCurrentMonth()} — {visibleLeaderboard.length} متسابق ظاهر
+              شهر {formatMonthLabel(getCurrentMonth())} — {visibleLeaderboard.length} متسابق ظاهر
             </h2>
             <div className="flex gap-2">
               <button
@@ -578,6 +687,15 @@ export default function Rewards() {
                 اختيار تلقائي
               </button>
               <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer mr-auto">
+                <input
+                  type="checkbox"
+                  checked={hideUnnamed}
+                  onChange={() => setHideUnnamed(v => !v)}
+                  className="w-4 h-4 accent-emerald-500"
+                />
+                إخفاء بدون اسم ({unnamedCount})
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={showHidden}
@@ -882,6 +1000,28 @@ export default function Rewards() {
               ))}
             </div>
           </div>
+
+          {/* Notify users after changing weights */}
+          <div className="bg-admin-surface p-5 rounded-xl border border-admin-border">
+            <h3 className="font-bold text-white mb-1">تنبيه المستخدمين بالتحديث</h3>
+            <p className="text-sm text-slate-400 mb-4">
+              عند تغيير أوزان النقاط، يظهر للمستخدمين تنبيه داخل التطبيق تلقائياً عند فتح لوحة الشرف.
+              يمكنك أيضاً إرسال إشعار فوري لدعوتهم لمراجعة نقاطهم الآن.
+            </p>
+            {weightsJustChanged && (
+              <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-sm text-emerald-200">
+                ✓ تم تحديث الأوزان — سيظهر للمستخدمين تنبيه داخل التطبيق تلقائياً. أرسل إشعاراً الآن لدعوتهم للرجوع.
+              </div>
+            )}
+            <button
+              onClick={handleSendUpdateNotification}
+              disabled={sendingNotif}
+              className="flex items-center gap-2 px-5 py-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
+            >
+              {sendingNotif ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+              {sendingNotif ? 'جاري الإرسال...' : 'أرسل تنبيه للمستخدمين'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -894,29 +1034,48 @@ export default function Rewards() {
               <p>لا يوجد سجل سابق</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {config.history.map((entry, idx) => (
-                <div key={idx} className="bg-admin-surface p-4 rounded-xl border border-admin-border">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-white">شهر {entry.month}</h3>
-                    <span className="text-xs text-slate-400">
-                      {entry.selectedBy === 'auto' ? 'اختيار تلقائي' : 'اختيار يدوي'} —{' '}
-                      {new Date(entry.selectedAt).toLocaleDateString('ar-EG')}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {entry.winners.map((w, i) => (
-                      <div key={w.userId} className="flex items-center justify-between text-sm">
-                        <span className="text-slate-200">
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}{' '}
-                          {w.displayName || w.userId.slice(0, 8)}
-                        </span>
-                        <span className="text-amber-300 font-medium">{w.score} نقطة</span>
+            <div className="space-y-3">
+              {historyByMonth.map(group => {
+                const isOpen = openMonths.has(group.key);
+                return (
+                  <div key={group.key} className="bg-admin-surface rounded-xl border border-admin-border overflow-hidden">
+                    <button
+                      onClick={() => toggleMonth(group.key)}
+                      className="w-full flex items-center justify-between p-4 text-right hover:bg-admin-surface-light transition-colors"
+                      aria-expanded={isOpen}
+                    >
+                      <span className="flex items-center gap-2 font-bold text-white">
+                        {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        {group.label}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {group.entries.length} {group.entries.length === 1 ? 'اختيار' : 'اختيارات'}
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 pb-4 space-y-4 border-t border-admin-border pt-3">
+                        {group.entries.map((entry, idx) => (
+                          <div key={idx} className="space-y-2">
+                            <div className="text-xs text-slate-400">
+                              {entry.selectedBy === 'auto' ? 'اختيار تلقائي' : 'اختيار يدوي'} —{' '}
+                              {new Date(entry.selectedAt).toLocaleDateString('ar-EG')}
+                            </div>
+                            {entry.winners.map((w, i) => (
+                              <div key={w.userId} className="flex items-center justify-between text-sm">
+                                <span className="text-slate-200">
+                                  {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}{' '}
+                                  {w.displayName || w.userId.slice(0, 8)}
+                                </span>
+                                <span className="text-amber-300 font-medium">{w.score} نقطة</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
