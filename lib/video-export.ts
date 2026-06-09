@@ -1,6 +1,7 @@
 // lib/video-export.ts
 // تصدير فيديو القصة — اتصال بخدمة التقديم — روح المسلم
 
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
@@ -92,8 +93,12 @@ export async function renderStoryVideo(options: VideoExportOptions): Promise<Vid
  */
 export async function saveVideoToGallery(localUri: string): Promise<boolean> {
   try {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') return false;
+    // Android: scoped storage allows app-generated writes without runtime permission.
+    // iOS: request write-only (add) Photo Library access.
+    if (Platform.OS === 'ios') {
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
+      if (status !== 'granted') return false;
+    }
     await MediaLibrary.saveToLibraryAsync(localUri);
     return true;
   } catch {

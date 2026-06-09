@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.2.4",
+    "version": "1.2.3",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
@@ -104,6 +104,15 @@
         "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
         "com.google.android.gms.permission.AD_ID"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
@@ -216,6 +225,22 @@
       ],
       "expo-asset",
       "expo-localization",
+      [
+        "expo-media-library",
+        {
+          "granularPermissions": [],
+          "savePhotosPermission": "للسماح بحفظ الصور والفيديو في معرض جهازك",
+          "preventAutomaticLimitedAccessAlert": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": false,
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       [
         "react-native-google-mobile-ads/app.plugin.js",
         {

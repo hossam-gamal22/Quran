@@ -485,7 +485,7 @@ export default function FavoritesScreen() {
         // iOS: still requires Photo Library Add permission.
         let canSave = true;
         if (Platform.OS === 'ios') {
-          const { status } = await MediaLibrary.requestPermissionsAsync();
+          const { status } = await MediaLibrary.requestPermissionsAsync(true);
           canSave = status === 'granted';
         }
 

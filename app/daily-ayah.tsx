@@ -371,8 +371,14 @@ export default function DailyAyahVideoScreen() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status === 'granted') {
+      // Android: scoped storage allows app-generated writes without runtime permission.
+      // iOS: request write-only (add) Photo Library access.
+      let canSave = true;
+      if (Platform.OS === 'ios') {
+        const { status } = await MediaLibrary.requestPermissionsAsync(true);
+        canSave = status === 'granted';
+      }
+      if (canSave) {
         await MediaLibrary.saveToLibraryAsync(uri);
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert('✅ ' + t('common.savedSuccess'), t('common.imageSavedSuccess'));

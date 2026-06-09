@@ -600,7 +600,7 @@ export default function StoryOfDayScreen() {
       // Android: scoped storage allows app-generated writes without runtime permission.
       // iOS: still requires Photo Library Add permission.
       if (Platform.OS === 'ios') {
-        const perm = await MediaLibrary.requestPermissionsAsync();
+        const perm = await MediaLibrary.requestPermissionsAsync(true);
         if (!perm.granted) {
           Alert.alert('', t('storyOfDay.photoPermissionRequired'));
           return;
