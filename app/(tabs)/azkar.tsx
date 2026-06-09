@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -186,7 +187,7 @@ export default function AzkarScreen() {
       const azkarCount = getAzkarByCategory(category.id).length;
       
       await Share.share({
-        message: `${categoryName}\n${azkarCount} ${t('tabs.azkar')}\n\n${t('common.fromApp')}`,
+        message: buildShareText(`${categoryName}\n${azkarCount} ${t('tabs.azkar')}`),
       });
     } catch (error) {
       console.error('Error sharing:', error);

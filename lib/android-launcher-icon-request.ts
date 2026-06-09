@@ -7,7 +7,7 @@ export const ANDROID_DYNAMIC_ICON_ALIASES = [
   'mawlid',
   'eid_fitr',
   'eid_adha',
-  'dhul_hijjah',
+  'hijri_new_year',
 ] as const;
 
 export type AndroidDynamicIconAlias = typeof ANDROID_DYNAMIC_ICON_ALIASES[number];

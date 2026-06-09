@@ -4,18 +4,20 @@
 // so the in-app gallery matches what the user will see on their home screen.
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, Platform, StyleSheet } from 'react-native';
+import { View, Text, Platform, StyleSheet, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getLanguage } from '@/lib/i18n';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
-import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
+import { formatPrayerDurationWithPrefix, SIN_MINUTE_GAP } from '@/lib/widget-format-duration';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { getPageFontFamily, isPageFontLoaded, loadPageFont } from '@/lib/qcf-font-loader';
 import { getPrayerNameAr, getPrayerNameEn } from '@/lib/prayer-times';
 import { formatEpochTimeInTimeZone } from '@/lib/widget-timezone';
-import { resolvePrayerTableState } from '@/lib/widget-prayer-table-state';
+import { deviceUses24Hour } from '@/lib/widget-clock-format';
+import { resolvePrayerTableState, type PrayerTableKey } from '@/lib/widget-prayer-table-state';
+import { curatedImageSource, type CuratedWidgetId } from '@/lib/widgets/curated-images';
 
 /**
  * Re-format a prayer time from its raw epoch into the language-current
@@ -27,7 +29,7 @@ import { resolvePrayerTableState } from '@/lib/widget-prayer-table-state';
  * render guarantees the visible suffix always matches the current language.
  */
 function formatPrayerTimeForPreview(epochMs: number | undefined, ar: boolean, timeZone?: string): string | null {
-  return formatEpochTimeInTimeZone(epochMs, timeZone, ar ? 'ar' : 'en');
+  return formatEpochTimeInTimeZone(epochMs, timeZone, ar ? 'ar' : 'en', deviceUses24Hour());
 }
 import { useSettings } from '@/contexts/SettingsContext';
 import {
@@ -50,7 +52,7 @@ import {
   type WidgetDateFormat,
   type ThemePalette,
 } from './shared';
-import { useWidgetSnapshotCapture, useWidgetForcedTheme, useWidgetPreviewData } from './snapshot-capture-context';
+import { useWidgetSnapshotCapture, useWidgetForcedTheme, useWidgetPreviewData, useBlankPrayerState } from './snapshot-capture-context';
 import { AnchorReporter } from './anchor-reporter';
 import {
   detectQuranTitle,
@@ -146,13 +148,57 @@ const num = (n: number, ar?: boolean): string => {
   return (ar ?? isArabicLang()) ? latinToArabicDigits(n) : String(n);
 };
 
-function englishAzkarFontSize(text: string, size: PreviewSize): number {
-  if (size === 'small') return text.length > 180 ? 10 : text.length > 120 ? 11 : text.length > 80 ? 12 : 14;
-  if (text.length > 240) return 15;
-  if (text.length > 200) return 16;
-  if (text.length > 160) return 18;
-  if (text.length > 110) return 20;
-  return 22;
+// Shared bottom padding for the ×count row so it sits at the IDENTICAL position
+// in all three azkar/dhikr previews (morning, evening, daily).
+const AZKAR_COUNT_PAD_BOTTOM = 10;
+
+// Compute the body font size that makes the text FILL the measured box, by
+// approximating that the glyphs tile the box area:
+//   area ≈ chars · (fs·charWidthFactor) · (fs·lineHeightFactor)
+//   ⇒ fs ≈ sqrt( box.w · box.h · fillRatio / (chars · cwf · lhf) )
+// Deterministic ⇒ identical on iOS + Android (no platform-dependent autosize).
+// Arabic and English are sized INDEPENDENTLY (Arabic has fewer words → larger);
+// keep per-script factors + clamps in sync with the Android FlexWidget + iOS.
+// Line-height ÷ fontSize per script — used both to SIZE the body (denominator
+// in the area model) and to RENDER it (`lineHeight = fs * lhf`), so the box math
+// and the actual layout agree and the full dhikr always fits.
+const AZKAR_LHF_AR = 1.55; // Arabic taller — diacritics
+const AZKAR_LHF_EN = 1.3;
+function azkarLineHeightFactor(isArabic: boolean): number {
+  return isArabic ? AZKAR_LHF_AR : AZKAR_LHF_EN;
+}
+function azkarFillFontSize(charCount: number, boxW: number, boxH: number, isArabic: boolean): number {
+  if (boxW <= 0 || boxH <= 0) return isArabic ? 20 : 16; // pre-measure fallback
+  const chars = Math.max(8, charCount);
+  const cwf = isArabic ? 0.5 : 0.55;   // avg glyph advance ÷ fontSize
+  const lhf = azkarLineHeightFactor(isArabic);
+  // Conservative fill so the WHOLE dhikr always fits (never truncated). With the
+  // body rendered at `lineHeight = fs·lhf` (no autosize), the rendered block
+  // height ≈ boxH·fillRatio, so fillRatio < 1 guarantees vertical headroom.
+  const fillRatio = 0.38;
+  const min = 8;
+  const max = isArabic ? 28 : 22;
+  const fs = Math.sqrt((boxW * boxH * fillRatio) / (chars * cwf * lhf));
+  return Math.max(min, Math.min(max, Math.floor(fs)));
+}
+
+// Body text box from CONSTANTS (no onLayout) — mirrors the Android FlexWidget
+// box (`AzkarFlexWidget.tsx`) so the computed font size is identical across the
+// gallery preview, Android, iOS, and the baked PNG. Computing from the measured
+// box raced the snapshot capture: the first frame used the oversized pre-measure
+// fallback (20px) and baked a TRUNCATED ("…") dhikr. Constants are deterministic.
+function azkarBodyBox(
+  size: PreviewSize,
+  hasTitle: boolean,
+  hasMetadata: boolean,
+): { w: number; h: number } {
+  const w = (size === 'small' ? 155 : 329) - 24; // − horizontal padding (12·2)
+  const h = (size === 'small' ? 155 : 155)
+    - (hasTitle ? 16 : 0)   // − title row (morning/evening Arabic only)
+    - 26                    // − ×count row
+    - 16                    // − vertical padding (8·2)
+    - (hasMetadata ? 26 : 0); // − benefit + reference (dailyDhikr Arabic non-small)
+  return { w, h };
 }
 
 /**
@@ -201,7 +247,7 @@ export function DaySimplePreview({ size, language }: { size: PreviewSize; langua
       const h = getLocalizedHijriDate();
       if (h) {
         dayNum = h.day;
-        monthLabel = ar ? (HIJRI_MONTHS_AR[h.month - 1] ?? h.monthName) : h.monthName;
+        monthLabel = ar ? (HIJRI_MONTHS_AR[h.month - 1] ?? h.monthName) : (HIJRI_MONTHS_EN[h.month - 1] ?? h.monthName);
       }
     } catch {}
   }
@@ -213,7 +259,7 @@ export function DaySimplePreview({ size, language }: { size: PreviewSize; langua
           style={{
             fontFamily: 'Rubik-Bold',
             fontSize: size === 'small' ? 16 : 20,
-            color: p.text,
+            color: p.ink,
             includeFontPadding: false,
           }}
         >
@@ -226,14 +272,14 @@ export function DaySimplePreview({ size, language }: { size: PreviewSize; langua
           style={{
             fontFamily: 'Rubik-Bold',
             fontSize: size === 'small' ? 52 : 68,
-            color: p.text,
+            color: p.ink,
             opacity: 0.94,
             includeFontPadding: false,
           }}
         >
           {applyNumerals(dayNum, numerals, ar)}
         </Text>
-        <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 14 : 18, color: p.muted }}>
+        <Text style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 14 : 18, color: p.ink }}>
           {monthLabel}
         </Text>
       </View>
@@ -263,7 +309,7 @@ export function DayThuluthPreview({ size, language }: { size: PreviewSize; langu
   }
   const watermark = applyNumerals(dayNum, numerals, ar);
   const watermarkFont = watermarkFontFor(numerals, ar, widgetFont);
-  const fillStrong = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
+  const fillStrong = p.ink;
   const fillFaint = p.isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
   return (
     <GlassTile size={size} padding={0} palette={p}>
@@ -336,7 +382,7 @@ export function DayDigitalPreview({ size, language }: { size: PreviewSize; langu
           fontFamily={digitFont}
           fontSize={fontPx}
           fontWeight="bold"
-          color={p.text}
+          color={p.ink}
           alignment="center"
           direction={ar ? 'rtl' : 'ltr'}
         >
@@ -349,7 +395,7 @@ export function DayDigitalPreview({ size, language }: { size: PreviewSize; langu
               fontFamily: digitFont,
               fontSize: fontPx,
               fontWeight: '600',
-              color: p.text,
+              color: p.ink,
               letterSpacing: -1,
               includeFontPadding: false,
               textAlignVertical: 'center',
@@ -413,7 +459,7 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
     }
     return formatDateSample(now, dateFormat, numerals, ar);
   })();
-  const fillStrong = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
+  const fillStrong = p.ink;
   const fillFaint = p.isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
   return (
     <GlassTile size={size} padding={0} palette={p}>
@@ -433,14 +479,16 @@ export function MonthSimplePreview({ size, language }: { size: PreviewSize; lang
         <View
           pointerEvents="none"
           style={{
+            // Center the month name across the FULL tile height (was bounded to
+            // the area above the date strip, which biased it upward). The date
+            // subtitle below is absolutely positioned so it doesn't affect this.
             position: 'absolute',
             top: 0,
-            bottom: dateBottom + (size === 'small' ? 18 : 22),
+            bottom: 0,
             left: 12,
             right: 12,
             alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: size === 'small' ? 10 : 14,
           }}
         >
           <Text
@@ -513,7 +561,7 @@ export function MonthThuluthPreview({ size, language }: { size: PreviewSize; lan
   }
   const watermark = applyNumerals(wmDay, numerals, ar);
   const watermarkFont = watermarkFontFor(numerals, ar, widgetFont);
-  const fillStrong = p.isLight ? 'rgba(0,0,0,0.86)' : 'rgba(255,255,255,0.92)';
+  const fillStrong = p.ink;
   const fillFaint = p.isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
   // Watermark vertical position: small widgets push the baseline up so the
   // digit body is visible above the bottom edge; medium keeps the previous
@@ -628,6 +676,15 @@ function resolvePreviewEpoch(sharedData: ReturnType<typeof useWidgetPreviewData>
 }
 
 function resolvePreviewPrayerItem(sharedData: ReturnType<typeof useWidgetPreviewData>, isNext: boolean, now: number = Date.now()) {
+  // Prefer the night-aware resolver: at night the next epoch is TOMORROW's Fajr,
+  // which never matches an entry in today-only `allPrayers` by epoch — so the
+  // old lookup returned undefined and callers fell back to the stale
+  // `nextPrayerNameAr` (e.g. المغرب). The table-state row already carries the
+  // correct key/name/nameAr/time for the night case.
+  const row = isNext
+    ? resolvePrayerTableState(sharedData?.prayer, now).nextRow
+    : resolvePrayerTableState(sharedData?.prayer, now).previousRow;
+  if (row) return row;
   const epoch = resolvePreviewEpoch(sharedData, isNext, now);
   if (!epoch) return undefined;
   return (sharedData?.prayer?.allPrayers ?? []).find(
@@ -635,10 +692,53 @@ function resolvePreviewPrayerItem(sharedData: ReturnType<typeof useWidgetPreview
   );
 }
 
+/**
+ * Intentional "enable location" placeholder for every prayer widget preview.
+ * Shown in the in-app gallery when no real location is available yet
+ * (`prayer.needsLocation`), instead of the misleading Makkah/sample times.
+ */
+function PrayerNeedsLocationTile({ size, palette, ar }: { size: PreviewSize; palette: ThemePalette; ar: boolean }) {
+  const iconSize = size === 'small' ? 26 : 34;
+  const titleFs = size === 'small' ? 14 : 17;
+  const subFs = size === 'small' ? 11 : 13;
+  return (
+    <GlassTile size={size} palette={palette}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <MaterialCommunityIcons name="map-marker-off" size={iconSize} color={palette.ink} />
+        <Text
+          numberOfLines={1}
+          style={{ fontFamily: PRAYER_NAME_FONT, fontSize: titleFs, lineHeight: titleFs + 5, color: palette.ink, textAlign: 'center', includeFontPadding: false }}
+        >
+          {ar ? 'فعّل الموقع' : 'Enable location'}
+        </Text>
+        {size !== 'small' && (
+          <Text
+            numberOfLines={2}
+            style={{ fontFamily: 'Rubik-Medium', fontSize: subFs, lineHeight: subFs + 5, color: palette.muted, textAlign: 'center', includeFontPadding: false }}
+          >
+            {ar ? 'لعرض مواقيت الصلاة' : 'to show prayer times'}
+          </Text>
+        )}
+      </View>
+    </GlassTile>
+  );
+}
+
 export function PrayerSimplePreview({ size, language, forSnapshot }: { size: PreviewSize; language?: Lang; forSnapshot?: boolean }) {
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
   const sharedData = useWidgetPreviewData();
   useLiveTick();
+  // `decouple` = this capture will overlay the NAME live (iOS always; Android
+  // gallery fallback under blankPrayerState). When set, bake a widest-name
+  // placeholder so the recorded rect never clips the live value.
+  const blankPrayerState = useBlankPrayerState();
+  const decouple = !!forSnapshot && (Platform.OS !== 'android' || blankPrayerState);
+  // No real location yet → intentional "enable location" placeholder in the
+  // gallery instead of the Makkah/sample fallback. Snapshot bakes keep their
+  // anchor layout (native shell handles needsLocation separately).
+  if (sharedData?.prayer?.needsLocation && !forSnapshot) {
+    return <PrayerNeedsLocationTile size={size} palette={p} ar={ar} />;
+  }
   const digitFont = 'Rubik-Bold';
   const trueNextItem = resolvePreviewPrayerItem(sharedData, true);
   // Reformat from epoch on every render so the AM/PM suffix follows the
@@ -655,9 +755,9 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
           {ar ? 'الصلاة القادمة' : 'Next Prayer'}
         </Text>
         {forSnapshot ? (
-          <AnchorReporter id="prayerHeroName" fontFamily={PRAYER_NAME_FONT} fontSize={size === 'small' ? 22 : 30} fontWeight="bold" color={p.text} alignment="center" direction={ar ? 'rtl' : 'ltr'}>
-            <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: size === 'small' ? 22 : 30, lineHeight: size === 'small' ? 27 : 36, color: p.text, includeFontPadding: false }}>
-              {name}
+          <AnchorReporter id="prayerHeroName" fontFamily={PRAYER_NAME_FONT} fontSize={size === 'small' ? 22 : 30} fontWeight="bold" color={p.ink} alignment="center" direction={ar ? 'rtl' : 'ltr'} blankOnAndroidCapture>
+            <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: size === 'small' ? 22 : 30, lineHeight: size === 'small' ? 27 : 36, color: p.ink, includeFontPadding: false }}>
+              {decouple ? prayerNameCapturePlaceholder(ar) : name}
             </Text>
           </AnchorReporter>
         ) : (
@@ -667,7 +767,7 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
               fontFamily: PRAYER_NAME_FONT,
               fontSize: size === 'small' ? 22 : 30,
               lineHeight: size === 'small' ? 27 : 36,
-              color: p.text,
+              color: p.ink,
               includeFontPadding: false,
             }}
           >
@@ -685,12 +785,12 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
           adjustsFontSizeToFit
           numberOfLines={1}
           minimumFontScale={0.7}
-          style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+          style={{ fontFamily: digitFont, fontSize: timeFs, lineHeight: timeFs + 6, color: p.ink, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
           anchorId="prayerHeroTime"
           anchorFontFamily={digitFont}
           anchorFontSize={timeFs}
           anchorFontWeight="bold"
-          anchorColor={p.text}
+          anchorColor={p.ink}
           anchorAlignment="center"
           anchorDirection={ar ? 'rtl' : 'ltr'}
         >
@@ -699,13 +799,13 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
         {/* Phase B C2: snapshot omits the live countdown; the iOS / Android shell
             draws it on top of the PNG so it stays accurate. */}
         {forSnapshot ? (
-          <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Medium" fontSize={size === 'small' ? 10 : 12} fontWeight="medium" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 4 }}>
-            <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 10 : 12, lineHeight: size === 'small' ? 13 : 16, color: p.muted, includeFontPadding: false }}>
-              {countdown}
+          <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Bold" fontSize={size === 'small' ? 12 : 14} fontWeight="bold" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 4 }}>
+            <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 12 : 14, lineHeight: size === 'small' ? 16 : 19, color: p.muted, includeFontPadding: false }}>
+              {countdownCapturePlaceholder(ar, false)}
             </Text>
           </AnchorReporter>
         ) : (
-          <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: size === 'small' ? 10 : 12, lineHeight: size === 'small' ? 13 : 16, color: p.muted, marginTop: 4, includeFontPadding: false }}>
+          <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 12 : 14, lineHeight: size === 'small' ? 16 : 19, color: p.muted, marginTop: 4, includeFontPadding: false }}>
             {countdown}
           </Text>
         )}
@@ -715,18 +815,21 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
 }
 
 const PRAYER_ROWS: {
+  /** Canonical prayer key — drives the anchor id so it stays stable across the
+   *  Friday "Jumuah" label change (keyEn becomes "Jumuah" but key stays "dhuhr"). */
+  key: PrayerTableKey;
   keyAr: string;
   keyEn: string;
   time: string;
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   isNext?: boolean;
 }[] = [
-  { keyAr: 'الفجر', keyEn: 'Fajr', time: '05:35', icon: 'weather-sunset-up' },
-  { keyAr: 'الشروق', keyEn: 'Sunrise', time: '06:49', icon: 'white-balance-sunny' },
-  { keyAr: getPrayerNameAr('dhuhr'), keyEn: getPrayerNameEn('dhuhr'), time: '12:17', icon: 'weather-sunny', isNext: true },
-  { keyAr: 'العصر', keyEn: 'Asr', time: '03:32', icon: 'weather-hazy' },
-  { keyAr: 'المغرب', keyEn: 'Maghrib', time: '06:42', icon: 'weather-sunset' },
-  { keyAr: 'العشاء', keyEn: 'Isha', time: '08:19', icon: 'weather-night' },
+  { key: 'fajr', keyAr: 'الفجر', keyEn: 'Fajr', time: '05:35', icon: 'weather-sunset-up' },
+  { key: 'sunrise', keyAr: 'الشروق', keyEn: 'Sunrise', time: '06:49', icon: 'white-balance-sunny' },
+  { key: 'dhuhr', keyAr: getPrayerNameAr('dhuhr'), keyEn: getPrayerNameEn('dhuhr'), time: '12:17', icon: 'weather-sunny', isNext: true },
+  { key: 'asr', keyAr: 'العصر', keyEn: 'Asr', time: '03:32', icon: 'weather-hazy' },
+  { key: 'maghrib', keyAr: 'المغرب', keyEn: 'Maghrib', time: '06:42', icon: 'weather-sunset' },
+  { key: 'isha', keyAr: 'العشاء', keyEn: 'Isha', time: '08:19', icon: 'weather-night' },
 ];
 
 function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar: boolean, now: number = Date.now()) {
@@ -751,6 +854,7 @@ function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar:
     // is missing (very old shared-data shape).
     const liveTime = formatPrayerTimeForPreview(item.epochMs, ar, data?.prayer?.timezone) ?? item.time ?? '--:--';
     return {
+      key: item.key,
       keyAr: item.nameAr ?? item.name ?? '',
       keyEn: item.name ?? item.nameAr ?? '',
       time: liveTime,
@@ -782,9 +886,40 @@ function compactRemainingFromEpoch(
   return formatPrayerDurationWithPrefix(safeEpoch, Date.now(), lang, direction);
 }
 
+/**
+ * Widest plausible countdown string, used ONLY as the hidden AnchorReporter
+ * child during capture so the recorded dp rect is wide enough for ANY live
+ * value. A far prayer (e.g. Isha→Fajr) can be many hours away, so the bake-time
+ * value alone (often minutes-only) produced a narrow box that clipped the live
+ * "بعد ٧ س ٤٠ د" down to "بعد ٧ س". The child is invisible (opacity 0) in the
+ * PNG; only its width matters, and the live overlay right-aligns within it.
+ */
+function countdownCapturePlaceholder(ar: boolean, withLabel = false, direction: 'until' | 'since' = 'until'): string {
+  // Includes the wider س↔minute gap so the captured anchor box is wide enough
+  // for the live overlay's widened countdown.
+  const body = ar ? `٢٣ س${SIN_MINUTE_GAP}٥٩ د` : '23H 59M';
+  const dir = direction === 'since'
+    ? (ar ? `منذ ${body}` : `${body} ago`)
+    : (ar ? `بعد ${body}` : `in ${body}`);
+  return withLabel ? (ar ? `الصلاة القادمة ${dir}` : `Next prayer ${dir}`) : dir;
+}
+
 function noWrapPrayerTime(value: string | number): string {
   const text = String(value).trim().replace(/\s+/g, ' ');
   return text.replace(/\s+/g, '\u00A0');
+}
+
+/**
+ * Widest plausible prayer NAME, used ONLY as the hidden name-anchor child during
+ * a capture where the name is overlaid live (iOS always; Android gallery
+ * fallback). The recorded dp rect is then wide enough for ANY live value \u2014
+ * including Friday's "\u0635\u0644\u0627\u0629 \u0627\u0644\u062C\u0645\u0639\u0629" / "Jumuah" \u2014 so the live overlay never clips
+ * (the home screen showed "\u0627\u0644\u0645\u063A\u0631" because the rect was sized to a shorter
+ * bake-time name). The child is invisible (opacity 0); only its width matters,
+ * and the live overlay centers within it.
+ */
+function prayerNameCapturePlaceholder(ar: boolean): string {
+  return ar ? '\u0635\u0644\u0627\u0629 \u0627\u0644\u062C\u0645\u0639\u0629' : 'Sunrise';
 }
 
 /**
@@ -871,8 +1006,17 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
   const { isArabic: ar, numerals, palette: p, fontVariant } = usePreviewSettings(language);
   const sharedData = useWidgetPreviewData();
   useLiveTick();
-  const timeFont = 'Rubik-Bold';
+  // `decouple` = this bake leaves prayer STATE (hero name, active-row highlight,
+  // active row colors) to the live overlay (iOS always; Android gallery fallback
+  // under blankPrayerState). Per-state template bakes keep them baked.
+  const blankPrayerState = useBlankPrayerState();
+  const decouple = !!forSnapshot && (Platform.OS !== 'android' || blankPrayerState);
   const widgetFontL = useWidgetFontFamily(fontVariant);
+  // No real location yet → intentional "enable location" placeholder.
+  if (sharedData?.prayer?.needsLocation && !forSnapshot) {
+    return <PrayerNeedsLocationTile size={size} palette={p} ar={ar} />;
+  }
+  const timeFont = 'Rubik-Bold';
   const nowMs = Date.now();
   const prayerState = resolvePrayerTableState(sharedData?.prayer, nowMs);
   const prayerRows = prayerRowsFromShared(sharedData, ar, nowMs);
@@ -888,10 +1032,48 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
     ?? nextPrayer.time;
   const fmt = (s: string | number) => applyNumerals(s, numerals, ar);
   const remainingText = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), fmt, ar);
-  const remainingTight = Platform.OS === 'android' ? remainingText : remainingText.replace(/\s/g, '');
-  // Highlight overlay for the active prayer row — light tint on light themes,
-  // white tint on dark, so it stays legible across all 8 palettes.
-  const activeBg = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)';
+  // Strip only ASCII spaces (not the wide U+2002 س↔minute gap) for the tight iOS variant.
+  const remainingTight = Platform.OS === 'android' ? remainingText : remainingText.replace(/ /g, '');
+  // Highlight overlay for the active prayer row — a clearly visible but still
+  // subtle dark band behind the next-prayer row (black tint on light themes,
+  // white tint on dark), legible across all 8 palettes including the cream
+  // light theme. Kept in sync with `highlightColor` in SnapshotWidget.tsx so the
+  // baked per-state band and the live gallery-fallback band look identical.
+  const activeBg = p.isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)';
+
+  // Row-name node. In the gallery (non-snapshot) render it's a bare <Text> so the
+  // in-app gallery is byte-for-byte unchanged. During capture it's wrapped in an
+  // AnchorReporter (id `prayerRowName.<key>`) with `blankOnAndroidCapture`, which
+  // blanks the name ONLY in the gallery-fallback PNG (blankPrayerState) so the
+  // home overlay can redraw all six names live with the correct active/muted
+  // color — matching the gallery. Per-state template bakes keep the name baked.
+  const renderRowName = (
+    row: { key: string; keyAr: string; keyEn: string },
+    fs: number,
+    lineHeight: number,
+    fgColor: string,
+  ) => {
+    const node = (
+      <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: fs, lineHeight, color: fgColor, includeFontPadding: false }}>
+        {ar ? row.keyAr : row.keyEn}
+      </Text>
+    );
+    if (!forSnapshot) return node;
+    return (
+      <AnchorReporter
+        id={`prayerRowName.${row.key}`}
+        fontFamily={PRAYER_NAME_FONT}
+        fontSize={fs}
+        fontWeight="bold"
+        color={p.ink}
+        alignment="center"
+        direction={ar ? 'rtl' : 'ltr'}
+        blankOnAndroidCapture
+      >
+        {node}
+      </AnchorReporter>
+    );
+  };
 
   if (size === 'medium') {
     const listFs = Platform.OS === 'android' ? 9.5 : 10;
@@ -910,18 +1092,24 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
             <View style={{ flex: 1, justifyContent: 'center' }}>
               {prayerRows.map((row) => {
                 const active = !!row.isNext;
-                const label = ar ? row.keyAr : row.keyEn;
                 const timeStr = noWrapPrayerTime(fmt(row.time));
-                const anchorId = `prayerRowTime.${row.keyEn.toLowerCase()}`;
-                // When capturing: skip the active-bg fill and use the
-                // muted color for every row — iOS overlay re-tints the
-                // current active row and writes time text in the active
-                // foreground color, so the PNG never freezes state.
-                const rowBg = ((forSnapshot && Platform.OS !== 'android') || !active) ? 'transparent' : activeBg;
-                const fgForCapture = forSnapshot && Platform.OS !== 'android' ? p.muted : (active ? p.text : p.muted);
+                const anchorId = `prayerRowTime.${row.key}`;
+                // When decoupling (iOS, or Android gallery fallback): skip the
+                // active-bg fill and use the muted color for every row — the live
+                // overlay re-tints the current active row + draws the highlight,
+                // so the PNG never freezes state. Per-state template bakes keep
+                // the highlight + active colors baked.
+                const rowBg = (decouple || !active) ? 'transparent' : activeBg;
+                const fgForCapture = decouple ? p.muted : (active ? p.ink : p.muted);
                 return (
-                  <View
+                  <AnchorReporter
                     key={row.keyEn}
+                    id={`prayerRowBg.${row.key}`}
+                    measureOnly
+                    fontFamily={timeFont}
+                    fontSize={listFs}
+                    color={p.ink}
+                    direction={ar ? 'rtl' : 'ltr'}
                     style={{
                       flexDirection: rowDir,
                       alignItems: 'center',
@@ -940,16 +1128,14 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                       anchorFontFamily={timeFont}
                       anchorFontSize={listFs}
                       anchorFontWeight="bold"
-                      anchorColor={p.text}
-                      anchorAlignment={ar ? 'leading' : 'trailing'}
+                      anchorColor={p.ink}
+                      anchorAlignment="trailing"
                       anchorDirection={ar ? 'rtl' : 'ltr'}
                     >
                       {timeStr}
                     </DynamicTimeText>
-                    <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: fgForCapture, includeFontPadding: false }}>
-                      {label}
-                    </Text>
-                  </View>
+                    {renderRowName(row, listFs, listFs + 3, fgForCapture)}
+                  </AnchorReporter>
                 );
               })}
             </View>
@@ -965,16 +1151,17 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   fontFamily={PRAYER_NAME_FONT}
                   fontSize={20}
                   fontWeight="bold"
-                  color={p.text}
+                  color={p.ink}
                   alignment="center"
                   direction={ar ? 'rtl' : 'ltr'}
+                  blankOnAndroidCapture
                 >
-                  <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
-                    {ar ? heroNameAr : heroNameEn}
+                  <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.ink, includeFontPadding: false }}>
+                    {decouple ? prayerNameCapturePlaceholder(ar) : (ar ? heroNameAr : heroNameEn)}
                   </Text>
                 </AnchorReporter>
               ) : (
-                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.text, includeFontPadding: false }}>
+                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: 20, lineHeight: 24, color: p.ink, includeFontPadding: false }}>
                   {ar ? heroNameAr : heroNameEn}
                 </Text>
               )}
@@ -983,12 +1170,12 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
-                style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+                style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.ink, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
                 anchorId="prayerHeroTime"
                 anchorFontFamily={timeFont}
                 anchorFontSize={heroTimeFs}
                 anchorFontWeight="bold"
-                anchorColor={p.text}
+                anchorColor={p.ink}
                 anchorAlignment="center"
                 anchorDirection={ar ? 'rtl' : 'ltr'}
               >
@@ -997,21 +1184,21 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               {forSnapshot ? (
                 <AnchorReporter
                   id="prayerHeroCountdown"
-                  fontFamily="Rubik-Medium"
-                  fontSize={9}
-                  fontWeight="medium"
+                  fontFamily="Rubik-Bold"
+                  fontSize={11}
+                  fontWeight="bold"
                   color={p.muted}
                   alignment="center"
                   direction={ar ? 'rtl' : 'ltr'}
                   isCountdown
                   style={{ marginTop: 2 }}
                 >
-                  <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
-                    {remainingText || (ar ? '— س — د' : '—H —M')}
+                  <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: 11, lineHeight: 14, color: p.muted, includeFontPadding: false }}>
+                    {countdownCapturePlaceholder(ar, false)}
                   </Text>
                 </AnchorReporter>
               ) : (
-                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>
+                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: 11, lineHeight: 14, color: p.muted, marginTop: 2, includeFontPadding: false }}>
                   {remainingText}
                 </Text>
               )}
@@ -1034,9 +1221,12 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
       <GlassTile size={size} padding={8} palette={p}>
         <View style={{ flex: 1, justifyContent: 'center' }}>
           <View style={{ flexDirection: rowDir, justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-            <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Medium" fontSize={9} fontWeight="medium" color={p.muted} alignment={ar ? 'leading' : 'trailing'} direction={ar ? 'rtl' : 'ltr'} isCountdown>
-              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
-                {remainingTight || (ar ? '— س — د' : '—H —M')}
+            <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Bold" fontSize={11} fontWeight="bold" color={p.muted} alignment="trailing" direction={ar ? 'rtl' : 'ltr'} isCountdown>
+              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: 11, lineHeight: 14, color: p.muted, includeFontPadding: false }}>
+                {/* Capture → max-width placeholder (hidden, just sizes the rect);
+                    gallery → the real countdown. Without the forSnapshot guard the
+                    AnchorReporter rendered the placeholder ("بعد ٢٣ س ٥٩ د") live. */}
+                {forSnapshot ? countdownCapturePlaceholder(ar, false) : (remainingTight || (ar ? '— س — د' : '—H —M'))}
               </Text>
             </AnchorReporter>
             <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>
@@ -1045,12 +1235,19 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
           </View>
           {prayerRows.map((row) => {
             const active = !!row.isNext;
-            const label = ar ? row.keyAr : row.keyEn;
             const timeStr = noWrapPrayerTime(fmt(row.time));
-            const rowAnchorId = `prayerRowTime.${row.keyEn.toLowerCase()}`;
+            const rowAnchorId = `prayerRowTime.${row.key}`;
+            const rowBg = (decouple || !active) ? 'transparent' : activeBg;
+            const fg = decouple ? p.muted : (active ? p.ink : p.muted);
             return (
-              <View
+              <AnchorReporter
                 key={row.keyEn}
+                id={`prayerRowBg.${row.key}`}
+                measureOnly
+                fontFamily={timeFont}
+                fontSize={listFs}
+                color={p.ink}
+                direction={ar ? 'rtl' : 'ltr'}
                 style={{
                   flexDirection: rowDir,
                   alignItems: 'center',
@@ -1058,24 +1255,22 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   paddingHorizontal: 4,
                   paddingVertical: rowPv,
                   borderRadius: 6,
-                  backgroundColor: active ? activeBg : 'transparent',
+                  backgroundColor: rowBg,
                 }}
               >
-                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}
+                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: Platform.OS === 'android' ? 54 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: listFs, lineHeight: listFs + 3, color: fg, letterSpacing: -0.3, includeFontPadding: false }}
                   anchorId={rowAnchorId}
                   anchorFontFamily={timeFont}
                   anchorFontSize={listFs}
                   anchorFontWeight="bold"
-                  anchorColor={p.text}
-                  anchorAlignment={ar ? 'leading' : 'trailing'}
+                  anchorColor={p.ink}
+                  anchorAlignment="trailing"
                   anchorDirection={ar ? 'rtl' : 'ltr'}
                 >
                   {timeStr}
                 </DynamicTimeText>
-                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: listFs, lineHeight: listFs + 3, color: active ? p.text : p.muted, includeFontPadding: false }}>
-                  {label}
-                </Text>
-              </View>
+                {renderRowName(row, listFs, listFs + 3, fg)}
+              </AnchorReporter>
             );
           })}
         </View>
@@ -1087,14 +1282,18 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
   const heroBg = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
   const watermarkFill = p.isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
   const isAndroid = Platform.OS === 'android';
-  const largePad = isAndroid ? 12 : 14;
-  const heroPadV = isAndroid ? 11 : 14;
-  const heroMb = isAndroid ? 9 : 10;
-  const heroNameFs = isAndroid ? 21 : 22;
-  const heroTimeFs = isAndroid ? 34 : 36;
-  const rowFs = isAndroid ? 16 : 15;
-  const rowPv = isAndroid ? 4 : 6;
-  const rowIcon = isAndroid ? 15 : 16;
+  // Android large prayer tile now uses the SAME hero/row metrics as iOS so the
+  // baked PNG + live overlay match the iOS reference 1:1 (was downsized, which
+  // made the Android hero look cramped vs iOS). The 329×345 tile fits these
+  // values with room to spare; verified against the re-baked PNG.
+  const largePad = 14;
+  const heroPadV = 14;
+  const heroMb = 10;
+  const heroNameFs = 22;
+  const heroTimeFs = 36;
+  const rowFs = 15;
+  const rowPv = 6;
+  const rowIcon = 16;
   // Language-specific flow. For Arabic (RTL), the hero icon is LEFT,
   // content-column right-aligned, schedule rows have time LEFT and
   // [name+icon] group RIGHT, with name LEFT of icon visually. For English
@@ -1142,38 +1341,45 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
               {'الصلاة'}
             </Text>
           ) : null}
-          <MaterialCommunityIcons name={nextPrayer.icon} size={isAndroid ? 28 : 32} color={p.muted} />
+          <MaterialCommunityIcons name={nextPrayer.icon} size={32} color={p.muted} />
           <View style={{ flex: 1, alignItems: heroContentAlign }}>
             {forSnapshot ? (
-              <AnchorReporter id="prayerHeroName" fontFamily={PRAYER_NAME_FONT} fontSize={heroNameFs} fontWeight="bold" color={p.text} alignment="center" direction={ar ? 'rtl' : 'ltr'}>
-                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
-                  {ar ? heroNameAr : heroNameEn}
+              // Pin the hero NAME to the same start edge ('leading' = right in RTL)
+              // as the hero time + countdown below. 'center' let the live-overlaid
+              // name drift off that shared edge (Android draws it centered in its
+              // rect), misaligning "الشروق" vs the time + "الصلاة القادمة" label.
+              <AnchorReporter id="prayerHeroName" fontFamily={PRAYER_NAME_FONT} fontSize={heroNameFs} fontWeight="bold" color={p.ink} alignment="leading" direction={ar ? 'rtl' : 'ltr'} blankOnAndroidCapture>
+                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.ink, includeFontPadding: false }}>
+                  {decouple ? prayerNameCapturePlaceholder(ar) : (ar ? heroNameAr : heroNameEn)}
                 </Text>
               </AnchorReporter>
             ) : (
-              <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.text, includeFontPadding: false }}>
+              <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: heroNameFs, lineHeight: heroNameFs + 4, color: p.ink, includeFontPadding: false }}>
                 {ar ? heroNameAr : heroNameEn}
               </Text>
             )}
-            <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.text, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
+            <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontFamily: timeFont, fontSize: heroTimeFs, lineHeight: heroTimeFs + 5, color: p.ink, marginTop: 2, letterSpacing: -1, includeFontPadding: false }}
               anchorId="prayerHeroTime"
               anchorFontFamily={timeFont}
               anchorFontSize={heroTimeFs}
               anchorFontWeight="bold"
-              anchorColor={p.text}
-              anchorAlignment="center"
+              anchorColor={p.ink}
+              // Right-align (leading for ar) to pin the time's right edge to the
+              // hero name — 'center' let it drift left inside the captured rect
+              // for prayer states whose time is narrower than the bake state's.
+              anchorAlignment="leading"
               anchorDirection={ar ? 'rtl' : 'ltr'}
             >
               {noWrapPrayerTime(fmt(heroTime))}
             </DynamicTimeText>
             {forSnapshot ? (
-              <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Medium" fontSize={isAndroid ? 11 : 12} fontWeight="medium" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: isAndroid ? 2 : 4 }}>
-                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: isAndroid ? 11 : 12, lineHeight: isAndroid ? 14 : 16, color: p.muted, includeFontPadding: false }}>
-                  {ar ? `الصلاة القادمة ${remainingLarge}` : `Next prayer ${remainingLarge}`}
+              <AnchorReporter id="prayerHeroCountdown" fontFamily="Rubik-Bold" fontSize={14} fontWeight="bold" color={p.muted} alignment="leading" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 4 }}>
+                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: 14, lineHeight: 19, color: p.muted, includeFontPadding: false }}>
+                  {countdownCapturePlaceholder(ar, true)}
                 </Text>
               </AnchorReporter>
             ) : (
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontFamily: 'Rubik-Medium', fontSize: isAndroid ? 11 : 12, lineHeight: isAndroid ? 14 : 16, color: p.muted, marginTop: isAndroid ? 2 : 4, includeFontPadding: false }}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontFamily: 'Rubik-Bold', fontSize: 14, lineHeight: 19, color: p.muted, marginTop: 4, includeFontPadding: false }}>
                 {ar ? `الصلاة القادمة ${remainingLarge}` : `Next prayer ${remainingLarge}`}
               </Text>
             )}
@@ -1182,12 +1388,19 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
         <View style={{ flex: isAndroid ? 1 : undefined, justifyContent: isAndroid ? 'space-between' : undefined }}>
           {prayerRows.map((row) => {
             const active = !!row.isNext;
-            const label = ar ? row.keyAr : row.keyEn;
             const timeStr = noWrapPrayerTime(fmt(row.time));
-            const rowAnchorId = `prayerRowTime.${row.keyEn.toLowerCase()}`;
+            const rowAnchorId = `prayerRowTime.${row.key}`;
+            const rowBg = (decouple || !active) ? 'transparent' : activeBg;
+            const fg = decouple ? p.muted : (active ? p.ink : p.muted);
             return (
-              <View
+              <AnchorReporter
                 key={row.keyEn}
+                id={`prayerRowBg.${row.key}`}
+                measureOnly
+                fontFamily={timeFont}
+                fontSize={rowFs}
+                color={p.ink}
+                direction={ar ? 'rtl' : 'ltr'}
                 style={{
                   flexDirection: rowDir,
                   alignItems: 'center',
@@ -1195,28 +1408,26 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                   paddingHorizontal: 8,
                   paddingVertical: rowPv,
                   borderRadius: 10,
-                  backgroundColor: active ? activeBg : 'transparent',
+                  backgroundColor: rowBg,
                   marginBottom: isAndroid ? 0 : 1,
                 }}
               >
-                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, letterSpacing: -0.3, includeFontPadding: false }}
+                <DynamicTimeText forSnapshot={forSnapshot} numberOfLines={1} style={{ width: isAndroid ? 66 : undefined, textAlign: ar ? 'left' : 'right', writingDirection: ar ? 'rtl' : 'ltr', fontFamily: timeFont, fontSize: rowFs, lineHeight: rowFs + 4, color: fg, letterSpacing: -0.3, includeFontPadding: false }}
                   anchorId={rowAnchorId}
                   anchorFontFamily={timeFont}
                   anchorFontSize={rowFs}
                   anchorFontWeight="bold"
-                  anchorColor={p.text}
-                  anchorAlignment={ar ? 'leading' : 'trailing'}
+                  anchorColor={p.ink}
+                  anchorAlignment="trailing"
                   anchorDirection={ar ? 'rtl' : 'ltr'}
                 >
                   {timeStr}
                 </DynamicTimeText>
                 <View style={{ flexDirection: innerGroupDir, alignItems: 'center', gap: 6 }}>
-                  <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: rowFs, lineHeight: rowFs + 4, color: active ? p.text : p.muted, includeFontPadding: false }}>
-                    {label}
-                  </Text>
-                  <MaterialCommunityIcons name={row.icon} size={rowIcon} color={active ? p.text : p.muted} />
+                  {renderRowName(row, rowFs, rowFs + 4, fg)}
+                  <MaterialCommunityIcons name={row.icon} size={rowIcon} color={fg} />
                 </View>
-              </View>
+              </AnchorReporter>
             );
           })}
         </View>
@@ -1229,6 +1440,14 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
   const { isArabic: ar, numerals, palette: p } = usePreviewSettings(language);
   const sharedData = useWidgetPreviewData();
   useLiveTick();
+  // `decouple` = this capture overlays the next/prev NAME live (iOS always;
+  // Android gallery fallback). Bake a widest-name placeholder so it never clips.
+  const blankPrayerState = useBlankPrayerState();
+  const decouple = !!forSnapshot && (Platform.OS !== 'android' || blankPrayerState);
+  // No real location yet → intentional "enable location" placeholder.
+  if (sharedData?.prayer?.needsLocation && !forSnapshot) {
+    return <PrayerNeedsLocationTile size={size} palette={p} ar={ar} />;
+  }
   const timeFont = 'Rubik-Bold';
   const boxBg = p.isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)';
   const boxBorder = p.isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.10)';
@@ -1298,9 +1517,9 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
           >
             <MaterialCommunityIcons name={item.icon as any} size={isAndroid ? 18 : 20} color={p.muted} />
             {forSnapshot ? (
-              <AnchorReporter id={item.nameId} fontFamily={PRAYER_NAME_FONT} fontSize={isAndroid ? 15 : 16} fontWeight="bold" color={p.text} alignment="center" direction={ar ? 'rtl' : 'ltr'} style={{ marginTop: 4 }}>
-                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: isAndroid ? 15 : 16, lineHeight: isAndroid ? 19 : 21, color: p.text, textAlign: 'center', includeFontPadding: false }}>
-                  {item.name}
+              <AnchorReporter id={item.nameId} fontFamily={PRAYER_NAME_FONT} fontSize={isAndroid ? 15 : 16} fontWeight="bold" color={p.ink} alignment="center" direction={ar ? 'rtl' : 'ltr'} blankOnAndroidCapture style={{ marginTop: 4 }}>
+                <Text numberOfLines={1} style={{ fontFamily: PRAYER_NAME_FONT, fontSize: isAndroid ? 15 : 16, lineHeight: isAndroid ? 19 : 21, color: p.ink, textAlign: 'center', includeFontPadding: false }}>
+                  {decouple ? prayerNameCapturePlaceholder(ar) : item.name}
                 </Text>
               </AnchorReporter>
             ) : (
@@ -1310,7 +1529,7 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
                   fontFamily: PRAYER_NAME_FONT,
                   fontSize: isAndroid ? 15 : 16,
                   lineHeight: isAndroid ? 19 : 21,
-                  color: p.text,
+                  color: p.ink,
                   marginTop: 4,
                   textAlign: 'center',
                   includeFontPadding: false,
@@ -1328,7 +1547,7 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
                 fontFamily: timeFont,
                 fontSize: isAndroid ? 24 : 28,
                 lineHeight: isAndroid ? 30 : 34,
-                color: p.text,
+                color: p.ink,
                 marginTop: 2,
                 letterSpacing: -0.5,
                 includeFontPadding: false,
@@ -1337,7 +1556,7 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
               anchorFontFamily={timeFont}
               anchorFontSize={isAndroid ? 24 : 28}
               anchorFontWeight="bold"
-              anchorColor={p.text}
+              anchorColor={p.ink}
               anchorAlignment="center"
               anchorDirection={ar ? 'rtl' : 'ltr'}
             >
@@ -1346,11 +1565,11 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
             {/* Dynamic countdown/since labels are drawn by the native shell so
                 both cards stay fresh and visually balanced on the home screen. */}
             {forSnapshot ? (
-              <AnchorReporter id={item.subId} fontFamily="Rubik-Medium" fontSize={9} fontWeight="medium" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 2 }}>
-                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, includeFontPadding: false }}>{item.sub}</Text>
+              <AnchorReporter id={item.subId} fontFamily="Rubik-Bold" fontSize={11} fontWeight="bold" color={p.muted} alignment="center" direction={ar ? 'rtl' : 'ltr'} isCountdown style={{ marginTop: 2 }}>
+                <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: 11, lineHeight: 14, color: p.muted, includeFontPadding: false }}>{countdownCapturePlaceholder(ar, false, item.subId === 'prayerSinceCountdown' ? 'since' : 'until')}</Text>
               </AnchorReporter>
             ) : (
-              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, lineHeight: 12, color: p.muted, marginTop: 2, includeFontPadding: false }}>{item.sub}</Text>
+              <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Bold', fontSize: 11, lineHeight: 14, color: p.muted, marginTop: 2, includeFontPadding: false }}>{item.sub}</Text>
             )}
           </View>
         ))}
@@ -1378,12 +1597,46 @@ function verseArabicFontSize(size: PreviewSize, ar: boolean, arabicChars: number
     return 24;
   }
 
-  if (arabicChars > 200) return 26;
-  if (arabicChars > 115 || effectiveWords > 10) return ar ? 34 : 31;
-  if (arabicChars > 82 || effectiveWords > 8) return ar ? 40 : 37;
-  if (arabicChars > 58 || effectiveWords > 6) return ar ? 46 : 42;
-  if (arabicChars > 38 || effectiveWords > 4) return ar ? 52 : 47;
-  return ar ? 58 : 52;
+  // Bumped up ~+6 so the verse fills more of the width and leaves only a small
+  // gap to the framing brackets (was leaving a wide empty band).
+  if (arabicChars > 200) return 30;
+  if (arabicChars > 115 || effectiveWords > 10) return ar ? 40 : 37;
+  if (arabicChars > 82 || effectiveWords > 8) return ar ? 46 : 43;
+  if (arabicChars > 58 || effectiveWords > 6) return ar ? 52 : 48;
+  if (arabicChars > 38 || effectiveWords > 4) return ar ? 58 : 54;
+  return ar ? 64 : 58;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Curated bundled-image previews — the gallery shows the EXACT same bundled
+// image (tinted to the theme) that the placed widget renders, so the preview
+// always matches the home screen. Used for verse/azkar/dhikr.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CuratedImagePreview({ widgetId, size, language }: { widgetId: CuratedWidgetId; size: PreviewSize; language?: Lang }) {
+  const { palette: p } = usePreviewSettings(language);
+  const src = curatedImageSource(widgetId, new Date());
+  const tint = p.ink;
+  // padding 0 + cover → the design fills the tile edge-to-edge at 100% (the PNGs
+  // are authored at the tile aspect ratio), matching the placed widget exactly.
+  return (
+    <GlassTile size={size} padding={0} palette={p}>
+      <Image source={src} resizeMode="cover" style={{ width: '100%', height: '100%', tintColor: tint }} />
+    </GlassTile>
+  );
+}
+
+export function CuratedVersePreview({ size, language }: { size: PreviewSize; language?: Lang }) {
+  return <CuratedImagePreview widgetId="verseOfDay" size={size} language={language} />;
+}
+export function CuratedAzkarMorningPreview({ size, language }: { size: PreviewSize; language?: Lang }) {
+  return <CuratedImagePreview widgetId="azkarMorning" size={size} language={language} />;
+}
+export function CuratedAzkarEveningPreview({ size, language }: { size: PreviewSize; language?: Lang }) {
+  return <CuratedImagePreview widgetId="azkarEvening" size={size} language={language} />;
+}
+export function CuratedDailyDhikrPreview({ size, language }: { size: PreviewSize; language?: Lang }) {
+  return <CuratedImagePreview widgetId="dailyDhikr" size={size} language={language} />;
 }
 
 export function VersePreview({ size, language }: { size: PreviewSize; language?: Lang }) {
@@ -1395,7 +1648,18 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
   const sharedVerse = sharedData?.verse;
   const pool = sharedData?.versePool;
   const liveEntry = (() => {
-    if (sharedVerse?.arabic && typeof (sharedVerse as any).surahNumber === 'number') {
+    // Only trust the stored snapshot when it is TODAY'S verse. The snapshot
+    // carries a `date` (YYYY-MM-DD) written by prepareVerseWidgetData; if it is
+    // stale (the app hasn't refreshed yet after midnight) we fall through to the
+    // deterministic pool index so the gallery shows TODAY's verse — fixed all
+    // day, rolling exactly at local midnight (the pool index reads `new Date()`),
+    // matching the real home-screen widget instead of yesterday's snapshot.
+    // Same key shape prepareVerseWidgetData stamps onto `verse.date`
+    // (`new Date().toISOString().split('T')[0]`) so a same-day snapshot matches.
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const snapshotDate = (sharedVerse as any)?.date as string | undefined;
+    const snapshotIsToday = !snapshotDate || snapshotDate === todayKey;
+    if (snapshotIsToday && sharedVerse?.arabic && typeof (sharedVerse as any).surahNumber === 'number') {
       return {
         arabic: sharedVerse.arabic,
         translation: sharedVerse.translation ?? '',
@@ -1469,46 +1733,64 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
   }, [qcfData?.page, qcfDarkMode]);
   const qcfDisplay = qcfData?.glyphs.join('\u200A') ?? arabicText;
   const arabicCharCount = arabicText.length;
-  const arabicFs = verseArabicFontSize(size, ar, arabicCharCount, qcfData?.glyphs.length ?? 0);
-  const bracketFs = Math.round(arabicFs * 0.92);
-  const verseSideInset = size === 'small' ? 32 : 36;
+  // Brackets are decorative frames at a fixed, modest size.
+  const bracketFs = size === 'small' ? 16 : 26;
+  // The ornate Quranic parens (﴾ ﴿, U+FD3E/U+FD3F) are absent from the bundled
+  // KFGQPCUthmanic TTF. iOS falls back to a system Arabic font that draws them
+  // as ornate medallions, but Android's fallback renders plain { } braces.
+  // Amiri (already registered) carries proper ornate glyphs — use it on Android
+  // to match the iOS look.
+  const bracketFontFamily = Platform.OS === 'android' ? 'Amiri' : 'KFGQPCUthmanic';
+  // Keeps the framing brackets just off the card edge; the verse fills the
+  // flex space between them (so the gap is only the small marginHorizontal).
+  const verseSideInset = size === 'small' ? 14 : 18;
+  // Verse size is COMPUTED (not autosized — Android's adjustsFontSizeToFit
+  // mis-measures the custom QCF font and leaves the verse small with a wide
+  // gap). Estimate the size that makes the glyphs span the width available
+  // between the brackets, so the verse always FILLS that space on one line.
+  const verseGlyphCount = qcfData?.glyphs.length ?? Math.max(1, Math.ceil(arabicCharCount / 4));
+  const verseTileWidth = size === 'small' ? 155 : 329;
+  const verseOuterPad = size === 'small' ? 14 : 20;
+  const verseAvailWidth = verseTileWidth - 2 * verseOuterPad - 2 * verseSideInset - 2 * bracketFs - 16;
+  const verseFillBase = Math.max(
+    size === 'small' ? 14 : 18,
+    Math.min(size === 'small' ? 40 : 60, Math.floor(verseAvailWidth / (verseGlyphCount * 0.6))),
+  );
   const translationFs = size === 'small'
     ? (translation.length > 90 ? 13 : 14)
     : translation.length > 95 ? 18 : 20;
   return (
     <GlassTile size={size} padding={0} palette={p}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: size === 'small' ? 14 : 20, paddingTop: ar ? 18 : 16, paddingBottom: ar ? 8 : 8 }}>
-        <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: verseSideInset, marginTop: ar ? 2 : 0, marginBottom: ar ? 0 : -8 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: size === 'small' ? 14 : 20, paddingTop: ar ? 10 : 12, paddingBottom: ar ? 10 : 10 }}>
+        {/* The verse Text spans the FULL content width (centered) so it renders
+            as large as possible; the two ornate brackets are absolutely
+            positioned in the side-inset gutters and VERTICALLY centered to the
+            verse line, so they frame the verse without stealing its width. */}
+        {/* Row: [ ﴿ ][ verse (flex:1) ][ ﴾ ]. The verse starts from a high base
+            font and `adjustsFontSizeToFit` shrinks it to FILL the flex space on
+            one line, so it always fills the width between the brackets with only
+            a small gap (instead of sitting small with a wide empty band). */}
+        <View style={{ width: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', paddingHorizontal: verseSideInset, marginTop: ar ? 2 : 0, marginBottom: ar ? 0 : 4 }}>
           <Text
             allowFontScaling={false}
-            style={{
-              position: 'absolute',
-              right: 0,
-              fontFamily: 'KFGQPCUthmanic',
-              fontSize: bracketFs,
-              lineHeight: Math.round(bracketFs * 1.15),
-              color: p.text,
-              includeFontPadding: false,
-            }}
+            style={{ fontFamily: bracketFontFamily, fontSize: bracketFs, color: p.ink, includeFontPadding: false }}
           >
             ﴿
           </Text>
-          <View style={{ alignSelf: 'stretch', overflow: 'hidden' }}>
+          <View style={{ flex: 1, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.38}
+              minimumFontScale={0.2}
               allowFontScaling={false}
               style={{
+                width: '100%',
                 fontFamily: qcfFontFamily ?? 'KFGQPCUthmanic',
-                fontSize: arabicFs,
-                color: p.text,
+                fontSize: verseFillBase,
+                color: p.ink,
                 textAlign: 'center',
                 writingDirection: 'rtl',
-                lineHeight: Platform.select({
-                  android: Math.round(arabicFs * 1.18),
-                  default: Math.round(arabicFs * 1.24),
-                }),
+                lineHeight: Math.round(verseFillBase * (Platform.OS === 'android' ? 1.18 : 1.24)),
                 includeFontPadding: false,
               }}
             >
@@ -1517,15 +1799,7 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
           </View>
           <Text
             allowFontScaling={false}
-            style={{
-              position: 'absolute',
-              left: 0,
-              fontFamily: 'KFGQPCUthmanic',
-              fontSize: bracketFs,
-              lineHeight: Math.round(bracketFs * 1.15),
-              color: p.text,
-              includeFontPadding: false,
-            }}
+            style={{ fontFamily: bracketFontFamily, fontSize: bracketFs, color: p.ink, includeFontPadding: false }}
           >
             ﴾
           </Text>
@@ -1539,12 +1813,12 @@ export function VersePreview({ size, language }: { size: PreviewSize; language?:
             style={{
               fontFamily: 'Rubik-Medium',
               fontSize: translationFs,
-              color: p.text,
+              color: p.ink,
               opacity: 0.88,
               textAlign: 'center',
               writingDirection: 'ltr',
               lineHeight: Math.round(translationFs * 1.35),
-              marginTop: size === 'small' ? -2 : -4,
+              marginTop: size === 'small' ? 4 : 6,
               includeFontPadding: false,
             }}
           >
@@ -1632,40 +1906,41 @@ function AzkarPreview({
   const { text: bodyText, isQuran } = resolveAzkarBodyText(slot, fallback, ar);
   const count = Math.max(1, slot?.zikr.count ?? 10);
 
-  // Font sizing matches iOS AzkarQuoteView:
-  //   Quran title → Rubik-Bold (largest)
-  //   Arabic chunk → Rubik-Regular
-  //   English translation → Rubik-Bold with length-aware sizing so it stays
-  //     large without clipping.
-  const bodyFont = isQuran || !ar ? 'Rubik-Bold' : 'Rubik-Regular';
-  const bodyFs = isQuran
-    ? (size === 'small' ? 16 : 21)
-    : ar
-      ? (size === 'small' ? 13 : 17)
-      : englishAzkarFontSize(bodyText, size);
+  // Body is Rubik-Bold; size is COMPUTED to fill the measured body box (no
+  // autosize — deterministic + identical on iOS/Android). Quran titles use a
+  // fixed size (short label, not a paragraph).
+  const bodyFont = 'Rubik-Bold';
+  // Computed fill from CONSTANT box (no onLayout race) — short azkar render
+  // large, long azkar smaller but COMPLETE (no "…"). Rendered at proportional
+  // lineHeight so the box math and layout agree; no autosize (its fixed
+  // lineHeight fought the shrink and truncated).
+  const bodyBox = azkarBodyBox(size, ar, false);
+  const bodyFs = azkarFillFontSize(bodyText.length, bodyBox.w, bodyBox.h, ar);
   const contentPadding = ar
     ? { paddingHorizontal: 12, paddingVertical: 8 }
     : { paddingHorizontal: 20, paddingVertical: 14 };
 
   return (
     <GlassTile size={size} padding={ar ? undefined : 0} palette={p}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', ...contentPadding }}>
+      <View style={{ flex: 1, ...contentPadding }}>
         {/* Title row hidden in English — the gallery + iOS widget label
             below the tile already say "Morning/Evening Adhkar", and the
             freed space goes to the (longer) translation body. */}
         {ar ? (
           <Text
             numberOfLines={1}
-            style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted }}
+            style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, textAlign: 'center', alignSelf: 'center' }}
           >
             {title}
           </Text>
         ) : null}
-        <View style={{ flex: 1, alignSelf: 'stretch', alignItems: ar ? 'center' : 'stretch', justifyContent: 'center', paddingBottom: ar ? 0 : 8 }}>
+        {/* Body in a flex:1 centered wrapper so the count row below always sits
+            at the SAME bottom position across all three azkar widgets. */}
+        <View
+          style={{ flex: 1, alignSelf: 'stretch', alignItems: 'stretch', justifyContent: 'center' }}
+        >
           <Text
-            numberOfLines={ar ? 3 : 5}
-            adjustsFontSizeToFit
-            minimumFontScale={ar ? 0.85 : 0.68}
+            numberOfLines={20}
             allowFontScaling={false}
             style={{
               fontFamily: bodyFont,
@@ -1673,16 +1948,20 @@ function AzkarPreview({
               color: fillText,
               textAlign: ar ? 'center' : 'left',
               writingDirection: ar ? 'rtl' : 'ltr',
-              lineHeight: Math.round(bodyFs * (ar ? 1.3 : 1.18)),
+              lineHeight: Math.round(bodyFs * azkarLineHeightFactor(ar)),
               includeFontPadding: false,
             }}
           >
-            {bodyText}
+            {/* English azkar/dhikr body rendered UPPERCASE to match the approved
+                mockups; Arabic is never uppercased. */}
+            {ar ? bodyText : bodyText.toUpperCase()}
           </Text>
         </View>
-        <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted, position: ar ? 'relative' : 'absolute', bottom: ar ? undefined : 10, alignSelf: 'center' }}>
-          {`×${applyNumerals(count, numerals, ar)}`}
-        </Text>
+        <View style={{ alignItems: 'center', paddingBottom: AZKAR_COUNT_PAD_BOTTOM }}>
+          <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 11 : 13, color: p.muted }}>
+            {`×${applyNumerals(count, numerals, ar)}`}
+          </Text>
+        </View>
       </View>
     </GlassTile>
   );
@@ -1723,7 +2002,7 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
   const dayLabel = applyNumerals(day, numerals, ar);
   const monthLabel = ar ? monthAr : (HIJRI_MONTHS_EN[monthIndex - 1] ?? monthAr);
   const hijriRow = `${dayLabel}  ${monthLabel}`;
-  const fillStrong = p.isLight ? 'rgba(0,0,0,0.86)' : p.text;
+  const fillStrong = p.ink;
   const watermarkLabel = ar ? 'هجري' : 'Hijri';
   const watermarkFs = size === 'small' ? 44 : 72;
   const watermarkFill = p.isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
@@ -1816,90 +2095,70 @@ export function DailyDhikrPreview({ size, language }: { size: PreviewSize; langu
     bodyText = ar
       ? (quranTitle!.startsWith('قراءة') ? quranTitle! : `قراءة ${quranTitle}`)
       : quranTitleToEnglish(quranTitle!);
-  } else if (!ar && translation) {
-    // Strip parenthetical notes so the rendered font stays large.
-    const cleaned = cleanEnglishTranslation(translation) || translation;
+  } else if (!ar && translation && cleanEnglishTranslation(translation)) {
+    // Strip parenthetical/editorial notes; if it strips to nothing (the whole
+    // translation was a note) fall through to the Arabic dhikr below instead of
+    // showing the raw note.
+    const cleaned = cleanEnglishTranslation(translation);
     const now = new Date();
     const minute = now.getHours() * 60 + now.getMinutes();
     bodyText = pickLongEnglishAzkarPage(cleaned, minute);
   } else {
-    const chunks = splitAzkarChunks(arabicSource);
-    const now = new Date();
-    const minute = now.getHours() * 60 + now.getMinutes();
-    const chunkIdx = ((minute % chunks.length) + chunks.length) % chunks.length;
-    bodyText = chunks[chunkIdx] ?? chunks[0] ?? arabicSource;
+    // Show the FULL Arabic dhikr (complete) — computed-fill sizing shrinks it to
+    // fit, so it never ends mid-sentence on a comma like a ≤140-char chunk would.
+    bodyText = arabicSource;
   }
 
-  // Rubik-Bold for Quran title AND English body; Rubik-Regular only for
-  // Arabic body chunks.
-  const bodyFont = isQuran || !ar ? 'Rubik-Bold' : 'Rubik-Regular';
-  const bodyFs = isQuran
-    ? (size === 'small' ? 14 : 19)
-    : ar
-      ? (size === 'small' ? 12 : 16)
-      : englishAzkarFontSize(bodyText, size);
+  // Body is Rubik-Bold; size COMPUTED from a CONSTANT box (no onLayout race) so
+  // the FULL dhikr fits without truncation and matches Android/iOS exactly.
+  const bodyFont = 'Rubik-Bold';
+  const hasMetadata = ar && size !== 'small' && Boolean(whenSaid || reference);
+  const bodyBox = azkarBodyBox(size, false, hasMetadata);
+  const bodyFs = azkarFillFontSize(bodyText.length, bodyBox.w, bodyBox.h, ar);
   const contentPadding = ar
     ? { paddingHorizontal: 12, paddingVertical: 8 }
     : { paddingHorizontal: 20, paddingVertical: 14 };
 
   return (
     <GlassTile size={size} padding={ar ? undefined : 0} palette={p}>
-      <View style={{ flex: 1, alignItems: ar ? 'center' : 'stretch', justifyContent: 'center', ...contentPadding }}>
-        <Text
-          numberOfLines={ar ? 3 : 5}
-          adjustsFontSizeToFit
-          minimumFontScale={ar ? 0.85 : 0.68}
-          allowFontScaling={false}
-          style={{
-            fontFamily: bodyFont,
-            fontSize: bodyFs,
-            color: p.text,
-            textAlign: ar ? 'center' : 'left',
-            writingDirection: ar ? 'rtl' : 'ltr',
-            lineHeight: Math.round(bodyFs * (ar ? 1.3 : 1.18)),
-            includeFontPadding: false,
-          }}
+      <View style={{ flex: 1, ...contentPadding }}>
+        {/* Body in a flex:1 centered wrapper; size computed from constants. */}
+        <View
+          style={{ flex: 1, alignSelf: 'stretch', alignItems: 'stretch', justifyContent: 'center' }}
         >
-          {bodyText}
-        </Text>
-        <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 12 : 14, color: p.muted, marginTop: 6, alignSelf: 'center' }}>
-          {`×${applyNumerals(count, numerals, ar)}`}
-        </Text>
-        {/* Arabic-only benefit + reference: hidden in English mode (no
-            English translation exists in azkar.json for these fields) so
-            the tile stays language-coherent and the translation body
-            gets the freed vertical space. */}
-        {ar && size !== 'small' && whenSaid ? (
           <Text
-            numberOfLines={1}
+            numberOfLines={20}
+            allowFontScaling={false}
             style={{
-              fontFamily: 'Rubik-Medium',
-              fontSize: 9,
-              color: p.muted,
-              marginTop: 4,
-              textAlign: 'center',
-              opacity: 0.85,
-              writingDirection: 'rtl',
+              fontFamily: bodyFont,
+              fontSize: bodyFs,
+              color: p.ink,
+              textAlign: ar ? 'center' : 'left',
+              writingDirection: ar ? 'rtl' : 'ltr',
+              lineHeight: Math.round(bodyFs * azkarLineHeightFactor(ar)),
+              includeFontPadding: false,
             }}
           >
-            {whenSaid}
+            {/* English body UPPERCASE to match the approved mockups. */}
+            {ar ? bodyText : bodyText.toUpperCase()}
           </Text>
-        ) : null}
-        {ar && size !== 'small' && reference ? (
-          <Text
-            numberOfLines={1}
-            style={{
-              fontFamily: 'Rubik-Medium',
-              fontSize: 9,
-              color: p.muted,
-              marginTop: 2,
-              textAlign: 'center',
-              opacity: 0.7,
-            }}
-          >
-            {reference}
+        </View>
+        <View style={{ alignItems: 'center', paddingBottom: AZKAR_COUNT_PAD_BOTTOM }}>
+          <Text style={{ fontFamily: 'Rubik-Bold', fontSize: size === 'small' ? 12 : 14, color: p.muted }}>
+            {`×${applyNumerals(count, numerals, ar)}`}
           </Text>
-        ) : null}
+          {/* Arabic-only benefit + reference: hidden in English mode. */}
+          {ar && size !== 'small' && whenSaid ? (
+            <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, color: p.muted, marginTop: 4, textAlign: 'center', opacity: 0.85, writingDirection: 'rtl' }}>
+              {whenSaid}
+            </Text>
+          ) : null}
+          {ar && size !== 'small' && reference ? (
+            <Text numberOfLines={1} style={{ fontFamily: 'Rubik-Medium', fontSize: 9, color: p.muted, marginTop: 2, textAlign: 'center', opacity: 0.7 }}>
+              {reference}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </GlassTile>
   );

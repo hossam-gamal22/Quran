@@ -261,6 +261,8 @@ describe('memorization storage and today plan', () => {
       date: '2026-05-07',
       newAyahs: [],
       reviewAyahs: [],
+      assignedNewCount: 0,
+      assignedReviewCount: 0,
       estimatedMinutes: 0,
     });
   });

@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -165,7 +166,7 @@ export default function FamousDuasScreen() {
     try {
       await Haptics.selectionAsync();
       const parts = [dua.arabic, dua.translation, dua.source].filter(Boolean);
-      const text = parts.join('\n\n');
+      const text = buildShareText(parts.join('\n\n'));
       await Clipboard.setStringAsync(text);
       Alert.alert(t('common.copied') || 'تم النسخ', '');
     } catch {}
@@ -179,8 +180,7 @@ export default function FamousDuasScreen() {
       if (dua.source) parts.push(`📖 ${dua.source}`);
       if (dua.fadl?.text) parts.push(`✨ ${dua.fadl.text}`);
       if (dua.fadl?.source) parts.push(dua.fadl.source);
-      parts.push('— روح المسلم');
-      const message = parts.join('\n\n');
+      const message = buildShareText(parts.join('\n\n'));
       await Share.share({ message });
     } catch {}
   }, []);

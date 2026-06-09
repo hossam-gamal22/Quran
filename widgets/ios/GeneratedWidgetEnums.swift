@@ -117,7 +117,7 @@ enum RoohMediumKind: String, AppEnum {
             title: LocalizedStringResource("widget.kind.prayerNextPrevious", defaultValue: "الصلاة السابقة والقادمة")
         ),
         .verseOfDay: DisplayRepresentation(
-            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "🔒 Verse of the Day")
+            title: LocalizedStringResource("widget.kind.verseOfDay.premium", defaultValue: "Verse of the Day")
         ),
         .azkarMorning: DisplayRepresentation(
             title: LocalizedStringResource("widget.kind.azkarMorning.premium", defaultValue: "🔒 Morning Azkar")

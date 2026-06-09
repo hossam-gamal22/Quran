@@ -8,18 +8,19 @@ import { getArabicSeasonalBannerCopy } from './seasonal-banner-copy';
 // الأنواع
 // ========================================
 
-export type SeasonType = 
-  | 'ramadan'      // رمضان
-  | 'hajj'         // موسم الحج
-  | 'ashura'       // عاشوراء
-  | 'mawlid'       // المولد النبوي
-  | 'eid_fitr'     // عيد الفطر
-  | 'eid_adha'     // عيد الأضحى
-  | 'dhul_hijjah'  // العشر الأوائل من ذي الحجة
-  | 'muharram'     // شهر محرم
-  | 'rajab'        // شهر رجب
-  | 'shaban'       // شهر شعبان
-  | 'none';        // لا يوجد موسم
+export type SeasonType =
+  | 'ramadan'        // رمضان
+  | 'hajj'           // موسم الحج
+  | 'ashura'         // عاشوراء
+  | 'mawlid'         // المولد النبوي
+  | 'eid_fitr'       // عيد الفطر
+  | 'eid_adha'       // عيد الأضحى
+  | 'dhul_hijjah'    // العشر الأوائل من ذي الحجة
+  | 'hijri_new_year' // رأس السنة الهجرية (١–٣ محرم)
+  | 'muharram'       // شهر محرم
+  | 'rajab'          // شهر رجب
+  | 'shaban'         // شهر شعبان
+  | 'none';          // لا يوجد موسم
 
 export interface SeasonInfo {
   type: SeasonType;
@@ -75,6 +76,7 @@ type SeasonDataEntry = Omit<SeasonInfo, 'isActive' | 'daysRemaining' | 'currentD
 
 type SeasonDate = Pick<HijriDate, 'day' | 'month' | 'year'>;
 
+// Keep this identical to SEASON_PRIORITY in lib/app-icon-manager.ts.
 const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
   'eid_fitr',
   'eid_adha',
@@ -83,6 +85,8 @@ const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
   'ramadan',
   'dhul_hijjah',
   'hajj',
+  // 1–3 Muharram window must beat the month-wide `muharram` season.
+  'hijri_new_year',
   'muharram',
   'rajab',
   'shaban',
@@ -279,6 +283,16 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
     endDate: { month: 12, day: 13 },
     color: '#CD853F',
     icon: 'sheep',
+  },
+  hijri_new_year: {
+    type: 'hijri_new_year',
+    nameAr: 'رأس السنة الهجرية',
+    nameEn: 'Hijri New Year',
+    description: 'بداية عام هجري جديد — نسأل الله أن يجعله عام خير وبركة',
+    startDate: { month: 1, day: 1 },
+    endDate: { month: 1, day: 3 },
+    color: '#607D8B',
+    icon: 'calendar-star',
   },
   muharram: {
     type: 'muharram',
@@ -546,6 +560,9 @@ let SEASONAL_GREETINGS: Record<SeasonType, string[]> = {
   ],
   mawlid: [
     'صلوا على النبي ﷺ',
+  ],
+  hijri_new_year: [
+    'كل عام وأنتم بخير — عام هجري مبارك',
   ],
   eid_fitr: [
     'كل عام وأنتم بخير — تقبل الله طاعتكم',

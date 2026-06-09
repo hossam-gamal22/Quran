@@ -29,6 +29,7 @@ import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
 import { resolveDailyVerse, resolveDailyVerseSync, withFullArabic } from '@/lib/seasonal-ayah';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
+import { buildShareText } from '@/lib/share-text';
 import { localizeNumber } from '@/lib/format-number';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -391,7 +392,7 @@ export default function DailyAyahVideoScreen() {
     try {
       if (Platform.OS === 'web') {
         await Share.share({
-          message: `${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}\n\n— ${t('common.appName')}`,
+          message: buildShareText(`${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}`),
         });
         return;
       }
@@ -400,7 +401,7 @@ export default function DailyAyahVideoScreen() {
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `${t('shareService.ayahRef')}: ${currentAyah.ref}` });
       } else {
-        await Share.share({ message: `${currentAyah.arabic}\n﴿ ${currentAyah.ref} ﴾` });
+        await Share.share({ message: buildShareText(`${currentAyah.arabic}\n﴿ ${currentAyah.ref} ﴾`) });
       }
     } catch {
       Alert.alert(t('common.error'), t('common.shareError'));

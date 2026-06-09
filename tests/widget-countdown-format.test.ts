@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  SIN_MINUTE_GAP,
   formatPrayerDurationCompact,
   formatPrayerDurationWithPrefix,
 } from '@/lib/widget-format-duration';
@@ -12,9 +13,12 @@ describe('widget countdown text contract', () => {
     const now = Date.parse('2026-06-01T12:00:00.000Z');
     const target = now + (2 * 3600 + 18 * 60 + 11) * 1000;
 
-    expect(formatPrayerDurationCompact(2 * 3600 + 18 * 60 + 11, 'ar')).toBe('2 س 18 د');
-    expect(formatPrayerDurationWithPrefix(target, now, 'ar', 'until')).toBe('بعد 2 س 18 د');
-    expect(formatPrayerDurationWithPrefix(now - 66 * 60 * 1000, now, 'ar', 'since')).toBe('منذ 1 س 6 د');
+    // The ≥1h Arabic format puts SIN_MINUTE_GAP (EN SPACE, U+2002) after «س» —
+    // build the expected strings from the constant so an invisible-char drift
+    // can't masquerade as a passing assertion.
+    expect(formatPrayerDurationCompact(2 * 3600 + 18 * 60 + 11, 'ar')).toBe(`2 س${SIN_MINUTE_GAP}18 د`);
+    expect(formatPrayerDurationWithPrefix(target, now, 'ar', 'until')).toBe(`بعد 2 س${SIN_MINUTE_GAP}18 د`);
+    expect(formatPrayerDurationWithPrefix(now - 66 * 60 * 1000, now, 'ar', 'since')).toBe(`منذ 1 س${SIN_MINUTE_GAP}6 د`);
   });
 
   test('does not reintroduce Android HH:MM:SS countdown rendering', () => {

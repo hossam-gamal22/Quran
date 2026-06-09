@@ -958,7 +958,7 @@ const _styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.22,
     shadowRadius: 22,
-    elevation: 8,
+    // No Android `elevation`: bg is translucent; elevation draws an inner ghost square.
   },
   loadingIconCircle: {
     width: 78,
@@ -1071,7 +1071,7 @@ const _styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 16,
-    elevation: 4,
+    // No Android `elevation`: bg is translucent; elevation draws an inner ghost square.
   },
   scoreRing: {
     width: 120,

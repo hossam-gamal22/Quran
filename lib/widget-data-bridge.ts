@@ -17,7 +17,9 @@ import {
   type WidgetSnapshotManifestEntry,
 } from './widget-data';
 import { getLanguage } from './i18n';
-import { type Location, type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes, applyAdjustments } from './prayer-times';
+import type { AndroidWidgetDecision } from './android-widget-task-handler';
+import { deviceUses24Hour } from './widget-clock-format';
+import { type Location, type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes, applyAdjustments, isFridayDate } from './prayer-times';
 import { getOfflinePrayerTimes } from './prayer-week-cache';
 import {
   buildCanonicalPrayerSnapshot,
@@ -38,7 +40,7 @@ import {
   PRAYER_INPUTS_VERSION,
   type PrayerKey,
 } from './widget-prayer-calculator';
-import { nextPrayerStaticState } from './widget-prayer-table-state';
+import { nextPrayerStaticState, resolvePrayerTableState } from './widget-prayer-table-state';
 
 const APP_GROUP = 'group.com.rooh.almuslim';
 const WIDGET_DATA_KEY = 'widget_shared_data';
@@ -49,6 +51,23 @@ const WIDGET_PRAYER_INPUTS_KEY_IOS = 'widget_prayer_inputs';
 const WIDGET_PRAYER_INPUTS_KEY_ANDROID = PRAYER_INPUTS_KEY; // '@widget_prayer_inputs'
 const SNAPSHOT_VERSION_KEY = '@widget_snapshot_version';
 const WIDGET_DISPLAY_PREFS_KEY = '@widget_display_preferences';
+/** Set when a settings-driven re-bake is owed; cleared only once the visible
+ *  widgets have been re-baked successfully. If the app is backgrounded mid-bake
+ *  (captureRef needs a live RN tree, so the bake aborts), this marker survives
+ *  and SnapshotPumpController's foreground drain force-rebakes on next launch —
+ *  the change self-heals instead of waiting for the user to re-enter the gallery.
+ *  Mirrors PUMP_PENDING_KEY in SnapshotPumpController / android-widget-task-handler. */
+const WIDGET_REBAKE_PENDING_KEY = '@widget_pump_pending';
+
+/** Mark that a user-initiated widget appearance change still owes a re-bake. */
+export async function markWidgetRebakePending(): Promise<void> {
+  try { await AsyncStorage.setItem(WIDGET_REBAKE_PENDING_KEY, 'true'); } catch {}
+}
+
+/** Clear the owed-re-bake marker after the visible widgets are freshly baked. */
+export async function clearWidgetRebakePending(): Promise<void> {
+  try { await AsyncStorage.removeItem(WIDGET_REBAKE_PENDING_KEY); } catch {}
+}
 
 function logWidgetTheme(message: string, payload?: unknown) {
   if (!__DEV__) return;
@@ -73,6 +92,7 @@ export type WidgetDisplayOverride = Partial<{
   widgetMonthCalendar: string;
   widgetNumerals: string;
   widgetTheme: string;
+  widgetLanguage: 'auto' | 'ar' | 'en';
   widgetDateFormat: string;
 }>;
 
@@ -103,12 +123,25 @@ async function triggerNativeWidgetReload(sharedData?: SharedWidgetData): Promise
       // so the refresh fan-out must enumerate every key in LEGACY_ANDROID_WIDGET_MAP
       // — `androidWidgetProviderNames()` returns exactly that.
       const { androidWidgetProviderNames } = require('./widgets/registry');
+      // Share the EXACT decide/render logic the headless task handler uses, so a
+      // language switch (this in-app fan-out) and an organic Android WIDGET_UPDATE
+      // can never diverge. This is what makes the Arabic-only / location / curated
+      // fallbacks flip deterministically the instant the user changes language —
+      // instead of waiting for Android's ~30-min updatePeriodMillis to route a
+      // refresh through the task handler.
+      const { decideAndroidWidget, renderAndroidWidgetDecision } = require('./android-widget-task-handler');
       const widgetNames: string[] = androidWidgetProviderNames();
-      const snapshotOverrides = new Map<string, AndroidSnapshotRenderOverride>();
 
+      // Precompute each placement's render decision up front (async: language,
+      // location check, prayer per-state template, PNG stat) so the synchronous
+      // requestWidgetUpdate callback can just render the resolved element.
+      const decisions = new Map<string, AndroidWidgetDecision | null>();
       await Promise.allSettled(widgetNames.map(async (widgetName) => {
-        const override = await resolveAndroidSnapshotRenderOverride(widgetName, sharedData);
-        if (override) snapshotOverrides.set(widgetName, override);
+        try {
+          decisions.set(widgetName, await decideAndroidWidget(widgetName, sharedData));
+        } catch {
+          decisions.set(widgetName, null);
+        }
       }));
 
       await Promise.allSettled(
@@ -116,13 +149,9 @@ async function triggerNativeWidgetReload(sharedData?: SharedWidgetData): Promise
           requestWidgetUpdate({
             widgetName,
             renderWidget: (widgetInfo: { width?: number; height?: number }) => {
-              const element = renderWidgetByName(
-                widgetName,
-                sharedData,
-                widgetInfo,
-                snapshotOverrides.get(widgetName),
-              );
-              return element;
+              const decision = decisions.get(widgetName);
+              if (!decision) return null;
+              return renderAndroidWidgetDecision(decision, sharedData, widgetInfo);
             },
             widgetNotFound: () => {
               // Widget not on home screen — nothing to do
@@ -447,6 +476,7 @@ function buildManifestFromEntries(
     id: string;
     size: string;
     theme: string;
+    language?: 'ar' | 'en';
     capturedWidth?: number;
     capturedHeight?: number;
     anchors?: ReadonlyArray<{
@@ -476,6 +506,7 @@ function buildManifestFromEntries(
       id: entry.id,
       size: entry.size,
       theme: entry.theme,
+      language: entry.language,
       updatedAt,
       capturedWidth: entry.capturedWidth,
       capturedHeight: entry.capturedHeight,
@@ -493,6 +524,68 @@ function mergeSnapshotManifest(
     ...(previous?.snapshotManifest ?? {}),
     ...nextEntries,
   };
+}
+
+/** Single-state model: the manifest should only ever describe the active
+ *  theme's snapshots (the only ones we keep on disk). Drop every other theme's
+ *  entries so the manifest never points at a PNG that the disk prune deleted. */
+function pruneManifestToTheme(
+  manifest: Record<string, WidgetSnapshotManifestEntry> | undefined,
+  theme: string,
+): Record<string, WidgetSnapshotManifestEntry> {
+  const out: Record<string, WidgetSnapshotManifestEntry> = {};
+  for (const [key, entry] of Object.entries(manifest ?? {})) {
+    if ((entry as WidgetSnapshotManifestEntry)?.theme === theme) out[key] = entry;
+  }
+  return out;
+}
+
+/** Guards the H2 in-session recovery retry so a failed recovery bake reschedules
+ *  at most one pending retry at a time (reset when that retry settles). */
+let recoveryRetryScheduled = false;
+
+/** Widget ids that render LIVE in the headless task (FlexWidget) and never load a
+ *  snapshot PNG — excluded from the missing-file check so they don't trigger an
+ *  endless force when they legitimately have no baked snapshot. */
+const LIVE_WIDGET_IDS_FOR_MISSING_CHECK = [
+  'azkarMorning', 'azkarEvening', 'dailyDhikr',
+  'daySimple', 'dayThuluth', 'dayDigital', 'monthSimple', 'monthThuluth',
+];
+
+/**
+ * Android only: returns true when any placed widget's snapshot PNG is unusable —
+ * either there is no manifest entry for its route key, or the manifest's file path
+ * does not exist on disk. Used to FORCE a re-bake (bypassing the per-theme hash
+ * skip in pumpWidgetSnapshotsForThemes) so that simply opening the app always
+ * regenerates a missing/deleted snapshot. Self-limiting: once the file is on disk
+ * the check returns false, so healthy foregrounds keep their normal hash-skip.
+ * iOS App Group paths can't be stat'd by expo-file-system, so iOS returns false.
+ */
+async function anyPlacedSnapshotFileMissing(
+  previousSharedData: SharedWidgetData | null,
+  placedRouteKeys: string[],
+): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+  if (placedRouteKeys.length === 0) return false;
+  let FileSystem: typeof import('expo-file-system');
+  try {
+    FileSystem = require('expo-file-system');
+  } catch {
+    return false;
+  }
+  const manifest = previousSharedData?.snapshotManifest ?? {};
+  for (const routeKey of placedRouteKeys) {
+    if (LIVE_WIDGET_IDS_FOR_MISSING_CHECK.some((id) => routeKey.startsWith(`${id}_`))) continue;
+    const entry = manifest[routeKey];
+    if (!entry?.path) return true; // never baked (or no path) → must bake
+    try {
+      const info = await FileSystem.getInfoAsync(entry.path);
+      if (!info.exists) return true;
+    } catch {
+      return true; // can't stat → assume missing, force a bake
+    }
+  }
+  return false;
 }
 
 async function getActiveSnapshotRouteKeys(
@@ -515,6 +608,24 @@ async function getActiveSnapshotRouteKeys(
           routeKeys.add(snapshotRouteKey(target.id, target.size, activeTheme));
         }
       }));
+
+      // Union the sticky "ever-placed" providers recorded by the headless
+      // WIDGET_ADDED task (key kept in sync with android-widget-task-handler's
+      // PLACED_PROVIDERS_KEY). getWidgetInfo() is timing-sensitive and can return
+      // empty for a genuinely-placed widget; the sticky set keeps that widget's
+      // route key in the bake set so its active-theme PNG is always regenerated.
+      try {
+        const rawPlaced = await AsyncStorage.getItem('@widget_placed_providers');
+        const placedProviders: string[] = rawPlaced ? JSON.parse(rawPlaced) : [];
+        if (Array.isArray(placedProviders)) {
+          placedProviders.forEach((provider) => {
+            const target = androidWidgetProviderTarget(provider);
+            if (target) routeKeys.add(snapshotRouteKey(target.id, target.size, activeTheme));
+          });
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[widget/refresh] sticky placed providers read failed:', e);
+      }
     } else if (Platform.OS === 'ios') {
       const { WidgetReloadModule } = NativeModules;
       const configs = WidgetReloadModule?.currentWidgetConfigurations
@@ -559,212 +670,6 @@ function normalizeAndroidPrayerStaticState(value?: string): AndroidPrayerStaticS
     : null;
 }
 
-function androidPrayerStaticTargetsForRouteKeys(
-  routeKeys: string[],
-  active: AndroidPrayerStaticState,
-): Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large'; active: AndroidPrayerStaticState }> {
-  const out: Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large'; active: AndroidPrayerStaticState }> = [];
-  const seen = new Set<string>();
-  for (const routeKey of routeKeys) {
-    const [widgetId, size] = routeKey.split('_');
-    if (!widgetId || !ANDROID_PRAYER_STATIC_WIDGETS.has(widgetId)) continue;
-    if (size !== 'small' && size !== 'medium' && size !== 'large') continue;
-    const key = `${widgetId}_${size}_${active}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      widgetId: widgetId as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
-      size,
-      active,
-    });
-  }
-  return out;
-}
-
-function androidPrayerStaticAllStateTargetsForRouteKeys(
-  routeKeys: string[],
-): Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large' }> {
-  const out: Array<{ widgetId: 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious'; size: 'small' | 'medium' | 'large' }> = [];
-  const seen = new Set<string>();
-  for (const routeKey of routeKeys) {
-    const [widgetId, size] = routeKey.split('_');
-    if (!widgetId || !ANDROID_PRAYER_STATIC_WIDGETS.has(widgetId)) continue;
-    if (size !== 'small' && size !== 'medium' && size !== 'large') continue;
-    const key = `${widgetId}_${size}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      widgetId: widgetId as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
-      size,
-    });
-  }
-  return out;
-}
-
-function routeKeysForTheme(routeKeys: string[], fromTheme: string, toTheme: string): string[] {
-  return routeKeys.map((routeKey) =>
-    routeKey.endsWith(`_${fromTheme}`)
-      ? `${routeKey.slice(0, -fromTheme.length)}${toTheme}`
-      : routeKey
-  );
-}
-
-interface AndroidSnapshotRenderOverride {
-  hasSnapshot?: boolean;
-  snapshotKey?: string;
-  snapshotPath?: string;
-  isPrayerStaticTemplate?: boolean;
-}
-
-async function resolveAndroidSnapshotRenderOverride(
-  widgetName: string,
-  data: SharedWidgetData,
-): Promise<AndroidSnapshotRenderOverride | undefined> {
-  if (Platform.OS !== 'android') return undefined;
-  try {
-    const { androidWidgetProviderTarget } = require('./widgets/registry');
-    const target = androidWidgetProviderTarget(widgetName);
-    if (!target || !ANDROID_PRAYER_STATIC_WIDGETS.has(target.id)) return undefined;
-
-    const active = normalizeAndroidPrayerStaticState(nextPrayerStaticState(data.prayer));
-    if (!active) return undefined;
-    if (target.size !== 'small' && target.size !== 'medium' && target.size !== 'large') return undefined;
-
-    const {
-      prayerStaticAssetExistsOnDevice,
-      prayerStaticAssetName,
-      prayerStaticAssetPath,
-    } = require('./widget-android-asset-resolver');
-    const { resolveWidgetTheme } = require('./widgets/snapshot');
-    const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
-    const templateOpts = {
-      widgetId: target.id,
-      size: target.size,
-      theme,
-      language: data.widgetLanguage === 'en' || data.language === 'en' ? 'en' : 'ar',
-      active,
-    };
-
-    if (!(await prayerStaticAssetExistsOnDevice(templateOpts))) return undefined;
-
-    const snapshotKey = prayerStaticAssetName(templateOpts);
-    const snapshotPath = prayerStaticAssetPath(templateOpts);
-    if (__DEV__) {
-      console.log(`[widget/refresh] immediate prayer static override widget=${widgetName} key=${snapshotKey}`);
-    }
-    return {
-      hasSnapshot: true,
-      snapshotKey,
-      snapshotPath,
-      isPrayerStaticTemplate: true,
-    };
-  } catch (e) {
-    if (__DEV__) console.warn('[widget/refresh] immediate prayer static override failed:', e);
-    return undefined;
-  }
-}
-
-/**
- * Render the correct widget component for a given widget name using the provided data.
- *
- * Two rendering paths:
- *   1. Legacy path — historic provider names (RoohSmall, PrayerTimesSmall, …)
- *      route through their hand-written wrapper components, which themselves
- *      delegate to SnapshotWidget. Preserved verbatim so existing placements
- *      keep working.
- *   2. Generic path (Phase I) — variant-specific provider names registered in
- *      app.json (e.g. RoohDayThuluthSmall) don't have wrapper files; they
- *      render `SnapshotWidget` directly using the (id, size) tuple resolved
- *      from the unified Android provider target map.
- */
-function renderWidgetByName(
-  widgetName: string,
-  data: SharedWidgetData,
-  widgetBounds?: { width?: number; height?: number },
-  snapshotOverride?: AndroidSnapshotRenderOverride,
-): React.ReactElement | null {
-  const { androidWidgetProviderTarget } = require('./widgets/registry');
-  const target = androidWidgetProviderTarget(widgetName);
-  if (target) {
-    const { SnapshotWidget } = require('@/components/widgets/android/SnapshotWidget');
-    const clickUri = (() => {
-      switch (target.id) {
-        case 'prayerSingle':
-        case 'prayerTable':
-        case 'prayerNextPrevious':
-          return 'rooh-almuslim://prayer';
-        case 'verseOfDay':
-          return 'rooh-almuslim://daily-ayah';
-        case 'azkarMorning':
-          return 'rooh-almuslim://azkar/morning';
-        case 'azkarEvening':
-        case 'dailyDhikr':
-          return 'rooh-almuslim://azkar';
-        case 'hijriDate':
-        case 'daySimple':
-        case 'dayThuluth':
-        case 'dayDigital':
-        case 'monthSimple':
-        case 'monthThuluth':
-          return 'rooh-almuslim://hijri';
-        default:
-          return 'rooh-almuslim://widget';
-      }
-    })();
-    return React.createElement(SnapshotWidget, {
-      widgetId: target.id,
-      size: target.size,
-      data,
-      hasSnapshot: snapshotOverride?.hasSnapshot,
-      snapshotKey: snapshotOverride?.snapshotKey,
-      snapshotPath: snapshotOverride?.snapshotPath,
-      isPrayerStaticTemplate: snapshotOverride?.isPrayerStaticTemplate,
-      widgetWidth: widgetBounds?.width,
-      widgetHeight: widgetBounds?.height,
-      clickAction: 'OPEN_URI',
-      clickUri,
-    });
-  }
-
-  const { RoohSmallWidget } = require('@/components/widgets/android/RoohSmallWidget');
-  const { RoohMediumWidget } = require('@/components/widgets/android/RoohMediumWidget');
-  const { RoohLargeWidget } = require('@/components/widgets/android/RoohLargeWidget');
-  const { PrayerTimesSmallWidget } = require('@/components/widgets/android/PrayerTimesSmallWidget');
-  const { PrayerTimesMediumWidget } = require('@/components/widgets/android/PrayerTimesMediumWidget');
-  const { PrayerTimesLargeWidget } = require('@/components/widgets/android/PrayerTimesLargeWidget');
-  const { DailyVerseSmallWidget } = require('@/components/widgets/android/DailyVerseSmallWidget');
-  const { DailyVerseMediumWidget } = require('@/components/widgets/android/DailyVerseMediumWidget');
-  const { DailyDhikrSmallWidget } = require('@/components/widgets/android/DailyDhikrSmallWidget');
-  const { DailyDhikrMediumWidget } = require('@/components/widgets/android/DailyDhikrMediumWidget');
-  const { AzkarProgressSmallWidget } = require('@/components/widgets/android/AzkarProgressSmallWidget');
-  const { AzkarProgressMediumWidget } = require('@/components/widgets/android/AzkarProgressMediumWidget');
-  const { HijriDateSmallWidget } = require('@/components/widgets/android/HijriDateSmallWidget');
-  const { HijriDateMediumWidget } = require('@/components/widgets/android/HijriDateMediumWidget');
-
-  const map: Record<string, React.FC<{ data: SharedWidgetData }>> = {
-    RoohSmall: RoohSmallWidget,
-    RoohMedium: RoohMediumWidget,
-    RoohLarge: RoohLargeWidget,
-    PrayerTimesSmall: PrayerTimesSmallWidget,
-    PrayerTimesMedium: PrayerTimesMediumWidget,
-    PrayerTimesLarge: PrayerTimesLargeWidget,
-    DailyVerseSmall: DailyVerseSmallWidget,
-    DailyVerseMedium: DailyVerseMediumWidget,
-    DailyDhikrSmall: DailyDhikrSmallWidget,
-    DailyDhikrMedium: DailyDhikrMediumWidget,
-    AzkarProgressSmall: AzkarProgressSmallWidget,
-    AzkarProgressMedium: AzkarProgressMediumWidget,
-    HijriDateSmall: HijriDateSmallWidget,
-    HijriDateMedium: HijriDateMediumWidget,
-  };
-
-  const Component = map[widgetName];
-  if (Component) return React.createElement(Component, { data });
-
-  // Fallback: per-variant or Android keyguard provider name. Look up the
-  // (id, size) in the registry map and render SnapshotWidget directly.
-  return null;
-}
 
 /**
  * Aggregate all widget data and write to shared storage, then refresh all Android widgets.
@@ -778,6 +683,9 @@ export async function updateWidgetData(
   try {
     const totalT0 = Date.now();
     const lang = getLanguage();
+    // Device 12/24h preference — single source of truth for every widget time
+    // string (baked + live overlay). Read once so the whole payload is consistent.
+    const use24 = deviceUses24Hour();
     const settings = await getWidgetSettings();
 
     const effectiveCalc = await getEffectivePrayerCalcSettings();
@@ -834,8 +742,15 @@ export async function updateWidgetData(
       } catch {}
     }
 
-    // Last-resort Makkah fallback: never let widgets render "--:--".
-    // The app will replace this with user-location data as soon as location is available.
+    // Track whether we have a REAL prayer source (explicit arg, canonical
+    // snapshot, or offline calc from stored coords). When false, every reader
+    // must render an intentional "enable location" placeholder rather than the
+    // Makkah/sample fallback values below.
+    const hasRealLocation = !!effectivePrayerTimes;
+
+    // Last-resort Makkah fallback: keep the countdown/epoch machinery happy and
+    // never crash on "--:--". The needsLocation flag (threaded below) tells the
+    // UI layers NOT to display these as if they were the user's real times.
     if (!effectivePrayerTimes) {
       effectivePrayerTimes = {
         fajr: '04:15',
@@ -857,7 +772,7 @@ export async function updateWidgetData(
     await writePrayerInputs().catch(() => null);
 
     const settledResults = await Promise.allSettled([
-      preparePrayerWidgetData(effectivePrayerTimes, location, lang, canonicalSnapshot),
+      preparePrayerWidgetData(effectivePrayerTimes, location, lang, canonicalSnapshot, use24, !hasRealLocation),
       prepareAzkarWidgetData(lang, settings.azkarWidget.categories),
       prepareVerseWidgetData(lang, { showTranslation: settings.verseWidget.showTranslation }),
       prepareDhikrWidgetData(lang, { showTranslation: settings.dhikrWidget.showTranslation, showBenefit: settings.dhikrWidget.showBenefit }),
@@ -883,16 +798,17 @@ export async function updateWidgetData(
     const prayerCompletion = (settledResults[4] as PromiseFulfilledResult<any>).value;
 
     // Pull user's widget preferences from app_settings.
-    // NOTE: widgetLanguage is intentionally derived from the app's main language —
-    // there is no per-widget language toggle anymore (Arabic UI → Arabic widgets,
-    // otherwise English).
+    // widgetLanguage is a user-selectable widget override (auto/ar/en) read from
+    // the display prefs below. 'auto' follows the app's main language (Arabic UI
+    // → Arabic widgets, otherwise English). Resolved to a binary 'ar'|'en' after
+    // the settings block.
     let widgetFontVariant: 'widget1' | 'widget2' = 'widget1';
     let widgetCalendar = 'auto';
     let widgetDayCalendar = 'auto';
     let widgetMonthCalendar = 'auto';
     let widgetNumerals = 'auto';
     let widgetTheme = 'auto';
-    const widgetLanguage = (lang === 'ar' || lang === 'ur') ? 'ar' : 'en';
+    let widgetLanguageSetting: 'auto' | 'ar' | 'en' = 'auto';
     let widgetDateFormat = 'gregorian-ar';
     try {
       const appSettingsRaw = await AsyncStorage.getItem('app_settings');
@@ -908,6 +824,7 @@ export async function updateWidgetData(
         if (d?.widgetMonthCalendar) widgetMonthCalendar = d.widgetMonthCalendar;
         if (d?.widgetNumerals) widgetNumerals = d.widgetNumerals;
         if (d?.widgetTheme) widgetTheme = d.widgetTheme;
+        if (d?.widgetLanguage) widgetLanguageSetting = d.widgetLanguage;
         if (d?.widgetDateFormat) widgetDateFormat = d.widgetDateFormat;
       }
       const widgetPrefsRaw = await AsyncStorage.getItem(WIDGET_DISPLAY_PREFS_KEY);
@@ -920,6 +837,7 @@ export async function updateWidgetData(
         if (d?.widgetMonthCalendar) widgetMonthCalendar = d.widgetMonthCalendar;
         if (d?.widgetNumerals) widgetNumerals = d.widgetNumerals;
         if (d?.widgetTheme) widgetTheme = d.widgetTheme;
+        if (d?.widgetLanguage) widgetLanguageSetting = d.widgetLanguage;
         if (d?.widgetDateFormat) widgetDateFormat = d.widgetDateFormat;
       }
       const displayOverride = options.displayOverride;
@@ -932,6 +850,7 @@ export async function updateWidgetData(
         if (displayOverride.widgetMonthCalendar) widgetMonthCalendar = displayOverride.widgetMonthCalendar;
         if (displayOverride.widgetNumerals) widgetNumerals = displayOverride.widgetNumerals;
         if (displayOverride.widgetTheme) widgetTheme = displayOverride.widgetTheme;
+        if (displayOverride.widgetLanguage) widgetLanguageSetting = displayOverride.widgetLanguage;
         if (displayOverride.widgetDateFormat) widgetDateFormat = displayOverride.widgetDateFormat;
         logWidgetTheme('applied immediate display override (updateWidgetData):', displayOverride);
       }
@@ -947,6 +866,16 @@ export async function updateWidgetData(
     } catch (e) {
       logWidgetTheme('loaded from storage (updateWidgetData) failed:', (e as Error)?.message ?? e);
     }
+
+    // Resolve the widget language: explicit ar/en wins; 'auto' follows the app
+    // language. Used for the baked snapshot, prayer templates, the single-state
+    // prune, and the widgetLanguage published to native (content data is already
+    // bilingual, so the render language is decided by this flag, not data prep).
+    // A widget ALWAYS renders in the app language — the per-widget language
+    // override was removed so the bake, the placed widget, and the app can never
+    // disagree or mix AR/EN. (`widgetLanguageSetting` is intentionally ignored.)
+    void widgetLanguageSetting;
+    const widgetLanguage: 'ar' | 'en' = (lang === 'ar' || lang === 'ur') ? 'ar' : 'en';
 
     // Phase F: real premium gating sourced from the subscription state cached
     // by SubscriptionContext. Mirrors the gating in
@@ -1049,6 +978,7 @@ export async function updateWidgetData(
       prayerCompletion,
       settings,
       language: lang,
+      use24Hour: use24,
       hijriOffset,
       versePool,
       azkarPools,
@@ -1080,7 +1010,9 @@ export async function updateWidgetData(
     let snapshotUpdatedAt = previousSharedData?.snapshotUpdatedAt;
     let snapshotManifest = previousSharedData?.snapshotManifest ?? {};
     let activeThemeForPrewarm: string | null = null;
-    let activeRouteKeysForPrewarm: string[] = [];
+    // True when a placed widget's snapshot PNG is missing on disk — forces a
+    // re-bake even if content is unchanged (H1) and arms the H2 recovery retry.
+    let missingPlacedFile = false;
 
     // Regenerate the active-theme snapshot before shared data is published.
     // Native widgets only receive the new manifest after the versioned PNGs are
@@ -1106,7 +1038,7 @@ export async function updateWidgetData(
       snapshotVersion = await nextSnapshotVersion();
       snapshotUpdatedAt = new Date().toISOString();
       setPumpContext({
-        language: lang,
+        language: widgetLanguage,
         isPremium: !!isPremium,
         display,
         sharedData: sharedDataBase,
@@ -1125,11 +1057,18 @@ export async function updateWidgetData(
       });
       if (Platform.OS === 'android' || Platform.OS === 'ios') {
         const placedRouteKeys = await getActiveSnapshotRouteKeys(activeTheme, previousSharedData);
-        activeRouteKeysForPrewarm = placedRouteKeys;
+        // If any placed widget's PNG is missing on disk, force a re-bake even when
+        // the per-theme hash matches — otherwise the pump hash-skips and the widget
+        // stays on the "open the app" fallback forever (gap b). Self-limiting once
+        // the file exists.
+        missingPlacedFile = await anyPlacedSnapshotFileMissing(previousSharedData, placedRouteKeys);
+        if (__DEV__ && missingPlacedFile) {
+          console.log('[widget/refresh] missingPlacedFile=true → forcing snapshot regeneration');
+        }
         const snapshotT0 = Date.now();
         const result = await pumpThemesFromCurrentState?.([activeTheme], {
           debounceMs: 0,
-          force: !!options.forceSnapshots || !!options.clearSnapshotCache,
+          force: !!options.forceSnapshots || !!options.clearSnapshotCache || missingPlacedFile,
           includeRouteKeys: placedRouteKeys.length > 0 ? placedRouteKeys : undefined,
           cleanup: false,
           commit: false,
@@ -1142,28 +1081,41 @@ export async function updateWidgetData(
         if (Object.keys(generatedManifest).length === 0) {
           throw new Error(`snapshot_generation_empty:${result.reason}`);
         }
-        snapshotManifest = mergeSnapshotManifest(previousSharedData, generatedManifest);
+        // Android single-state: keep only the active theme's previous entries
+        // (for placed widgets we didn't re-bake this run) plus the freshly
+        // generated ones — every other theme is being pruned off disk below.
+        // iOS keeps ALL themes in the manifest so the native Edit Widget picker
+        // can resolve a PNG for any selectable appearance.
+        snapshotManifest = Platform.OS === 'android'
+          ? {
+              ...pruneManifestToTheme(previousSharedData?.snapshotManifest, activeTheme),
+              ...generatedManifest,
+            }
+          : mergeSnapshotManifest(previousSharedData, generatedManifest);
         if (Platform.OS === 'android') {
           const { ensureAndroidPrayerStaticTemplates } = require('./widgets/snapshot');
-          const currentPrayerState = normalizeAndroidPrayerStaticState(nextPrayerStaticState(prayerData));
-          const priorityTargets = currentPrayerState
-            ? androidPrayerStaticTargetsForRouteKeys(placedRouteKeys, currentPrayerState)
-            : [];
-          if (priorityTargets.length > 0) {
-            const templates = await ensureAndroidPrayerStaticTemplates?.({
-              theme: activeTheme,
-              language: lang === 'en' ? 'en' : 'ar',
-              force: !!options.clearSnapshotCache,
-              targets: priorityTargets,
-            });
-            if (templates?.errors?.length) {
-              throw new Error(`android_prayer_template_generation_failed:${templates.errors.join('|')}`);
-            }
-            if (__DEV__) {
-              console.log(
-                `[widget/android] priority prayer templates ready generated=${templates?.generated ?? 0} skipped=${templates?.skipped ?? false} targets=${priorityTargets.length}`,
-              );
-            }
+          // Generate ALL six prayer-state templates for EVERY prayer widget/size
+          // of the ACTIVE theme — UNCONDITIONALLY (no `targets`, so it doesn't
+          // depend on placed-widget detection). The previous version gated this
+          // on `placedRouteKeys`, which is empty when `getWidgetInfo` returns
+          // nothing (fresh manifest / flaky detection); the templates then never
+          // generated and the widget served the stale gallery PNG all day — the
+          // reported "الفجر/الظهر with the wrong time + wrong highlight". Omitting
+          // `targets` makes ensureAndroidPrayerStaticTemplates bake the full
+          // "all prayer kinds × sizes × 6 states" matrix for this theme. It is
+          // signature-gated, so repeat calls are a cheap no-op once generated.
+          const templates = await ensureAndroidPrayerStaticTemplates?.({
+            theme: activeTheme,
+            language: widgetLanguage,
+            force: !!options.clearSnapshotCache,
+          });
+          if (templates?.errors?.length) {
+            throw new Error(`android_prayer_template_generation_failed:${templates.errors.join('|')}`);
+          }
+          if (__DEV__) {
+            console.log(
+              `[widget/android] all-state prayer templates ready (active theme=${activeTheme}) generated=${templates?.generated ?? 0} skipped=${templates?.skipped ?? false}`,
+            );
           }
         }
         if (__DEV__) {
@@ -1189,6 +1141,18 @@ export async function updateWidgetData(
         throw e;
       }
       if (__DEV__) console.warn('⚠️ Snapshot generation skipped; keeping previous manifest:', e);
+      // H2: a recovery bake (triggered because a placed PNG was missing) failed —
+      // usually a transient capture error (fonts not yet applied, SnapshotHost not
+      // mounted, app backgrounded mid-capture). Retry once, shortly, so it
+      // self-heals within this session instead of waiting for the next manual open.
+      if (missingPlacedFile && !recoveryRetryScheduled) {
+        recoveryRetryScheduled = true;
+        setTimeout(() => {
+          updateWidgetData(undefined, undefined, { forceSnapshots: true })
+            .catch(() => {})
+            .finally(() => { recoveryRetryScheduled = false; });
+        }, 1500);
+      }
     }
 
     const sharedData: SharedWidgetData = {
@@ -1213,69 +1177,97 @@ export async function updateWidgetData(
 
     if ((Platform.OS === 'android' || Platform.OS === 'ios') && activeThemeForPrewarm) {
       const prewarmTheme = activeThemeForPrewarm;
-      const activeRouteKeySet = new Set(activeRouteKeysForPrewarm);
+      const prewarmLang: 'ar' | 'en' = widgetLanguage;
       setTimeout(() => {
         (async () => {
           try {
             const prewarmT0 = Date.now();
             const { pumpThemesFromCurrentState } = require('./widgets/pump');
-            const { RESOLVED_WIDGET_THEMES } = require('./widgets/snapshot');
-            const themes: string[] = Platform.OS === 'android' ? Array.from(RESOLVED_WIDGET_THEMES ?? [prewarmTheme]) : [prewarmTheme];
-            let prewarmEntries = 0;
-            for (const theme of themes) {
-              const includeRouteKeys = Platform.OS === 'android'
-                ? routeKeysForTheme(activeRouteKeysForPrewarm, prewarmTheme, theme)
-                : undefined;
-              const result = await pumpThemesFromCurrentState?.([theme], {
-                debounceMs: 0,
-                force: false,
-                includeRouteKeys: includeRouteKeys && includeRouteKeys.length > 0 ? includeRouteKeys : undefined,
-                cleanup: theme === themes[themes.length - 1],
-                commit: false,
-              });
-              if (result?.entries?.length) {
-                const extraEntries = result.entries.filter((entry: any) => !activeRouteKeySet.has(entry.routeKey));
-                prewarmEntries += result.entries.length;
-                if (extraEntries.length > 0) {
-                  const prewarmManifest = buildManifestFromEntries(extraEntries, new Date().toISOString());
+
+            if (Platform.OS === 'ios') {
+              // iOS keeps ALL themes baked so the native "Edit Widget" theme
+              // picker (RoohTheme AppEnum) can switch a placed widget's
+              // appearance while the app is closed — every selectable theme's
+              // PNG must already exist in the App Group. Filenames are
+              // id_size_theme(_vN); cleanup on the last theme drops only stale
+              // snapshot-version files, never a live theme. No single-state prune.
+              const { RESOLVED_WIDGET_THEMES } = require('./widgets/snapshot');
+              const themes: string[] = Array.from(RESOLVED_WIDGET_THEMES ?? [prewarmTheme]);
+              let prewarmEntries = 0;
+              for (const theme of themes) {
+                const themeResult = await pumpThemesFromCurrentState?.([theme], {
+                  debounceMs: 0,
+                  force: false,
+                  includeRouteKeys: undefined,
+                  cleanup: theme === themes[themes.length - 1],
+                  commit: false,
+                });
+                if (themeResult?.entries?.length) {
+                  prewarmEntries += themeResult.entries.length;
+                  const prewarmManifest = buildManifestFromEntries(themeResult.entries, new Date().toISOString());
                   const latest = await readCachedSharedData();
                   if (latest) {
-                    const merged: SharedWidgetData = {
-                      ...latest,
-                      snapshotManifest: mergeSnapshotManifest(latest, prewarmManifest),
-                    };
-                    await writeToSharedStorage(WIDGET_DATA_KEY, JSON.stringify(merged));
+                    await writeToSharedStorage(
+                      WIDGET_DATA_KEY,
+                      JSON.stringify({ ...latest, snapshotManifest: mergeSnapshotManifest(latest, prewarmManifest) }),
+                    );
                   }
                 }
               }
+              if (__DEV__) console.log(`[widget/refresh] iosBackgroundPrewarmMs=${Date.now() - prewarmT0} entries=${prewarmEntries}`);
+              await triggerNativeWidgetReload((await readCachedSharedData()) ?? sharedData);
+              return;
+            }
+
+            // Android single-state model: never pre-bake other themes. Complete
+            // the rest of the ACTIVE theme's gallery (widgets the user hasn't
+            // placed yet) so a later placement finds its PNG instantly — the
+            // foreground pass already baked the placed ones. `includeRouteKeys:
+            // undefined` bakes the whole active-theme registry; signature-gated
+            // so already-baked tiles are a cheap no-op.
+            const result = await pumpThemesFromCurrentState?.([prewarmTheme], {
+              debounceMs: 0,
+              force: false,
+              includeRouteKeys: undefined,
+              cleanup: false,
+              commit: false,
+            });
+            let latest = await readCachedSharedData();
+            if (result?.entries?.length && latest) {
+              const prewarmManifest = buildManifestFromEntries(result.entries, new Date().toISOString());
+              latest = {
+                ...latest,
+                snapshotManifest: {
+                  ...pruneManifestToTheme(latest.snapshotManifest, prewarmTheme),
+                  ...prewarmManifest,
+                },
+              };
+              await writeToSharedStorage(WIDGET_DATA_KEY, JSON.stringify(latest));
             }
             if (__DEV__) {
-              console.log(`[widget/refresh] backgroundPrewarmMs=${Date.now() - prewarmT0} entries=${prewarmEntries}`);
+              console.log(`[widget/refresh] backgroundPrewarmMs=${Date.now() - prewarmT0} entries=${result?.entries?.length ?? 0}`);
             }
             if (Platform.OS === 'android') {
-              const staticT0 = Date.now();
+              // Bake the full prayer matrix (all kinds × sizes × 6 states) for the
+              // ACTIVE theme + current language only. Signature-gated → cheap
+              // no-op once generated. The foreground pass already did this when a
+              // prayer widget is placed; this covers the gallery-complete case.
               const { ensureAndroidPrayerStaticTemplates } = require('./widgets/snapshot');
-              let generated = 0;
-              let skipped = 0;
-              for (const theme of themes) {
-                const targetRouteKeys = routeKeysForTheme(activeRouteKeysForPrewarm, prewarmTheme, theme);
-                const targets = androidPrayerStaticAllStateTargetsForRouteKeys(targetRouteKeys);
-                if (targets.length === 0) continue;
-                const templates = await ensureAndroidPrayerStaticTemplates?.({
-                  theme,
-                  language: lang === 'en' ? 'en' : 'ar',
-                  force: false,
-                  targets,
-                });
-                generated += templates?.generated ?? 0;
-                if (templates?.skipped) skipped += 1;
-              }
+              const templates = await ensureAndroidPrayerStaticTemplates?.({
+                theme: prewarmTheme,
+                language: prewarmLang,
+                force: false,
+              });
               if (__DEV__) {
-                console.log(
-                  `[widget/android] backgroundPrayerTemplatesMs=${Date.now() - staticT0} generated=${generated} skipped=${skipped}`,
-                );
+                console.log(`[widget/android] backgroundPrayerTemplates generated=${templates?.generated ?? 0} skipped=${templates?.skipped ?? false}`);
               }
             }
+            // Single-state disk hygiene: delete every snapshot/template that is
+            // not the active theme + current language, then refresh on-screen
+            // widgets against the pruned manifest.
+            const { pruneSnapshotsToActiveState } = require('./widgets/snapshot');
+            await pruneSnapshotsToActiveState?.(prewarmTheme, prewarmLang);
+            await triggerNativeWidgetReload(latest ?? sharedData);
           } catch (e) {
             if (__DEV__) console.warn('[widget/refresh] background prewarm skipped:', e);
           }

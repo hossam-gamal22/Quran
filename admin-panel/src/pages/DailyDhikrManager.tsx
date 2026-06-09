@@ -14,10 +14,15 @@ import {
   getFirestore,
   serverTimestamp,
 } from 'firebase/firestore';
-import { Pencil, Trash2, Plus, Power, Search, Download } from 'lucide-react';
+import { Pencil, Trash2, Plus, Power, Search, Download, BookOpen } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
 import { getDefaultDailyDhikr } from '../data/adhkar-defaults';
+// Same bundled file the mobile app ships. `lib/daily-dhikr.ts` builds the daily
+// pool from THIS file (every zikr that has Arabic text) + the Firestore
+// `dailyDhikr` additions below. We mirror that here so the admin sees the exact
+// same pool (~293) the app rotates through for "ذكر اليوم".
+import bundledAzkar from '@app-data/json/azkar.json';
 
 interface DailyDhikrItem {
   id: string;
@@ -30,6 +35,29 @@ interface DailyDhikrItem {
 }
 
 const COLLECTION = 'dailyDhikr';
+
+// Read-only library pool, derived from the bundled azkar.json exactly like the
+// app's getLocalPool(). These are managed in "إدارة الأذكار" — shown here only
+// so the admin can see everything that appears in the app's daily rotation.
+interface LocalPoolItem {
+  id: string;
+  arabic: string;
+  reference: string;
+  benefit: string;
+}
+
+const LOCAL_POOL: LocalPoolItem[] = (() => {
+  const data = bundledAzkar as unknown;
+  const azkar: any[] = Array.isArray(data) ? data : ((data as { azkar?: any[] })?.azkar || []);
+  return azkar
+    .filter((z) => z?.arabic)
+    .map((z) => ({
+      id: `local_${z.id}`,
+      arabic: String(z.arabic),
+      reference: String(z.reference || ''),
+      benefit: typeof z.benefit === 'string' ? z.benefit : String(z.benefit?.ar || ''),
+    }));
+})();
 
 export default function DailyDhikrManager() {
   const [items, setItems] = useState<DailyDhikrItem[]>([]);
@@ -159,12 +187,15 @@ export default function DailyDhikrManager() {
     }
   };
 
-  const filtered = items.filter(
-    (i) =>
-      i.arabic.includes(searchQuery) ||
-      i.reference.includes(searchQuery) ||
-      (i.benefit && i.benefit.includes(searchQuery))
-  );
+  const matchesSearch = (i: { arabic: string; reference: string; benefit?: string }) =>
+    !searchQuery ||
+    i.arabic.includes(searchQuery) ||
+    i.reference.includes(searchQuery) ||
+    (i.benefit ? i.benefit.includes(searchQuery) : false);
+
+  const filtered = items.filter(matchesSearch);
+  const filteredLocal = LOCAL_POOL.filter(matchesSearch);
+  const totalPool = items.length + LOCAL_POOL.length;
 
   return (
     <div className="max-w-4xl mx-auto" dir="rtl">
@@ -182,7 +213,9 @@ export default function DailyDhikrManager() {
             الأذكار اليومية
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            إدارة الأذكار التي تظهر في صفحة "أذكار يومية" — تُدمج مع الأذكار المحلية
+            أي ذكر تضيفه هنا يدخل التناوب مع أذكار المكتبة في نفس مجموعة «ذكر اليوم»
+            ({totalPool} ذكر) ويظهر للمستخدمين بالتناوب يومًا ما (شرط أن يكون مُفعّلًا).
+            الإجمالي: {LOCAL_POOL.length} من المكتبة + {items.length} مُضافة.
           </p>
         </div>
         <div className="flex gap-2">
@@ -346,77 +379,127 @@ export default function DailyDhikrManager() {
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && filteredLocal.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-4xl mb-3">📿</p>
           <p className="text-gray-500 dark:text-gray-400">
-            {searchQuery ? 'لا توجد نتائج' : 'لم تتم إضافة أذكار بعد'}
+            {searchQuery ? 'لا توجد نتائج' : 'لا توجد أذكار'}
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              className={`bg-white dark:bg-admin-surface rounded-xl p-4 border border-gray-200 dark:border-admin-border transition-opacity ${
-                !item.enabled ? 'opacity-50' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => handleToggle(item)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      item.enabled
-                        ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                        : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-admin-surface-light'
+        <div className="space-y-8">
+          {/* Managed additions (Firestore) — editable */}
+          {filtered.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-emerald-600 dark:text-accent-light mb-3 flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                أذكار مُضافة — {filtered.length} (تتناوب مع المكتبة وتظهر للمستخدمين)
+              </h3>
+              <div className="space-y-3">
+                {filtered.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`bg-white dark:bg-admin-surface rounded-xl p-4 border border-gray-200 dark:border-admin-border transition-opacity ${
+                      !item.enabled ? 'opacity-50' : ''
                     }`}
-                    aria-label={item.enabled ? 'تعطيل' : 'تفعيل'}
-                    title={item.enabled ? 'تعطيل' : 'تفعيل'}
                   >
-                    <Power className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleEdit(item)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                    aria-label="تعديل"
-                    title="تعديل"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                    aria-label="حذف"
-                    title="حذف"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleToggle(item)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            item.enabled
+                              ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                              : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-admin-surface-light'
+                          }`}
+                          aria-label={item.enabled ? 'تعطيل' : 'تفعيل'}
+                          title={item.enabled ? 'تعطيل' : 'تفعيل'}
+                        >
+                          <Power className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                          aria-label="تعديل"
+                          title="تعديل"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          aria-label="حذف"
+                          title="حذف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                <div className="flex-1 text-right">
-                  <p className="text-gray-900 dark:text-white leading-relaxed mb-2">
-                    {item.arabic}
-                  </p>
-                  <p className="text-sm text-emerald-600 dark:text-accent-light">
-                    📖 {item.reference}
-                  </p>
-                  {item.benefit && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      ✨ {item.benefit}
-                    </p>
-                  )}
-                </div>
+                      <div className="flex-1 text-right">
+                        <p className="text-gray-900 dark:text-white leading-relaxed mb-2">
+                          {item.arabic}
+                        </p>
+                        <p className="text-sm text-emerald-600 dark:text-accent-light">
+                          📖 {item.reference}
+                        </p>
+                        {item.benefit && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            ✨ {item.benefit}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+          )}
+
+          {/* Library pool (from azkar.json) — read-only, managed in إدارة الأذكار */}
+          {filteredLocal.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                من المكتبة (للعرض فقط — تُدار من "إدارة الأذكار") — {filteredLocal.length}
+              </h3>
+              <div className="space-y-3">
+                {filteredLocal.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-gray-50 dark:bg-admin-bg rounded-xl p-4 border border-gray-200 dark:border-admin-border"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="shrink-0 text-[11px] px-2 py-1 rounded-md bg-gray-200 dark:bg-admin-surface-light text-gray-500 dark:text-gray-400">
+                        المكتبة
+                      </span>
+                      <div className="flex-1 text-right">
+                        <p className="text-gray-900 dark:text-white leading-relaxed mb-2">
+                          {item.arabic}
+                        </p>
+                        {item.reference && (
+                          <p className="text-sm text-emerald-600 dark:text-accent-light">
+                            📖 {item.reference}
+                          </p>
+                        )}
+                        {item.benefit && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            ✨ {item.benefit}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Count */}
       {!loading && (
-        <p className="text-center text-sm text-gray-400 mt-4">
-          {items.length} ذكر ({items.filter((i) => i.enabled).length} مفعّل)
+        <p className="text-center text-sm text-gray-400 mt-6">
+          إجمالي مجموعة "ذكر اليوم": {totalPool} ذكر — {LOCAL_POOL.length} من المكتبة + {items.length} مُضافة ({items.filter((i) => i.enabled).length} مفعّلة)
         </p>
       )}
     </div>

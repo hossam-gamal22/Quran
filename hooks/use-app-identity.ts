@@ -10,7 +10,7 @@ export function useAppIdentity() {
   const isArabic = isRTL(settings?.language);
 
   return {
-    appName: isArabic ? 'روح المسلم' : 'Rooh Al Muslim',
+    appName: isArabic ? 'روح المسلم' : 'Rooh Al-Muslim',
     logoSource: isArabic 
       ? require('@/assets/images/icons/App-icon.png') 
       : require('@/assets/images/icons/App-icon_en.png'),

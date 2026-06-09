@@ -87,6 +87,7 @@ export function formatEpochTimeInTimeZone(
   epochMs: number | undefined,
   timeZone: string | undefined,
   language: WidgetTimeLanguage,
+  use24Hour = false,
 ): string | null {
   if (!epochMs || !Number.isFinite(epochMs)) return null;
   const date = new Date(epochMs);
@@ -95,10 +96,12 @@ export function formatEpochTimeInTimeZone(
     timeZone: safeTimeZone,
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
+    hour12: !use24Hour,
   }).formatToParts(date);
   const hour = parts.find((part) => part.type === 'hour')?.value ?? '';
   const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+  // 24-hour mode carries no AM/PM (ص/م) suffix.
+  if (use24Hour) return `${hour}:${minute}`;
   const dayPeriod = (parts.find((part) => part.type === 'dayPeriod')?.value ?? 'AM').toUpperCase();
   const suffix = language === 'ar' ? (dayPeriod === 'PM' ? 'م' : 'ص') : dayPeriod;
   return `${hour}:${minute} ${suffix}`;

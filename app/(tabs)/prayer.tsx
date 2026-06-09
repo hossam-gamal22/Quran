@@ -469,10 +469,11 @@ export default function PrayerScreen() {
       let status = existing.status;
       if (status !== 'granted') {
         if (stored) return stored;
+        ({ status } = await Location.requestForegroundPermissionsAsync());
+        // Mark AFTER the prompt was actually shown (Android-gated banner).
         if (Platform.OS === 'android') {
           await markPermissionRequested('location');
         }
-        ({ status } = await Location.requestForegroundPermissionsAsync());
       }
       if (status !== 'granted') {
         if (stored) return stored;
@@ -1273,7 +1274,7 @@ export default function PrayerScreen() {
 
           {topSelectedKey === 'qibla' ? (
             <Animated.View entering={FadeInDown.duration(300)}>
-              <QiblaScreen />
+              <QiblaScreen embedded />
             </Animated.View>
           ) : (
             <>
@@ -1322,7 +1323,14 @@ export default function PrayerScreen() {
                                       source={logoSource}
                                       style={styles.thumbWidgetLogo}
                                     />
-                                    <Text style={styles.thumbWidgetAppName}>{appName}</Text>
+                                    <Text
+                                      style={styles.thumbWidgetAppName}
+                                      numberOfLines={1}
+                                      adjustsFontSizeToFit
+                                      minimumFontScale={0.6}
+                                    >
+                                      {appName}
+                                    </Text>
                                   </View>
                                 </View>
                               </View>
@@ -1482,7 +1490,8 @@ export default function PrayerScreen() {
           )}
         </ScrollView>
 
-        {topSelectedKey !== 'qibla' && <BannerAdComponent screen="prayer" inTabScreen />}
+        {/* Single banner for both sub-tabs — embedded Qibla no longer renders its own */}
+        <BannerAdComponent screen="prayer" inTabScreen />
 
 
 

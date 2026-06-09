@@ -10,6 +10,7 @@ const PRESERVED_KEYS = [
   '@app_version',
   '@app_theme',
   '@app_icon_variant',
+  '@app_icon_version',
   '@language',
   '@app_language',
   '@user_settings',

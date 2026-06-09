@@ -5,6 +5,7 @@
 
 import { Dimensions } from 'react-native';
 import { getHijriDate, HIJRI_MONTHS_AR } from '@/lib/hijri-date';
+import { deviceUses24Hour, formatClockHHMM } from '@/lib/widget-clock-format';
 
 export type WidgetThemeKey =
   | 'auto'
@@ -33,9 +34,8 @@ export function latinToArabicDigits(value: string | number): string {
 }
 
 export function formatTimeHHMM(date: Date): string {
-  const h = String(date.getHours()).padStart(2, '0');
-  const m = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+  // Follows the device 12/24-hour clock preference (not app language).
+  return formatClockHHMM(date, deviceUses24Hour());
 }
 
 export function formatDateSlash(date: Date): string {
@@ -52,6 +52,10 @@ export interface ThemePalette {
   muted: string;
   faint: string;
   isLight: boolean;
+  /** Unified widget text colour (gold on olive/desert, white on
+   *  dark/green/blue/slate, black on light/auto). Mirrors WidgetPalette.ink in
+   *  components/widgets/android/shared.ts. */
+  ink: string;
 }
 
 /**
@@ -64,6 +68,7 @@ export const PREVIEW_PALETTE: ThemePalette = {
   muted: 'rgba(255,255,255,0.62)',
   faint: 'rgba(255,255,255,0.32)',
   isLight: false,
+  ink: '#FFFFFF',
 };
 
 // ────────────────────────────────────────────────────────
@@ -160,9 +165,10 @@ export const PREVIEW_PALETTES: Record<WidgetThemeKey, ThemePalette> = {
     background: '#E3E0DB',
     surface: 'rgba(255,255,255,0.30)',
     text: '#3A3A39',
-    muted: '#5E5E5C',
+    muted: 'rgba(0,0,0,0.62)',
     faint: 'rgba(58,58,57,0.32)',
     isLight: true,
+    ink: '#000000',
   },
   dark: {
     background: '#373737',
@@ -171,54 +177,61 @@ export const PREVIEW_PALETTES: Record<WidgetThemeKey, ThemePalette> = {
     muted: 'rgba(255,255,255,0.62)',
     faint: 'rgba(255,255,255,0.32)',
     isLight: false,
+    ink: '#FFFFFF',
   },
   light: {
     background: '#E3E0DB',
     surface: 'rgba(255,255,255,0.30)',
     text: '#3A3A39',
-    muted: '#5E5E5C',
+    muted: 'rgba(0,0,0,0.62)',
     faint: 'rgba(58,58,57,0.32)',
     isLight: true,
+    ink: '#000000',
   },
   olive: {
     background: '#293126',
     surface: 'rgba(255,255,255,0.10)',
     text: '#F2F3E8',
-    muted: '#C7CBB8',
+    muted: 'rgba(249,232,203,0.62)',
     faint: 'rgba(215,227,162,0.32)',
     isLight: false,
+    ink: '#f9e8cb',
   },
   green: {
     background: '#0E3B2E',
     surface: 'rgba(255,255,255,0.10)',
     text: '#E8F4EC',
-    muted: '#9EC4B0',
+    muted: 'rgba(255,255,255,0.62)',
     faint: 'rgba(52,198,138,0.32)',
     isLight: false,
+    ink: '#FFFFFF',
   },
   blue: {
     background: '#0F2B4D',
     surface: 'rgba(255,255,255,0.10)',
     text: '#E2ECF8',
-    muted: '#94B2D0',
+    muted: 'rgba(255,255,255,0.62)',
     faint: 'rgba(93,164,240,0.32)',
     isLight: false,
+    ink: '#FFFFFF',
   },
   desert: {
     background: '#4C3523',
     surface: 'rgba(255,255,255,0.10)',
     text: '#F1E2C8',
-    muted: '#C9AC85',
+    muted: 'rgba(249,232,203,0.62)',
     faint: 'rgba(216,176,122,0.32)',
     isLight: false,
+    ink: '#f9e8cb',
   },
   slate: {
     background: '#2A2D31',
     surface: 'rgba(255,255,255,0.10)',
     text: '#E5E8EC',
-    muted: '#A3ABB3',
+    muted: 'rgba(255,255,255,0.62)',
     faint: 'rgba(154,168,181,0.32)',
     isLight: false,
+    ink: '#FFFFFF',
   },
 };
 

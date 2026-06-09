@@ -13,6 +13,7 @@ import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { Platform, Linking, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { t } from '@/lib/i18n';
 
 const DISMISS_KEY_PREFIX = '@perm_banner_dismissed_';
 const REQUESTED_KEY_PREFIX = '@perm_requested_';
@@ -38,9 +39,9 @@ export interface PermissionStatus {
 export interface PermissionIssue {
   key: PermissionKey;
   severity: 'critical' | 'warning';
-  titleAr: string;
-  bodyAr: string;
-  actionLabelAr: string;
+  title: string;
+  body: string;
+  actionLabel: string;
   action: () => Promise<void>;
 }
 
@@ -278,17 +279,19 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
   const issues: PermissionIssue[] = [];
 
   // Critical: إشعارات معطّلة → التطبيق لا يستطيع تنبيه المستخدم نهائياً
+  // نعرض البانر فقط لو المستخدم سبق وطُلب منه الإذن ورفض/سحبه — لا نزعج
+  // مستخدماً لم يُسأل بعد. (نفس السلوك على كل المنصّات، مش أندرويد فقط)
   if (
     s.notifications === 'denied' &&
-    (await shouldShowAndroidRequestedIssue('notifications')) &&
+    (await hasPermissionBeenRequested('notifications')) &&
     (await shouldShowBanner('notifications'))
   ) {
     issues.push({
       key: 'notifications',
       severity: 'critical',
-      titleAr: 'الإشعارات معطّلة',
-      bodyAr: 'لن تصلك أذكار، تذكيرات الصلاة، أو أي تنبيهات. فعّل الإشعارات الآن.',
-      actionLabelAr: 'فتح الإعدادات',
+      title: t('permissions.notificationsTitle'),
+      body: t('permissions.notificationsBody'),
+      actionLabel: t('permissions.openSettings'),
       action: openAppSettings,
     });
   }
@@ -301,9 +304,9 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     issues.push({
       key: 'exactAlarm',
       severity: 'critical',
-      titleAr: 'الأذان قد يتأخر',
-      bodyAr: 'الأذان يحتاج إذن "الإنذارات الدقيقة" ليعمل في وقته بالضبط.',
-      actionLabelAr: 'منح الإذن',
+      title: t('permissions.exactAlarmTitle'),
+      body: t('permissions.exactAlarmBody'),
+      actionLabel: t('permissions.grantPermission'),
       action: openExactAlarmSettings,
     });
   }
@@ -317,9 +320,9 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     issues.push({
       key: 'batteryOptimization',
       severity: 'warning',
-      titleAr: 'لضمان وصول الإشعارات',
-      bodyAr: 'استثناء التطبيق من توفير البطارية يضمن وصول إشعارات الصلاة دائماً.',
-      actionLabelAr: 'استثناء التطبيق',
+      title: t('permissions.batteryTitle'),
+      body: t('permissions.batteryBody'),
+      actionLabel: t('permissions.excludeApp'),
       action: openBatteryOptimizationSettings,
     });
   }
@@ -331,13 +334,13 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     (await shouldShowAndroidRequestedIssue('oemAutoStart')) &&
     (await shouldShowBanner('oemAutoStart'))
   ) {
-    const oemNameAr = getOemNameAr(s.manufacturer);
+    const oemName = getOemName(s.manufacturer);
     issues.push({
       key: 'oemAutoStart',
       severity: 'warning',
-      titleAr: `إعدادات ${oemNameAr} الإضافية`,
-      bodyAr: `أجهزة ${oemNameAr} تحتاج تفعيل “التشغيل التلقائي” حتى تصلك إشعارات الصلاة دائماً.`,
-      actionLabelAr: 'فتح الإعدادات',
+      title: t('permissions.oemTitle', { name: oemName }),
+      body: t('permissions.oemBody', { name: oemName }),
+      actionLabel: t('permissions.openSettings'),
       action: openOemAutoStartSettings,
     });
   }
@@ -351,9 +354,9 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     issues.push({
       key: 'location',
       severity: 'warning',
-      titleAr: 'موقعك غير محدد',
-      bodyAr: 'مواقيت الصلاة معتمدة حالياً على مكة. فعّل الموقع لمواقيت دقيقة لمدينتك.',
-      actionLabelAr: 'فتح الإعدادات',
+      title: t('permissions.locationTitle'),
+      body: t('permissions.locationBody'),
+      actionLabel: t('permissions.openSettings'),
       action: async () => {
         await requestLocationAndReschedule();
       },
@@ -371,9 +374,9 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     issues.push({
       key: 'dndAccess',
       severity: 'warning',
-      titleAr: 'وضع "عدم الإزعاج" يكتم الأذان',
-      bodyAr: 'وضع عدم الإزعاج مفعّل حالياً. اسمح للأذان بتجاوزه حتى لا يُكتم في وقت الصلاة.',
-      actionLabelAr: 'منح الإذن',
+      title: t('permissions.dndTitle'),
+      body: t('permissions.dndBody'),
+      actionLabel: t('permissions.grantPermission'),
       action: openDndAccessSettings,
     });
   }
@@ -384,9 +387,9 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     issues.push({
       key: 'backgroundRefresh',
       severity: 'warning',
-      titleAr: 'تحديث التطبيق في الخلفية معطّل',
-      bodyAr: 'بدون "تحديث التطبيق في الخلفية" قد لا تتجدد إشعارات الصلاة بعد عدة أيام. فعّله من الإعدادات.',
-      actionLabelAr: 'فتح الإعدادات',
+      title: t('permissions.backgroundRefreshTitle'),
+      body: t('permissions.backgroundRefreshBody'),
+      actionLabel: t('permissions.openSettings'),
       action: openAppSettings,
     });
   }
@@ -403,6 +406,35 @@ export async function openAppSettings(): Promise<void> {
   } catch (e) {
     console.error('❌ [perm-recovery] فشل فتح الإعدادات:', e);
   }
+}
+
+/**
+ * يفتح أقرب صفحة نظام تسمح بتفعيل إشعارات التطبيق.
+ *
+ * Android: يفتح صفحة "إشعارات التطبيق" مباشرة عبر ACTION_APP_NOTIFICATION_SETTINGS
+ *          (مدعومة رسمياً منذ Android 8 / API 26) — المستخدم يرى مفتاح الإشعارات فوراً.
+ * iOS:     لا يسمح iOS بفتح صفحة إشعارات التطبيق مباشرة من تطبيق آخر دون
+ *          UIApplicationOpenNotificationSettingsURLString (يتطلب كود native + iOS 16+).
+ *          الطريقة الرسمية الموثوقة على كل الإصدارات هي فتح صفحة إعدادات التطبيق
+ *          نفسها (UIApplicationOpenSettingsURLString) عبر Linking.openSettings()،
+ *          ومنها ينقر المستخدم "الإشعارات" ثم يفعّل "السماح بالإشعارات".
+ *          هذه ليست الإعدادات العامة — بل صفحة التطبيق المخصّصة.
+ */
+export async function openNotificationSettings(): Promise<void> {
+  if (Platform.OS === 'android') {
+    try {
+      const IntentLauncher = require('expo-intent-launcher');
+      await IntentLauncher.startActivityAsync(
+        'android.settings.APP_NOTIFICATION_SETTINGS',
+        { extra: { 'android.provider.extra.APP_PACKAGE': 'com.rooh.almuslim' } },
+      );
+      return;
+    } catch (e) {
+      console.warn('⚠️ [perm-recovery] فشل فتح إعدادات إشعارات التطبيق، fallback لصفحة التطبيق:', e);
+    }
+  }
+  // iOS (وكل fallback): صفحة إعدادات التطبيق المخصّصة — أقرب ما يسمح به iOS رسمياً.
+  await openAppSettings();
 }
 
 /**
@@ -478,9 +510,9 @@ export async function openDndAccessSettings(): Promise<void> {
 }
 
 /**
- * تحويل اسم الشركة لاسم عربي للعرض في banner
+ * تحويل اسم الشركة لاسم تجاري للعرض في banner (محايد لغوياً عدا الـ fallback)
  */
-function getOemNameAr(manufacturer: string): string {
+function getOemName(manufacturer: string): string {
   const m = manufacturer.toLowerCase();
   if (m.includes('xiaomi') || m.includes('redmi') || m.includes('poco')) return 'Xiaomi/Redmi';
   if (m.includes('oppo') || m.includes('realme')) return 'Oppo/Realme';
@@ -509,7 +541,7 @@ function getOemNameAr(manufacturer: string): string {
   if (m.includes('gionee')) return 'Gionee';
   if (m.includes('coolpad')) return 'Coolpad';
   if (m.includes('leeco') || m.includes('letv')) return 'LeEco';
-  return 'جهازك';
+  return t('permissions.thisDevice');
 }
 /**
  * يخفي banner معين لمدة 24 ساعة (المستخدم رفضه يدوياً)

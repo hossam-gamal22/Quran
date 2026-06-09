@@ -143,6 +143,25 @@ export function subscribeToSubscriptionConfig(
 
 // ==================== State Management ====================
 
+// ==================== Live premium mirror ====================
+// Authoritative `isPremium` lives in SubscriptionContext (it merges IAP +
+// admin/winner grants fetched from Firestore). The persisted
+// `@subscription_state` snapshot lags behind for winner (admin-granted)
+// premium because the grant is fetched async on app open. Imperative ad
+// gates that can't use the React context (app-open ad, standalone
+// interstitial) read this in-memory mirror so a freshly-detected winner
+// grant suppresses ads immediately — without waiting for the snapshot to
+// be persisted or for a background→foreground cycle.
+let inMemoryPremiumActive = false;
+
+/** Called by SubscriptionContext whenever the authoritative isPremium changes. */
+export const setInMemoryPremium = (isPremium: boolean): void => {
+  inMemoryPremiumActive = isPremium;
+};
+
+/** Synchronous best-effort premium check including admin/winner grants. */
+export const isPremiumActiveSync = (): boolean => inMemoryPremiumActive;
+
 export const getSubscriptionState = async (): Promise<SubscriptionState> => {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);

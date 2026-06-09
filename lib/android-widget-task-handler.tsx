@@ -10,17 +10,38 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SharedWidgetData } from './widget-data';
-import { getPrayerNameAr, getPrayerNameEn } from './prayer-times';
+import { getPrayerNameAr, getPrayerNameEn, isFridayDate } from './prayer-times';
 import { formatEpochTimeInTimeZone } from './widget-timezone';
-import { nextPrayerStaticState } from './widget-prayer-table-state';
+import { deviceUses24Hour } from './widget-clock-format';
+import { nextPrayerStaticState, resolvePrayerTableState } from './widget-prayer-table-state';
 import {
   prayerStaticAssetName,
   prayerStaticAssetPath,
   prayerStaticAssetExistsOnDevice,
+  defaultPreviousFor,
   type PrayerLang,
   type PrayerStateKey,
   type PrayerTheme,
 } from './widget-android-asset-resolver';
+
+/**
+ * Map the resolved next/previous prayer state to the asset token, applying the
+ * Friday "Jumuah" override: on Fridays a Dhuhr slot uses the baked "صلاة الجمعة"
+ * variant. Runs in the headless task too, so Friday is correct even closed-app
+ * (the per-state jumuah templates are always baked up front).
+ */
+function resolveFridayPrayerStates(prayer: SharedWidgetData['prayer'], now: Date): { active: PrayerStateKey | null; previous: PrayerStateKey } {
+  const rawActive = nextPrayerStaticState(prayer);
+  const validStates = new Set<PrayerStateKey>(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']);
+  let active: PrayerStateKey | null = rawActive && validStates.has(rawActive as PrayerStateKey) ? (rawActive as PrayerStateKey) : null;
+  const ts = resolvePrayerTableState(prayer, now.getTime());
+  let previous: PrayerStateKey = (ts.previousKey as PrayerStateKey | undefined) ?? (active ? defaultPreviousFor(active) : 'sunrise');
+  if (isFridayDate(now)) {
+    if (active === 'dhuhr') active = 'jumuah';
+    if (previous === 'dhuhr') previous = 'jumuah';
+  }
+  return { active, previous };
+}
 
 import {
   SnapshotWidget,
@@ -31,12 +52,11 @@ import {
 } from '@/components/widgets/android/SnapshotWidget';
 import { LockedWidget } from '@/components/widgets/android/LockedWidget';
 import { AppNotOpenedWidget } from '@/components/widgets/android/AppNotOpenedWidget';
-import { AzkarFlexWidget } from '@/components/widgets/android/AzkarFlexWidget';
-
-/** Widget ids that bypass the PNG snapshot pipeline and render as live
- *  FlexWidget trees. Lets the 15-minute content alarm produce visible
- *  cycling — each refresh reads `azkarPools` + current minute fresh. */
-const LIVE_AZKAR_WIDGET_IDS = new Set(['azkarMorning', 'azkarEvening', 'dailyDhikr']);
+import { CuratedImageWidget } from '@/components/widgets/android/CuratedImageWidget';
+import { ArabicOnlyWidget } from '@/components/widgets/android/ArabicOnlyWidget';
+import { LocationNeededWidget } from '@/components/widgets/android/LocationNeededWidget';
+import { WidgetFallbackNotice } from '@/components/widgets/android/WidgetFallbackNotice';
+import { isCuratedWidget, type CuratedWidgetId } from '@/lib/widgets/curated-images';
 
 const WIDGET_DATA_KEY = 'widget_shared_data';
 const SUBSCRIPTION_STATE_KEY = '@subscription_state';
@@ -44,6 +64,12 @@ export const APP_OPENED_ONCE_KEY = '@rooh_app_opened_once';
 /** Set to "true" when WIDGET_ADDED fires. SnapshotPumpController reads &
  *  clears this on the next foreground pass to force a re-pump. */
 const PUMP_PENDING_KEY = '@widget_pump_pending';
+/** Sticky list of provider names that have ever been placed on the home screen.
+ *  The headless task cannot bake PNGs, so getActiveSnapshotRouteKeys() (in
+ *  widget-data-bridge) unions this set with the (timing-sensitive) live
+ *  getWidgetInfo() result — guaranteeing a placed widget's route key stays in the
+ *  foreground bake set even when getWidgetInfo() momentarily returns empty. */
+const PLACED_PROVIDERS_KEY = '@widget_placed_providers';
 
 // Widget provider names permitted without premium on WIDGET_ADDED. Derived from
 // LEGACY_ANDROID_WIDGET_MAP + premiumRequiredForSize so it matches gallery/iOS gating.
@@ -110,6 +136,59 @@ async function hasAppEverOpened(): Promise<boolean> {
     return legacyFirstOpen !== null;
   } catch {
     return false;
+  }
+}
+
+async function readPlacedProviders(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PLACED_PROVIDERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Append a provider to the sticky placed-providers set (idempotent). */
+async function recordPlacedProvider(widgetName: string): Promise<void> {
+  try {
+    const current = await readPlacedProviders();
+    if (current.includes(widgetName)) return;
+    await AsyncStorage.setItem(PLACED_PROVIDERS_KEY, JSON.stringify([...current, widgetName]));
+  } catch {
+    // Best-effort — a missed write just means we fall back to live detection.
+  }
+}
+
+/**
+ * Drop a provider from the sticky set, but ONLY when getWidgetInfo() confirms
+ * zero remaining instances. A stale entry costs at most one extra offscreen
+ * capture per foreground (harmless); dropping a still-placed provider would
+ * reintroduce the missing-PNG bug — so we err toward keeping it.
+ */
+async function forgetPlacedProviderIfGone(widgetName: string): Promise<void> {
+  try {
+    const current = await readPlacedProviders();
+    if (!current.includes(widgetName)) return;
+    let stillPlaced = false;
+    try {
+      const { getWidgetInfo } = require('react-native-android-widget');
+      const placements = await getWidgetInfo(widgetName).catch(() => null);
+      // Only trust a definitive empty array. null / throw means we couldn't
+      // confirm, so keep the entry.
+      if (placements == null) return;
+      stillPlaced = Array.isArray(placements) && placements.length > 0;
+    } catch {
+      return;
+    }
+    if (stillPlaced) return;
+    await AsyncStorage.setItem(
+      PLACED_PROVIDERS_KEY,
+      JSON.stringify(current.filter((p) => p !== widgetName)),
+    );
+  } catch {
+    // ignore
   }
 }
 
@@ -325,8 +404,9 @@ async function refreshPrayerWidgetData(
       isha:    { en: getPrayerNameEn('isha', now),    ar: getPrayerNameAr('isha', now) },
     };
     const isAr = data.widgetLanguage === 'ar' || (!data.widgetLanguage && (data.language || 'ar') === 'ar');
+    const use24 = deviceUses24Hour();
     const formatWidgetTime = (ms: number) => {
-      return formatEpochTimeInTimeZone(ms, inputs.timezone, isAr ? 'ar' : 'en') ?? '--:--';
+      return formatEpochTimeInTimeZone(ms, inputs.timezone, isAr ? 'ar' : 'en', use24) ?? '--:--';
     };
     const nextNames = nameMap[snapshot.next] ?? nameMap.fajr;
     const prevNames = nameMap[snapshot.previous] ?? nameMap.isha;
@@ -370,118 +450,279 @@ async function refreshPrayerWidgetData(
   }
 }
 
-function widgetDeepLink(widgetId: string): string {
-  switch (widgetId) {
-    case 'prayerSingle':
-    case 'prayerTable':
-    case 'prayerNextPrevious':
-      return 'rooh-almuslim://prayer';
-    case 'verseOfDay':
-      return 'rooh-almuslim://daily-ayah';
-    case 'azkarMorning':
-      return 'rooh-almuslim://azkar/morning';
-    case 'azkarEvening':
-    case 'dailyDhikr':
-      return 'rooh-almuslim://azkar';
-    case 'hijriDate':
-    case 'daySimple':
-    case 'dayThuluth':
-    case 'dayDigital':
-    case 'monthSimple':
-    case 'monthThuluth':
-      return 'rooh-almuslim://hijri';
-    default:
-      return 'rooh-almuslim://widget';
-  }
+/**
+ * The render decision for a single Android widget placement. Computed once by the
+ * async `decideAndroidWidget` (which may stat the filesystem, read prayer inputs,
+ * etc.) and then turned into a React element by the pure, synchronous
+ * `renderAndroidWidgetDecision`.
+ *
+ * Splitting decide/render is what lets BOTH render entry points share identical
+ * logic: the headless task handler (async, imperative `renderWidget(jsx)`) and
+ * the in-app `requestWidgetUpdate` fan-out (whose `renderWidget` callback must
+ * return an element SYNCHRONOUSLY). Before this split the fan-out path rendered
+ * SnapshotWidget directly and silently skipped the Arabic-only / location /
+ * curated guards — so a language switch produced mixed/blank widgets until an
+ * organic Android update happened to route through the task handler.
+ */
+export type AndroidWidgetDecision =
+  | { kind: 'arabicOnly'; size: AndroidSize; theme: string }
+  | { kind: 'location'; size: AndroidSize; theme: string; isArabic: boolean; clickUri: string }
+  | { kind: 'curated'; id: CuratedWidgetId; size: 'small' | 'medium'; theme: string; clickUri: string }
+  | {
+      kind: 'snapshot';
+      id: string;
+      size: AndroidSize;
+      hasSnapshot: boolean;
+      missingKey?: string;
+      snapshotKey: string;
+      snapshotPath: string;
+      fallbackReason?: string;
+      isPrayerStaticTemplate: boolean;
+      clickUri: string;
+    }
+  | { kind: 'fallbackNotice'; id: string; size: AndroidSize; theme: string; isArabic: boolean; clickUri: string };
+
+/** A widget's language ALWAYS follows the app language (widgetLanguage override
+ *  wins when explicitly 'ar'/'en'). Single source of truth for every guard. */
+function resolveWidgetLangFromData(data: SharedWidgetData): 'ar' | 'en' {
+  return data.widgetLanguage === 'ar'
+    ? 'ar'
+    : data.widgetLanguage === 'en'
+      ? 'en'
+      : (data.language || 'ar') === 'ar' ? 'ar' : 'en';
 }
 
 /**
- * Render a SnapshotWidget for a placement. Resolves the active theme from the
- * shared widget data, checks whether the corresponding `<id>_<size>_<theme>.png`
- * exists on disk, and passes both signals to SnapshotWidget so it can pick the
- * correct branch (real PNG vs branded loading card). Never layers a fallback
- * underneath the transparent foreground PNG.
+ * Resolve which widget element a placement should render, doing all async work
+ * (language resolution, location check, prayer per-state template lookup, PNG
+ * stat) up front. Returns `null` only when the provider name is unknown.
+ *
+ * Deep-link tap targets are read straight from the registry (`def.deepLink`) —
+ * the single source of truth — except the Arabic-only fallback, whose tap always
+ * goes to Language settings so the user can un-break it.
  */
+export async function decideAndroidWidget(
+  widgetName: string,
+  data: SharedWidgetData,
+): Promise<AndroidWidgetDecision | null> {
+  const target = resolveTarget(widgetName);
+  if (!target) return null;
+
+  const lang = resolveWidgetLangFromData(data);
+  const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
+  const def = getDefinition(target.id);
+  const clickUri = def?.deepLink ?? 'rooh-almuslim://widget';
+
+  // 1) Arabic-only widgets (forcedLanguage: 'ar' — curated verse/azkar/dhikr +
+  // calligraphic day/month-thuluth) show an English "Arabic only" notice when
+  // the app language isn't Arabic, instead of mixed/empty content.
+  if (def?.forcedLanguage === 'ar' && lang === 'en') {
+    return { kind: 'arabicOnly', size: target.size, theme };
+  }
+
+  // 2) Prayer widgets with no stored location and no usable cached times: show a
+  // "enable location" notice instead of wrong/default times.
+  if (PRAYER_WIDGET_IDS.has(target.id)) {
+    try {
+      const { readPrayerInputs } = require('./widget-prayer-calculator');
+      const inputs = await readPrayerInputs();
+      const hasFiniteEpoch = (data.prayer?.allPrayers ?? []).some(
+        (r) => Number.isFinite(Number(r.epochMs)) && Number(r.epochMs) > 0,
+      );
+      if (!inputs && !hasFiniteEpoch) {
+        return { kind: 'location', size: target.size, theme, isArabic: lang === 'ar', clickUri };
+      }
+    } catch {
+      // If the location check fails, fall through to the normal render path.
+    }
+  }
+
+  // 3) Curated bundled-image widgets (verse/azkar/dhikr): Arabic-only, tinted to
+  // the theme over a native themed background, picked by date — offline-forever.
+  if (isCuratedWidget(target.id)) {
+    return {
+      kind: 'curated',
+      id: target.id as CuratedWidgetId,
+      size: target.size as 'small' | 'medium',
+      theme,
+      clickUri,
+    };
+  }
+
+  // 4) Snapshot (default): resolve the baked PNG route + per-state prayer template.
+  try {
+    const routeKey = snapshotRouteKeyForPlacement(target.id, target.size, theme);
+    const manifestEntry = data.snapshotManifest?.[routeKey];
+    const widgetLang = lang;
+    let snapshotKey = manifestEntry?.key ?? routeKey;
+    let path = manifestEntry?.path ?? (manifestEntry?.key
+      ? snapshotFilePathForKey(manifestEntry.key)
+      : snapshotFilePath(target.id, target.size, theme));
+    let isPrayerStaticTemplate = false;
+    if (PRAYER_WIDGET_IDS.has(target.id)) {
+      const now = new Date();
+      const { active, previous } = resolveFridayPrayerStates(data.prayer, now);
+      if (active) {
+        const templateOpts = {
+          widgetId: target.id as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
+          size: target.size,
+          theme: theme as PrayerTheme,
+          language: widgetLang as PrayerLang,
+          active,
+          previous,
+          // Friday: the table swaps to the Jumuah-labeled per-state variant so the
+          // Dhuhr row reads «صلاة الجمعة» all day (not just while Dhuhr is next).
+          friday: isFridayDate(now),
+        };
+        if (await prayerStaticAssetExistsOnDevice(templateOpts)) {
+          snapshotKey = prayerStaticAssetName(templateOpts);
+          path = prayerStaticAssetPath(templateOpts);
+          isPrayerStaticTemplate = true;
+        }
+      }
+    }
+    // Language guard: never serve a gallery PNG baked in a different language
+    // than `widgetLang` — overlaying resolved-language names/times on stale
+    // other-language chrome is what produced the AR/EN text overlap. Per-state
+    // prayer templates are language-keyed in their filename already.
+    const langMismatch = !isPrayerStaticTemplate
+      && !!manifestEntry?.language
+      && manifestEntry.language !== widgetLang;
+    let hasSnapshot = false;
+    let fallbackReason: string | undefined;
+    try {
+      const info = await FileSystem.getInfoAsync(path);
+      hasSnapshot = info.exists && !langMismatch;
+      if (!info.exists) fallbackReason = 'png_missing';
+      else if (langMismatch) fallbackReason = `lang_mismatch:${manifestEntry?.language}!=${widgetLang}`;
+    } catch (e) {
+      fallbackReason = `stat_failed:${(e as Error)?.message ?? 'unknown'}`;
+    }
+    if (__DEV__) {
+      const action = hasSnapshot ? 'loaded' : 'fallback';
+      console.log(`[widget/android] ${action} snapshot route=${routeKey} key=${snapshotKey} path=${path}${fallbackReason ? ` reason=${fallbackReason}` : ''}`);
+    }
+    return {
+      kind: 'snapshot',
+      id: target.id,
+      size: target.size,
+      hasSnapshot,
+      missingKey: hasSnapshot ? undefined : snapshotKey,
+      snapshotKey,
+      snapshotPath: path,
+      fallbackReason,
+      isPrayerStaticTemplate,
+      clickUri,
+    };
+  } catch (e) {
+    // Any failure in the snapshot path must never surface a raw error on the
+    // home screen. Fall back to the bundled preview + "open the app" notice.
+    if (__DEV__) console.warn('[widget/android] snapshot decision failed; using fallback notice:', e);
+    return { kind: 'fallbackNotice', id: target.id, size: target.size, theme, isArabic: lang === 'ar', clickUri };
+  }
+}
+
+/** Pure, synchronous render of a previously-computed decision. Safe to call from
+ *  the `requestWidgetUpdate` callback (which must return an element synchronously). */
+export function renderAndroidWidgetDecision(
+  decision: AndroidWidgetDecision,
+  data: SharedWidgetData,
+  bounds?: { width?: number; height?: number },
+): React.ReactElement | null {
+  switch (decision.kind) {
+    case 'arabicOnly':
+      // Fixed tap target: Language settings (NOT the widget's own deepLink) so
+      // the user lands where they can switch the app to Arabic and un-break it.
+      return (
+        <ArabicOnlyWidget
+          size={decision.size}
+          theme={decision.theme}
+          widgetWidth={bounds?.width}
+          widgetHeight={bounds?.height}
+          clickUri="rooh-almuslim://settings/language"
+        />
+      );
+    case 'location':
+      return (
+        <LocationNeededWidget theme={decision.theme} isArabic={decision.isArabic} clickUri={decision.clickUri} />
+      );
+    case 'curated':
+      return (
+        <CuratedImageWidget
+          widgetId={decision.id}
+          size={decision.size}
+          theme={decision.theme}
+          clickUri={decision.clickUri}
+          widgetWidth={bounds?.width}
+          widgetHeight={bounds?.height}
+        />
+      );
+    case 'snapshot':
+      return (
+        <SnapshotWidget
+          widgetId={decision.id}
+          size={decision.size}
+          data={data}
+          hasSnapshot={decision.hasSnapshot}
+          missingKey={decision.missingKey}
+          snapshotKey={decision.snapshotKey}
+          snapshotPath={decision.snapshotPath}
+          fallbackReason={decision.fallbackReason}
+          isPrayerStaticTemplate={decision.isPrayerStaticTemplate}
+          widgetWidth={bounds?.width}
+          widgetHeight={bounds?.height}
+          clickAction="OPEN_URI"
+          clickUri={decision.clickUri}
+        />
+      );
+    case 'fallbackNotice':
+      return (
+        <WidgetFallbackNotice
+          widgetId={decision.id}
+          size={decision.size}
+          theme={decision.theme}
+          isArabic={decision.isArabic}
+          widgetWidth={bounds?.width}
+          widgetHeight={bounds?.height}
+          clickAction="OPEN_URI"
+          clickUri={decision.clickUri}
+        />
+      );
+  }
+}
+
 async function renderSnapshotWidget(
   widgetName: string,
   data: SharedWidgetData,
   renderWidget: (jsx: React.ReactElement) => void,
   widgetBounds?: { width?: number; height?: number },
 ): Promise<void> {
-  const target = resolveTarget(widgetName);
-  if (!target) return;
+  const decision = await decideAndroidWidget(widgetName, data);
+  if (!decision) return;
+  const element = renderAndroidWidgetDecision(decision, data, widgetBounds);
+  if (element) renderWidget(element);
+}
 
-  // Azkar / Daily-Dhikr widgets render LIVE via FlexWidget so they cycle
-  // visibly when the 15-min content alarm fires — no PNG to regenerate.
-  // Each task-handler invocation reads sharedData + current time and picks
-  // the active content without relying on app foreground snapshot pumping.
-  if (LIVE_AZKAR_WIDGET_IDS.has(target.id)) {
-    renderWidget(
-      <AzkarFlexWidget
-        widgetId={target.id as 'azkarMorning' | 'azkarEvening' | 'dailyDhikr'}
-        size={target.size as 'small' | 'medium'}
-        data={data}
-        clickUri={widgetDeepLink(target.id)}
-      />,
-    );
-    return;
-  }
-
-  const theme = resolveWidgetTheme(data.widgetTheme, Appearance.getColorScheme());
-  const routeKey = snapshotRouteKeyForPlacement(target.id, target.size, theme);
-  const manifestEntry = data.snapshotManifest?.[routeKey];
-  let snapshotKey = manifestEntry?.key ?? routeKey;
-  let path = manifestEntry?.path ?? (manifestEntry?.key
-    ? snapshotFilePathForKey(manifestEntry.key)
-    : snapshotFilePath(target.id, target.size, theme));
-  let isPrayerStaticTemplate = false;
-  if (PRAYER_WIDGET_IDS.has(target.id)) {
-    const rawState = nextPrayerStaticState(data.prayer);
-    const validStates = new Set<PrayerStateKey>(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']);
-    if (rawState && validStates.has(rawState as PrayerStateKey)) {
-      const templateOpts = {
-        widgetId: target.id as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
-        size: target.size,
-        theme: theme as PrayerTheme,
-        language: (data.widgetLanguage === 'en' || data.language === 'en' ? 'en' : 'ar') as PrayerLang,
-        active: rawState as PrayerStateKey,
-      };
-      if (await prayerStaticAssetExistsOnDevice(templateOpts)) {
-        snapshotKey = prayerStaticAssetName(templateOpts);
-        path = prayerStaticAssetPath(templateOpts);
-        isPrayerStaticTemplate = true;
-      }
-    }
-  }
-  let hasSnapshot = false;
-  let fallbackReason: string | undefined;
-  try {
-    const info = await FileSystem.getInfoAsync(path);
-    hasSnapshot = info.exists;
-    if (!hasSnapshot) fallbackReason = 'png_missing';
-  } catch (e) {
-    fallbackReason = `stat_failed:${(e as Error)?.message ?? 'unknown'}`;
-  }
-  if (__DEV__) {
-    const action = hasSnapshot ? 'loaded' : 'fallback';
-    console.log(`[widget/android] ${action} snapshot route=${routeKey} key=${snapshotKey} path=${path}${fallbackReason ? ` reason=${fallbackReason}` : ''}`);
-  }
-  const missingKey = hasSnapshot ? undefined : snapshotKey;
+/** Render the universal graceful fallback (bundled preview + "open the app to
+ *  refresh" banner). Used whenever a snapshot is missing or any render throws,
+ *  so the user never sees a blank/error widget. */
+function renderWidgetFallbackNotice(
+  target: { id: string; size: string },
+  data: SharedWidgetData | null,
+  renderWidget: (jsx: React.ReactElement) => void,
+  widgetBounds?: { width?: number; height?: number },
+): void {
+  const theme = resolveWidgetTheme(data?.widgetTheme, Appearance.getColorScheme());
+  const isArabic = !(data?.widgetLanguage === 'en' || data?.language === 'en');
   renderWidget(
-    <SnapshotWidget
+    <WidgetFallbackNotice
       widgetId={target.id}
       size={target.size}
-      data={data}
-      hasSnapshot={hasSnapshot}
-      missingKey={missingKey}
-      snapshotKey={snapshotKey}
-      snapshotPath={path}
-      fallbackReason={fallbackReason}
-      isPrayerStaticTemplate={isPrayerStaticTemplate}
+      theme={theme}
+      isArabic={isArabic}
       widgetWidth={widgetBounds?.width}
       widgetHeight={widgetBounds?.height}
-      clickAction="OPEN_URI"
-      clickUri={widgetDeepLink(target.id)}
+      clickAction="OPEN_APP"
     />,
   );
 }
@@ -490,6 +731,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   const { widgetInfo, widgetAction, renderWidget } = props;
   const widgetName = widgetInfo.widgetName;
 
+  try {
   switch (widgetAction) {
     case 'WIDGET_ADDED': {
       let data = await loadWidgetData();
@@ -507,6 +749,10 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // hash matches. The headless task handler can't mount SnapshotHost, so
       // the snapshot PNGs are generated by the in-app pump.
       try { await AsyncStorage.setItem(PUMP_PENDING_KEY, 'true'); } catch {}
+
+      // Remember this placement so the next foreground bake always includes its
+      // route key, even if getWidgetInfo() is flaky on that pass.
+      await recordPlacedProvider(widgetName);
 
       const appOpened = await hasAppEverOpened();
 
@@ -591,8 +837,29 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     }
 
     case 'WIDGET_DELETED':
+      // Only drop the sticky entry when no instances of this provider remain.
+      await forgetPlacedProviderIfGone(widgetName);
+      return;
     case 'WIDGET_CLICK':
     default:
       return;
+  }
+  } catch (e) {
+    // Ultimate safety net: an unhandled error must never surface a raw or blank
+    // widget. Show the graceful fallback (bundled preview + "open the app"
+    // notice) instead, degrading to the simplest possible render if even that
+    // fails.
+    if (__DEV__) console.warn('[widget/android] task handler failed; showing fallback notice:', e);
+    try {
+      const target = resolveTarget(widgetName);
+      if (target) {
+        const data = await loadWidgetData();
+        renderWidgetFallbackNotice(target, data, renderWidget, widgetInfo);
+      } else {
+        renderWidget(<AppNotOpenedWidget />);
+      }
+    } catch {
+      try { renderWidget(<AppNotOpenedWidget />); } catch {}
+    }
   }
 }

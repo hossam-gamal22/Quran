@@ -108,10 +108,31 @@ export interface MemorizationSettings {
   nightMode: boolean;
 }
 
+export interface AyahRef {
+  surahNumber: number;
+  ayahNumber: number;
+}
+
+/**
+ * Persisted snapshot of the day's assigned ward. Captured once per (date, plan)
+ * so the daily ward stays stable across the day instead of refilling as ayahs
+ * are marked. Lives in AsyncStorage under @rooh_memorization_today.
+ */
+export interface TodayPlanSnapshot {
+  date: string; // YYYY-MM-DD
+  planId: string;
+  assignedNew: AyahRef[];
+  assignedReview: AyahRef[];
+}
+
 export interface TodayPlan {
   date: string;
-  newAyahs: { surahNumber: number; ayahNumber: number }[];
-  reviewAyahs: { surahNumber: number; ayahNumber: number }[];
+  // Remaining (not-yet-completed) items for today — drive the rings + session start.
+  newAyahs: AyahRef[];
+  reviewAyahs: AyahRef[];
+  // Original assigned counts for today — stable ring denominators.
+  assignedNewCount: number;
+  assignedReviewCount: number;
   estimatedMinutes: number;
 }
 

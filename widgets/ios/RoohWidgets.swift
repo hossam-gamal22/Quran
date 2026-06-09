@@ -276,7 +276,7 @@ private let compiledWidgetRegistryById: [String: RegistryDef] = [
     "prayerSingle": RegistryDef(id: "prayerSingle", sizes: ["small"], isPremium: false, premiumSizes: nil),
     "prayerTable": RegistryDef(id: "prayerTable", sizes: ["small", "medium", "large"], isPremium: false, premiumSizes: nil),
     "prayerNextPrevious": RegistryDef(id: "prayerNextPrevious", sizes: ["medium"], isPremium: false, premiumSizes: nil),
-    "verseOfDay": RegistryDef(id: "verseOfDay", sizes: ["small", "medium", "large"], isPremium: true, premiumSizes: nil),
+    "verseOfDay": RegistryDef(id: "verseOfDay", sizes: ["small", "medium", "large"], isPremium: false, premiumSizes: nil),
     "azkarMorning": RegistryDef(id: "azkarMorning", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
     "azkarEvening": RegistryDef(id: "azkarEvening", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
     "dailyDhikr": RegistryDef(id: "dailyDhikr", sizes: ["small", "medium"], isPremium: true, premiumSizes: nil),
@@ -324,6 +324,10 @@ struct WidgetPrayerData: Codable {
     var previousPrayerAtEpochMs: Double?
     var calculationLocation: String?
     var timezone: String?
+    /// True when no real location is available yet (no stored coords / snapshot /
+    /// offline calc). Prayer widget views render an intentional "enable location"
+    /// placeholder instead of the Makkah/sample fallback when this is set.
+    var needsLocation: Bool?
     var prayerDataUpdatedAt: String?
     var latitude: Double?
     var longitude: Double?
@@ -477,9 +481,18 @@ private func prayerTimelineDates(data: SharedWidgetData, now: Date = Date()) -> 
 
     let timeUntilEnd = densificationEnd.timeIntervalSince(now)
     if timeUntilEnd > 60 {
+        // Anchor the densified runway to the wall-clock minute (:00) instead of
+        // the raw generation instant. Entries are `now + k·60` otherwise, so they
+        // inherit `now`'s seconds and — frozen by the `.atEnd` policy for ~95 min —
+        // make the compact countdown flip mid-minute, one minute out of phase with
+        // the device clock. Flooring to the minute lands every entry on :00 so the
+        // widget's minute changes in lockstep with the status bar. The current
+        // minute's :00 entry (minute 0, ≤ now) is included so it shows immediately;
+        // the raw `[now]` seed is collapsed against it by the minute-bucket dedupe.
+        let minuteAnchor = Date(timeIntervalSince1970: (now.timeIntervalSince1970 / 60).rounded(.down) * 60)
         let minutes = max(1, min(95, Int(ceil(timeUntilEnd / 60))))
-        for minute in 1...minutes {
-            dates.append(now.addingTimeInterval(TimeInterval(minute * 60)))
+        for minute in 0...minutes {
+            dates.append(minuteAnchor.addingTimeInterval(TimeInterval(minute * 60)))
         }
     }
 
@@ -524,6 +537,32 @@ private func prayerTimelinePolicyDate(data: SharedWidgetData, now: Date = Date()
 
 // MARK: - Providers
 
+/// Timeline entry dates for curated image widgets. Azkar advance every 5
+/// minutes (sequential); verse/dhikr change once at the next local midnight.
+/// WidgetKit advances through entries within a single timeline WITHOUT spending
+/// reload budget, so 5-minute stepping is safe.
+private func curatedTimelineDates(widgetId: String, now: Date = Date()) -> [Date] {
+    let cal = Calendar.current
+    switch widgetId {
+    case "azkarMorning", "azkarEvening":
+        // 5-minute steps for the next 6 hours, aligned to the current 5-minute
+        // boundary so each entry lands exactly on a slot change.
+        let minute = cal.component(.minute, from: now)
+        let hour = cal.component(.hour, from: now)
+        var base = cal.date(bySettingHour: hour, minute: (minute / 5) * 5, second: 0, of: now) ?? now
+        var dates: [Date] = []
+        for _ in 0..<72 {
+            dates.append(base)
+            base = base.addingTimeInterval(5 * 60)
+        }
+        return dates
+    default:
+        // verse / daily dhikr: change once per day at local midnight.
+        let nextMidnight = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: now) ?? now)
+        return [now, nextMidnight]
+    }
+}
+
 struct SmallProvider: AppIntentTimelineProvider {
     // The widget gallery / picker preview always renders sample data so users
     // see a representative card. Real placements use `snapshot` / `timeline`
@@ -547,7 +586,11 @@ struct SmallProvider: AppIntentTimelineProvider {
         let real = sharedDataIfAvailable()
         let data = real ?? sampleSharedDataForSystemLocale()
         let now = Date()
-        let entries = prayerTimelineDates(data: data, now: now).map {
+        let widgetId = configuration.widget.rawValue
+        let dates = isCuratedImageWidget(widgetId)
+            ? curatedTimelineDates(widgetId: widgetId, now: now)
+            : prayerTimelineDates(data: data, now: now)
+        let entries = dates.map {
             RoohEntry(date: $0, configuration: configuration, data: data, hasRealData: real != nil)
         }
         return Timeline(entries: entries, policy: .atEnd)
@@ -571,7 +614,11 @@ struct MediumProvider: AppIntentTimelineProvider {
         let real = sharedDataIfAvailable()
         let data = real ?? sampleSharedDataForSystemLocale()
         let now = Date()
-        let entries = prayerTimelineDates(data: data, now: now).map {
+        let widgetId = configuration.widget.rawValue
+        let dates = isCuratedImageWidget(widgetId)
+            ? curatedTimelineDates(widgetId: widgetId, now: now)
+            : prayerTimelineDates(data: data, now: now)
+        let entries = dates.map {
             RoohEntry(date: $0, configuration: configuration, data: data, hasRealData: real != nil)
         }
         return Timeline(entries: entries, policy: .atEnd)
@@ -595,7 +642,11 @@ struct LargeProvider: AppIntentTimelineProvider {
         let real = sharedDataIfAvailable()
         let data = real ?? sampleSharedDataForSystemLocale()
         let now = Date()
-        let entries = prayerTimelineDates(data: data, now: now).map {
+        let widgetId = configuration.widget.rawValue
+        let dates = isCuratedImageWidget(widgetId)
+            ? curatedTimelineDates(widgetId: widgetId, now: now)
+            : prayerTimelineDates(data: data, now: now)
+        let entries = dates.map {
             RoohEntry(date: $0, configuration: configuration, data: data, hasRealData: real != nil)
         }
         return Timeline(entries: entries, policy: .atEnd)
@@ -1283,6 +1334,11 @@ struct ThemePalette {
     let muted: Color
     let accent: Color
     let isLight: Bool
+    /// Unified widget text colour — gold on olive/desert, white on
+    /// dark/green/blue/slate, black on light/auto. Mirrors WidgetPalette.ink in
+    /// components/widgets/android/shared.ts and ThemePalette.ink in
+    /// components/widgets/previews/shared.ts so every widget matches.
+    let ink: Color
 }
 
 /// Resolve `RoohTheme.auto` to the same light/cream style as the in-app
@@ -1320,24 +1376,26 @@ func themeFromString(_ raw: String) -> RoohTheme {
     return RoohTheme(rawValue: raw) ?? .auto
 }
 
+private let widgetGoldInk = Color(red: 249.0 / 255.0, green: 232.0 / 255.0, blue: 203.0 / 255.0)
+
 func palette(_ theme: RoohTheme) -> ThemePalette {
     switch theme {
     case .auto:
-        return ThemePalette(background: Color(hex: "#E3E0DB"), surface: Color.white.opacity(0.30), text: Color(hex: "#3A3A39"), muted: Color(hex: "#5E5E5C"), accent: Color(hex: "#3A3A39"), isLight: true)
+        return ThemePalette(background: Color(hex: "#E3E0DB"), surface: Color.white.opacity(0.30), text: Color(hex: "#3A3A39"), muted: Color.black.opacity(0.62), accent: Color(hex: "#3A3A39"), isLight: true, ink: .black)
     case .light:
-        return ThemePalette(background: Color(hex: "#E3E0DB"), surface: Color.white.opacity(0.30), text: Color(hex: "#3A3A39"), muted: Color(hex: "#5E5E5C"), accent: Color(hex: "#3A3A39"), isLight: true)
+        return ThemePalette(background: Color(hex: "#E3E0DB"), surface: Color.white.opacity(0.30), text: Color(hex: "#3A3A39"), muted: Color.black.opacity(0.62), accent: Color(hex: "#3A3A39"), isLight: true, ink: .black)
     case .dark:
-        return ThemePalette(background: Color(hex: "#373737"), surface: Color.white.opacity(0.12), text: .white, muted: .white.opacity(0.62), accent: .white, isLight: false)
+        return ThemePalette(background: Color(hex: "#373737"), surface: Color.white.opacity(0.12), text: .white, muted: .white.opacity(0.62), accent: .white, isLight: false, ink: .white)
     case .olive:
-        return ThemePalette(background: Color(hex: "#293126"), surface: Color.white.opacity(0.12), text: Color(hex: "#F2F3E8"), muted: Color(hex: "#C7CBB8"), accent: Color(hex: "#D7E3A2"), isLight: false)
+        return ThemePalette(background: Color(hex: "#293126"), surface: Color.white.opacity(0.12), text: Color(hex: "#F2F3E8"), muted: widgetGoldInk.opacity(0.62), accent: Color(hex: "#D7E3A2"), isLight: false, ink: widgetGoldInk)
     case .green:
-        return ThemePalette(background: Color(hex: "#0E3B2E"), surface: Color.white.opacity(0.10), text: Color(hex: "#E8F4EC"), muted: Color(hex: "#9EC4B0"), accent: Color(hex: "#34C68A"), isLight: false)
+        return ThemePalette(background: Color(hex: "#0E3B2E"), surface: Color.white.opacity(0.10), text: Color(hex: "#E8F4EC"), muted: .white.opacity(0.62), accent: Color(hex: "#34C68A"), isLight: false, ink: .white)
     case .blue:
-        return ThemePalette(background: Color(hex: "#0F2B4D"), surface: Color.white.opacity(0.10), text: Color(hex: "#E2ECF8"), muted: Color(hex: "#94B2D0"), accent: Color(hex: "#5DA4F0"), isLight: false)
+        return ThemePalette(background: Color(hex: "#0F2B4D"), surface: Color.white.opacity(0.10), text: Color(hex: "#E2ECF8"), muted: .white.opacity(0.62), accent: Color(hex: "#5DA4F0"), isLight: false, ink: .white)
     case .desert:
-        return ThemePalette(background: Color(hex: "#4C3523"), surface: Color.white.opacity(0.10), text: Color(hex: "#F1E2C8"), muted: Color(hex: "#C9AC85"), accent: Color(hex: "#D8B07A"), isLight: false)
+        return ThemePalette(background: Color(hex: "#4C3523"), surface: Color.white.opacity(0.10), text: Color(hex: "#F1E2C8"), muted: widgetGoldInk.opacity(0.62), accent: Color(hex: "#D8B07A"), isLight: false, ink: widgetGoldInk)
     case .slate:
-        return ThemePalette(background: Color(hex: "#2A2D31"), surface: Color.white.opacity(0.10), text: Color(hex: "#E5E8EC"), muted: Color(hex: "#A3ABB3"), accent: Color(hex: "#9AA8B5"), isLight: false)
+        return ThemePalette(background: Color(hex: "#2A2D31"), surface: Color.white.opacity(0.10), text: Color(hex: "#E5E8EC"), muted: .white.opacity(0.62), accent: Color(hex: "#9AA8B5"), isLight: false, ink: .white)
     }
 }
 
@@ -1705,16 +1763,16 @@ struct DaySimpleView: View {
         VStack(spacing: 0) {
             Text(weekdayName(context))
                 .font(.custom("Rubik-Bold", size: isSmall ? 16 : 20))
-                .foregroundStyle(p.text)
+                .foregroundStyle(p.ink)
                 .lineLimit(1)
             Text(formatNumber(dayNumberFor(context, cal: cal), context))
                 .font(.custom("Rubik-Bold", size: isSmall ? 52 : 68))
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
-                .foregroundStyle(p.text.opacity(0.94))
+                .foregroundStyle(p.ink.opacity(0.94))
             Text(context.isArabic ? monthNameFor(context, cal: cal) : monthNameFor(context, cal: cal).uppercased())
                 .font(.custom("Rubik-Medium", size: isSmall ? 14 : 18))
-                .foregroundStyle(p.muted)
+                .foregroundStyle(p.ink)
                 .lineLimit(1)
         }
         .padding(isSmall ? 20 : 22)
@@ -1738,7 +1796,7 @@ struct DayDigitalView: View {
                 .font(.custom("Rubik-Bold", size: 44))
                 .tracking(-1)
                 .minimumScaleFactor(0.7)
-                .foregroundStyle(p.text)
+                .foregroundStyle(p.ink)
             Text(subtitle)
                 .font(.custom("Rubik-Regular", size: 12))
                 .lineLimit(1)
@@ -1813,7 +1871,7 @@ struct DayThuluthView: View {
                 .font(.custom(context.arabicFontFamily, size: mainFs))
                 .minimumScaleFactor(0.75)
                 .lineLimit(1)
-                .foregroundStyle(p.text.opacity(0.92))
+                .foregroundStyle(p.ink.opacity(0.92))
                 .padding(.top, optical)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1851,7 +1909,7 @@ struct MonthSimpleView: View {
                     .minimumScaleFactor(0.45)
                     .lineLimit(1)
                     .padding(.vertical, 8)
-                    .foregroundStyle(p.text.opacity(0.92))
+                    .foregroundStyle(p.ink.opacity(0.92))
                 Text(
                     isHijriArabic
                         ? "\(formatNumber(dayNumberFor(context, cal: cal), context)) من \(monthNameFor(context, cal: cal)) \(formatNumber(yearNumberFor(context, cal: cal), context))"
@@ -1904,7 +1962,7 @@ struct MonthThuluthView: View {
                 .font(.custom(context.arabicFontFamily, size: mainFs))
                 .minimumScaleFactor(0.75)
                 .lineLimit(1)
-                .foregroundStyle(p.text.opacity(0.92))
+                .foregroundStyle(p.ink.opacity(0.92))
                 // Match RN's `paddingTop: Math.round(fs * 0.55)` so the
                 // Thuluth glyph sits optically centered (font baseline
                 // sits high relative to the visual glyph mass).
@@ -1946,8 +2004,48 @@ struct MonthElegantEnView: View {
 /// time string, countdown (bottom). Padding + font sizes match the RN preview
 /// at 155×155 dp so the in-app gallery and the home-screen widget render
 /// identically.
+/// Intentional "enable location" placeholder for every home-screen prayer
+/// widget. Shown when `prayer.needsLocation` is set (no real coordinates yet),
+/// instead of the Makkah/sample fallback times — mirrors the in-app gallery and
+/// Android placeholders.
+struct PrayerNeedsLocationView: View {
+    let context: WidgetContext
+    let family: WidgetFamily
+
+    var body: some View {
+        let p = palette(context.theme)
+        let isAr = context.isArabic
+        let isSmall = family == .systemSmall
+        VStack(spacing: isSmall ? 6 : 10) {
+            Image(systemName: "location.slash")
+                .font(.system(size: isSmall ? 24 : 30, weight: .regular))
+                .foregroundStyle(p.ink)
+            Text(isAr ? "فعّل الموقع" : "Enable location")
+                .font(prayerNameFont(size: isSmall ? 15 : 18))
+                .foregroundStyle(p.ink)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if !isSmall {
+                Text(isAr ? "لعرض مواقيت الصلاة" : "to show prayer times")
+                    .font(.custom("Rubik-Medium", size: 12))
+                    .foregroundStyle(p.muted)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .padding(isSmall ? 14 : 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environment(\.layoutDirection, isAr ? .rightToLeft : .leftToRight)
+    }
+}
+
 struct PrayerSingleView: View {
     let context: WidgetContext
+    // WidgetKit ignores `.environment(\.layoutDirection)`, so read the device
+    // direction and order the countdown phrase for the CONTENT language instead.
+    @Environment(\.layoutDirection) private var systemDirection
 
     var body: some View {
         let p = palette(context.theme)
@@ -1966,34 +2064,33 @@ struct PrayerSingleView: View {
                 .padding(.bottom, 2)
             Text(name)
                 .font(prayerNameFont(size: 22))
-                .foregroundStyle(p.text)
+                .foregroundStyle(p.ink)
                 .lineLimit(1)
             Text(timeStr)
                 .font(.custom("Rubik-Bold", size: 42))
-                .foregroundStyle(p.text)
+                .foregroundStyle(p.ink)
                 .kerning(-1)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
                 .padding(.top, 2)
             let durationSingle = PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")
-            // Just "بعد X" — the "الصلاة القادمة" header above already
-            // sets context, so prefixing the duration with it would
-            // produce "الصلاة القادمة … الصلاة القادمة بعد …" (visible
-            // duplicate, doesn't match gallery preview).
+            // Just "in X" / "بعد X" — the header above already sets context. The
+            // prefix reads first; order it for the content language on any device.
+            let cdAligned = (systemDirection == .rightToLeft) == context.isArabic
+            let cdPrefix = context.isArabic ? "بعد" : "in"
             HStack(spacing: 3) {
-                if context.isArabic {
-                    Text("بعد")
+                if cdAligned {
+                    Text(cdPrefix)
                     Text(durationSingle)
                 } else {
-                    Text("in")
                     Text(durationSingle)
+                    Text(cdPrefix)
                 }
             }
             .font(.custom("Rubik-Medium", size: 10))
             .foregroundStyle(p.muted)
             .lineLimit(1)
             .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
-            .environment(\.layoutDirection, context.isArabic ? .rightToLeft : .leftToRight)
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -2007,6 +2104,39 @@ struct PrayerTableView: View {
     let context: WidgetContext
     let family: WidgetFamily
 
+    // Direction handling.
+    //
+    // WidgetKit lays the widget out using the DEVICE/system language direction and
+    // IGNORES any `.environment(\.layoutDirection, …)` override. So on an Arabic
+    // (RTL) phone an English widget would render mirrored vs the in-app gallery,
+    // which ALWAYS follows the WIDGET language (English → name-left/time-right).
+    // To match the gallery on every device we read the ambient direction WidgetKit
+    // actually used and arrange every element so the VISUAL order follows the
+    // CONTENT language (`context.isArabic`), independent of the device.
+    @Environment(\.layoutDirection) private var systemDirection
+
+    private var systemRTL: Bool  { systemDirection == .rightToLeft }
+    private var contentRTL: Bool { context.isArabic }
+    /// `true` when the system direction already matches the content direction, so
+    /// HStack order / `.leading` / `.trailing` resolve to the side we want.
+    private var aligned: Bool { systemRTL == contentRTL }
+
+    /// Horizontal alignment for the content's reading-start edge (left for LTR
+    /// content, right for RTL content), compensated for the device flip.
+    private var leadH: HorizontalAlignment { aligned ? .leading : .trailing }
+
+    /// Place `start` on the content reading-start side and `end` on the other side,
+    /// regardless of the device's RTL/LTR. (HStack's first child sits on the SYSTEM
+    /// leading edge; we pick the order so the VISUAL result follows the content.)
+    @ViewBuilder
+    private func reading(_ start: AnyView, _ end: AnyView, spacing: CGFloat, spacer: Bool = true) -> some View {
+        if aligned {
+            HStack(spacing: spacing) { start; if spacer { Spacer(minLength: 0) }; end }
+        } else {
+            HStack(spacing: spacing) { end; if spacer { Spacer(minLength: 0) }; start }
+        }
+    }
+
     var body: some View {
         let p = palette(context.theme)
         let prayer = context.data.prayer
@@ -2019,38 +2149,34 @@ struct PrayerTableView: View {
         // clear "current next prayer" indicator at home-screen scale.
         let activeBg = p.isLight ? Color.black.opacity(0.10) : Color.white.opacity(0.16)
 
-        Group {
-            switch family {
-            case .systemSmall:
-                smallLayout(prayers: prayers, prayer: prayer, palette: p, activeBg: activeBg)
-            case .systemLarge:
-                largeLayout(prayers: prayers, prayer: prayer, next: next, palette: p, activeBg: activeBg)
-            default:
-                mediumLayout(prayers: prayers, prayer: prayer, next: next, palette: p, activeBg: activeBg)
-            }
+        switch family {
+        case .systemSmall:
+            smallLayout(prayers: prayers, prayer: prayer, palette: p, activeBg: activeBg)
+        case .systemLarge:
+            largeLayout(prayers: prayers, prayer: prayer, next: next, palette: p, activeBg: activeBg)
+        default:
+            mediumLayout(prayers: prayers, prayer: prayer, next: next, palette: p, activeBg: activeBg)
         }
-        // Pin layout to LTR so list-on-left / hero-on-right matches the in-app gallery preview
-        // regardless of device locale. Arabic glyphs still shape correctly within Text views.
-        .environment(\.layoutDirection, .leftToRight)
     }
 
     // MARK: Small (compact list)
     @ViewBuilder
     private func smallLayout(prayers: [WidgetPrayerItem], prayer: WidgetPrayerData?, palette p: ThemePalette, activeBg: Color) -> some View {
+        let timerDate = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
+        let durationSm = PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")
+        let countdown = AnyView(Text(context.isArabic ? "بعد \(durationSm)" : "in \(durationSm)")
+            .font(.custom("Rubik-Medium", size: 9))
+            .foregroundStyle(p.muted)
+            .lineLimit(1)
+            .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX")))
+        let title = AnyView(Text(context.isArabic ? "الصلاة القادمة" : "Next Prayer")
+            .font(.custom("Rubik-Medium", size: 9))
+            .foregroundStyle(p.muted))
         VStack(spacing: 0) {
-            HStack {
-                let timerDate = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
-                let durationSm = PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")
-                Text(context.isArabic ? "بعد \(durationSm)" : "in \(durationSm)")
-                    .font(.custom("Rubik-Medium", size: 9))
-                    .foregroundStyle(p.muted)
-                    .lineLimit(1)
-                    .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
-                Spacer()
-                Text(context.isArabic ? "الصلاة القادمة" : "Next Prayer")
-                    .font(.custom("Rubik-Medium", size: 9))
-                    .foregroundStyle(p.muted)
-            }
+            // Title ("Next Prayer") on the content reading-start side, countdown on
+            // the other — matching the gallery. English: title LEFT / countdown
+            // RIGHT; Arabic: title RIGHT / countdown LEFT — on ANY device.
+            reading(title, countdown, spacing: 8)
             .padding(.bottom, 3)
             ForEach(prayers) { item in
                 prayerRow(item: item, palette: p, activeBg: activeBg, fontSize: 11, padH: 4, padV: 2)
@@ -2066,54 +2192,44 @@ struct PrayerTableView: View {
         let nextNameAr = next?.nameAr ?? prayer?.nextPrayerNameAr ?? "الفجر"
         let nextName   = next?.name ?? prayer?.nextPrayerName ?? "Fajr"
         let nextTime   = prayerTimeFromEpoch(next?.epochMs, context)
-        HStack(spacing: 8) {
-            // List (left for Arabic, right for English — matches RN outerDir).
-            VStack(spacing: 1) {
-                ForEach(prayers) { item in
-                    prayerRow(item: item, palette: p, activeBg: activeBg, fontSize: 10, padH: 4, padV: 1.5)
-                }
+        let listCol = VStack(spacing: 1) {
+            ForEach(prayers) { item in
+                prayerRow(item: item, palette: p, activeBg: activeBg, fontSize: 10, padH: 4, padV: 1.5)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Hero
-            VStack(spacing: 2) {
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // List sits left for Arabic, right for English (matches RN outerDir) —
+        // ordered explicitly below.
+        let heroCol = VStack(spacing: 2) {
                 Text(context.isArabic ? "الصلاة القادمة" : "Next Prayer")
                     .font(.custom("Rubik-Medium", size: 10))
                     .foregroundStyle(p.muted)
                 Text(context.isArabic ? nextNameAr : nextName)
                     .font(.custom("Rubik-Bold", size: 20))
-                    .foregroundStyle(p.text)
+                    .foregroundStyle(p.ink)
                     .lineLimit(1)
                 Text(nextTime)
                     .font(.custom("Rubik-Bold", size: 32))
-                    .foregroundStyle(p.text)
+                    .foregroundStyle(p.ink)
                     .kerning(-1)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 let timerDateMed = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
                 let durationMed = PrayerDurationFormat.until(timerDateMed, from: context.date, language: context.isArabic ? "ar" : "en")
-                // Header text above ("الصلاة القادمة") already sets context.
-                // Render just the bare "بعد X" countdown below to avoid the
-                // visible duplicate phrase. Uses the same HStack + RTL
-                // pattern as the NextPrev widget so Arabic word order is
-                // correct ("بعد" right, duration left).
-                HStack(spacing: 3) {
-                    if context.isArabic {
-                        Text("بعد")
-                        Text(durationMed)
-                    } else {
-                        Text("in")
-                        Text(durationMed)
-                    }
-                }
+                // Header above ("الصلاة القادمة") already sets context, so render
+                // just the bare "in X" / "بعد X" countdown. The prefix reads first,
+                // ordered for the content direction on any device.
+                let cdPrefix = context.isArabic ? "بعد" : "in"
+                reading(AnyView(Text(cdPrefix)), AnyView(Text(durationMed)), spacing: 3, spacer: false)
                     .font(.custom("Rubik-Medium", size: 9))
                     .foregroundStyle(p.muted)
                     .lineLimit(1)
                     .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
-                    .environment(\.layoutDirection, context.isArabic ? .rightToLeft : .leftToRight)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+        // Hero column on the content reading-start side (left for English / right
+        // for Arabic), list on the other — on any device.
+        reading(AnyView(heroCol), AnyView(listCol), spacing: 8, spacer: false)
         .padding(8)
     }
 
@@ -2125,44 +2241,48 @@ struct PrayerTableView: View {
         let nextTime   = prayerTimeFromEpoch(next?.epochMs, context)
         let heroBg = p.isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08)
 
+        // The decorative "الصلاة" calligraphy watermark matches the RN gallery,
+        // which renders it ONLY for Arabic content, on the physical right edge.
+        let wmAlign = Alignment(horizontal: systemRTL ? .leading : .trailing, vertical: .bottom)
+        let wmEdge: Edge.Set = systemRTL ? .leading : .trailing
+
         VStack(spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                // Watermark behind hero content — uses the DecoType Thuluth 2
-                // calligraphy bundled as WidgetFont.ttf. iOS registers fonts
-                // by their internal PostScript name regardless of filename,
-                // so the SwiftUI name MUST be "DecoTypeThuluth2" even though
-                // the bundled file is WidgetFont.ttf. Same opacity range as
-                // the RN gallery (`rgba(0,0,0,0.06)` light / `rgba(255,255,255,0.05)` dark).
-                Text("الصلاة")
-                    .font(.custom("DecoTypeThuluth2", size: 52))
-                    .foregroundStyle(p.isLight ? Color.black.opacity(0.10) : Color.white.opacity(0.08))
-                    .padding(.trailing, 12)
-                    .padding(.bottom, 14)
-                    .allowsTightening(true)
-                    .lineLimit(1)
-                HStack(alignment: .center, spacing: 14) {
-                    Image(systemName: prayerSymbol(next?.name ?? prayer?.nextPrayer ?? "fajr"))
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(p.muted)
-                        .frame(width: 36)
-                    Spacer(minLength: 0)
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text(context.isArabic ? nextNameAr : nextName)
-                            .font(.custom("Rubik-Bold", size: 22))
-                            .foregroundStyle(p.text)
-                        Text(nextTime)
-                            .font(.custom("Rubik-Bold", size: 36))
-                            .foregroundStyle(p.text)
-                        let timerDateLg = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
-                        let durationLg = PrayerDurationFormat.until(timerDateLg, from: context.date, language: context.isArabic ? "ar" : "en")
-                        Text(context.isArabic ? "الصلاة القادمة بعد \(durationLg)" : "Next prayer in \(durationLg)")
-                            .font(.custom("Rubik-Medium", size: 12))
-                            .foregroundStyle(p.muted)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
-                    }
+            ZStack(alignment: wmAlign) {
+                if contentRTL {
+                    // DecoType Thuluth 2 calligraphy (bundled as WidgetFont.ttf; iOS
+                    // registers fonts by PostScript name, so the SwiftUI name is
+                    // "DecoTypeThuluth2"). Faint opacity range matches the gallery.
+                    Text("الصلاة")
+                        .font(.custom("DecoTypeThuluth2", size: 52))
+                        .foregroundStyle(p.isLight ? Color.black.opacity(0.10) : Color.white.opacity(0.08))
+                        .padding(wmEdge, 12)
+                        .padding(.bottom, 14)
+                        .allowsTightening(true)
+                        .lineLimit(1)
                 }
+                let heroIcon = Image(systemName: prayerSymbol(next?.name ?? prayer?.nextPrayer ?? "fajr"))
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(p.muted)
+                    .frame(width: 36)
+                let heroText = VStack(alignment: leadH, spacing: 5) {
+                    Text(context.isArabic ? nextNameAr : nextName)
+                        .font(.custom("Rubik-Bold", size: 22))
+                        .foregroundStyle(p.ink)
+                    Text(nextTime)
+                        .font(.custom("Rubik-Bold", size: 36))
+                        .foregroundStyle(p.ink)
+                    let timerDateLg = Date(timeIntervalSince1970: resolvedNextPrayerEpochMs(context) / 1000)
+                    let durationLg = PrayerDurationFormat.until(timerDateLg, from: context.date, language: context.isArabic ? "ar" : "en")
+                    Text(context.isArabic ? "الصلاة القادمة بعد \(durationLg)" : "Next prayer in \(durationLg)")
+                        .font(.custom("Rubik-Medium", size: 12))
+                        .foregroundStyle(p.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
+                }
+                // Text block on the content reading-start side (left for English /
+                // right for Arabic), glyph on the other — on any device.
+                reading(AnyView(heroText), AnyView(heroIcon), spacing: 14)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
             }
@@ -2187,32 +2307,38 @@ struct PrayerTableView: View {
     private func prayerRow(item: WidgetPrayerItem, palette p: ThemePalette, activeBg: Color, fontSize: CGFloat, padH: CGFloat, padV: CGFloat, showIcon: Bool = false, iconSize: CGFloat = 16) -> some View {
         let active = item.isNext ?? false
         let timeText = prayerTimeFromEpoch(item.epochMs, context)
-        let color: Color = active ? p.text : p.muted
-        HStack(spacing: 8) {
-            Text(timeText)
-                .font(.custom("Rubik-Bold", size: fontSize))
-                .kerning(-0.3)
-                .foregroundStyle(color)
-            Spacer()
-            HStack(spacing: 6) {
-                Text(context.isArabic ? (item.nameAr ?? "الفجر") : (item.name ?? "Fajr"))
-                    .font(.custom("Rubik-Bold", size: fontSize))
-                    .foregroundStyle(color)
-                if showIcon {
-                    Image(systemName: prayerSymbol(item.name ?? "fajr"))
-                        .font(.system(size: iconSize, weight: .medium))
-                        .foregroundStyle(color)
-                }
-            }
-        }
-        .padding(.horizontal, padH)
-        .padding(.vertical, padV)
-        .background(RoundedRectangle(cornerRadius: 6).fill(active ? activeBg : Color.clear))
+        let color: Color = active ? p.ink : p.muted
+        let timeView = AnyView(Text(timeText)
+            .font(.custom("Rubik-Bold", size: fontSize))
+            .kerning(-0.3)
+            .foregroundStyle(color))
+        let nameText = AnyView(Text(context.isArabic ? (item.nameAr ?? "الفجر") : (item.name ?? "Fajr"))
+            .font(.custom("Rubik-Bold", size: fontSize))
+            .foregroundStyle(color))
+        // Glyph leads the name in reading order (English: icon LEFT of name;
+        // Arabic: icon RIGHT of name) — matching the gallery, on any device.
+        let nameGroup: AnyView = {
+            guard showIcon else { return nameText }
+            let iconView = AnyView(Image(systemName: prayerSymbol(item.name ?? "fajr"))
+                .font(.system(size: iconSize, weight: .medium))
+                .foregroundStyle(color))
+            return AnyView(reading(iconView, nameText, spacing: 6, spacer: false))
+        }()
+        // Name(+icon) on the content reading-start side, time on the other.
+        reading(nameGroup, timeView, spacing: 8)
+            .padding(.horizontal, padH)
+            .padding(.vertical, padV)
+            .background(RoundedRectangle(cornerRadius: 6).fill(active ? activeBg : Color.clear))
     }
 }
 
 struct PrayerNextPreviousView: View {
     let context: WidgetContext
+    // WidgetKit ignores `.environment(\.layoutDirection)`, so read the device
+    // direction and place boxes/phrases for the CONTENT language on any device.
+    @Environment(\.layoutDirection) private var systemDirection
+    private var aligned: Bool { (systemDirection == .rightToLeft) == context.isArabic }
+
     var body: some View {
         let p = palette(context.theme)
         // Phase D: 7-day-aware next/previous prayer derivation.
@@ -2221,26 +2347,21 @@ struct PrayerNextPreviousView: View {
         let nextEpochMs = next.epochMs ?? resolvedNextPrayerEpochMs(context)
         let prevEpochMs = previous.epochMs ?? resolvedPreviousPrayerEpochMs(context)
 
+        // "Previous" sits on the content reading-start side, "Next" on the other —
+        // English: Previous LEFT / Next RIGHT; Arabic: السابقة RIGHT / القادمة LEFT.
+        // HStack's first child lands on the SYSTEM leading edge, so pick the order
+        // that produces the content-correct visual on this device.
         HStack(spacing: 10) {
-            // Reading-order layout follows the widget's localized name:
-            //   Arabic ("الصلاة السابقة والقادمة" read right-to-left)
-            //     → السابقة on RIGHT, القادمة on LEFT  → render [next, previous]
-            //       under forced LTR (first child = left).
-            //   English ("Previous & Next" read left-to-right)
-            //     → Previous on LEFT, Next on RIGHT     → render [previous, next].
-            // Without this swap the English widget shows next-on-left even
-            // though the name reads "Previous & Next" — confusing for LTR users.
-            if context.isArabic {
-                prayerBox(item: next, epochMs: nextEpochMs, isNext: true, palette: p)
+            if aligned {
                 prayerBox(item: previous, epochMs: prevEpochMs, isNext: false, palette: p)
+                prayerBox(item: next, epochMs: nextEpochMs, isNext: true, palette: p)
             } else {
-                prayerBox(item: previous, epochMs: prevEpochMs, isNext: false, palette: p)
                 prayerBox(item: next, epochMs: nextEpochMs, isNext: true, palette: p)
+                prayerBox(item: previous, epochMs: prevEpochMs, isNext: false, palette: p)
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .environment(\.layoutDirection, .leftToRight)
     }
 
     func prayerBox(item: WidgetPrayerItem?, epochMs: Double, isNext: Bool, palette p: ThemePalette) -> some View {
@@ -2256,12 +2377,12 @@ struct PrayerNextPreviousView: View {
                 .foregroundStyle(p.muted)
             Text(context.isArabic ? (item?.nameAr ?? "الفجر") : (item?.name ?? "Fajr"))
                 .font(prayerNameFont(size: 16))
-                .foregroundStyle(p.text)
+                .foregroundStyle(p.ink)
                 .padding(.top, 2)
             Text(prayerTimeFromEpoch(item?.epochMs, context))
                 .font(.custom("Rubik-Bold", size: 28))
                 .kerning(-0.5)
-                .foregroundStyle(p.text)
+                .foregroundStyle(p.ink)
                 .padding(.top, 2)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
@@ -2272,36 +2393,27 @@ struct PrayerNextPreviousView: View {
                 let durNP = isNext
                     ? PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")
                     : PrayerDurationFormat.since(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")
-                // Render prefix + duration as TWO separate Text views inside
-                // a direction-forced HStack. The single-Text approach
-                // (`"\(prefix) \(durNP)"`) was getting reordered by SwiftUI's
-                // BiDi algorithm because the surrounding VStack is pinned
-                // LTR — the short "بعد"/"منذ" prefix wasn't dominant enough
-                // to override the base direction. With HStack + RTL layout,
-                // child 1 (prefix) is placed at the rightmost visual
-                // position and child 2 (duration) at the leftmost. Arabic
-                // readers scan right-to-left and see "بعد 2 س 30 د" /
-                // "منذ 4 س 17 د" — matching the gallery convention exactly.
+                // Reading order of prefix + duration:
+                //   next         → "in X"  / "بعد X"  (prefix first)
+                //   previous AR  → "منذ X"            (prefix first)
+                //   previous EN  → "X ago"            (duration first, suffix style)
+                // Order the two Texts so they read correctly on any device.
                 let durFont = Font.custom("Rubik-Medium", size: 9)
+                let readFirst: String  = (isNext || context.isArabic) ? prefix : durNP
+                let readSecond: String = (isNext || context.isArabic) ? durNP : prefix
                 HStack(spacing: 3) {
-                    if context.isArabic {
-                        Text(prefix)
-                        Text(durNP)
-                    } else if isNext {
-                        // English next: "in 2H 30M"
-                        Text(prefix)
-                        Text(durNP)
+                    if aligned {
+                        Text(readFirst)
+                        Text(readSecond)
                     } else {
-                        // English previous: "5H ago" — suffix style
-                        Text(durNP)
-                        Text(prefix)
+                        Text(readSecond)
+                        Text(readFirst)
                     }
                 }
                 .font(durFont)
                 .foregroundStyle(p.muted)
                 .lineLimit(1)
                 .environment(\.locale, context.usesArabicNumerals ? Locale(identifier: "ar_EG") : Locale(identifier: "en_US_POSIX"))
-                .environment(\.layoutDirection, context.isArabic ? .rightToLeft : .leftToRight)
                 .padding(.top, 2)
             }
         }
@@ -2359,9 +2471,11 @@ struct VerseView: View {
             return (entry.arabic, en, "Surah \(enName)  \(ayahNum)")
         }
         let bundled = BundledDailyAyahs.todaysAyah(for: context.date)
-        return context.isArabic
-            ? (bundled.arabic, "", bundled.ref)
-            : (bundled.arabic, bundled.translation, "Surah \(bundled.ref)")
+        if context.isArabic {
+            return (bundled.arabic, "", "سورة \(bundled.ref)")
+        }
+        let bundledAyahNum = formatNumber(bundled.ayah, context)
+        return (bundled.arabic, bundled.translation, "Surah \(bundled.refEn)  \(bundledAyahNum)")
     }
 
     var body: some View {
@@ -2385,7 +2499,7 @@ struct VerseView: View {
                     .lineSpacing(4)
                     .lineLimit(context.isArabic ? 6 : 3)
                     .allowsTightening(true)
-                    .foregroundStyle(p.text)
+                    .foregroundStyle(p.ink)
                     .environment(\.layoutDirection, .rightToLeft)
                 if !context.isArabic, !translation.isEmpty {
                     Text(translation)
@@ -2395,7 +2509,7 @@ struct VerseView: View {
                         .lineSpacing(1)
                         .lineLimit(2)
                         .allowsTightening(true)
-                        .foregroundStyle(p.text.opacity(0.88))
+                        .foregroundStyle(p.ink.opacity(0.88))
                         .environment(\.layoutDirection, .leftToRight)
                 }
                 Text(ref.isEmpty ? (context.isArabic ? "البقرة" : "Al-Baqarah") : ref)
@@ -2432,6 +2546,13 @@ private func collapseAzkarWidgetWhitespace(_ raw: String) -> String {
 
 private func stripAzkarTranslationNoise(_ raw: String) -> String {
     var t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Strip square-bracket notes anywhere ("[For the evening, … read as follows:]")
+    // and parenthetical instructional notes (Note:/read as follows/whoever says/…)
+    // so an evening instruction can never leak into the Morning widget, etc.
+    t = t.replacingOccurrences(of: "\\[[^\\]]*\\]", with: " ", options: .regularExpression)
+    t = t.replacingOccurrences(of: "\\([^()]*\\b(?:note\\s*:|read as follows|whoever says|instead of|amsa|asbaha)\\b[^()]*\\)", with: " ", options: [.regularExpression, .caseInsensitive])
+    t = collapseAzkarWidgetWhitespace(t)
 
     while t.last == ")" {
         var depth = 0
@@ -2490,30 +2611,57 @@ private func cleanEnglishAzkarWidgetText(_ raw: String) -> String {
     stripAzkarTranslationNoise(raw)
 }
 
-private func englishAzkarFontSize(_ text: String, isSmall: Bool) -> CGFloat {
-    if isSmall { return text.count > 180 ? 10 : (text.count > 120 ? 11 : (text.count > 80 ? 12 : 14)) }
-    if text.count > 240 { return 15 }
-    if text.count > 200 { return 16 }
-    if text.count > 160 { return 18 }
-    if text.count > 110 { return 20 }
-    return 22
+// Computed fill sizing — mirrors azkarFillFontSize in
+// components/widgets/previews/index.tsx (same per-script factors/clamps). The
+// font is sized so the text fills the box, so it matches the gallery + Android.
+private func azkarFillFontSize(_ charCount: Int, boxW: CGFloat, boxH: CGFloat, isArabic: Bool) -> CGFloat {
+    if boxW <= 0 || boxH <= 0 { return isArabic ? 20 : 16 }
+    let chars = CGFloat(max(8, charCount))
+    let cwf: CGFloat = isArabic ? 0.5 : 0.55
+    let lhf: CGFloat = isArabic ? 1.55 : 1.3
+    // Conservative fill + low min so the WHOLE dhikr always fits (never truncated).
+    // Keep in sync with azkarFillFontSize in components/widgets/previews/index.tsx.
+    let fillRatio: CGFloat = 0.38
+    let minFs: CGFloat = 8
+    let maxFs: CGFloat = isArabic ? 28 : 22
+    let fs = (boxW * boxH * fillRatio / (chars * cwf * lhf)).squareRoot()
+    return max(minFs, min(maxFs, floor(fs)))
 }
 
-private func splitLongEnglishAzkar(_ raw: String, maxChars: Int = 260) -> [String] {
+// Paginate long English azkar so a page is NEVER a mid-sentence fragment AND
+// stays readable. `maxChars` is sized so a page fills the tile at a large font;
+// longer azkar split into multiple COMPLETE-sentence pages that cycle by the
+// minute. Kept in sync with the JS copy in lib/widget-azkar-helpers.ts.
+private func splitLongEnglishAzkar(_ raw: String, maxChars: Int = 220) -> [String] {
     let clean = raw
         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
     if clean.isEmpty { return [] }
     if clean.count <= maxChars { return [clean] }
+    // Split into complete sentences (terminator kept with the sentence).
+    var sentences: [String] = []
+    var sentence = ""
+    for ch in clean {
+        sentence.append(ch)
+        if ".!?،؛".contains(ch) {
+            let s = sentence.trimmingCharacters(in: .whitespaces)
+            if !s.isEmpty { sentences.append(s) }
+            sentence = ""
+        }
+    }
+    let tail = sentence.trimmingCharacters(in: .whitespaces)
+    if !tail.isEmpty { sentences.append(tail) }
+    if sentences.isEmpty { return [clean] }
+    // Pack whole sentences into ≤maxChars pages — never break inside a sentence.
     var chunks: [String] = []
     var current = ""
-    for word in clean.split(separator: " ") {
-        let candidate = current.isEmpty ? String(word) : "\(current) \(word)"
-        if candidate.count <= maxChars {
+    for s in sentences {
+        let candidate = current.isEmpty ? s : "\(current) \(s)"
+        if candidate.count <= maxChars || current.isEmpty {
             current = candidate
         } else {
-            if !current.isEmpty { chunks.append(current) }
-            current = String(word)
+            chunks.append(current)
+            current = s
         }
     }
     if !current.isEmpty { chunks.append(current) }
@@ -2567,27 +2715,21 @@ struct AzkarQuoteView: View {
             }
             if !isAr && !z.translation.isEmpty {
                 let cleaned = cleanEnglishAzkarWidgetText(z.translation)
-                return pickLongEnglishAzkarPage(cleaned.isEmpty ? z.translation : cleaned, pageIndex: slot?.chunkIndex ?? 0)
+                // If the translation was ENTIRELY an editorial note (strips to
+                // empty), fall through to the Arabic dhikr — never show the raw note.
+                if !cleaned.isEmpty {
+                    return pickLongEnglishAzkarPage(cleaned, pageIndex: slot?.chunkIndex ?? 0)
+                }
             }
-            let chunks = z.displayChunks
-            let idx = slot?.chunkIndex ?? 0
-            if !chunks.isEmpty, idx < chunks.count { return chunks[idx] }
+            // Full Arabic dhikr (complete) — computed-fill sizing shrinks it to fit.
             return z.arabic
         }()
-        let bodyFont: Font = {
-            if isQuran {
-                let fs: CGFloat = isSmall ? 17 : 22
-                return .custom("Rubik-Bold", size: fs)
-            }
-            if isAr {
-                let fs: CGFloat = isSmall ? 14 : 18
-                return .custom("Rubik-Regular", size: fs)
-            }
-            // English prose: large but balanced. Pick the size by text length
-            // so the widget reads clearly without clipping.
-            let fs = englishAzkarFontSize(bodyText, isSmall: isSmall)
-            return .custom("Rubik-Bold", size: fs)
-        }()
+        // Body box ≈ widget cell minus chrome (title row in AR, ×count, padding).
+        let azkarBoxW: CGFloat = (isSmall ? 155 : 329) - (isAr ? 24 : 40)
+        let azkarBoxH: CGFloat = 155 - (isAr ? 16 : 0) - 24 - 28
+        // Computed fill for ALL bodies incl. Quran-recitation titles (no truncation).
+        let bodyFs = azkarFillFontSize(bodyText.count, boxW: azkarBoxW, boxH: azkarBoxH, isArabic: isAr)
+        let bodyFont: Font = .custom("Rubik-Bold", size: bodyFs)
 
         let count = max(zikr?.count ?? 1, 1)
         // ×-prefix format ("×10" not "10×") — reads naturally as "times 10".
@@ -2604,15 +2746,17 @@ struct AzkarQuoteView: View {
                     .foregroundStyle(p.muted)
             }
             Spacer(minLength: 0)
-            Text(bodyText)
+            // English body UPPERCASE to match the approved mockups; Arabic never.
+            Text(isAr ? bodyText : bodyText.uppercased())
                 .font(bodyFont)
-                // English uses length-aware sizing so home-screen widgets
-                // stay readable without clipping.
-                .minimumScaleFactor(isAr ? 0.85 : 0.68)
+                // Computed-fill floor (0.2) is only a last-resort net; proportional
+                // lineSpacing keeps the box math (lhf 1.55) and layout in agreement
+                // so the FULL dhikr fits — never truncated.
+                .minimumScaleFactor(0.2)
                 .multilineTextAlignment(isAr ? .center : .leading)
-                .lineLimit(isAr ? 3 : 5)
-                .lineSpacing(isAr ? 2 : 0)
-                .foregroundStyle(p.text)
+                .lineLimit(20)
+                .lineSpacing(isAr ? floor(bodyFs * 0.28) : 0)
+                .foregroundStyle(p.ink)
                 .allowsTightening(true)
                 .environment(\.layoutDirection, isAr ? .rightToLeft : .leftToRight)
             Spacer(minLength: 0)
@@ -2655,25 +2799,22 @@ struct DailyDhikrView: View {
             if !isAr && !z.translation.isEmpty {
                 let cleaned = cleanEnglishAzkarWidgetText(z.translation)
                 let minute = Calendar.current.component(.hour, from: context.date) * 60 + Calendar.current.component(.minute, from: context.date)
-                return pickLongEnglishAzkarPage(cleaned.isEmpty ? z.translation : cleaned, pageIndex: minute)
+                // All-note translation strips to empty → fall through to Arabic.
+                if !cleaned.isEmpty {
+                    return pickLongEnglishAzkarPage(cleaned, pageIndex: minute)
+                }
             }
-            let chunks = z.displayChunks
-            let idx = slot?.chunkIndex ?? 0
-            if !chunks.isEmpty, idx < chunks.count { return chunks[idx] }
+            // Full Arabic dhikr (complete) — computed-fill sizing shrinks it to fit.
             return z.arabic
         }()
-        let bodyFont: Font = {
-            if isQuran {
-                let fs: CGFloat = isSmall ? 18 : 24
-                return .custom("Rubik-Bold", size: fs)
-            }
-            if isAr {
-                let fs: CGFloat = isSmall ? 15 : 19
-                return .custom("Rubik-Regular", size: fs)
-            }
-            let fs = englishAzkarFontSize(bodyText, isSmall: isSmall)
-            return .custom("Rubik-Bold", size: fs)
-        }()
+        // Daily Dhikr has no title row — box is the cell minus ×count + padding
+        // (and the Arabic benefit/reference rows when shown).
+        let hasMetadata = isAr && !isSmall && !((zikr?.benefit ?? "").isEmpty)
+        let azkarBoxW: CGFloat = (isSmall ? 155 : 329) - (isAr ? 24 : 40)
+        let azkarBoxH: CGFloat = 155 - 24 - 28 - (hasMetadata ? 26 : 0)
+        // Computed fill for ALL bodies incl. Quran-recitation titles (no truncation).
+        let bodyFs = azkarFillFontSize(bodyText.count, boxW: azkarBoxW, boxH: azkarBoxH, isArabic: isAr)
+        let bodyFont: Font = .custom("Rubik-Bold", size: bodyFs)
         let count = max(1, zikr?.count ?? 100)
         let countStr = formatNumber(count, context)
         let benefit = zikr?.benefit ?? ""
@@ -2681,15 +2822,17 @@ struct DailyDhikrView: View {
 
         VStack(spacing: 4) {
             Spacer(minLength: 0)
-            Text(bodyText)
+            // English body UPPERCASE to match the approved mockups; Arabic never.
+            Text(isAr ? bodyText : bodyText.uppercased())
                 .font(bodyFont)
-                // English uses length-aware sizing so home-screen widgets
-                // stay readable without clipping.
-                .minimumScaleFactor(isAr ? 0.85 : 0.68)
+                // Computed-fill floor (0.2) is only a last-resort net; proportional
+                // lineSpacing keeps the box math (lhf 1.55) and layout in agreement
+                // so the FULL dhikr fits — never truncated.
+                .minimumScaleFactor(0.2)
                 .multilineTextAlignment(isAr ? .center : .leading)
-                .lineLimit(isAr ? 3 : 5)
-                .lineSpacing(isAr ? 2 : 0)
-                .foregroundStyle(p.text)
+                .lineLimit(20)
+                .lineSpacing(isAr ? floor(bodyFs * 0.28) : 0)
+                .foregroundStyle(p.ink)
                 .allowsTightening(true)
             Text("×\(countStr)")
                 .font(.custom("Rubik-Bold", size: isSmall ? 12 : 14))
@@ -2836,9 +2979,10 @@ struct LockNextPrayerView: View {
                 HStack(spacing: 3) {
                     Text(prefix)
                         .font(lockRubik(size: 14, weight: "Rubik-Medium"))
-                    Text(PrayerDurationFormat.until(nextPrayerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
+                    Text(timerInterval: Date.now...max(Date.now, nextPrayerDate), countsDown: true)
                         .font(lockRubik(size: 14, weight: "Rubik-Medium"))
                         .multilineTextAlignment(.leading)
+                        .monospacedDigit()
                 }
                 .environment(\.layoutDirection, .leftToRight)
                 .lineLimit(1)
@@ -2964,10 +3108,11 @@ struct LockNextPrayerCountdownView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
             } currentValueLabel: {
-                Text(PrayerDurationFormat.until(nextPrayerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
+                Text(timerInterval: Date.now...max(Date.now, nextPrayerDate), countsDown: true)
                     .font(lockRubik(size: 12))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                    .monospacedDigit()
             }
             .gaugeStyle(.accessoryCircular)
             .containerBackground(for: .widget) { Color.clear }
@@ -3221,7 +3366,11 @@ func applyNumeralsTo(_ value: String, _ context: WidgetContext) -> String {
 
 func prayerTimeFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String {
     guard let ms = epochMs, ms > 1000 else { return "--:--" }
-    let date = Date(timeIntervalSince1970: ms / 1000)
+    // Round to the nearest minute. Some epochs (canonical snapshot / next-prayer)
+    // carry seconds; formatting the raw value floors them and shows a time one
+    // minute early vs the phone/app. Rounding keeps the widget in sync.
+    let roundedMs = (ms / 60000.0).rounded() * 60000.0
+    let date = Date(timeIntervalSince1970: roundedMs / 1000)
     let f = DateFormatter()
     f.timeZone = widgetDisplayTimeZone(context)
     // Pin the format string to a stable POSIX locale so the colon and digit
@@ -3245,7 +3394,7 @@ func prayerTimeFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String
 /// Returns only the digits+colon part (e.g. "٤:١١") without AM/PM — for large displays.
 func prayerTimeDigitsFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String {
     guard let ms = epochMs, ms > 1000 else { return "--:--" }
-    let date = Date(timeIntervalSince1970: ms / 1000)
+    let date = Date(timeIntervalSince1970: ((ms / 60000.0).rounded() * 60000.0) / 1000)
     let f = DateFormatter()
     f.timeZone = widgetDisplayTimeZone(context)
     f.locale = Locale(identifier: "en_US_POSIX")
@@ -3257,7 +3406,7 @@ func prayerTimeDigitsFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> 
 /// Returns only the AM/PM indicator (e.g. "ص" or "م") — displayed separately at small size.
 func prayerAMPMFromEpoch(_ epochMs: Double?, _ context: WidgetContext) -> String {
     guard let ms = epochMs, ms > 1000 else { return "" }
-    let date = Date(timeIntervalSince1970: ms / 1000)
+    let date = Date(timeIntervalSince1970: ((ms / 60000.0).rounded() * 60000.0) / 1000)
     let f = DateFormatter()
     f.timeZone = widgetDisplayTimeZone(context)
     f.locale = Locale(identifier: "en_US_POSIX")
@@ -3555,9 +3704,9 @@ private func overlaySwiftUIColor(kind: LiveOverlayKind, _ p: ThemePalette) -> Co
         // muted/active distinction comes from the underlying PNG (which keeps
         // the active highlight tint from the gallery snapshot).
         _ = idx
-        return p.text
+        return p.ink
     default:
-        return p.text
+        return p.ink
     }
 }
 
@@ -3706,6 +3855,27 @@ private func todaysPrayersFromContext(_ context: WidgetContext) -> [WidgetPrayer
                 isPassed: false,
                 isNext: false
             ))
+        }
+    }
+    // Guarantee exactly one highlighted "next" row even when the epoch lists are
+    // sparse/stale (the `ms == nextEpoch` match above can miss when the next
+    // prayer epoch isn't among today's rows): highlight the first upcoming
+    // prayer, else the first row (Fajr — the next prayer after Isha).
+    if !items.contains(where: { $0.isNext ?? false }) {
+        if let idx = items.firstIndex(where: { ($0.epochMs ?? 0) > nowMs }) ?? (items.isEmpty ? nil : 0) {
+            items[idx].isNext = true
+        }
+    }
+    // Friday: force the Dhuhr row to «صلاة الجمعة» / "Jumuah" regardless of which
+    // path populated it (incl. stale app-written fallback names). Keyed on the
+    // ENTRY date so a timeline that crosses into Friday relabels correctly, and
+    // mirrors the Android headless Jumuah relabel so the table/hero/prev read
+    // Jumuah for ALL of Friday. All home prayer surfaces derive from here.
+    if Calendar(identifier: .gregorian).component(.weekday, from: context.date) == 6 {
+        for i in items.indices where (items[i].nameAr == "الظهر" || items[i].name == "Dhuhr") {
+            items[i].name = "Jumuah"
+            // Widget Friday label is the single word «الجمعة», per spec.
+            items[i].nameAr = "الجمعة"
         }
     }
     return items
@@ -3873,13 +4043,19 @@ private func dynamicPrayerHomeView(widgetId: String, family: WidgetFamily, conte
     ZStack {
         RoundedRectangle(cornerRadius: family == .systemSmall ? 28 : 32)
             .fill(p.background)
-        switch widgetId {
-        case "prayerSingle":
-            PrayerSingleView(context: context)
-        case "prayerNextPrevious":
-            PrayerNextPreviousView(context: context)
-        default:
-            PrayerTableView(context: context, family: family)
+        // No real location yet → intentional "enable location" placeholder
+        // instead of the Makkah/sample fallback times (mirrors gallery + Android).
+        if context.data.prayer?.needsLocation == true {
+            PrayerNeedsLocationView(context: context, family: family)
+        } else {
+            switch widgetId {
+            case "prayerSingle":
+                PrayerSingleView(context: context)
+            case "prayerNextPrevious":
+                PrayerNextPreviousView(context: context)
+            default:
+                PrayerTableView(context: context, family: family)
+            }
         }
     }
 }
@@ -3954,8 +4130,9 @@ private func liveOverlayView(
             let timerDate = Date(timeIntervalSince1970: epochMs / 1000)
             HStack(spacing: anchor.compact ? 1 : 3) {
                 Text(context.isArabic ? "بعد" : "in")
-                Text(PrayerDurationFormat.until(timerDate, from: context.date, language: context.isArabic ? "ar" : "en"))
+                Text(timerInterval: Date.now...max(Date.now, timerDate), countsDown: true)
                     .environment(\.locale, arabicLocale)
+                    .monospacedDigit()
             }
             .font(baseFont)
             .foregroundStyle(fg)
@@ -3970,12 +4147,15 @@ private func liveOverlayView(
         let epochMs = resolvedPreviousPrayerEpochMs(context)
         if epochMs > 1000 {
             let timerDate = Date(timeIntervalSince1970: epochMs / 1000)
+            let elapsedText = Text(timerInterval: timerDate...Date.distantFuture, countsDown: false)
+                .environment(\.locale, arabicLocale)
+                .monospacedDigit()
             HStack(spacing: anchor.compact ? 1 : 3) {
                 if context.isArabic {
                     Text("منذ")
-                    Text(PrayerDurationFormat.since(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")).environment(\.locale, arabicLocale)
+                    elapsedText
                 } else {
-                    Text(PrayerDurationFormat.since(timerDate, from: context.date, language: context.isArabic ? "ar" : "en")).environment(\.locale, arabicLocale)
+                    elapsedText
                     Text("ago")
                 }
             }
@@ -4080,16 +4260,32 @@ struct WidgetImageView: View {
         // caller forgets.
         let resolvedTheme = resolvedRoohTheme(context.theme, colorScheme: colorScheme)
 
+        // Arabic-only widgets show an English "Arabic only" notice when the app
+        // language isn't Arabic, instead of mixed/empty content.
+        if isArabicOnlyWidget(widgetId) && !context.isArabic {
+            ArabicOnlyView(family: family, context: context)
+                .widgetURL(URL(string: widgetDeepLink(widgetId)))
+        // Curated bundled-image widgets (verse/azkar/dhikr): Arabic-only, tinted
+        // to the theme over a native themed background, picked by date — works
+        // offline forever with no app open and no shared data required.
+        } else if isCuratedImageWidget(widgetId) {
+            CuratedImageView(widgetId: widgetId, family: family, context: context)
+                .widgetURL(URL(string: widgetDeepLink(widgetId)))
         // Prayer widgets: pure SwiftUI, no PNG bake, no overlay anchors.
         // Data comes from PrayerCalculator (offline adhan-swift) so the widget
         // updates daily forever without the app being opened. Matches the
         // Glassify architecture. Renders natively whenever EITHER the offline
         // calculator inputs (lat/lng/method) are available in the App Group OR
         // the JS bridge has written prayer epochs — both yield real data.
-        if isPrayerHomeWidget(widgetId) && (PrayerInputs.read() != nil || context.hasRealData) {
+        } else if isPrayerHomeWidget(widgetId) && (PrayerInputs.read() != nil || context.hasRealData) {
             let pal = palette(resolvedTheme)
             dynamicPrayerHomeView(widgetId: widgetId, family: family, context: context, palette: pal)
                 .widgetURL(URL(string: widgetDeepLink(widgetId)))
+        } else if isPrayerHomeWidget(widgetId) {
+            // Prayer widget but no stored location and no real data: show a
+            // location notice instead of wrong/default times.
+            LocationNeededView(family: family, context: context)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
         } else if widgetId == "azkarMorning" || widgetId == "azkarEvening" {
             // Azkar widgets pick from BundledAzkar.morning / .evening (the
             // full 45 morning + 13 evening set bundled in the extension),

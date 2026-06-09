@@ -23,6 +23,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDateLocale, tArray } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from '@/lib/admin-data-api';
 import { getDayNames } from '@/constants/dayNames';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
@@ -245,7 +246,7 @@ export default function HijriCalendarScreen() {
   const handleShare = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await Share.share({ message: `🌙 ${getDateString()}\n\n— ${t('common.appSharingSig') || 'Rooh Al Muslim'}` });
+      await Share.share({ message: buildShareText(`🌙 ${getDateString()}`) });
     } catch {}
   };
 

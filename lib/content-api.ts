@@ -551,18 +551,42 @@ export function normalizeReligiousStoriesForDisplay(items: CMSReligiousStory[]):
   return deduped;
 }
 
+/** True when two normalized story lists have the identical id ordering. */
+function sameStoryOrder(a: CMSReligiousStory[], b: CMSReligiousStory[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id) return false;
+  }
+  return true;
+}
+
+/**
+ * Warm the in-memory cache for religious stories from AsyncStorage so the
+ * screen's synchronous first paint already has the settled order. Local-only
+ * (no network); the screen's own onSnapshot keeps it fresh afterwards.
+ */
+export const warmReligiousStoriesCache = () =>
+  getStoredContent<ReligiousStoriesContent>('religious_stories');
+
 export function useReligiousStoriesContentStatus(): {
   stories: CMSReligiousStory[];
   isRefreshing: boolean;
   hasCachedStories: boolean;
 } {
-  // Render with the bundled seed on first paint so users never see an empty
-  // list while AsyncStorage/Firestore are still resolving.
-  const [stories, setStories] = useState<CMSReligiousStory[]>(() =>
-    [...BUNDLED_RELIGIOUS_SEED].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-  );
+  // First paint must already be the settled order — never an interim sort that
+  // re-orders a frame later. If the in-memory cache is warm (warmed at app
+  // bootstrap or by a prior visit this session) we normalize it synchronously
+  // so the very first render equals the final order. Only when nothing is
+  // cached do we fall back to the bundled seed.
+  const [stories, setStories] = useState<CMSReligiousStory[]>(() => {
+    const cached = getCachedContent<ReligiousStoriesContent>('religious_stories');
+    if (cached?.stories?.length) {
+      return normalizeReligiousStoriesForDisplay(cached.stories);
+    }
+    return [...BUNDLED_RELIGIOUS_SEED].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [hasCachedStories, setHasCachedStories] = useState(BUNDLED_RELIGIOUS_SEED.length > 0);
+  const [hasCachedStories, setHasCachedStories] = useState(() => stories.length > 0);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -604,7 +628,10 @@ export function useReligiousStoriesContentStatus(): {
       if (cached?.stories?.length) {
         currentVersion = getVersion(cached);
         const normalized = normalizeStories(cached.stories);
-        setStories(normalized);
+        // The synchronous useState initializer may have already produced this
+        // exact order from the warm memory cache; skip the redundant set so we
+        // don't trigger a needless re-render on mount.
+        setStories((prev) => (sameStoryOrder(prev, normalized) ? prev : normalized));
         setHasCachedStories(normalized.length > 0);
 
         if (cached.updateMode === 'interval' && (cached.refreshIntervalMinutes ?? 0) > 0) {

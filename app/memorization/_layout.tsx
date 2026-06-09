@@ -11,6 +11,7 @@ export default function MemorizationLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="new" />
+      <Stack.Screen name="edit" />
       <Stack.Screen name="learn" />
       <Stack.Screen name="hide" />
       <Stack.Screen name="test" />

@@ -96,7 +96,14 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
             source={iconSource || require('@/assets/images/icons/icon.png')}
             style={styles.logo}
           />
-          <Text style={styles.appName}>{t('common.appName')}</Text>
+          <Text
+            style={styles.appName}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            {t('common.appName')}
+          </Text>
         </View>
       </View>
 

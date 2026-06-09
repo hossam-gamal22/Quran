@@ -23,6 +23,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
@@ -351,7 +352,7 @@ export default function QuoteOfDayScreen() {
     const evidenceLine = quote.evidenceArabic ? `\n${quote.evidenceArabic}` : '';
     const sourceLine = quote.source ? `${t('azkar.source')}: ${quote.source}\n` : '';
     await Share.share({
-      message: `${quote.arabic}\n${evidenceLine}\n\n${quote.translation}\n\n${authorLine}\n${sourceLine}\n${t('common.fromApp')}`,
+      message: buildShareText(`${quote.arabic}\n${evidenceLine}\n\n${quote.translation}\n\n${authorLine}\n${sourceLine}`),
     });
   }, [quote]);
 

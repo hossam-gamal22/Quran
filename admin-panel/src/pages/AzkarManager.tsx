@@ -11,6 +11,10 @@ import { db, storage } from '../firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { bumpContentVersion } from '../utils/content-version';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+// Canonical adhkar dataset — imported from the SAME file the mobile app ships
+// (`data/json/azkar.json`). Using the bundled file (not an external GitHub URL)
+// guarantees the admin panel and the app can never drift apart.
+import bundledAzkar from '@app-data/json/azkar.json';
 
 // ========================================
 // الأنواع
@@ -119,8 +123,8 @@ const SUBCATEGORIES: Record<string, { id: string; name: string }[]> = {
 const STORAGE_AUDIO_PATH = 'adhkar-audio';
 const MAX_AUDIO_SIZE_MB = 15;
 
-// ✅ استخدام raw.githubusercontent لتجنب مشكلة jsDelivr cache
-const AZKAR_JSON_URL = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/json/azkar.json';
+// المصدر الأساسي للأذكار = نفس ملف التطبيق المضمّن (data/json/azkar.json).
+// لم نعد نسحب من رابط GitHub خارجي حتى لا تختلف بيانات الأدمن عن التطبيق.
 
 const getZikrSortOrder = (zikr: Zikr): number => {
   const sortOrder = Number(zikr.sortOrder);
@@ -175,7 +179,7 @@ const AzkarManager: React.FC = () => {
   const [editingZikr, setEditingZikr] = useState<Zikr | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [dataSource, setDataSource] = useState<'github' | 'firestore'>('github');
+  const [dataSource, setDataSource] = useState<'bundled' | 'firestore'>('bundled');
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [activeTab, setActiveTab] = useState<'list' | 'audio'>('list');
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
@@ -220,8 +224,8 @@ const AzkarManager: React.FC = () => {
 
   useEffect(() => {
     // On mount, prefer Firestore (source of truth for the live app).
-    // Falls back to GitHub JSON only if Firestore is empty (first-time bootstrap).
-    loadFromFirestoreOrGithub();
+    // Falls back to the bundled app JSON only if Firestore is empty (first-time bootstrap).
+    loadFromFirestoreOrBundle();
     // Initial load only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -252,39 +256,27 @@ const AzkarManager: React.FC = () => {
     setFilteredList(filtered);
   };
 
-  const loadAzkarFromGitHub = async () => {
+  const loadBundledAzkar = () => {
     setLoading(true);
 
     try {
-      // إضافة timestamp لتجنب الـ cache
-      const url = `${AZKAR_JSON_URL}?t=${Date.now()}`;
-
-      const response = await fetch(url, {
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Support both shapes: a bare array OR { azkar: [...] }
+      // نفس الملف الذي يشحنه التطبيق (data/json/azkar.json) — لا اتصال بالشبكة.
+      // يدعم الشكلين: مصفوفة مجردة أو { azkar: [...] }
+      const data = bundledAzkar as unknown;
       const list: Zikr[] = Array.isArray(data)
         ? (data as Zikr[])
-        : (data?.azkar || []);
+        : ((data as { azkar?: Zikr[] })?.azkar || []);
       const sortedList = sortAzkarList(list);
 
       setAzkarData({
-        version: (data?.version as string) || '2.0',
-        lastUpdate: (data?.lastUpdate as string) || new Date().toISOString().split('T')[0],
+        version: (Array.isArray(data) ? undefined : (data as { version?: string })?.version) || '2.0',
+        lastUpdate: new Date().toISOString().split('T')[0],
         totalCount: sortedList.length,
         azkar: sortedList,
       });
       setAzkarList(sortedList);
-      setDataSource('github');
-      showNotification(`✅ تم تحميل ${sortedList.length} ذكر بنجاح`, 'success');
+      setDataSource('bundled');
+      showNotification(`✅ تم تحميل ${sortedList.length} ذكر من نسخة التطبيق`, 'success');
 
     } catch (error) {
       console.error('Error loading azkar:', error);
@@ -296,10 +288,10 @@ const AzkarManager: React.FC = () => {
 
   /**
    * Load from Firestore (source of truth used by the mobile app). If Firestore
-   * is empty (first-time bootstrap), fall back to the bundled GitHub JSON so
-   * the admin can then click "رفع إلى Firestore" to seed it.
+   * is empty (first-time bootstrap), fall back to the bundled app JSON so the
+   * admin can then click "رفع إلى Firestore" to seed it.
    */
-  const loadFromFirestoreOrGithub = async () => {
+  const loadFromFirestoreOrBundle = async () => {
     setLoading(true);
     try {
       const snap = await getDocs(collection(db, 'azkar'));
@@ -319,11 +311,11 @@ const AzkarManager: React.FC = () => {
         return;
       }
     } catch (e) {
-      console.warn('Firestore load failed, falling back to GitHub:', e);
+      console.warn('Firestore load failed, falling back to bundled app JSON:', e);
     }
     setLoading(false);
-    // Firestore empty or unreachable — load bundled JSON
-    await loadAzkarFromGitHub();
+    // Firestore empty or unreachable — load the bundled app JSON
+    loadBundledAzkar();
   };
 
   // ========================================
@@ -597,12 +589,12 @@ const AzkarManager: React.FC = () => {
   const syncToFirestore = async () => {
     if (!azkarList.length) return;
     // EXTRA SAFETY: this is a destructive bulk-overwrite. Block it when the
-    // current data came from GitHub — otherwise it would wipe per-zikr edits
-    // that admins have saved directly to Firestore.
-    if (dataSource === 'github') {
+    // current data came from the bundled app JSON — otherwise it would wipe
+    // per-zikr edits that admins have saved directly to Firestore.
+    if (dataSource === 'bundled') {
       const confirmed = confirm(
         '⚠️ تحذير خطير:\n\n' +
-        'البيانات الحالية محملة من GitHub (النسخة الأصلية).\n' +
+        'البيانات الحالية محملة من نسخة التطبيق (النسخة الأصلية).\n' +
         'الرفع الآن سيمسح كل التعديلات المحفوظة في Firestore (النصوص، الأصوات، الترجمات).\n\n' +
         'هل أنت متأكد؟ العملية لا يمكن التراجع عنها.',
       );
@@ -833,7 +825,7 @@ const AzkarManager: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">إدارة الأذكار والأدعية</h1>
           <p className="text-slate-400 text-sm mt-1">
             {azkarData && (
-              <span>الإصدار: {azkarData.version} | آخر تحديث: {azkarData.lastUpdate} | المصدر: {dataSource === 'firestore' ? 'Firestore' : 'GitHub'}</span>
+              <span>الإصدار: {azkarData.version} | آخر تحديث: {azkarData.lastUpdate} | المصدر: {dataSource === 'firestore' ? 'Firestore' : 'نسخة التطبيق'}</span>
             )}
           </p>
         </div>
@@ -862,7 +854,7 @@ const AzkarManager: React.FC = () => {
             تحميل من Firestore
           </button>
           <button
-            onClick={loadFromFirestoreOrGithub}
+            onClick={loadFromFirestoreOrBundle}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-accent-dark hover:bg-accent-dark text-white rounded-xl disabled:opacity-50 transition-colors"
           >
@@ -1218,7 +1210,7 @@ const AzkarManager: React.FC = () => {
             {azkarList.length === 0 ? 'لا توجد أذكار' : 'لا توجد نتائج'}
           </p>
           <button
-            onClick={loadAzkarFromGitHub}
+            onClick={loadBundledAzkar}
             className="px-6 py-3 bg-accent hover:bg-accent-dark text-white rounded-xl transition-colors"
           >
             إعادة التحميل

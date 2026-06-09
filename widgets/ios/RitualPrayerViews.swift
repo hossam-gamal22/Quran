@@ -54,6 +54,16 @@ private func ritualDefaultDhuhrArabic() -> String {
     Calendar(identifier: .gregorian).component(.weekday, from: Date()) == 6 ? "صلاة الجمعة" : "الظهر"
 }
 
+/// Force a Dhuhr row/name to «صلاة الجمعة» on Fridays, regardless of the
+/// (possibly stale, app-written) name carried in the entry data. Mirrors the
+/// Android headless Jumuah relabel so the prayer list reads Jumuah for ALL of
+/// Friday — not only while Dhuhr is the next prayer.
+private func ritualFridayName(_ ar: String, on date: Date) -> String {
+    let isFriday = Calendar(identifier: .gregorian).component(.weekday, from: date) == 6
+    if isFriday && (ar == "الظهر" || ar == "صلاة الجمعة") { return "صلاة الجمعة" }
+    return ar
+}
+
 private func ritualGlyph(_ key: String) -> String {
     switch key.lowercased() {
     case let k where k.contains("fajr"): return "sunrise.fill"
@@ -113,7 +123,7 @@ struct RitualPrayerPair: View {
                         .font(.custom("DecoTypeThuluth2", size: 32))
                         .foregroundColor(.white)
                     Text(countdown)
-                        .font(.custom("Rubik-Regular", size: 13))
+                        .font(.custom("Rubik-Bold", size: 15))
                         .foregroundColor(.white.opacity(0.7))
                 }
                 Spacer()
@@ -153,8 +163,9 @@ struct RitualPrayerTable: View {
         GlassCard {
             HStack(alignment: .center, spacing: 4) {
                 ForEach(items) { p in
+                    let arName = ritualFridayName(p.nameAr, on: entry.date)
                     VStack(spacing: 4) {
-                        Text(isArabic ? p.nameAr : ritualLabel(p.nameAr, isArabic: false))
+                        Text(isArabic ? arName : ritualLabel(arName, isArabic: false))
                             .font(.custom("DecoTypeThuluth2", size: 13))
                             .foregroundColor(p.isPassed ? .white.opacity(0.5) : .white)
                         Text(p.time)
@@ -236,7 +247,7 @@ struct RitualPrayerCompact: View {
                     .font(.custom("DecoTypeThuluth2", size: 30))
                     .foregroundColor(.white)
                 Text(countdown)
-                    .font(.custom("Rubik-Regular", size: 12))
+                    .font(.custom("Rubik-Bold", size: 14))
                     .foregroundColor(.white.opacity(0.7))
             }
             .padding(14)
@@ -269,7 +280,7 @@ struct RitualPrayerSimple: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(countdown)
-                    .font(.custom("Rubik-Regular", size: 12))
+                    .font(.custom("Rubik-Bold", size: 14))
                     .foregroundColor(.white.opacity(0.7))
             }
             .padding(14)
@@ -329,16 +340,17 @@ struct RitualPrayerSerene: View {
             GlassCard {
                 VStack(spacing: 1) {
                     ForEach(items) { p in
+                        let arName = ritualFridayName(p.nameAr, on: entry.date)
                         HStack {
                             HStack(spacing: 8) {
                                 Image(systemName: ritualGlyph(p.name))
                                     .font(.system(size: 12))
                                     .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white)
-                                Text(isArabic ? p.nameAr : ritualLabel(p.nameAr, isArabic: false))
+                                Text(isArabic ? arName : ritualLabel(arName, isArabic: false))
                                     .font(.custom("DecoTypeThuluth2", size: 14))
                                     .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white)
                                 if !isArabic {
-                                    Text(p.nameAr)
+                                    Text(arName)
                                         .font(.custom("DecoTypeThuluth2", size: 11))
                                         .foregroundColor(p.isPassed && !p.isNext ? .white.opacity(0.4) : .white.opacity(0.7))
                                 }

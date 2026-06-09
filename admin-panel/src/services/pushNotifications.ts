@@ -1307,6 +1307,37 @@ const PRIZE_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
 };
 
 /**
+ * ترجمات إشعار تحديث طريقة حساب النقاط (تغيّر الأوزان)
+ */
+const REWARDS_WEIGHTS_UPDATE_TRANSLATIONS: NotificationTranslations = {
+  ar: { title: 'تم تحديث نظام النقاط 🏆', body: 'تم تعديل طريقة حساب النقاط. افتح لوحة الشرف لمراجعة نقاطك وترتيبك الجديد.' },
+  en: { title: 'Points system updated 🏆', body: 'The way points are calculated has changed. Open the honor board to review your new score and rank.' },
+  fr: { title: 'Système de points mis à jour 🏆', body: 'Le calcul des points a changé. Ouvrez le tableau d\'honneur pour voir votre nouveau score et classement.' },
+  de: { title: 'Punktesystem aktualisiert 🏆', body: 'Die Punkteberechnung wurde geändert. Öffne die Ehrentafel, um deinen neuen Punktestand und Rang zu sehen.' },
+  es: { title: 'Sistema de puntos actualizado 🏆', body: 'La forma de calcular los puntos cambió. Abre el tablero de honor para ver tu nueva puntuación y posición.' },
+  tr: { title: 'Puan sistemi güncellendi 🏆', body: 'Puan hesaplama yöntemi değişti. Yeni puanınızı ve sıralamanızı görmek için onur tablosunu açın.' },
+  ur: { title: 'پوائنٹس سسٹم اپ ڈیٹ ہو گیا 🏆', body: 'پوائنٹس کے حساب کا طریقہ تبدیل ہو گیا ہے۔ اپنا نیا اسکور اور درجہ دیکھنے کے لیے آنر بورڈ کھولیں۔' },
+  id: { title: 'Sistem poin diperbarui 🏆', body: 'Cara perhitungan poin telah berubah. Buka papan kehormatan untuk melihat skor dan peringkat baru Anda.' },
+  ms: { title: 'Sistem mata dikemas kini 🏆', body: 'Cara pengiraan mata telah berubah. Buka papan kehormat untuk melihat skor dan kedudukan baharu anda.' },
+  hi: { title: 'पॉइंट सिस्टम अपडेट हुआ 🏆', body: 'अंक गणना का तरीका बदल गया है। अपना नया स्कोर और रैंक देखने के लिए ऑनर बोर्ड खोलें।' },
+  bn: { title: 'পয়েন্ট সিস্টেম আপডেট হয়েছে 🏆', body: 'পয়েন্ট গণনার পদ্ধতি পরিবর্তন হয়েছে। আপনার নতুন স্কোর ও র‍্যাঙ্ক দেখতে অনার বোর্ড খুলুন।' },
+  ru: { title: 'Система баллов обновлена 🏆', body: 'Способ расчёта баллов изменился. Откройте доску почёта, чтобы увидеть свой новый счёт и место.' },
+};
+
+/**
+ * إرسال إشعار لجميع المستخدمين بأن أوزان النقاط تغيّرت، يدعوهم لمراجعة
+ * لوحة الشرف. يُستخدم يدوياً من صفحة المكافآت بعد تعديل الأوزان.
+ */
+export const sendRewardsWeightsUpdateNotification = async (): Promise<SendResult> => {
+  return sendPushNotification({
+    translations: REWARDS_WEIGHTS_UPDATE_TRANSLATIONS,
+    targetAudience: 'all',
+    actionType: 'screen',
+    actionUrl: '/honor-board',
+  });
+};
+
+/**
  * إرسال إشعار للفائزين بالجائزة الشهرية
  */
 export const sendPrizeNotification = async (

@@ -470,3 +470,25 @@ export const ISLAMIC_PATTERN_OPACITY = {
   light: 0.08,
   dark: 0.12,
 };
+
+// ============================================
+// Card shadow tokens
+// ============================================
+// Soft shadow for translucent / glass cards. iOS-only on purpose: applying Android
+// `elevation` to a view that has a semi-transparent backgroundColor makes Android draw
+// a rounded-rect shadow shape that bleeds *through* the translucent body — the
+// "inner square" artifact (visible e.g. on selected prayer tiles in dark mode). iOS
+// ignores `elevation` and renders these shadow* props cleanly, so for glass cards the
+// shadow must stay iOS-only.
+//
+// Opaque elements (FABs, solid buttons, opaque cards) that legitimately need a real
+// Android shadow should keep their own `elevation` instead of using this token.
+export const softCardShadow = Platform.select({
+  ios: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+  },
+  default: {},
+}) as object;

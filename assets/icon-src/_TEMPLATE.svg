@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RUH AL-MUSLIM : MASTER APP-ICON TEMPLATE (1024 x 1024)
+  ===========================================================================
+  This file is the design reference for EVERY app icon (default + seasonal).
+  Open it in Figma / Illustrator / Inkscape, place your artwork on the
+  "ARTWORK" layer, then export a 1024x1024 PNG named after the icon key
+  (e.g. hajj.png) into THIS folder (assets/icon-src/). Then run:
+
+      pnpm icons:build   then   npx expo prebuild (clean)
+
+  SAFE-ZONE RULES (why the guides exist):
+    Canvas (1024)        : full bleed. Background colour only. Will be cropped.
+    72dp mask (682)      : visible on most launcher masks. Secondary art only.
+    66dp SAFE circle(624): ALL critical content (logo, key glyphs) MUST stay
+                           inside this circle. Anything outside may be cut on
+                           circle / squircle / rounded launchers.
+  The guide layer (id="GUIDES") is for design only. Hide or delete it before
+  exporting the final PNG (or just paint your full-bleed background over it).
+  ===========================================================================
+-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ===== BACKGROUND LAYER (full bleed, croppable) ===== -->
+  <g id="BACKGROUND">
+    <rect x="0" y="0" width="1024" height="1024" fill="#11161c"/>
+  </g>
+
+  <!-- ===== ARTWORK LAYER (place your logo/scene here, inside the safe circle) ===== -->
+  <g id="ARTWORK">
+    <!-- Replace this placeholder with your real artwork -->
+  </g>
+
+  <!-- ===== GUIDES (design-time only — remove before export) ===== -->
+  <g id="GUIDES" fill="none" stroke-dasharray="14 10">
+    <!-- canvas edge -->
+    <rect x="2" y="2" width="1020" height="1020" stroke="#ff5252" stroke-width="3"/>
+    <!-- 72dp visible mask square (682) -->
+    <rect x="171" y="171" width="682" height="682" rx="120" stroke="#ffb300" stroke-width="3"/>
+    <!-- 66dp SAFE content circle (624) -->
+    <circle cx="512" cy="512" r="312" stroke="#4caf50" stroke-width="4"/>
+    <!-- center crosshair -->
+    <g stroke="#4caf50" stroke-width="2" stroke-dasharray="0">
+      <line x1="512" y1="180" x2="512" y2="844"/>
+      <line x1="180" y1="512" x2="844" y2="512"/>
+    </g>
+    <text x="512" y="900" fill="#4caf50" font-family="sans-serif" font-size="34"
+          font-weight="700" text-anchor="middle" stroke="none">
+      KEEP CONTENT INSIDE GREEN CIRCLE
+    </text>
+  </g>
+</svg>

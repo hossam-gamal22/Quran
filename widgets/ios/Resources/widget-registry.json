@@ -250,9 +250,9 @@
       "ios",
       "android"
     ],
-    "isPremium": true,
-    "forcedLanguage": null,
-    "deepLink": "rooh-almuslim://daily-ayah",
+    "isPremium": false,
+    "forcedLanguage": "ar",
+    "deepLink": "rooh-almuslim://quran",
     "iosKind": "verseOfDay",
     "androidProvider": "RoohQuranSmall",
     "legacyAndroidProvider": "DailyVerseSmall"
@@ -270,7 +270,7 @@
       "android"
     ],
     "isPremium": true,
-    "forcedLanguage": null,
+    "forcedLanguage": "ar",
     "deepLink": "rooh-almuslim://azkar/morning",
     "iosKind": "azkarMorning",
     "androidProvider": "RoohAzkarSmall",
@@ -289,7 +289,7 @@
       "android"
     ],
     "isPremium": true,
-    "forcedLanguage": null,
+    "forcedLanguage": "ar",
     "deepLink": "rooh-almuslim://azkar/evening",
     "iosKind": "azkarEvening",
     "androidProvider": "RoohAzkarSmall",
@@ -308,7 +308,7 @@
       "android"
     ],
     "isPremium": true,
-    "forcedLanguage": null,
+    "forcedLanguage": "ar",
     "deepLink": "rooh-almuslim://daily-dhikr",
     "iosKind": "dailyDhikr",
     "androidProvider": "RoohAzkarSmall",

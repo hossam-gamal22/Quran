@@ -78,6 +78,7 @@ import { hydrateFontSettings } from '@/hooks/use-font-config';
 import { hydrateDailyDuasFromFirestore } from '@/data/daily-duas';
 import { hydrateFamousDuasFromFirestore } from '@/data/famous-duas';
 import { hydrateStoriesFromFirestore } from '@/data/stories';
+import { warmReligiousStoriesCache } from '@/lib/content-api';
 import { initRemoteTranslations } from '@/lib/remote-translations';
 import { fontRegular } from '@/lib/fonts';
 import { toWesternDigits } from '@/lib/format-number';
@@ -149,6 +150,12 @@ LogBox.ignoreLogs([
   // Fixed by experimentalForceLongPolling in config/firebase.ts; kept here as
   // a safety net for any remaining edge cases during network transitions.
   'FIRESTORE (10',
+  // Benign Firestore connectivity logs emitted by the SDK's own logger (not via
+  // our try/catch). Firestore auto-retries and the app serves cached config, so
+  // these should not pop the red LogBox overlay. See lib/firestore-error.ts.
+  'Firestore (10',
+  'Could not reach Cloud Firestore backend',
+  'client is offline',
   'INTERNAL ASSERTION FAILED',
   'expo-notifications: Android Push notifications',
   'Failed to initialize IAP',
@@ -646,6 +653,13 @@ async function restoreFullCloudBackupIfFreshInstall() {
   }
 }
 
+// Throttle for the foreground-resume seasonal-icon re-sync. Re-resolving the
+// icon on every resume would be wasteful; once per ~30 min is enough to catch a
+// season boundary (e.g. Dhul-Hijjah day 9 → day 10 at local midnight) crossed
+// while the app was backgrounded, without a cold start or the 6h background task.
+let lastIconResumeSyncMs = 0;
+const ICON_RESUME_SYNC_THROTTLE_MS = 30 * 60 * 1000;
+
 export default function RootLayout() {
   const pathname = usePathname();
   const router = useRouter();
@@ -1043,6 +1057,15 @@ export default function RootLayout() {
 
     initFirebase();
 
+    // Warm the religious-stories memory cache from AsyncStorage early so the
+    // قصص دينية screen can hydrate its list synchronously on first paint
+    // (settled order, no flicker). Local read only; onSnapshot keeps it fresh.
+    initWithTimeout(
+      () => warmReligiousStoriesCache().then(() => {}),
+      'Religious stories cache warm',
+      4000
+    );
+
     // B3: hydrate adhkar from Firestore admin overrides (background, with cache)
     initWithTimeout(
       () => hydrateAzkarFromFirestore(),
@@ -1166,19 +1189,20 @@ export default function RootLayout() {
       );
     }
 
-    // Sync app icon to match saved language/season on launch.
-    // SeasonalProvider refreshes this later with authoritative Hijri data.
+    // Sync app icon to match saved language/season on launch, THEN check for an
+    // admin-pushed announcement. These must run in order: the sync applies (and,
+    // on iOS, verifies) the icon, and checkForIconUpdate — the sole owner of the
+    // version key — only announces when that icon verifiably landed. Running them
+    // concurrently used to race on the version key and produced false/duplicate
+    // "تم تحديث الأيقونة" alerts.
+    // SeasonalProvider refreshes the icon again later with authoritative Hijri data.
     initWithTimeout(
-      () => syncAppIconOnStartup(getLanguage() as any, getLocalCurrentSeason()?.type ?? null),
-      'App icon sync',
-      5000
-    );
-
-    // Check for admin-pushed icon updates and show alert if new version
-    initWithTimeout(
-      () => checkForIconUpdate(),
-      'App icon update check',
-      5000
+      async () => {
+        await syncAppIconOnStartup(getLanguage() as any, getLocalCurrentSeason()?.type ?? null);
+        await checkForIconUpdate();
+      },
+      'App icon sync + update check',
+      8000
     );
 
     // Register the periodic icon-refresh task so seasonal icons still swap
@@ -1234,6 +1258,16 @@ export default function RootLayout() {
         // Force-refresh azkar overrides (admin edits to text/audio/benefit)
         // so changes show without needing to reinstall or wait for cache TTL.
         refreshAzkarFromFirestore().catch((e) => console.warn('⚠️ [AppResume] refreshAzkar:', e?.message));
+        // Re-resolve the seasonal launcher icon on resume (throttled). Closes the
+        // gap where the app sits backgrounded across a season boundary — e.g.
+        // Dhul-Hijjah day 9 → day 10 at local midnight — so the icon flips when
+        // the user returns instead of only on cold start / the 6h background task.
+        // syncAppIconOnStartup no-ops when the icon is already correct.
+        if (Date.now() - lastIconResumeSyncMs > ICON_RESUME_SYNC_THROTTLE_MS) {
+          lastIconResumeSyncMs = Date.now();
+          syncAppIconOnStartup(getLanguage() as any, getLocalCurrentSeason()?.type ?? null)
+            .catch((e) => console.warn('⚠️ [AppResume] syncAppIcon:', e?.message));
+        }
         // Check for a pending deep link from Control Center / Spotlight shortcut
         consumePendingDeepLink(router);
         // Verify prayer notifications exist; if none, force reschedule.

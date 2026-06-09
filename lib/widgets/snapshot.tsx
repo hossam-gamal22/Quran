@@ -152,6 +152,9 @@ export interface SnapshotEntry {
   size: PreviewSize;
   /** Resolved theme variant this PNG renders with. */
   theme: ResolvedWidgetTheme;
+  /** Language this PNG was baked in — stamped into the manifest so the placed
+   *  widget refuses to overlay mismatched-language text on a stale PNG. */
+  language?: 'ar' | 'en';
   /** Stable route key native uses to find this entry in SharedWidgetData.snapshotManifest. */
   routeKey: string;
   /** Versioned/cache-busted PNG basename without `.png`. */
@@ -185,7 +188,23 @@ export interface WidgetSnapshotResult {
  *  partial run (e.g. active theme only) does not short-circuit later passes. */
 // v3: anchors are now FRAME-relative (measureLayout vs root) — bump to force a
 // one-time re-bake so the manifest captures the corrected anchor positions.
-const HASH_KEY_PREFIX = '@widget_snapshot_hash_v3';
+// v4: countdown anchors are now captured with a max-width placeholder (hidden,
+// so the PNG bytes are unchanged and the content hash wouldn't move on its own);
+// bump the prefix to force the manifest + anchors to regenerate so the WIDE
+// countdown rects are recorded (otherwise long "بعد ٦ س ٢٤ د" still clips).
+// v5: small prayer-table header countdown now uses trailing alignment (left for
+// Arabic) so it lines up with the times column — re-capture the anchor.
+// v6: prayer countdowns are now Rubik-Bold + ~2px larger — re-capture so the
+// manifest records the bigger fontSize / bold weight the live overlay draws.
+// v7: countdowns gained a wider «س»↔minute gap (U+2002) — the capture placeholder
+// is wider, so re-capture the anchor boxes to fit the widened live overlay.
+// v8: the gallery prayer PNGs BLANK the hero/next/prev name on Android.
+// v9: the gallery prayer PNGs now also decouple the ACTIVE-ROW HIGHLIGHT and the
+// active row COLORS (chrome-only fallback), drawn live by the home overlay. The
+// PNG bytes change but the content hash inputs don't, so bump the prefix to force
+// a one-time re-bake — otherwise an old PNG keeps a baked highlight that would
+// double with the live one.
+const HASH_KEY_PREFIX = '@widget_snapshot_hash_v9';
 function hashKey(theme: ResolvedWidgetTheme): string { return `${HASH_KEY_PREFIX}:${theme}`; }
 
 /** SHA-1 not available in JS without a dep; we use a fast non-crypto hash. */
@@ -226,6 +245,7 @@ export function computeSnapshotHash(input: SnapshotInput, theme?: ResolvedWidget
     `dh=${input.dhikrSignature}`,
     `az=${input.azkarSignature}`,
   ];
+  if (input.sharedData?.use24Hour != null) parts.push(`h24=${input.sharedData.use24Hour ? 1 : 0}`);
   if (input.snapshotVersion != null) parts.push(`sv=${input.snapshotVersion}`);
   if (input.refreshProofMarker) parts.push(`proof=${input.refreshProofMarker}`);
   if (theme) parts.push(`t=${theme}`);
@@ -296,6 +316,11 @@ interface OffscreenSlotProps {
   /** Slot key used by the anchor collector so reports are routed to the
    *  correct buffer (slot keys are unique per (id, size, theme) mount). */
   slotKey: string;
+  /** True only for the gallery-snapshot pump so the prayer NAME + active-row
+   *  highlight + active colors are decoupled from the Android bake (gallery PNG =
+   *  clean chrome fallback that draws those live). Per-state template bakes leave
+   *  this false → name + highlight + colors stay baked. */
+  blankPrayerState?: boolean;
 }
 
 /**
@@ -307,7 +332,7 @@ interface OffscreenSlotProps {
  * `forSnapshot={true}` is passed through so previews with a live overlay omit
  * the countdown region (C2).
  */
-function OffscreenSlot({ def, size, language, theme, sharedData, innerRef, slotKey }: OffscreenSlotProps) {
+function OffscreenSlot({ def, size, language, theme, sharedData, innerRef, slotKey, blankPrayerState }: OffscreenSlotProps) {
   const dims = getSizeDims(size);
   const Preview = def.Preview as React.FC<{
     size: PreviewSize;
@@ -316,8 +341,8 @@ function OffscreenSlot({ def, size, language, theme, sharedData, innerRef, slotK
   }>;
   const lang: 'ar' | 'en' = (def.forcedLanguage ?? language) as 'ar' | 'en';
   const captureValue = React.useMemo(
-    () => ({ capturing: true, registerAnchor: getAnchorRegistrar(slotKey), rootRef: innerRef }),
-    [slotKey, innerRef],
+    () => ({ capturing: true, registerAnchor: getAnchorRegistrar(slotKey), rootRef: innerRef, blankPrayerState: !!blankPrayerState }),
+    [slotKey, innerRef, blankPrayerState],
   );
   return (
     <WidgetSnapshotCaptureContext.Provider value={captureValue}>
@@ -357,6 +382,8 @@ type SlotMap = Record<
     language: 'ar' | 'en';
     theme: ResolvedWidgetTheme;
     sharedData?: SharedWidgetData;
+    /** Gallery pump only — see OffscreenSlotProps.blankPrayerState. */
+    blankPrayerState?: boolean;
   }
 >;
 
@@ -416,6 +443,7 @@ export function SnapshotHost() {
           language={slot.language}
           theme={slot.theme}
           sharedData={slot.sharedData}
+          blankPrayerState={slot.blankPrayerState}
           innerRef={getOrCreateRef(key)}
         />
       ))}
@@ -675,7 +703,11 @@ async function runSnapshotPass(
         const key = `${def.id}_${size}_${theme}`;
         const routeKey = snapshotRouteKey(def.id, size, theme);
         if (includeRouteKeys && !includeRouteKeys.has(routeKey)) continue;
-        const slot = { def, size, language, theme, sharedData: input.sharedData };
+        // Gallery pump: decouple all prayer STATE visuals (name + active-row
+        // highlight + active colors) from this PNG on Android, so the home
+        // fallback (used when a per-state template is missing) is a clean chrome
+        // canvas that draws those live. Per-state template bakes do NOT set this.
+        const slot = { def, size, language, theme, sharedData: input.sharedData, blankPrayerState: true };
 
         // Mount this single slot — wait for setState + layout + font application.
         // 250 ms gives Android time to apply custom widget fonts before capture;
@@ -723,6 +755,9 @@ async function runSnapshotPass(
                 id: slot.def.id,
                 size: slot.size,
                 theme: slot.theme,
+                // Stamp the baked language so the placed widget never overlays
+                // mismatched-language text on a stale other-language PNG.
+                language: slot.language,
                 routeKey,
                 key: name,
                 hash: entryHash,
@@ -1066,31 +1101,51 @@ export async function snapshotInventory(): Promise<SnapshotInventoryEntry[]> {
 // which converts the flat PNGs into proper iOS Asset Catalog imagesets.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PrayerStateKey = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+export type PrayerStateKey = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' | 'jumuah';
+// Real prayer states baked for the normal day. 'jumuah' is NOT here — it is a
+// Friday-only name variant of `dhuhr` appended separately (see JUMUAH_BAKE_SPECS).
 export const PRAYER_STATE_KEYS: ReadonlyArray<PrayerStateKey> = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
 const PRAYER_NAME_AR: Record<PrayerStateKey, string> = {
   fajr: 'الفجر', sunrise: 'الشروق', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء',
+  // Widget Friday label is the single word «الجمعة» (replaces «الظهر»), per spec.
+  jumuah: 'الجمعة',
 };
 const PRAYER_NAME_EN: Record<PrayerStateKey, string> = {
   fajr: 'Fajr', sunrise: 'Sunrise', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha',
+  jumuah: 'Jumuah',
 };
 const isFriday = (date: Date) => date.getDay() === 5;
 const prayerNameAr = (key: PrayerStateKey, date: Date) =>
-  key === 'dhuhr' && isFriday(date) ? 'صلاة الجمعة' : PRAYER_NAME_AR[key];
+  key === 'dhuhr' && isFriday(date) ? 'الجمعة' : PRAYER_NAME_AR[key];
 const prayerNameEn = (key: PrayerStateKey, date: Date) =>
   key === 'dhuhr' && isFriday(date) ? 'Jumuah' : PRAYER_NAME_EN[key];
 /** Canonical 6-prayer schedule used by the bake fixture. Times are illustrative
  *  only — they're rendered with `opacity: 0` (transparent placeholder) because
  *  the home-screen overlay draws the user's actual time on top. */
 const BAKE_TIMES: Record<PrayerStateKey, string> = {
-  fajr: '04:14', sunrise: '05:35', dhuhr: '12:17', asr: '15:33', maghrib: '18:42', isha: '20:19',
+  fajr: '04:14', sunrise: '05:35', dhuhr: '12:17', asr: '15:33', maghrib: '18:42', isha: '20:19', jumuah: '12:17',
 };
 // v4: prayer previews now wrap the small/large/single time, name and countdown
 // in AnchorReporter (was plain Text/placeholder), so the chrome layout shifted
 // slightly — re-bake the static templates so their blank slots line up with the
 // new captured anchor positions the live overlay draws into.
-const ANDROID_PRAYER_TEMPLATE_SCHEMA = 4;
+// v6: bump to force a re-bake back to the right/left-aligned hero layout after a
+// reverted centering experiment (v5) left centered PNGs cached on devices.
+// v7: large prayer tile now uses iOS hero/row metrics (bigger icon 32, padding
+// 14, name 22, time 36, countdown 12, row font 15, row pad 6) to match the iOS
+// reference exactly — re-bake so the chrome + captured anchors reflect it.
+// v8: fix captured anchor alignment so the live overlay matches the gallery —
+// prayer-row TIMES use trailing (left for Arabic, inside their box) and the
+// large hero COUNTDOWN uses leading (right edge pinned to the hero, no drift).
+// v9: hero TIME now leading (right-aligned to the name) and the countdown rects
+// are captured with a max-width placeholder so long "بعد ٧ س ٤٠ د" values no
+// longer clip — re-bake so the wider rects + new time anchor are recorded.
+// v11 (schema): bake set now includes the always-present Friday "Jumuah" variants
+// (prayerSingle/Table `_jumuah`, prayerNextPrevious `_sunrise_jumuah` / `_jumuah_asr`),
+// and regular fixtures use a FIXED non-Friday name date (so a Friday bake can no
+// longer poison the normal Dhuhr template). Re-bake the whole matrix.
+const ANDROID_PRAYER_TEMPLATE_SCHEMA = 12;
 const ANDROID_PRAYER_TEMPLATE_HASH_KEY = '@widget_android_prayer_template_hash_v1';
 const ANDROID_PRAYER_TEMPLATE_DIR = `${FileSystem.documentDirectory}prayer-static/`;
 const androidPrayerTemplatePromises = new Map<string, Promise<{ generated: number; skipped: boolean; errors: string[] }>>();
@@ -1121,10 +1176,25 @@ type AndroidPrayerStaticRequest = {
 /** Build a `SharedWidgetData` fixture that asserts `nextState` is the next
  *  prayer (highlighted, hero-baked). `previousState` is the one immediately
  *  before in the prayer order, used by the next/prev widget. */
-function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateKey): SharedWidgetData {
+// Fixed reference dates for NAME computation so baked templates are weekday-STABLE
+// regardless of the actual bake day. Only Dhuhr's name is weekday-dependent
+// (Friday → "صلاة الجمعة"): the regular bake forces a non-Friday so a Friday bake
+// never poisons the normal Dhuhr template ("الظهر"), and the jumuah variant forces
+// a Friday so it's always "صلاة الجمعة". Epoch offsets stay relative to `now`.
+const NAME_DATE_NON_FRIDAY = new Date(2025, 0, 4); // Saturday
+const NAME_DATE_FRIDAY = new Date(2025, 0, 3);     // Friday
+
+function buildBakeFixture(
+  nextState: PrayerStateKey,
+  previousState: PrayerStateKey,
+  opts?: { jumuah?: boolean },
+): SharedWidgetData {
   const order = PRAYER_STATE_KEYS;
   const nowMs = Date.now();
   const targetIdx = order.indexOf(nextState);
+  // Friday variant → Dhuhr renders "صلاة الجمعة" everywhere (hero + row); regular
+  // → always "الظهر". Names use this fixed date; epochs/timing use `now`.
+  const nameRef = opts?.jumuah ? NAME_DATE_FRIDAY : NAME_DATE_NON_FRIDAY;
   // Build a synthetic timeline where:
   //   • every prayer with index < targetIdx has epoch in the PAST
   //   • nextState (targetIdx) has epoch in the FUTURE
@@ -1137,8 +1207,8 @@ function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateK
     const offsetMin = (i - targetIdx) * 90 + 30;  // nextState → +30 min, prior → negative
     const prayerDate = new Date(nowMs + offsetMin * 60 * 1000);
     return {
-      name: prayerNameEn(k, prayerDate),
-      nameAr: prayerNameAr(k, prayerDate),
+      name: prayerNameEn(k, nameRef),
+      nameAr: prayerNameAr(k, nameRef),
       time: BAKE_TIMES[k],
       epochMs: prayerDate.getTime(),
       isPassed: i < targetIdx,
@@ -1148,12 +1218,12 @@ function buildBakeFixture(nextState: PrayerStateKey, previousState: PrayerStateK
   return {
     prayer: {
       nextPrayer: nextState,
-      nextPrayerName: prayerNameEn(nextState, new Date(nowMs + 30 * 60 * 1000)),
-      nextPrayerNameAr: prayerNameAr(nextState, new Date(nowMs + 30 * 60 * 1000)),
+      nextPrayerName: prayerNameEn(nextState, nameRef),
+      nextPrayerNameAr: prayerNameAr(nextState, nameRef),
       nextPrayerTime: BAKE_TIMES[nextState],
       nextPrayerAtEpochMs: nowMs + 30 * 60 * 1000,
-      previousPrayerName: prayerNameEn(previousState, new Date(nowMs - 90 * 60 * 1000)),
-      previousPrayerNameAr: prayerNameAr(previousState, new Date(nowMs - 90 * 60 * 1000)),
+      previousPrayerName: prayerNameEn(previousState, nameRef),
+      previousPrayerNameAr: prayerNameAr(previousState, nameRef),
       previousPrayerAtEpochMs: nowMs - 90 * 60 * 1000,
       timeRemaining: '30:00',
       timeRemainingMinutes: 30,
@@ -1177,10 +1247,48 @@ function defaultPreviousFor(next: PrayerStateKey): PrayerStateKey {
     case 'fajr':    return 'isha';
     case 'sunrise': return 'fajr';
     case 'dhuhr':   return 'sunrise';
+    case 'jumuah':  return 'sunrise';
     case 'asr':     return 'dhuhr';
     case 'maghrib': return 'asr';
     case 'isha':    return 'maghrib';
   }
+}
+
+/**
+ * Friday "Jumuah" name variants appended to the FULL bake (the no-`active` path)
+ * so a closed-app Friday selects a baked "صلاة الجمعة" template — no live name,
+ * no re-bake (the headless task knows the date and picks the jumuah token).
+ * Each fixture is built with `{ jumuah: true }` so the Dhuhr slot renders
+ * "صلاة الجمعة" (hero + row). Real prayer states (next/prev) drive timing/layout.
+ */
+function jumuahBakeSpecs(defId: string): Array<{ token: string; next: PrayerStateKey; prev: PrayerStateKey }> {
+  if (defId === 'prayerSingle') {
+    // The hero only ever shows the ACTIVE prayer's name, so Jumuah only matters
+    // when Dhuhr is next — one variant is enough.
+    return [{ token: 'jumuah', next: 'dhuhr', prev: 'sunrise' }];
+  }
+  if (defId === 'prayerTable') {
+    // The table shows ALL six rows at every prayer state, so the Dhuhr ROW must
+    // read «صلاة الجمعة» for the WHOLE of Friday — not only while Dhuhr is next.
+    // Bake one Friday variant per highlighted state (each renders every row with
+    // the Friday name date, so the Dhuhr row is always Jumuah). The headless
+    // selector picks `${active}_jumuah` on Fridays (`dhuhr` arrives as `jumuah`).
+    return [
+      { token: 'fajr_jumuah',    next: 'fajr',    prev: defaultPreviousFor('fajr') },
+      { token: 'sunrise_jumuah', next: 'sunrise', prev: defaultPreviousFor('sunrise') },
+      { token: 'jumuah',         next: 'dhuhr',   prev: defaultPreviousFor('dhuhr') },
+      { token: 'asr_jumuah',     next: 'asr',     prev: defaultPreviousFor('asr') },
+      { token: 'maghrib_jumuah', next: 'maghrib', prev: defaultPreviousFor('maghrib') },
+      { token: 'isha_jumuah',    next: 'isha',    prev: defaultPreviousFor('isha') },
+    ];
+  }
+  if (defId === 'prayerNextPrevious') {
+    return [
+      { token: 'sunrise_jumuah', next: 'dhuhr', prev: 'sunrise' }, // next slot = Jumuah (before Dhuhr)
+      { token: 'jumuah_asr', next: 'asr', prev: 'dhuhr' },         // previous slot = Jumuah (after Dhuhr)
+    ];
+  }
+  return [];
 }
 
 /**
@@ -1214,12 +1322,21 @@ export async function ensureAndroidPrayerStaticTemplates(opts: {
         .flatMap((def) => def.sizes.map((size) => ({ def, size })));
   const expected = requested.flatMap(({ def, size, active, previous }) => {
     const states = active ? [active] : PRAYER_STATE_KEYS;
-    return states.map((nextState) => {
+    const base = states.map((nextState) => {
       const prevState = previous ?? defaultPreviousFor(nextState);
       const stateToken = def.id === 'prayerNextPrevious' ? `${prevState}_${nextState}` : nextState;
       return `${def.id}_${size}_${opts.theme}_${opts.language}_${stateToken}`;
     });
+    // Full-bake (no `active`) also produces the Friday Jumuah variants.
+    const jumuah = active
+      ? []
+      : jumuahBakeSpecs(def.id).map((s) => `${def.id}_${size}_${opts.theme}_${opts.language}_${s.token}`);
+    return [...base, ...jumuah];
   });
+  // Bakes are now weekday-STABLE (buildBakeFixture uses a fixed name date per
+  // variant), so no Friday discriminator is needed in the signature: the regular
+  // Dhuhr template is always "الظهر" and the always-present jumuah variant is
+  // always "صلاة الجمعة"; the headless selector picks between them by date.
   const signature = [
     ANDROID_PRAYER_TEMPLATE_SCHEMA,
     WIDGET_REGISTRY_VERSION,
@@ -1248,12 +1365,19 @@ export async function ensureAndroidPrayerStaticTemplates(opts: {
       const errors: string[] = [];
       let generated = 0;
       for (const { def, size, active, previous } of requested) {
-        const states = active ? [active] : PRAYER_STATE_KEYS;
-        for (const nextState of states) {
-          const prevState = previous ?? defaultPreviousFor(nextState);
-          const fixture = buildBakeFixture(nextState, prevState);
-          const stateToken = def.id === 'prayerNextPrevious' ? `${prevState}_${nextState}` : nextState;
-          const assetName = `${def.id}_${size}_${opts.theme}_${opts.language}_${stateToken}`;
+        // Regular per-state entries + (full-bake only) the Friday Jumuah variants.
+        const entries: Array<{ token: string; next: PrayerStateKey; prev: PrayerStateKey; jumuah: boolean }> =
+          (active ? [active] : PRAYER_STATE_KEYS).map((nextState) => {
+            const prevState = previous ?? defaultPreviousFor(nextState);
+            const token = def.id === 'prayerNextPrevious' ? `${prevState}_${nextState}` : nextState;
+            return { token, next: nextState, prev: prevState, jumuah: false };
+          });
+        if (!active) {
+          for (const s of jumuahBakeSpecs(def.id)) entries.push({ token: s.token, next: s.next, prev: s.prev, jumuah: true });
+        }
+        for (const entry of entries) {
+          const fixture = buildBakeFixture(entry.next, entry.prev, { jumuah: entry.jumuah });
+          const assetName = `${def.id}_${size}_${opts.theme}_${opts.language}_${entry.token}`;
           hostSetSlots!({
             [assetName]: { def, size, language: opts.language, theme: opts.theme, sharedData: fixture },
           } as any);
@@ -1285,6 +1409,71 @@ export async function ensureAndroidPrayerStaticTemplates(opts: {
     return await promise;
   } finally {
     androidPrayerTemplatePromises.delete(signature);
+  }
+}
+
+/** Parse the resolved theme baked into a `widgets/` snapshot filename.
+ *  Names look like `${id}_${size}_${theme}` or `${id}_${size}_${theme}_v${ver}`.
+ *  Returns null when no known theme token is present (leave such files alone). */
+function themeOfSnapshotFileKey(keyNoExt: string): ResolvedWidgetTheme | null {
+  for (const t of RESOLVED_WIDGET_THEMES) {
+    if (keyNoExt.endsWith(`_${t}`) || keyNoExt.includes(`_${t}_v`)) return t;
+  }
+  return null;
+}
+
+/**
+ * Single-state disk hygiene (Android only): keep ONLY the active theme's widget
+ * PNGs and the active theme + language prayer-state templates; delete every
+ * other variant.
+ *
+ * This is the core of the "one baked state at a time" model — switching the
+ * widget theme or language regenerates the new state, and this prune removes
+ * the old one so the on-disk widget footprint stays ~1× instead of
+ * 7(themes) × 2(languages). Matching is purely by filename token so it never
+ * depends on the (possibly stale) snapshot manifest.
+ *
+ * iOS deliberately keeps ALL theme PNGs baked: its native "Edit Widget" sheet
+ * exposes a theme picker (RoohTheme AppEnum) that the user can switch while the
+ * app is closed, so every selectable theme's PNG must already exist in the App
+ * Group. iOS stale-version cleanup is handled by `cleanupOldSnapshots()`, not
+ * here — so this function is a no-op off Android.
+ */
+export async function pruneSnapshotsToActiveState(
+  activeTheme: ResolvedWidgetTheme,
+  language: 'ar' | 'en',
+): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  // widgets/ — delete any registry snapshot whose baked theme ≠ activeTheme.
+  try {
+    const dir = `${FileSystem.documentDirectory}widgets/`;
+    const files = await FileSystem.readDirectoryAsync(dir).catch(() => []);
+    const prefixes = registrySnapshotPrefixes();
+    await Promise.all(files.map(async (file) => {
+      if (!file.endsWith('.png')) return;
+      const key = file.slice(0, -4);
+      if (!prefixes.some((prefix) => key.startsWith(prefix))) return; // not ours
+      const theme = themeOfSnapshotFileKey(key);
+      if (theme == null || theme === activeTheme) return; // keep unknown + active
+      await FileSystem.deleteAsync(`${dir}${file}`, { idempotent: true }).catch(() => {});
+    }));
+  } catch (e) {
+    if (__DEV__) console.warn('[snapshot] widgets prune failed', e);
+  }
+
+  // prayer-static/ — keep only `..._<activeTheme>_<language>_...` templates.
+  try {
+    const dir = ANDROID_PRAYER_TEMPLATE_DIR;
+    const files = await FileSystem.readDirectoryAsync(dir).catch(() => []);
+    const keepToken = `_${activeTheme}_${language}_`;
+    await Promise.all(files.map(async (file) => {
+      if (!file.endsWith('.png')) return;
+      if (file.includes(keepToken)) return;
+      await FileSystem.deleteAsync(`${dir}${file}`, { idempotent: true }).catch(() => {});
+    }));
+  } catch (e) {
+    if (__DEV__) console.warn('[snapshot] prayer-static prune failed', e);
   }
 }
 

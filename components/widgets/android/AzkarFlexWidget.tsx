@@ -50,13 +50,22 @@ function useArabicNumerals(data: SharedWidgetData, isAr: boolean): boolean {
   return isAr;
 }
 
-function englishAzkarFontSize(text: string, isSmall: boolean): number {
-  if (isSmall) return text.length > 180 ? 10 : text.length > 120 ? 11 : text.length > 80 ? 12 : 14;
-  if (text.length > 240) return 15;
-  if (text.length > 200) return 16;
-  if (text.length > 160) return 18;
-  if (text.length > 110) return 20;
-  return 22;
+// Computed fill sizing — mirrors azkarFillFontSize in
+// components/widgets/previews/index.tsx (same per-script factors/clamps). The
+// box is the nominal widget cell minus chrome (RNAW has no onLayout), so the
+// font fills the tile and matches the gallery preview + iOS.
+function azkarFillFontSize(charCount: number, boxW: number, boxH: number, isArabic: boolean): number {
+  if (boxW <= 0 || boxH <= 0) return isArabic ? 20 : 16;
+  const chars = Math.max(8, charCount);
+  const cwf = isArabic ? 0.5 : 0.55;
+  const lhf = isArabic ? 1.55 : 1.3;
+  // Conservative fill + low min so the WHOLE dhikr always fits (never truncated).
+  // Keep in sync with azkarFillFontSize in components/widgets/previews/index.tsx.
+  const fillRatio = 0.38;
+  const min = 8;
+  const max = isArabic ? 28 : 22;
+  const fs = Math.sqrt((boxW * boxH * fillRatio) / (chars * cwf * lhf));
+  return Math.max(min, Math.min(max, Math.floor(fs)));
 }
 
 interface AzkarFlexWidgetProps {
@@ -128,6 +137,11 @@ export function AzkarFlexWidget({ widgetId, size, data, clickUri }: AzkarFlexWid
     const minute = now.getHours() * 60 + now.getMinutes();
     bodyText = pickLongEnglishAzkarPage(bodyText, minute);
   }
+  // English azkar/dhikr body is rendered UPPERCASE to match the approved
+  // mockups. Arabic is never uppercased (no-op there, but gate explicitly).
+  if (!isAr) {
+    bodyText = bodyText.toUpperCase();
+  }
   const count = slot ? Math.max(1, slot.zikr.count) : 10;
   // ×-prefix format: "×10" not "10×" — reads naturally as "times 10".
   const countText = `×${arabicNums ? toArabicDigits(count) : String(count)}`;
@@ -141,14 +155,9 @@ export function AzkarFlexWidget({ widgetId, size, data, clickUri }: AzkarFlexWid
   //                         longer prose fits in 4 lines without clipping.
   // Rubik-Bold for Quran title AND English body; Rubik-Regular only for
   // Arabic chunks.
-  const bodyFont = isQuran || !isAr ? 'Rubik-Bold' : 'Rubik-Regular';
-  const bodyFs = isQuran
-    ? (isSmall ? 16 : widgetId === 'dailyDhikr' ? 22 : 21)
-    : isAr
-      ? (isSmall ? 13 : widgetId === 'dailyDhikr' ? 17 : 16)
-      : englishAzkarFontSize(bodyText, isSmall);
-  const titleFs = isSmall ? 11 : 13;
-  const radius = TILE_RADIUS[size];
+  // Arabic dhikr body is BOLD; size COMPUTED to fill the tile (mirrors the
+  // gallery preview + iOS). Box = nominal widget cell minus chrome.
+  const bodyFont = 'Rubik-Bold';
 
   // Arabic mode shows the title row; English mode hides it to free up the
   // body area for the longer translation prose (the widget label below the
@@ -158,13 +167,26 @@ export function AzkarFlexWidget({ widgetId, size, data, clickUri }: AzkarFlexWid
   // English mode to keep the tile language-coherent.
   const showMetadata = isAr && !isSmall && (benefit.length > 0 || reference.length > 0);
 
+  // Body box from constants (RNAW has no onLayout) — mirrors azkarBodyBox in
+  // components/widgets/previews/index.tsx so the gallery == Android == iOS.
+  const boxW = (isSmall ? 155 : 329) - 24; // − horizontal padding (12·2)
+  const boxH = (isSmall ? 155 : 155)
+    - (showTitle ? 16 : 0)        // − title row
+    - 26                          // − ×count row
+    - 16                          // − vertical padding
+    - (showMetadata ? 26 : 0);    // − benefit + reference
+  // Computed fill for ALL bodies incl. Quran-recitation titles (no truncation).
+  const bodyFs = azkarFillFontSize(bodyText.length, boxW, boxH, isAr);
+  const titleFs = isSmall ? 11 : 13;
+  const radius = TILE_RADIUS[size];
+
   return (
     <FlexWidget
       style={{
         width: 'match_parent',
         height: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
         alignItems: 'center',
         backgroundColor: p.bg,
         borderRadius: radius,
@@ -188,18 +210,30 @@ export function AzkarFlexWidget({ widgetId, size, data, clickUri }: AzkarFlexWid
         />
       ) : null}
 
-      <TextWidget
-        text={bodyText}
+      {/* Body lives in a flex:1 wrapper so it is vertically CENTERED in the
+          space between the (optional) title and the count — no big empty gap
+          when the English body is short, matching the approved mockups. */}
+      <FlexWidget
         style={{
-          fontFamily: bodyFont,
-          fontSize: bodyFs,
-          color: p.text,
-          textAlign: isAr ? 'center' : 'left',
-          marginTop: showTitle ? 4 : 0,
+          flex: 1,
+          width: 'match_parent',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
         }}
-        allowFontScaling={false}
-        maxLines={isAr ? 3 : 5}
-      />
+      >
+        <TextWidget
+          text={bodyText}
+          style={{
+            fontFamily: bodyFont,
+            fontSize: bodyFs,
+            color: p.text,
+            textAlign: isAr ? 'center' : 'left',
+          }}
+          allowFontScaling={false}
+          maxLines={20}
+        />
+      </FlexWidget>
 
       <FlexWidget
         style={{

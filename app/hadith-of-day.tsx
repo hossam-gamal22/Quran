@@ -22,6 +22,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -115,8 +116,8 @@ export default function HadithOfDayScreen() {
         if (hadith.translation) parts.push(hadith.translation);
         else parts.push(hadith.arabic);
       }
-      parts.push(`📜 ${hadith.narrator} — ${hadith.source}`, `\n${t('common.fromApp')}`);
-      await Share.share({ message: parts.join('\n\n') });
+      parts.push(`📜 ${hadith.narrator} — ${hadith.source}`);
+      await Share.share({ message: buildShareText(parts.join('\n\n')) });
     } catch { /* ignore */ }
   };
 

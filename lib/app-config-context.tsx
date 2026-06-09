@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { Platform } from 'react-native';
 import { getAppConfig, subscribeToAppConfig, RemoteAppConfig } from './app-config-api';
 import { checkAndNotifyUpdate } from './app-update-checker';
+import { logFirestoreError } from './firestore-error';
 
 interface AppConfigContextType {
   config: RemoteAppConfig;
@@ -75,7 +76,7 @@ export const AppConfigProvider = ({ children }: { children: ReactNode }) => {
         ).catch(() => {}); // Fire-and-forget, don't block config loading
       }
     } catch (error) {
-      console.error('Error loading config:', error);
+      logFirestoreError('Error loading config', error);
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +93,7 @@ export const AppConfigProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
       },
       (error) => {
-        console.error('Real-time config subscription error:', error);
+        logFirestoreError('Real-time config subscription error', error);
       }
     );
     

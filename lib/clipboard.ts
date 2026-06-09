@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Platform, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { t } from '@/lib/i18n';
+import { buildShareText } from './share-text';
 
 /**
  * نسخ نص إلى الحافظة
@@ -63,19 +64,20 @@ export async function readFromClipboard(): Promise<string | null> {
  */
 export async function shareText(text: string, title?: string): Promise<boolean> {
   try {
+    const message = buildShareText(text);
     if (Platform.OS === 'web') {
       if (navigator.share) {
         await navigator.share({
           title: title || t('shareService.shareTitle'),
-          text: text,
+          text: message,
         });
         return true;
       }
       // fallback: نسخ للحافظة
-      return await copyToClipboard(text);
+      return await copyToClipboard(message);
     } else {
       const result = await Share.share({
-        message: text,
+        message,
         title: title,
       });
       return result.action === Share.sharedAction;
@@ -98,9 +100,9 @@ export async function copyAyah(
   let text = `﴿ ${ayahText} ﴾`;
   if (includeReference) {
     text += `\n\n📖 ${t('shareService.surahRef')} ${surahName} - ${t('shareService.ayahRef')} ${ayahNumber}`;
-    text += `\n📱 تطبيق روح المسلم`;
   }
-  return await copyToClipboard(text);
+  // الـ footer الموحّد يُضاف مركزيًا عبر buildShareText
+  return await copyToClipboard(buildShareText(text));
 }
 
 /**
@@ -118,6 +120,6 @@ export async function copyDhikr(
   if (count) {
     text += `\n🔢 ${t('shareService.repeat')}: ${count} ${t('shareService.time')}`;
   }
-  text += `\n📱 تطبيق روح المسلم`;
-  return await copyToClipboard(text);
+  // الـ footer الموحّد يُضاف مركزيًا عبر buildShareText
+  return await copyToClipboard(buildShareText(text));
 }

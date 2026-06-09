@@ -173,16 +173,34 @@ function getAyahText(surahNumber: number, ayahNumber: number): {
 }
 
 /**
- * Fisher-Yates shuffle pick: returns `count` distinct random ayat
- * uniformly sampled from the concise ayat set that fits the widget well.
+ * Fisher-Yates shuffle pick: returns `count` distinct ayat from the concise
+ * ayat set. The shuffle is SEEDED with a fixed constant (mulberry32) — NOT
+ * `Math.random` — so every device (iOS + Android) generates the IDENTICAL pool
+ * and therefore shows the SAME daily ayah. (Was Math.random ⇒ each platform got
+ * a different verse.)
  */
+const VERSE_POOL_SEED = 0x6a09e667; // fixed ⇒ deterministic pool order across devices
+// Fixed index anchor: the daily ayah = (absolute-days-since-anchor) % poolSize,
+// identical on every device. Bump VERSE_POOL_SEED to reshuffle the whole pool.
+const VERSE_POOL_SEED_YEAR = 2025;
+const VERSE_POOL_SEED_DOY = 1;
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 function pickRandomAyat(count: number): VersePoolEntry[] {
   const flat = loadFlatAyat();
   const n = flat.length;
+  const rand = seededRandom(VERSE_POOL_SEED);
   const indices = new Array(n);
   for (let i = 0; i < n; i++) indices[i] = i;
   for (let i = 0; i < count; i++) {
-    const j = i + Math.floor(Math.random() * (n - i));
+    const j = i + Math.floor(rand() * (n - i));
     const tmp = indices[i];
     indices[i] = indices[j];
     indices[j] = tmp;
@@ -245,39 +263,26 @@ export async function ensureVersePool(now: Date = new Date()): Promise<VersePool
       String((e as any).translation ?? '').length > MAX_WIDGET_TRANSLATION_CHARS
     ));
 
+  // FIXED seed so the day-index is an absolute function of the calendar date,
+  // identical on every device (iOS + Android) ⇒ same daily ayah everywhere.
+  // (Previously the seed was the device's generation date + the pool order was
+  // Math.random, so each platform showed a different verse.) The pool is a
+  // fixed-order ring buffer indexed by date — NO per-device rolling/consumption.
   const needsRegenerate =
     !existing ||
     !Array.isArray(existing.entries) ||
     existing.entries.length !== VERSE_POOL_SIZE ||
+    existing.seedYear !== VERSE_POOL_SEED_YEAR ||
+    existing.seedDayOfYear !== VERSE_POOL_SEED_DOY ||
     missingTranslationSchema;
 
-  if (!needsRegenerate && existing) {
-    const elapsed = Math.max(0, daysSinceSeed(existing, now));
-    if (elapsed === 0) return existing;
-    if (elapsed < existing.entries.length) {
-      const entries = existing.entries.slice(elapsed);
-      entries.push(...pickRandomAyat(Math.min(elapsed, VERSE_POOL_SIZE)));
-      const pool: VersePool = {
-        entries: entries.slice(0, VERSE_POOL_SIZE),
-        seedDayOfYear: dayOfYear(now),
-        seedYear: now.getFullYear(),
-        generatedAt: now.toISOString(),
-      };
-      try {
-        await AsyncStorage.setItem(VERSE_POOL_KEY, JSON.stringify(pool));
-      } catch (e) {
-        if (__DEV__) console.warn('[verse-pool] AsyncStorage rolling write failed:', e);
-      }
-      if (__DEV__) console.log(`[verse-pool] rolled ${elapsed} consumed ayat; pool size=${pool.entries.length}`);
-      return pool;
-    }
-  }
+  if (!needsRegenerate && existing) return existing;
 
   const entries = pickRandomAyat(VERSE_POOL_SIZE);
   const pool: VersePool = {
     entries,
-    seedDayOfYear: dayOfYear(now),
-    seedYear: now.getFullYear(),
+    seedDayOfYear: VERSE_POOL_SEED_DOY,
+    seedYear: VERSE_POOL_SEED_YEAR,
     generatedAt: now.toISOString(),
   };
   try {

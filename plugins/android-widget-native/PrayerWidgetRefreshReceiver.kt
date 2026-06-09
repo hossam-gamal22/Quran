@@ -50,7 +50,11 @@ class PrayerWidgetRefreshReceiver : BroadcastReceiver() {
     private const val REQUEST_CONTENT = 9103
     private val executor = Executors.newSingleThreadExecutor()
 
-    private const val CONTENT_REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+    // Azkar widgets advance through their curated set one new dhikr every 5
+    // minutes (verse/daily dhikr only change at midnight but share this alarm —
+    // an extra re-pick is cheap). Note: Android Doze may stretch this when the
+    // screen is off; it ticks reliably while the device is awake.
+    private const val CONTENT_REFRESH_INTERVAL_MS = 5 * 60 * 1000L
 
     private val PRAYER_PROVIDERS = listOf(
       RoohPrayerSingleSmall::class.java,

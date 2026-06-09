@@ -15,8 +15,15 @@ interface RawSurah {
 
 const QURAN: RawSurah[] = localQuranData as any;
 
+// O(1) surah lookup built once at module load. getSurahMeta is called very
+// frequently (every getAyahText / getAyahCount / getSurahName across all hifz
+// screens), so the previous linear QURAN.find per call added up.
+const SURAH_BY_NUMBER: Map<number, RawSurah> = new Map(
+  QURAN.map((s) => [s.number, s]),
+);
+
 export function getSurahMeta(surahNumber: number): RawSurah | undefined {
-  return QURAN.find((s) => s.number === surahNumber);
+  return SURAH_BY_NUMBER.get(surahNumber);
 }
 
 export function getSurahName(surahNumber: number): string {

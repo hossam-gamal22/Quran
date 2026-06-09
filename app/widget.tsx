@@ -2,7 +2,7 @@
 // Glassify-style widget hub: replaces the old widget-settings.tsx + widgets-gallery.tsx pair.
 // Tab 1 = Gallery (real previews of every variant). Tab 2 = Settings (minimal: permissions + how-to + about).
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Modal,
   Pressable,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -36,7 +37,12 @@ import { guardPremiumFeature } from '@/lib/premium-guard';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { t, getLanguage } from '@/lib/i18n';
 import { requestAddWidget } from '@/lib/widget-add-helper';
-import { updateWidgetData, refreshWidgetDisplayNow } from '@/lib/widget-data-bridge';
+import {
+  updateWidgetData,
+  refreshWidgetDisplayNow,
+  markWidgetRebakePending,
+  clearWidgetRebakePending,
+} from '@/lib/widget-data-bridge';
 import { getWidgetHowToSteps } from '@/lib/widget-how-to-steps';
 import {
   coerceWidgetDateFormatForCalendar,
@@ -236,17 +242,29 @@ function GalleryTab({
 }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
+  const { settings } = useSettings();
   const sections = Platform.OS === 'android' ? SECTIONS_ANDROID : SECTIONS_IOS;
   const ar = isRTL;
   const lang = getLanguage();
   const showLangNotice = lang !== 'ar' && lang !== 'en';
+  // A widget ALWAYS renders in the app language (the per-widget language
+  // override was removed) so the gallery preview matches the home-screen widget
+  // and the two can never disagree or mix AR/EN.
+  const widgetLang: 'ar' | 'en' = (lang === 'ar' || lang === 'ur') ? 'ar' : 'en';
   const [widgetPreviewData, setWidgetPreviewData] = useState<SharedWidgetData | null>(null);
+  // Gate the gallery until the first read of the shared payload completes, so the
+  // previews never render their sample/fallback values for a frame before real
+  // data (or the needsLocation placeholder) is available.
+  const [previewLoaded, setPreviewLoaded] = useState(false);
 
   const loadPreviewData = useCallback(async (cancelled?: () => boolean) => {
     try {
       const raw = await AsyncStorage.getItem('widget_shared_data');
       if (!cancelled?.() && raw) setWidgetPreviewData(JSON.parse(raw));
     } catch {}
+    finally {
+      if (!cancelled?.()) setPreviewLoaded(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -280,7 +298,7 @@ function GalleryTab({
          old card instances and one frame of the previous language's text
          can flash before the new translations propagate through context. */}
       <ScrollView
-        key={`gallery-${lang}`}
+        key={`gallery-${lang}-${widgetLang}`}
         style={styles.scrollView}
         contentContainerStyle={styles.galleryScroll}
         showsVerticalScrollIndicator={false}
@@ -289,11 +307,17 @@ function GalleryTab({
           {Platform.OS === 'ios' ? t('widgetPage.iosHint') : t('widgetPage.androidHint')}
         </Text>
 
-      {(() => {
+      {!previewLoaded ? (
+        <View style={{ paddingVertical: 60, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (() => {
+        // Hide variants whose forced language doesn't match the viewer: an
+        // Arabic-only widget (forcedLanguage: 'ar') never shows in the gallery
+        // for a non-Arabic (English) viewer, and vice-versa. Variants with no
+        // forcedLanguage adapt to the viewer and are always shown.
         const allVariants = sections.flatMap((s) =>
-          ar
-            ? s.variants.filter((v) => v.forcedLanguage !== 'en')
-            : s.variants.filter((v) => v.forcedLanguage !== 'ar')
+          s.variants.filter((v) => !v.forcedLanguage || v.forcedLanguage === widgetLang)
         );
         const smalls = allVariants.filter((v) => v.size === 'small');
         const mediums = allVariants.filter((v) => v.size === 'medium');
@@ -338,18 +362,19 @@ function GalleryTab({
                     isPremium={isPremium}
                     onPress={() => onAddWidget(variant)}
                     isRTL={ar}
+                    previewLanguage={widgetLang}
                   />
                 ))}
               </View>
             ))}
             {sortedMediums.map((variant) => (
               <View key={variant.id} style={styles.fullRow}>
-                <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} />
+                <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} previewLanguage={widgetLang} />
               </View>
             ))}
             {sortedLarges.map((variant) => (
               <View key={variant.id} style={styles.fullRow}>
-                <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} />
+                <VariantCard variant={variant} isPremium={isPremium} onPress={() => onAddWidget(variant)} isRTL={ar} previewLanguage={widgetLang} />
               </View>
             ))}
           </View>
@@ -368,22 +393,35 @@ function VariantCard({
   isPremium,
   onPress,
   isRTL,
+  previewLanguage,
 }: {
   variant: WidgetVariant;
   isPremium: boolean;
   onPress: () => void;
   isRTL: boolean;
+  previewLanguage?: 'ar' | 'en';
 }) {
   const colors = useColors();
   const locked = !isWidgetUnlocked(variant.definition, isPremium, variant.size);
+  // English (or any non-Arabic) viewer looking at an Arabic-only widget: show an
+  // "Arabic only" badge (same style as the premium lock) instead of the premium
+  // badge — the placed widget itself renders an English notice.
+  const arabicOnly = previewLanguage === 'en' && variant.forcedLanguage === 'ar';
   const Preview = variant.Preview;
 
   return (
     <View style={cardStyles.cell}>
       <Pressable onPress={onPress} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
         <View>
-          <Preview size={variant.size} language={variant.forcedLanguage} />
-          {locked ? (
+          <Preview size={variant.size} language={variant.forcedLanguage ?? previewLanguage} />
+          {arabicOnly ? (
+            <View pointerEvents="none" style={cardStyles.lockOverlay}>
+              <View style={cardStyles.lockPill}>
+                <MaterialCommunityIcons name="translate" size={13} color="#FFFFFF" />
+                <Text style={cardStyles.lockText}>Arabic only</Text>
+              </View>
+            </View>
+          ) : locked ? (
             <View pointerEvents="none" style={cardStyles.lockOverlay}>
               <View style={cardStyles.lockPill}>
                 <MaterialCommunityIcons name="lock" size={13} color="#FFFFFF" />
@@ -464,6 +502,14 @@ function SettingsTab({
   const styles = useScaledStyles(_styles, colors.fs);
   const { settings, updateDisplay } = useSettings();
   const [perms, setPerms] = useState<PermissionState>({ background: 'unknown', location: 'undetermined' });
+  // Drives the inline "updating widgets…" / "updated ✓" banner while a placed
+  // widget re-bake runs. 'idle' renders nothing.
+  const [widgetSyncState, setWidgetSyncState] = useState<'idle' | 'updating' | 'done'>('idle');
+  // Re-entrancy guards: a re-bake is heavy (off-screen captureRef per variant),
+  // so we run at most one at a time and coalesce settings tapped during a bake
+  // into a single trailing re-bake against the latest persisted prefs.
+  const syncInFlightRef = useRef(false);
+  const syncDirtyRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -495,16 +541,60 @@ function SettingsTab({
   const applyWidgetSetting = useCallback(
     async (patch: Parameters<typeof updateDisplay>[0]) => {
       if (__DEV__) console.log('[WidgetTheme] passed to updateDisplay:', patch);
-      const displayOnlySync = refreshWidgetDisplayNow(patch as any);
-      if (__DEV__) console.log('[WidgetTheme] immediate widget sync queued:', patch);
-      try {
-        await updateDisplay(patch);
-        await displayOnlySync;
-        updateWidgetData(undefined, undefined, { displayOverride: patch as any }).catch((e) => {
-          if (__DEV__) console.warn('[WidgetTheme] full widget sync failed:', e);
+      // Always update the in-app reactive context first so the gallery previews
+      // reflect the change instantly and the new prefs are persisted.
+      await updateDisplay(patch);
+
+      // iOS: a display-only reload is safe — most iOS widgets render live SwiftUI,
+      // so pushing the new theme/numerals gives instant home-screen feedback while
+      // the PNG re-bakes. Android does NOT do this: its widgets are a baked PNG +
+      // live text overlays, so reloading native now would paint the OLD PNG with
+      // freshly-recolored overlays → the "half old / half new" flash. Android waits
+      // for the single post-bake reload inside updateWidgetData().
+      if (Platform.OS === 'ios') {
+        refreshWidgetDisplayNow(patch as any).catch((e) => {
+          if (__DEV__) console.warn('[WidgetTheme] iOS display-only sync failed:', e);
         });
+      }
+
+      // If a re-bake is already running, just mark the queue dirty — the in-flight
+      // pass will run one more time against the now-persisted latest prefs.
+      if (syncInFlightRef.current) {
+        syncDirtyRef.current = true;
+        return;
+      }
+
+      syncInFlightRef.current = true;
+      setWidgetSyncState('updating');
+      try {
+        // Mark the re-bake as owed up front: if the app is backgrounded mid-bake,
+        // SnapshotPumpController's foreground drain force-rebakes on next launch.
+        await markWidgetRebakePending();
+        let override: Parameters<typeof updateDisplay>[0] | undefined = patch;
+        do {
+          syncDirtyRef.current = false;
+          // forceSnapshots: guarantees a fresh bake of the placed (visible) widgets
+          // and surfaces capture errors (non-force calls swallow them and keep the
+          // stale manifest). Visible-first ordering is handled inside updateWidgetData
+          // via getActiveSnapshotRouteKeys → includeRouteKeys; background themes /
+          // prayer matrix continue deferred. A single native reload fires once the
+          // new PNG + manifest are committed.
+          await updateWidgetData(undefined, undefined, {
+            displayOverride: override as any,
+            forceSnapshots: true,
+          });
+          // Subsequent coalesced passes read the latest persisted prefs directly.
+          override = undefined;
+        } while (syncDirtyRef.current);
+        await clearWidgetRebakePending();
+        setWidgetSyncState('done');
+        setTimeout(() => setWidgetSyncState((s) => (s === 'done' ? 'idle' : s)), 2000);
       } catch (e) {
-        if (__DEV__) console.warn('[WidgetTheme] immediate widget sync failed:', e);
+        // Leave the owed-re-bake marker set → next app foreground self-heals.
+        if (__DEV__) console.warn('[WidgetTheme] widget sync failed; will self-heal on next foreground:', e);
+        setWidgetSyncState('idle');
+      } finally {
+        syncInFlightRef.current = false;
       }
     },
     [updateDisplay],
@@ -538,9 +628,40 @@ function SettingsTab({
       contentContainerStyle={styles.settingsScroll}
       showsVerticalScrollIndicator={false}
     >
-      {/* Customize — Language is intentionally omitted: widgets always follow the
-          app's main language (Arabic UI → Arabic widgets, otherwise English). */}
+      {widgetSyncState !== 'idle' && (
+        <View
+          style={[
+            styles.syncBanner,
+            {
+              backgroundColor: widgetSyncState === 'done' ? `${colors.primary}22` : colors.card,
+              borderColor: widgetSyncState === 'done' ? colors.primary : colors.border,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+            },
+          ]}
+        >
+          {widgetSyncState === 'updating' ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <MaterialCommunityIcons name="check-circle" size={18} color={colors.primary} />
+          )}
+          <Text
+            style={[
+              styles.syncBannerText,
+              {
+                color: colors.text,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              },
+            ]}
+          >
+            {widgetSyncState === 'updating' ? t('widgetPage.updatingWidgets') : t('widgetPage.widgetsUpdated')}
+          </Text>
+        </View>
+      )}
       <SettingsGroup title={t('widgetPage.customize')} isRTL={isRTL}>
+        {/* Language picker removed: a widget ALWAYS renders in the app language
+            (no per-widget language override) so the placed widget can never
+            disagree with the app or mix AR/EN. */}
         <WidgetOptionRow
           isRTL={isRTL}
           label={t('widgetPage.calendar')}
@@ -660,6 +781,7 @@ function getWidgetSettingDescriptions(isRTL: boolean) {
       dateFormat: 'يغيّر سطر التاريخ المختصر في ودجات اليوم الرقمي والشهر فقط.',
       numerals: 'يغيّر شكل الأرقام في ودجات التاريخ ومواقيت الصلاة والعدادات.',
       theme: 'يغيّر ألوان كل الودجات في المعرض وعلى شاشة الهاتف.',
+      language: 'لغة نص الودجات (أسماء الصلوات، التواريخ، الترجمة). «تلقائي» يتبع لغة التطبيق.',
     };
   }
   return {
@@ -667,6 +789,7 @@ function getWidgetSettingDescriptions(isRTL: boolean) {
     dateFormat: 'Changes the compact date line in digital day and month widgets only.',
     numerals: 'Changes digits in date, prayer-time, and countdown widgets.',
     theme: 'Changes colors for all gallery and home-screen widgets.',
+    language: 'Language of widget text (prayer names, dates, translation). “Auto” follows the app language.',
   };
 }
 
@@ -1088,6 +1211,16 @@ const _styles = StyleSheet.create({
   },
   // Settings
   settingsScroll: { paddingHorizontal: 16, paddingTop: 12 },
+  syncBanner: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  syncBannerText: { flex: 1, fontSize: 13, fontFamily: fontMedium() },
   group: { marginBottom: 18 },
   groupTitle: {
     fontFamily: fontSemiBold(),

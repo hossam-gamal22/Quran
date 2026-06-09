@@ -23,10 +23,39 @@
 
 export type DurationLang = 'ar' | 'en';
 
-/** Returns a compact human-friendly duration string. Never HH:MM:SS. */
+/**
+ * Wider gap placed AFTER «س» (before the minutes) in the Arabic ≥1h format, e.g.
+ * «١ س ٤ د» → «١ س ٤ د» with a roomier س↔minute gap. EN SPACE (U+2002, ½em) is
+ * used instead of a regular double-space because it is NOT collapsed by SVG
+ * whitespace handling (the picker thumbnail) and renders at a consistent width
+ * across RN Text, RemoteViews, and SwiftUI.
+ */
+export const SIN_MINUTE_GAP = ' ';
+
+/**
+ * Prayer epochs carry seconds (e.g. Fajr 4:11:23) but the widget shows HH:MM
+ * ("4:11"). Truncating the prayer epoch to the minute before a countdown delta
+ * makes the displayed minutes equal the wall-clock HH:MM difference (so 4:33 vs
+ * Fajr 4:11 reads «منذ ٢٢ د», not 21). `now` is intentionally left un-truncated.
+ */
+export function truncateEpochToMinute(ms: number): number {
+  return Math.floor(ms / 60000) * 60000;
+}
+
+/**
+ * Returns a compact human-friendly duration string. Never HH:MM:SS.
+ *
+ * `roundUpMinutes` rounds a partial minute UP to the next whole minute. Use it
+ * for "until next prayer" countdowns so the shown value matches the wall-clock
+ * minute difference: at 8:06:40 with the next prayer at 8:30 the remaining is
+ * 23m20s — flooring shows "23 د" while the user reads 8:30−8:06 = 24. Elapsed
+ * ("since") timers keep flooring (you have been past the prayer for ≥N whole
+ * minutes), so this defaults to false.
+ */
 export function formatPrayerDurationCompact(
   seconds: number,
   language: DurationLang = 'en',
+  roundUpMinutes = false,
 ): string {
   // Clamp negative values to zero — the widget should never display "-5M".
   const total = Math.max(0, Math.floor(seconds));
@@ -34,13 +63,14 @@ export function formatPrayerDurationCompact(
   if (total < 60) {
     return isArabic ? `${total} ث` : `${total}S`;
   }
-  const totalMinutes = Math.floor(total / 60);
+  const totalMinutes = roundUpMinutes ? Math.ceil(total / 60) : Math.floor(total / 60);
   if (totalMinutes < 60) {
     return isArabic ? `${totalMinutes} د` : `${totalMinutes}M`;
   }
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return isArabic ? `${hours} س ${minutes} د` : `${hours}H ${minutes}M`;
+  // Wider gap after «س» (SIN_MINUTE_GAP) per the widget spacing request.
+  return isArabic ? `${hours} س${SIN_MINUTE_GAP}${minutes} د` : `${hours}H ${minutes}M`;
 }
 
 /**
@@ -57,8 +87,12 @@ export function formatPrayerDurationToEpoch(
   if (!targetEpochMs || !Number.isFinite(targetEpochMs)) {
     return formatPrayerDurationCompact(0, language);
   }
-  const deltaMs = direction === 'until' ? targetEpochMs - nowMs : nowMs - targetEpochMs;
-  return formatPrayerDurationCompact(Math.max(0, Math.floor(deltaMs / 1000)), language);
+  // Truncate the prayer epoch to the minute so the shown minutes equal the
+  // displayed HH:MM difference (the row shows "4:11", not "4:11:23"). `now`
+  // stays as-is and "until" still rounds its partial minute up.
+  const target = truncateEpochToMinute(targetEpochMs);
+  const deltaMs = direction === 'until' ? target - nowMs : nowMs - target;
+  return formatPrayerDurationCompact(Math.max(0, Math.floor(deltaMs / 1000)), language, direction === 'until');
 }
 
 /**

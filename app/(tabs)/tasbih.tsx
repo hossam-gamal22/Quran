@@ -43,7 +43,7 @@ import { getLanguage, getTranslations, t } from '@/lib/i18n';
 import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
 import { AppModal } from '@/components/ui/AppModal';
 import { copyToClipboard } from '../../lib/clipboard';
-import { APP_CONFIG } from '../../constants/app';
+import { buildShareText } from '@/lib/share-text';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { useAdBottomInset } from '@/lib/ads-context';
@@ -1198,8 +1198,8 @@ export default function TasbihScreen() {
 
   const handleShare = async () => {
     const dhikrDisplay = isArabic ? stripTashkeel(selectedTasbih.text) : (selectedTasbih.transliteration || stripTashkeel(selectedTasbih.text));
-    const text = `📿 ${t('tasbih.title')}\n\n「 ${dhikrDisplay} 」\n\n🔢 ${t('tasbih.counter')}: ${count}/${selectedTasbih.target}\n🔄 ${t('tasbih.rounds')}: ${rounds}\n📊 ${t('tasbih.todayTotal')}: ${totalCount}\n\n${APP_CONFIG.getShareSignature()}`;
-    try { await Share.share({ message: text }); } catch (e) { console.error(e); }
+    const text = `📿 ${t('tasbih.title')}\n\n「 ${dhikrDisplay} 」\n\n🔢 ${t('tasbih.counter')}: ${count}/${selectedTasbih.target}\n🔄 ${t('tasbih.rounds')}: ${rounds}\n📊 ${t('tasbih.todayTotal')}: ${totalCount}`;
+    try { await Share.share({ message: buildShareText(text) }); } catch (e) { console.error(e); }
   };
 
   // ===== COMPUTED =====

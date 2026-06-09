@@ -22,6 +22,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
@@ -155,8 +156,8 @@ export default function DailyDhikrScreen() {
     try {
       const parts = [dhikr.arabic];
       if (dhikr.benefit) parts.push(`✨ ${dhikr.benefit}`);
-      parts.push(`📖 ${dhikr.reference}`, `\n${t('common.fromApp')}`);
-      await Share.share({ message: parts.join('\n\n') });
+      parts.push(`📖 ${dhikr.reference}`);
+      await Share.share({ message: buildShareText(parts.join('\n\n')) });
     } catch { /* ignore */ }
   };
 

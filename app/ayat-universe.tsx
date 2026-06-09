@@ -22,6 +22,7 @@ import { COSMIC_VERSES, COSMIC_VERSE_THEMES, CosmicVerse } from '@/data/ayat-uni
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { getDefaultTranslationForLanguage } from '@/lib/quran-api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -91,7 +92,7 @@ export default function AyatUniverseScreen() {
     const ref = isArabic ? verse.reference : transliterateReference(verse.reference, language);
     const text = isArabic ? verse.arabic : (translations[verse.id] || verse.arabic);
     await Share.share({
-      message: `﴿ ${text} ﴾\n\n${ref}\n\n${t('common.fromApp')}`,
+      message: buildShareText(`﴿ ${text} ﴾\n\n${ref}`),
     });
   };
 

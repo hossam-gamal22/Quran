@@ -59,12 +59,21 @@ export interface SnapshotCaptureContextValue {
    *  this so the reported x/y are FRAME-relative (not parent-relative), which is
    *  what the native overlay / manifest consumers expect. */
   rootRef?: React.RefObject<any> | null;
+  /** True ONLY for the gallery-snapshot pump (`runSnapshotPass`). When set, the
+   *  prayer previews decouple ALL state-dependent visuals from the Android bake
+   *  (hero/next/prev NAME, active-row HIGHLIGHT, active row COLORS) — exactly the
+   *  way iOS already does — so the gallery PNG is a clean chrome-only fallback.
+   *  The home overlay then draws those live. The per-state template bake leaves
+   *  this false, so those PNGs keep name + highlight + colors baked (the PRIMARY
+   *  path, pixel-identical to the gallery). */
+  blankPrayerState?: boolean;
 }
 
 const NOOP_CONTEXT: SnapshotCaptureContextValue = {
   capturing: false,
   registerAnchor: () => {},
   rootRef: null,
+  blankPrayerState: false,
 };
 
 export const WidgetSnapshotCaptureContext =
@@ -80,6 +89,10 @@ export function useAnchorRegistrar(): (anchor: CaptureAnchor) => void {
 
 export function useSnapshotRootRef(): React.RefObject<any> | null {
   return React.useContext(WidgetSnapshotCaptureContext).rootRef ?? null;
+}
+
+export function useBlankPrayerState(): boolean {
+  return React.useContext(WidgetSnapshotCaptureContext).blankPrayerState ?? false;
 }
 
 /**

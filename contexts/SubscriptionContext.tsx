@@ -14,6 +14,7 @@ import {
   subscribeToSubscriptionConfig,
   getSubscriptionState,
   setSubscriptionState,
+  setInMemoryPremium,
   getPlanFromProductId,
   DEFAULT_SUBSCRIPTION_CONFIG,
 } from '@/lib/subscription-manager';
@@ -233,6 +234,14 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     premiumSourceRef.current = premiumSource;
   }, [premiumSource]);
+
+  // Mirror the authoritative premium flag into a synchronous module-level
+  // cache so imperative ad gates (app-open ad, standalone interstitial) honor
+  // admin/winner grants the moment they are detected — not only after the
+  // grant is persisted to AsyncStorage on a later launch.
+  useEffect(() => {
+    setInMemoryPremium(state.isPremium);
+  }, [state.isPremium]);
 
   useEffect(() => {
     let mounted = true;

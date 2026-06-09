@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -200,7 +201,7 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-const QiblaScreen = () => {
+const QiblaScreen = ({ embedded = false }: { embedded?: boolean }) => {
   const insets = useSafeAreaInsets();
   const adBottomInset = useAdBottomInset();
   const { settings, t, isDarkMode } = useSettings();
@@ -217,6 +218,10 @@ const QiblaScreen = () => {
   const [isLocalCalc, setIsLocalCalc] = useState(false);
   const [meccaDistance, setMeccaDistance] = useState<number | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  // When we fall back to a stored/last-known location because the live fix is
+  // unavailable, surface an actionable prompt so the direction can be made
+  // accurate. 'permission' = access denied, 'services' = location off.
+  const [needsLocationPrompt, setNeedsLocationPrompt] = useState<'permission' | 'services' | null>(null);
   const isAlignedRef = useRef(false);
   const styleSwitcherRef = useRef<ScrollView>(null);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
@@ -247,6 +252,14 @@ const QiblaScreen = () => {
     }
   }, []);
 
+  // Tapping the "enable location" prompt: open OS settings so the user can
+  // grant permission / turn services on, then a re-focus / retry picks up the
+  // fresh fix.
+  const handleEnableLocation = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openSettings().catch(() => {});
+  }, []);
+
   const handleStyleChange = useCallback(async (styleId: string) => {
     if (styleId === currentStyleId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -256,19 +269,12 @@ const QiblaScreen = () => {
 
   // ------ Fetch bearing for a given coordinate pair (background upgrade) ------
   const fetchBearingForCoords = useCallback(async (lat: number, lng: number, mounted: { value: boolean }) => {
-    // Distance to Mecca
+    // Distance to Mecca (used only for the near-Kaaba contextual note).
+    // We ALWAYS compute a real bearing — the great-circle direction stays
+    // well-defined and meaningful even within Makkah, right down to a few
+    // metres of the Kaaba. Never short-circuit to a "no Qibla needed" state.
     const dist = distanceToMecca(lat, lng);
     if (mounted.value) setMeccaDistance(dist);
-
-    // If user is at the Kaaba (< 1 km), skip API
-    if (dist < 1) {
-      if (mounted.value) {
-        setQiblaBearing(0);
-        setIsLocalCalc(false);
-      }
-      await setCachedBearing(0, lat, lng);
-      return;
-    }
 
     // Try APIs directly (no connectivity check — just let them fail fast)
     let bearing: number | null = null;
@@ -300,6 +306,10 @@ const QiblaScreen = () => {
     (async () => {
       try {
         // ── Phase 0: Instant bearing from cache (compass visible in ~20ms) ──
+        // Track whether we have ANY displayable fallback bearing so that, if the
+        // live fix is later unavailable, we keep the compass and show an
+        // actionable prompt instead of a blocking error screen.
+        let hasFallbackBearing = false;
         const cachedBearing = await getCachedBearing();
         if (cachedBearing && mounted.value) {
           setQiblaBearing(cachedBearing.bearing);
@@ -307,6 +317,7 @@ const QiblaScreen = () => {
           setMeccaDistance(distanceToMecca(cachedBearing.lat, cachedBearing.lon));
           setIsLocalCalc(false);
           setUsingCachedLocation(true);
+          hasFallbackBearing = true;
         }
 
         // If no cached bearing, try stored location for instant local calc
@@ -319,30 +330,41 @@ const QiblaScreen = () => {
             setMeccaDistance(distanceToMecca(storedLoc.latitude, storedLoc.longitude));
             setIsLocalCalc(true);
             setUsingCachedLocation(true);
+            hasFallbackBearing = true;
           }
         }
 
         // ── Phase 1: Request location permission ──
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        // Mark AFTER the prompt was actually shown (Android-gated banner).
         if (Platform.OS === 'android') {
           await markPermissionRequested('location');
         }
-        const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          // If we already have a bearing from cache, don't show error
-          if (!cachedBearing && mounted.value) {
+          // Have a fallback to show → keep the compass + prompt to enable
+          // location for an accurate direction. Otherwise hard error.
+          if (hasFallbackBearing) {
+            if (mounted.value) setNeedsLocationPrompt('permission');
+          } else if (mounted.value) {
             setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
           }
           if (mounted.value) setIsInitializing(false);
           return;
         }
         if (!(await Location.hasServicesEnabledAsync())) {
-          if (!cachedBearing && mounted.value)
+          if (hasFallbackBearing) {
+            if (mounted.value) setNeedsLocationPrompt('services');
+          } else if (mounted.value) {
             setErrorMsg(
               t('qibla.servicesDisabled') || 'Location services disabled. Please enable them and try again.'
             );
+          }
           if (mounted.value) setIsInitializing(false);
           return;
         }
+
+        // Live location is available → clear any stale prompt.
+        if (mounted.value) setNeedsLocationPrompt(null);
 
         // ── Phase 2: Get fresh GPS (Balanced accuracy + 3s timeout) ──
         let lat: number;
@@ -549,20 +571,46 @@ const QiblaScreen = () => {
     style: { flex: 1 } as const,
   };
 
-  if (!qiblaBearing && !errorMsg) {
-    return (
-      <BackgroundWrapper {...bgProps}>
+  // When embedded inside the prayer tab, the parent already provides the single
+  // full-screen BackgroundWrapper + ScrollView. Rendering our own here stacks a
+  // second background layer (a different `cover` crop of the same image over an
+  // opaque solidBg) → the visible dark/green seam. So embedded = transparent
+  // content only; standalone keeps its own BackgroundWrapper.
+  //
+  // NOTE: these are invoked as plain functions (not `<Wrap/>` JSX) on purpose —
+  // defining a component inside render gives it a new identity each render and
+  // would remount the whole compass subtree on every guidance/state update.
+  const wrap = (children: React.ReactNode) =>
+    embedded ? children : <BackgroundWrapper {...bgProps}>{children}</BackgroundWrapper>;
+
+  // Vertical scroll is owned by the parent prayer ScrollView when embedded, so
+  // render content in a plain View (avoids nested-vertical-scroll gesture
+  // conflict + height collapse). Standalone keeps its own ScrollView.
+  const container = (children: React.ReactNode) =>
+    embedded ? (
+      <View>{children}</View>
+    ) : (
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 + adBottomInset }]}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {children}
+      </ScrollView>
+    );
+
+  if (qiblaBearing == null && !errorMsg) {
+    return wrap(
       <View style={styles.centeredLoading}>
         <ActivityIndicator size="large" color="#0d8e62" />
         <Text style={[styles.loadingText, { color: colors.text }]}>{t('qibla.findingDirection') || 'Finding Qibla Direction...'}</Text>
       </View>
-      </BackgroundWrapper>
     );
   }
 
   if (errorMsg) {
-    return (
-      <BackgroundWrapper {...bgProps}>
+    return wrap(
       <View style={styles.centeredLoading}>
         <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#FF6B6B" />
         <Text style={[styles.loadingText, { color: '#FF6B6B', marginTop: 16 }]}>{errorMsg}</Text>
@@ -580,20 +628,34 @@ const QiblaScreen = () => {
           <Text style={styles.retryText}>{t('common.retry') || 'Retry'}</Text>
         </TouchableOpacity>
       </View>
-      </BackgroundWrapper>
     );
   }
 
   const isAligned = guidance === guidanceAligned;
 
-  return (
-    <BackgroundWrapper {...bgProps}>
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 + adBottomInset }]}
-      showsVerticalScrollIndicator={false}
-      bounces={false}
-    >
+  return wrap(
+    <>
+    {container(
+      <>
+      {/* Enable-location prompt — shown when the direction is based on a
+          fallback location because permission/services are off. Tappable:
+          opens OS settings. The compass stays visible underneath. */}
+      {needsLocationPrompt && (
+        <TouchableOpacity
+          style={[styles.enableLocationBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+          onPress={handleEnableLocation}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="crosshairs-gps" size={18} color="#FFA726" />
+          <Text style={[styles.enableLocationText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {needsLocationPrompt === 'services'
+              ? (t('qibla.enableServicesForAccuracy') || 'فعّل خدمة الموقع للحصول على اتجاه دقيق')
+              : (t('qibla.enableLocationForAccuracy') || 'فعّل إذن الموقع للحصول على اتجاه دقيق')}
+          </Text>
+          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={18} color="#FFA726" />
+        </TouchableOpacity>
+      )}
+
       {/* 1. Guidance text — hidden during initialization to prevent flash */}
       {!isInitializing && guidance ? (
       <View style={styles.guidanceContainer}>
@@ -738,18 +800,19 @@ const QiblaScreen = () => {
         </BlurView>
       </View>
 
-      {/* 3. Kaaba + Compass — or special message if at Mecca */}
-      {meccaDistance != null && meccaDistance < 1 ? (
-        <View style={styles.atMeccaContainer}>
-          <Text style={styles.atMeccaEmoji}>🕋</Text>
-          <Text style={[styles.atMeccaText, { color: colors.text }]}>
-            {t('qibla.atMecca')}
-          </Text>
-          <Text style={[styles.atMeccaSubtext, { color: colors.muted }]}>
-            {t('qibla.atMeccaDesc')}
+      {/* Near-Kaaba note — shown only with a CONFIRMED GPS fix (not fallback
+          coords) and never replaces the live compass. The Qibla direction is
+          always computed and displayed; this is purely informational. */}
+      {!isInitializing && meccaDistance != null && meccaDistance < 0.3 && !usingCachedLocation && (
+        <View style={styles.infoBadge}>
+          <Text style={styles.infoBadgeText}>
+            {'🕋 ' + t('qibla.atMecca') + ' — ' + t('qibla.atMeccaDesc')}
           </Text>
         </View>
-      ) : (
+      )}
+
+      {/* 3. Kaaba + Compass — always shown; the Qibla direction is meaningful
+          everywhere, including inside Makkah, right up to the Kaaba itself. */}
       <View style={styles.compassArea}>
         {/* KAABA — static, fixed above compass */}
         <View style={styles.fixedKaabaContainer}>
@@ -826,14 +889,11 @@ const QiblaScreen = () => {
           </Animated.View>
         </View>
       </View>
-      )}
 
       {/* 4. Title + degree + distance + coordinates at the bottom */}
       <View style={styles.header}>
         <Text style={[styles.titleText, { color: colors.text }]}>{t('tabs.qibla') || 'Qibla Direction'}</Text>
-        {meccaDistance == null || meccaDistance >= 1 ? (
-          <Text style={[styles.subtitleText, { color: colors.muted }]}>{Math.round(qiblaBearing!)}°</Text>
-        ) : null}
+        <Text style={[styles.subtitleText, { color: colors.muted }]}>{Math.round(qiblaBearing!)}°</Text>
         {meccaDistance != null && (
           <Text style={[styles.distanceText, { color: colors.muted }]}>
             {(t('qibla.distanceToKaaba') || 'على بُعد {km} كم من الكعبة المشرفة').replace('{km}', Math.round(meccaDistance).toLocaleString())}
@@ -845,9 +905,10 @@ const QiblaScreen = () => {
           </Text>
         )}
       </View>
-    </ScrollView>
-    <BannerAdComponent screen="qibla" inTabScreen />
-    </BackgroundWrapper>
+      </>
+    )}
+    {!embedded && <BannerAdComponent screen="qibla" inTabScreen />}
+    </>
   );
 };
 
@@ -956,6 +1017,26 @@ const _styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(255, 167, 38, 0.15)',
   },
+  enableLocationBanner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 167, 38, 0.4)',
+    backgroundColor: 'rgba(255, 167, 38, 0.15)',
+  },
+  enableLocationText: {
+    flex: 1,
+    color: '#FFA726',
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+  },
   calibrationText: {
     color: '#FFA726',
     fontSize: 13,
@@ -997,26 +1078,6 @@ const _styles = StyleSheet.create({
   infoBadgeText: {
     color: '#FFA726',
     fontSize: 12,
-    fontFamily: fontRegular(),
-    textAlign: 'center',
-  },
-  atMeccaContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  atMeccaEmoji: {
-    fontSize: 72,
-    marginBottom: 16,
-  },
-  atMeccaText: {
-    fontSize: 22,
-    fontFamily: fontBold(),
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  atMeccaSubtext: {
-    fontSize: 15,
     fontFamily: fontRegular(),
     textAlign: 'center',
   },

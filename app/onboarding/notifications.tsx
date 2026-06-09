@@ -216,11 +216,12 @@ export default function NotificationsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      // Mark AFTER the prompt was actually shown (Android-gated banner).
       if (Platform.OS === 'android') {
         await markPermissionRequested('notifications');
       }
-      const { status } = await Notifications.requestPermissionsAsync();
-      
+
       if (status === 'granted') {
         setPermissionGranted(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

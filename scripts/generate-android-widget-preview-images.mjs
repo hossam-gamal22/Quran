@@ -15,6 +15,16 @@ const REG_PATH = resolve(ROOT, 'widgets/ios/Resources/widget-registry.json');
 // them in drawable-nodpi so Android Launcher does not density-scale them before
 // fitting them into its widget picker cells.
 const OUT_DIR = resolve(ROOT, 'android/app/src/main/res/drawable-nodpi');
+// JS-requirable copies of the previews, used by SnapshotWidget as a guaranteed
+// fallback image when a widget has no baked PNG on disk yet (fresh add, cleared
+// cache, generation failure). Shipped in the JS bundle so they are always present.
+const FALLBACK_OUT_DIR = resolve(ROOT, 'assets/images/widgets/fallback');
+// Widgets that render LIVE (TextWidget/FlexWidget) in the headless task and never
+// fall through to the snapshot-image branch — they need no bundled fallback PNG.
+const LIVE_WIDGET_IDS = new Set([
+  'azkarMorning', 'azkarEvening', 'dailyDhikr',
+  'daySimple', 'dayThuluth', 'dayDigital', 'monthSimple', 'monthThuluth',
+]);
 const DEFAULT_IN_DIR = resolve(ROOT, 'tmp/widget-previews');
 const IN_DIR = process.argv[2] ? resolve(ROOT, process.argv[2]) : DEFAULT_IN_DIR;
 const THEME = process.argv[3] ?? 'light';
@@ -29,6 +39,10 @@ const SIZE_DIMS = {
 
 function previewDrawableName(id, size) {
   return `widget_preview_${id.toLowerCase()}_${size}.png`;
+}
+
+function fallbackAssetName(id, size) {
+  return `${id}_${size}.png`;
 }
 
 function premiumRequired(def, size) {
@@ -165,11 +179,17 @@ function pickerOverlayText(kind, compact) {
   // dayDigital bakes its time directly into the gallery PNG, so overlaying a
   // sample time here would double-draw and produce overlapping digits. Skip it.
   if (kind === 'currentTime') return '';
-  if (kind === 'prayerPreviousCountdown') return 'منذ ٤ س ١ د';
-  if (kind === 'prayerNextCountdownWithLabel') return 'الصلاة القادمة بعد ٢ س ٢٧ د';
+  // Wider gap after «س» (U+2002 EN SPACE) — mirrors SIN_MINUTE_GAP in
+  // lib/widget-format-duration so every surface shows the same س↔minute spacing.
+  const GAP = ' ';
+  if (kind === 'prayerPreviousCountdown') return `منذ ٤ س${GAP}١ د`;
+  if (kind === 'prayerNextCountdownWithLabel') return `الصلاة القادمة بعد ٢ س${GAP}٢٧ د`;
   if (kind === 'prayerNextCountdown') {
-    const value = 'بعد ٢ س ٢٧ د';
-    return compact ? value.replace(/\s/g, '') : value;
+    // Only the small prayer-table anchor is `compact: true` — the spaced string
+    // is too wide for the 2×2 card and clips, so cram it there. Strip only ASCII
+    // spaces so the wide GAP after «س» survives ("بعد٢س ٢٧د").
+    const value = `بعد ٢ س${GAP}٢٧ د`;
+    return compact ? value.replace(/ /g, '') : value;
   }
   return '';
 }
@@ -235,12 +255,16 @@ async function loadSnapshot(id, size, premium, outPath) {
 }
 
 mkdirSync(OUT_DIR, { recursive: true });
+mkdirSync(FALLBACK_OUT_DIR, { recursive: true });
 const registry = JSON.parse(readFileSync(REG_PATH, 'utf8'));
 const expectedFiles = new Set();
+const expectedFallbackFiles = new Set();
 for (const def of registry) {
   if (!Array.isArray(def.platforms) || !def.platforms.includes('android')) continue;
   for (const size of def.sizes ?? []) {
-    if (SIZE_DIMS[size]) expectedFiles.add(previewDrawableName(def.id, size));
+    if (!SIZE_DIMS[size]) continue;
+    expectedFiles.add(previewDrawableName(def.id, size));
+    if (!LIVE_WIDGET_IDS.has(def.id)) expectedFallbackFiles.add(fallbackAssetName(def.id, size));
   }
 }
 for (const file of readdirSync(OUT_DIR)) {
@@ -248,7 +272,13 @@ for (const file of readdirSync(OUT_DIR)) {
     unlinkSync(resolve(OUT_DIR, file));
   }
 }
+for (const file of readdirSync(FALLBACK_OUT_DIR)) {
+  if (/\.png$/.test(file) && !expectedFallbackFiles.has(file)) {
+    unlinkSync(resolve(FALLBACK_OUT_DIR, file));
+  }
+}
 let count = 0;
+let fallbackCount = 0;
 for (const def of registry) {
   if (!Array.isArray(def.platforms) || !def.platforms.includes('android')) continue;
   for (const size of def.sizes ?? []) {
@@ -258,7 +288,16 @@ for (const def of registry) {
     const png = await loadSnapshot(def.id, size, premium, out);
     writeFileSync(out, PNG.sync.write(png));
     count += 1;
+    // Emit the JS-requirable fallback for snapshot-based widgets. Generated
+    // without the premium badge — the snapshot fallback branch is only reached
+    // for widgets the user is entitled to (premium widgets render LockedWidget
+    // when not entitled), so a lock badge would be wrong there.
+    if (!LIVE_WIDGET_IDS.has(def.id)) {
+      const fallbackPng = await loadSnapshot(def.id, size, false, out);
+      writeFileSync(resolve(FALLBACK_OUT_DIR, fallbackAssetName(def.id, size)), PNG.sync.write(fallbackPng));
+      fallbackCount += 1;
+    }
   }
 }
 
-console.log(`Generated ${count} Android widget picker thumbnails from ${IN_DIR}`);
+console.log(`Generated ${count} Android widget picker thumbnails (+${fallbackCount} bundled fallbacks) from ${IN_DIR}`);

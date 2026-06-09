@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { t } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -306,13 +307,13 @@ export default function RuqyaScreen() {
     if (isQuran) {
       const slide = currentSlide as QuranSlide;
       const glyphsText = collectSlideArabicText(slide);
-      message = `${slide.labelAr}\n\n${glyphsText}\n\n${slide.count > 1 ? `— ${slide.count} مرات —\n\n` : ''}🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
+      message = `${slide.labelAr}\n\n${glyphsText}\n\n${slide.count > 1 ? `— ${slide.count} مرات —\n\n` : ''}🔒 ${t('azkar.ruqya')}`;
     } else {
       const slide = currentSlide as DuaSlide;
-      message = `${slide.arabic}\n\n${slide.count > 1 ? `— ${slide.count} مرات —\n` : ''}📖 ${slide.reference}\n\n🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
+      message = `${slide.arabic}\n\n${slide.count > 1 ? `— ${slide.count} مرات —\n` : ''}📖 ${slide.reference}\n\n🔒 ${t('azkar.ruqya')}`;
     }
     try {
-      await Share.share({ message });
+      await Share.share({ message: buildShareText(message) });
     } catch {}
   }, [currentSlide, isQuran]);
 

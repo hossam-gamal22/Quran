@@ -214,7 +214,7 @@ const _styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.22,
     shadowRadius: 22,
-    elevation: 8,
+    // No Android `elevation`: bg is translucent; elevation draws an inner ghost square.
   },
   iconCircle: {
     width: 78,

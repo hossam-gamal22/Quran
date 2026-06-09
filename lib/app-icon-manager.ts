@@ -10,6 +10,7 @@ import { db } from '@/config/firebase';
 import { isRTL, getLanguage } from '@/lib/i18n';
 import type { Language } from '@/constants/translations';
 import type { SeasonType } from '@/lib/seasonal-content';
+import { getHijriDate } from '@/lib/hijri-date';
 import { buildAndroidLauncherIconRequest } from '@/lib/android-launcher-icon-request';
 import { RoohLauncherIcon } from '@/modules/rooh-launcher-icon';
 
@@ -23,6 +24,11 @@ const IS_EXPO_GO =
 const ICON_STORAGE_KEY = '@app_icon_variant';
 const ICON_VERSION_KEY = '@app_icon_version';
 const ICON_PENDING_KEY = '@app_icon_pending';
+// The icon variant we last *announced* to the user. Distinct from
+// ICON_STORAGE_KEY (the variant we last *applied/armed*): the announcement must
+// fire only when the visible icon verifiably changed, never merely when we
+// intended a change.
+const ICON_ANNOUNCED_KEY = '@app_icon_announced';
 const ENGLISH_ICON = 'app_icon_english';
 
 // ─── Types ──────────────────────────────────────────────
@@ -35,7 +41,21 @@ export type SeasonalIconKey =
   | 'mawlid'
   | 'eid_fitr'
   | 'eid_adha'
-  | 'dhul_hijjah';
+  | 'hijri_new_year';
+
+// Icon keys that have been retired from the bundle but may still live in stored
+// Firestore configs (`appConfig/appIcons`) or persisted state (`@app_icon_variant`).
+// They are normalized to their replacement so old data never resolves to a
+// missing native icon. `dhul_hijjah` was merged into the single `hajj` icon for
+// the first 9 days of Dhul-Hijjah.
+const LEGACY_ICON_ALIASES: Record<string, SeasonalIconKey> = {
+  dhul_hijjah: 'hajj',
+};
+
+export function normalizeIconKey(key: string | null | undefined): SeasonalIconKey {
+  if (!key) return 'default_ar';
+  return (LEGACY_ICON_ALIASES[key] ?? key) as SeasonalIconKey;
+}
 
 export type IconMode = 'auto' | 'manual' | 'language_only';
 
@@ -72,7 +92,14 @@ export const DEFAULT_SEASONAL_MAP: Record<Exclude<SeasonType, 'none'>, SeasonalI
   mawlid: 'mawlid',
   eid_fitr: 'eid_fitr',
   eid_adha: 'eid_adha',
-  dhul_hijjah: 'dhul_hijjah',
+  // Days 1–9 of Dhul-Hijjah show the single Hajj icon. The `dhul_hijjah` season
+  // wins the priority over `hajj` for days 1–9 (see SEASON_PRIORITY), so we map
+  // BOTH period-seasons to the same `hajj` asset — making the first-9-days icon
+  // deterministic regardless of which season resolves. Day 10 flips to the sheep
+  // (eid_adha) automatically via its higher priority. The standalone
+  // `dhul_hijjah` icon asset is intentionally no longer referenced.
+  dhul_hijjah: 'hajj',
+  hijri_new_year: 'hijri_new_year',
   // Months without dedicated icons fall back to language default.
   ashura: 'default_ar',
   muharram: 'default_ar',
@@ -87,6 +114,7 @@ export const DEFAULT_ENABLED_SEASONS: Exclude<SeasonType, 'none'>[] = [
   'eid_fitr',
   'eid_adha',
   'dhul_hijjah',
+  'hijri_new_year',
 ];
 
 export const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
@@ -113,6 +141,10 @@ export const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
   mawlid: {
     ar: 'ذكرى المولد النبوي',
     en: 'Mawlid Reminder',
+  },
+  hijri_new_year: {
+    ar: 'عام هجري جديد',
+    en: 'Hijri New Year',
   },
   ashura: {
     ar: 'يوم عاشوراء',
@@ -157,6 +189,10 @@ export const DEFAULT_SEASONAL_ALERT_MESSAGES: SeasonalLocalizedText = {
     ar: 'تم تحديث أيقونة التطبيق بمناسبة ذكرى المولد النبوي. اللهم صل وسلم وبارك على نبينا محمد.',
     en: 'The app icon has been updated for the Mawlid reminder. Peace and blessings be upon Prophet Muhammad.',
   },
+  hijri_new_year: {
+    ar: 'تم تحديث أيقونة التطبيق بمناسبة العام الهجري الجديد. نسأل الله أن يجعله عام خير وبركة.',
+    en: 'The app icon has been updated for the new Hijri year. May Allah make it a year of goodness and blessings.',
+  },
   ashura: {
     ar: 'تم تحديث أيقونة التطبيق بمناسبة عاشوراء. تقبل الله صيامكم وصالح أعمالكم.',
     en: 'The app icon has been updated for Ashura. May Allah accept your fasting and good deeds.',
@@ -176,6 +212,7 @@ export const DEFAULT_SEASONAL_ALERT_MESSAGES: SeasonalLocalizedText = {
 };
 
 // Priority order for overlapping seasons (most specific event wins).
+// NOTE: keep this identical to SEASON_PRIORITY in lib/seasonal-content.ts.
 const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
   'eid_fitr',
   'eid_adha',
@@ -184,6 +221,9 @@ const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
   'ramadan',
   'dhul_hijjah',
   'hajj',
+  // Short, specific Hijri-new-year window (1–3 Muharram) must out-prioritize the
+  // month-wide `muharram` season (which maps to the default icon).
+  'hijri_new_year',
   'muharram',
   'rajab',
   'shaban',
@@ -264,7 +304,7 @@ function toNativeIconName(key: SeasonalIconKey): string | null {
     case 'default_en':
       return ENGLISH_ICON;
     default:
-      return key; // ramadan / hajj / mawlid / eid_* / dhul_hijjah
+      return key; // ramadan / hajj / mawlid / eid_* / hijri_new_year
   }
 }
 
@@ -283,7 +323,7 @@ export function resolveActiveIcon(
   if (mode === 'language_only') return langDefault;
 
   if (mode === 'manual' && config?.manualIcon) {
-    return config.manualIcon;
+    return normalizeIconKey(config.manualIcon);
   }
 
   // Auto mode: use season if active and enabled.
@@ -291,7 +331,7 @@ export function resolveActiveIcon(
     const enabled = config?.enabledSeasons ?? DEFAULT_ENABLED_SEASONS;
     if (enabled.includes(currentSeason as Exclude<SeasonType, 'none'>)) {
       const map = { ...DEFAULT_SEASONAL_MAP, ...(config?.seasonalMap ?? {}) };
-      const mapped = map[currentSeason as Exclude<SeasonType, 'none'>];
+      const mapped = normalizeIconKey(map[currentSeason as Exclude<SeasonType, 'none'>]);
       if (mapped && mapped !== 'default_ar' && mapped !== 'default_en') {
         return mapped;
       }
@@ -443,7 +483,8 @@ function scheduleAndroidDeferredSwitch(key: SeasonalIconKey): void {
  *     This guarantees OEM launchers refresh on next launch without killing the
  *     user's current session.
  */
-export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
+export async function setSeasonalIcon(rawKey: SeasonalIconKey): Promise<void> {
+  const key = normalizeIconKey(rawKey);
   if (await isIconAlreadyActive(key)) {
     // Clear any stale pending switch from a prior session.
     if (Platform.OS === 'android') {
@@ -472,8 +513,9 @@ export async function setSeasonalIcon(key: SeasonalIconKey): Promise<void> {
  * tasks while the app is suspended.
  */
 export async function setSeasonalIconForBackgroundTask(
-  key: SeasonalIconKey
+  rawKey: SeasonalIconKey
 ): Promise<void> {
+  const key = normalizeIconKey(rawKey);
   if (await isIconAlreadyActive(key)) return;
   await applyAppIconNow(key, /* killApp */ Platform.OS === 'android');
 }
@@ -525,9 +567,9 @@ export async function syncAppIconOnStartup(
   const config = await loadAppIconsConfig(forceConfigRefresh);
   const target = resolveActiveIcon(config, currentSeason, language);
   await setSeasonalIcon(target);
-  if (config?.version) {
-    await AsyncStorage.setItem(ICON_VERSION_KEY, String(config.version));
-  }
+  // NOTE: the version key is owned exclusively by checkForIconUpdate(). The sync
+  // path must NOT write it — doing so races the announcement check at startup and
+  // can silently swallow (or duplicate) the "icon updated" alert.
 }
 
 /**
@@ -542,9 +584,7 @@ export async function syncAppIconForBackgroundTask(
   const config = await loadAppIconsConfig(true);
   const target = resolveActiveIcon(config, currentSeason, language);
   await setSeasonalIconForBackgroundTask(target);
-  if (config?.version) {
-    await AsyncStorage.setItem(ICON_VERSION_KEY, String(config.version));
-  }
+  // Version key is owned exclusively by checkForIconUpdate() — see note there.
 }
 
 // ─── Update notification (multilingual) ─────────────────
@@ -595,9 +635,7 @@ export async function checkForIconUpdate(): Promise<void> {
     const data = await loadAppIconsConfig(true); // bypass cache so we see latest version
     if (!data || !data.alertEnabled || !data.version) return;
 
-    const savedVersion = await AsyncStorage.getItem(ICON_VERSION_KEY);
-    const lastVersion = savedVersion ? parseInt(savedVersion, 10) : 0;
-    if (data.version <= lastVersion) return;
+    const savedVersionRaw = await AsyncStorage.getItem(ICON_VERSION_KEY);
 
     const lang = getLanguage() as Language;
     const { getCurrentSeason } = await import('@/lib/seasonal-content');
@@ -607,20 +645,46 @@ export async function checkForIconUpdate(): Promise<void> {
       : null;
     const targetIcon = resolveActiveIcon(data, seasonalType, lang);
 
-    // Detect whether this version bump actually changes the visible icon BEFORE
-    // applying it. If the resolved icon is already active (e.g. an Arabic user
-    // with no active season stays on the default icon), showing an "icon updated"
-    // alert is misleading — the icon did not change. In that case we silently
-    // record the new version and skip the announcement.
-    const iconAlreadyActive = await isIconAlreadyActive(targetIcon);
-
-    // Always trigger the switch — setSeasonalIcon will no-op if already active.
+    // Apply the resolved icon first (setSeasonalIcon no-ops if already active),
+    // then verify it actually landed before deciding whether to announce.
     await setSeasonalIcon(targetIcon);
 
-    if (iconAlreadyActive) {
+    // Fresh install (or cleared storage): baseline silently. Nothing was
+    // "updated" — the user is seeing this build for the first time — so we record
+    // the version + the active variant without showing the update alert.
+    if (savedVersionRaw === null) {
       await AsyncStorage.setItem(ICON_VERSION_KEY, String(data.version));
+      await AsyncStorage.setItem(ICON_ANNOUNCED_KEY, targetIcon);
       return;
     }
+
+    const lastVersion = parseInt(savedVersionRaw, 10) || 0;
+
+    // Record the version UNCONDITIONALLY and up front. The announcement must be
+    // strictly once-per-version: even if the icon is already correct, the user
+    // dismisses the alert without tapping OK, or the native switch silently
+    // fails, we must never re-prompt for the same version on the next launch.
+    await AsyncStorage.setItem(ICON_VERSION_KEY, String(data.version));
+
+    // Only consider announcing when the admin actually pushed a newer version.
+    if (data.version <= lastVersion) return;
+
+    // VERIFIED-CHANGE GATE. Announce only when the target icon is genuinely the
+    // active one now — on iOS this checks live native state, on Android it checks
+    // the alias state we own. In Expo Go / when the native module is missing the
+    // switch is a no-op, so this is false and we never show a false "updated".
+    const verifiedActive = await isIconAlreadyActive(targetIcon);
+    if (!verifiedActive) return;
+
+    // And only when the visible icon differs from what we last announced. This
+    // prevents re-announcing a version bump that doesn't change the user's icon.
+    const lastAnnounced = (await AsyncStorage.getItem(ICON_ANNOUNCED_KEY)) as SeasonalIconKey | null;
+    const announcedBaseline: SeasonalIconKey = lastAnnounced ?? 'default_ar';
+    if (announcedBaseline === targetIcon) return;
+
+    // From here we will announce: record the announced variant so this exact
+    // visible icon is never announced twice.
+    await AsyncStorage.setItem(ICON_ANNOUNCED_KEY, targetIcon);
 
     const usesSeasonalIcon = targetIcon !== 'default_ar' && targetIcon !== 'default_en';
     const seasonalTitle = usesSeasonalIcon
@@ -641,14 +705,8 @@ export async function checkForIconUpdate(): Promise<void> {
     const message = seasonalMessage || pickLocalizedText(data.alertMessageI18n, data.alertMessage, data.alertMessageEn, lang);
     const okLabel = isRTL(lang) ? 'حسناً' : 'OK';
 
-    Alert.alert(title, message, [
-      {
-        text: okLabel,
-        onPress: async () => {
-          await AsyncStorage.setItem(ICON_VERSION_KEY, String(data.version));
-        },
-      },
-    ]);
+    // Version already persisted above — the button is purely an acknowledgement.
+    Alert.alert(title, message, [{ text: okLabel }]);
   } catch (e) {
     if (__DEV__) console.log('📱 Icon update check failed:', e);
   }

@@ -22,7 +22,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, DarkColors, Spacing, BorderRadius, Shadows, ModalColors } from '../constants/theme';
-import { APP_CONFIG } from '../constants/app';
+import { buildShareText } from '@/lib/share-text';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -962,15 +962,15 @@ export default function AllahNamesScreen() {
   // المشاركة
   const handleShareName = async (name: AllahName) => {
     const localizedMeaning = getNameMeaning(name, currentLang);
-    const text = `\u2728 \u0645\u0646 \u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0644\u0647 \u0627\u0644\u062d\u0633\u0646\u0649 \u2728\n\n\ud83c\udf1f ${name.name}\n\n\ud83d\udc8e \u0627\u0644\u0645\u0639\u0646\u0649: ${localizedMeaning}\n\n\ud83d\udcdd \u0627\u0644\u0634\u0631\u062d:\n${name.description}${name.evidence ? `\n\n\ud83d\udcd6 \u0627\u0644\u062f\u0644\u064a\u0644:\n${name.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
+    const text = `\u2728 \u0645\u0646 \u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0644\u0647 \u0627\u0644\u062d\u0633\u0646\u0649 \u2728\n\n\ud83c\udf1f ${name.name}\n\n\ud83d\udc8e \u0627\u0644\u0645\u0639\u0646\u0649: ${localizedMeaning}\n\n\ud83d\udcdd \u0627\u0644\u0634\u0631\u062d:\n${name.description}${name.evidence ? `\n\n\ud83d\udcd6 \u0627\u0644\u062f\u0644\u064a\u0644:\n${name.evidence}` : ''}`;
     await shareText(text, `${name.name} - \u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0644\u0647 \u0627\u0644\u062d\u0633\u0646\u0649`);
     setShowShareModal(false);
   };
   
   const handleCopyName = async (name: AllahName) => {
     const localizedMeaning = getNameMeaning(name, currentLang);
-    const text = `✨ من أسماء الله الحسنى ✨\n\n🌟 ${name.name}\n\n💎 المعنى: ${localizedMeaning}\n\n📝 الشرح:\n${name.description}${name.evidence ? `\n\n📖 الدليل:\n${name.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
-    
+    const text = buildShareText(`✨ من أسماء الله الحسنى ✨\n\n🌟 ${name.name}\n\n💎 المعنى: ${localizedMeaning}\n\n📝 الشرح:\n${name.description}${name.evidence ? `\n\n📖 الدليل:\n${name.evidence}` : ''}`);
+
     const success = await copyToClipboard(text);
     if (success) {
       Alert.alert(t('common.copied'), t('names.nameCopied'));
@@ -1313,7 +1313,7 @@ export default function AllahNamesScreen() {
                     onPress={async () => {
                       if (!selectedName) return;
                       const localizedMeaning = getNameMeaning(selectedName, currentLang);
-                      const text = `✨ من أسماء الله الحسنى ✨\n\n🌟 ${selectedName.name}\n\n💎 المعنى: ${localizedMeaning}\n\n📝 الشرح:\n${selectedName.description}${selectedName.evidence ? `\n\n📖 الدليل:\n${selectedName.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
+                      const text = buildShareText(`✨ من أسماء الله الحسنى ✨\n\n🌟 ${selectedName.name}\n\n💎 المعنى: ${localizedMeaning}\n\n📝 الشرح:\n${selectedName.description}${selectedName.evidence ? `\n\n📖 الدليل:\n${selectedName.evidence}` : ''}`);
                       const url = `whatsapp://send?text=${encodeURIComponent(text)}`;
                       const supported = await Linking.canOpenURL(url);
                       if (supported) {

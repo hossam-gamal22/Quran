@@ -1308,6 +1308,7 @@ export interface TranslationKeys {
     notificationsRequired: string;
     notificationsRequiredMsg: string;
     systemNotificationsBlockedMsg: string;
+    iosNotificationSettingsHint: string;
     openSettings: string;
     pm: string;
     prayer: string;
@@ -1851,6 +1852,26 @@ export interface TranslationKeys {
   
     activeUsersGetPremium: string;
   };
+  permissions: {
+    notificationsTitle: string;
+    notificationsBody: string;
+    exactAlarmTitle: string;
+    exactAlarmBody: string;
+    batteryTitle: string;
+    batteryBody: string;
+    oemTitle: string;
+    oemBody: string;
+    locationTitle: string;
+    locationBody: string;
+    dndTitle: string;
+    dndBody: string;
+    backgroundRefreshTitle: string;
+    backgroundRefreshBody: string;
+    openSettings: string;
+    grantPermission: string;
+    excludeApp: string;
+    thisDevice: string;
+  };
   celebration: {
     adhkarComplete: string;
     mayAllahAccept: string;
@@ -2060,6 +2081,8 @@ export interface TranslationKeys {
     atMeccaDesc: string;
     calibrate: string;
     distanceToKaaba: string;
+    enableLocationForAccuracy: string;
+    enableServicesForAccuracy: string;
     findingDirection: string;
     internetRequired: string;
     localCalc: string;
@@ -2238,6 +2261,8 @@ export interface TranslationKeys {
     settings: string;
     iosHint: string;
     androidHint: string;
+    updatingWidgets: string;
+    widgetsUpdated: string;
     permissions: string;
     backgroundRefresh: string;
     locationAccess: string;
@@ -2794,6 +2819,26 @@ export interface TranslationKeys {
 }
 // ==================== العربية ====================
 const ar: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'الإشعارات معطّلة',
+    notificationsBody: 'لن تصلك أذكار، تذكيرات الصلاة، أو أي تنبيهات. فعّل الإشعارات الآن.',
+    exactAlarmTitle: 'الأذان قد يتأخر',
+    exactAlarmBody: 'الأذان يحتاج إذن "الإنذارات الدقيقة" ليعمل في وقته بالضبط.',
+    batteryTitle: 'لضمان وصول الإشعارات',
+    batteryBody: 'استثناء التطبيق من توفير البطارية يضمن وصول إشعارات الصلاة دائماً.',
+    oemTitle: 'إعدادات {name} الإضافية',
+    oemBody: 'أجهزة {name} تحتاج تفعيل "التشغيل التلقائي" حتى تصلك إشعارات الصلاة دائماً.',
+    locationTitle: 'موقعك غير محدد',
+    locationBody: 'مواقيت الصلاة معتمدة حالياً على مكة. فعّل الموقع لمواقيت دقيقة لمدينتك.',
+    dndTitle: 'وضع "عدم الإزعاج" يكتم الأذان',
+    dndBody: 'وضع عدم الإزعاج مفعّل حالياً. اسمح للأذان بتجاوزه حتى لا يُكتم في وقت الصلاة.',
+    backgroundRefreshTitle: 'تحديث التطبيق في الخلفية معطّل',
+    backgroundRefreshBody: 'بدون "تحديث التطبيق في الخلفية" قد لا تتجدد إشعارات الصلاة بعد عدة أيام. فعّله من الإعدادات.',
+    openSettings: 'فتح الإعدادات',
+    grantPermission: 'منح الإذن',
+    excludeApp: 'استثناء التطبيق',
+    thisDevice: 'جهازك',
+  },
   gharibQuran: {
     title: 'غريب القرآن',
     subtitle: 'معاني الكلمات الصعبة والغريبة في القرآن — تصفّح أو ابحث عن كلمة.',
@@ -4062,6 +4107,7 @@ const ar: TranslationKeys = {
     notificationsRequired: 'الإشعارات مطلوبة',
     notificationsRequiredMsg: 'يرجى تفعيل الإشعارات من إعدادات الجهاز',
     systemNotificationsBlockedMsg: 'الإشعارات مفعّلة داخل التطبيق، لكنها معطّلة من إعدادات النظام في هاتفك. لن تصلك أي تنبيهات حتى تفتح إعدادات النظام وتسمح بالإشعارات لتطبيق روح المسلم.',
+    iosNotificationSettingsHint: 'بعد فتح صفحة إعدادات التطبيق: اضغط «الإشعارات» ثم فعّل «السماح بالإشعارات».',
     openSettings: 'فتح الإعدادات',
     pm: 'م',
     prayer: 'الصلاة',
@@ -4808,10 +4854,12 @@ const ar: TranslationKeys = {
   },
   qibla: {
     aligned: 'القبلة أمامك',
-    atMecca: 'أنت في مكة المكرمة 🕋',
-    atMeccaDesc: 'لا حاجة لتحديد اتجاه القبلة',
+    atMecca: 'أنت قرب الكعبة المشرّفة 🕋',
+    atMeccaDesc: 'استقبل الكعبة مباشرةً',
     calibrate: 'حرّك هاتفك على شكل ∞ لمعايرة البوصلة',
     distanceToKaaba: 'على بُعد {km} كم من الكعبة المشرفة',
+    enableLocationForAccuracy: 'فعّل إذن الموقع للحصول على اتجاه دقيق',
+    enableServicesForAccuracy: 'فعّل خدمة الموقع للحصول على اتجاه دقيق',
     findingDirection: 'جاري تحديد الاتجاه...',
     internetRequired: 'يتطلب الاتصال بالإنترنت',
     localCalc: 'حساب محلي',
@@ -4990,6 +5038,8 @@ const ar: TranslationKeys = {
     settings: 'الإعدادات',
     iosHint: 'اضغط مطولاً على الشاشة الرئيسية ثم اضغط "+" واختر روح المسلم لإضافة الودجة المناسبة',
     androidHint: 'اضغط مطولاً على الشاشة الرئيسية ثم اختر "الودجات" وابحث عن روح المسلم',
+    updatingWidgets: 'جارٍ تحديث الودجات…',
+    widgetsUpdated: 'تم تحديث الودجات',
     permissions: 'الأذونات',
     backgroundRefresh: 'تحديث في الخلفية',
     locationAccess: 'الوصول للموقع',
@@ -5528,6 +5578,26 @@ const ar: TranslationKeys = {
 };
 // ==================== English ====================
 const en: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Notifications are off',
+    notificationsBody: "You won't receive adhkar, prayer reminders, or any alerts. Enable notifications now.",
+    exactAlarmTitle: 'The adhan may be delayed',
+    exactAlarmBody: 'The adhan needs the "Alarms & reminders" permission to fire exactly on time.',
+    batteryTitle: 'To make sure notifications arrive',
+    batteryBody: 'Excluding the app from battery optimization ensures prayer notifications always arrive.',
+    oemTitle: 'Extra {name} settings',
+    oemBody: '{name} devices need "Auto-start" enabled so prayer notifications always reach you.',
+    locationTitle: 'Your location is not set',
+    locationBody: 'Prayer times currently rely on Makkah. Enable location for accurate times for your city.',
+    dndTitle: '"Do Not Disturb" silences the adhan',
+    dndBody: "Do Not Disturb is currently on. Allow the adhan to bypass it so it isn't muted at prayer time.",
+    backgroundRefreshTitle: 'Background App Refresh is off',
+    backgroundRefreshBody: 'Without "Background App Refresh", prayer notifications may stop renewing after a few days. Enable it in Settings.',
+    openSettings: 'Open Settings',
+    grantPermission: 'Grant permission',
+    excludeApp: 'Exclude app',
+    thisDevice: 'your device',
+  },
   gharibQuran: {
     title: 'Uncommon Quran Words',
     subtitle: 'Meanings of difficult and uncommon words in the Quran — browse or search.',
@@ -5596,7 +5666,7 @@ const en: TranslationKeys = {
     favorites: 'Favorites',
     addToFavorites: 'Add to Favorites',
     removeFromFavorites: 'Remove from Favorites',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'None',
     appBackgrounds: 'App Backgrounds',
     appSharingSig: 'From Rooh Al-Muslim app',
@@ -6796,6 +6866,7 @@ const en: TranslationKeys = {
     notificationsRequired: 'Notifications Required',
     notificationsRequiredMsg: 'Please enable notifications from device settings',
     systemNotificationsBlockedMsg: 'Notifications are enabled in the app, but blocked at the system level. You will not receive any alerts until you open device settings and allow notifications for Ruh Al-Muslim.',
+    iosNotificationSettingsHint: 'After the app settings page opens: tap “Notifications”, then turn on “Allow Notifications”.',
     openSettings: 'Open Settings',
     pm: 'PM',
     prayer: 'Prayer',
@@ -7542,10 +7613,12 @@ const en: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla Aligned',
-    atMecca: 'You are at Makkah Al-Mukarramah 🕋',
-    atMeccaDesc: 'No need to determine Qibla direction',
+    atMecca: 'You are near the Holy Kaaba 🕋',
+    atMeccaDesc: 'Face the Kaaba directly',
     calibrate: 'Move your phone in a figure-8 to calibrate',
     distanceToKaaba: '{km} km from the Kaaba',
+    enableLocationForAccuracy: 'Enable location access for an accurate direction',
+    enableServicesForAccuracy: 'Turn on location services for an accurate direction',
     findingDirection: 'Finding direction...',
     internetRequired: 'Internet required',
     localCalc: 'Local Calculation',
@@ -7724,6 +7797,8 @@ const en: TranslationKeys = {
     settings: 'Settings',
     iosHint: 'Long-press your home screen, tap +, then search for Rooh Al-Muslim and pick a widget.',
     androidHint: 'Long-press your home screen, tap Widgets, then search for Rooh Al-Muslim.',
+    updatingWidgets: 'Updating widgets…',
+    widgetsUpdated: 'Widgets updated',
     permissions: 'Permissions',
     backgroundRefresh: 'Background app refresh',
     locationAccess: 'Location access',
@@ -8262,6 +8337,26 @@ const en: TranslationKeys = {
 };
 //==================== Français ====================
 const fr: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Notifications désactivées',
+    notificationsBody: "Vous ne recevrez ni adhkar, ni rappels de prière, ni aucune alerte. Activez les notifications maintenant.",
+    exactAlarmTitle: "L'adhan peut être retardé",
+    exactAlarmBody: "L'adhan a besoin de l'autorisation « Alarmes et rappels » pour se déclencher à l'heure exacte.",
+    batteryTitle: 'Pour garantir la réception des notifications',
+    batteryBody: "Exclure l'application de l'optimisation de la batterie garantit que les notifications de prière arrivent toujours.",
+    oemTitle: 'Paramètres {name} supplémentaires',
+    oemBody: "Les appareils {name} nécessitent l'activation du « démarrage automatique » pour que les notifications de prière vous parviennent toujours.",
+    locationTitle: "Votre position n'est pas définie",
+    locationBody: 'Les horaires de prière se basent actuellement sur La Mecque. Activez la localisation pour des horaires précis pour votre ville.',
+    dndTitle: 'Le mode « Ne pas déranger » coupe l\'adhan',
+    dndBody: "Le mode Ne pas déranger est activé. Autorisez l'adhan à le contourner afin qu'il ne soit pas coupé à l'heure de la prière.",
+    backgroundRefreshTitle: "L'actualisation en arrière-plan est désactivée",
+    backgroundRefreshBody: 'Sans « Actualisation en arrière-plan », les notifications de prière peuvent cesser de se renouveler après quelques jours. Activez-la dans les Réglages.',
+    openSettings: 'Ouvrir les réglages',
+    grantPermission: "Accorder l'autorisation",
+    excludeApp: "Exclure l'application",
+    thisDevice: 'votre appareil',
+  },
   gharibQuran: {
     title: 'Mots rares du Coran',
     subtitle: 'Significations des mots difficiles et rares du Coran — parcourez ou recherchez.',
@@ -8330,7 +8425,7 @@ const fr: TranslationKeys = {
     favorites: 'Favoris',
     addToFavorites: 'Ajouter aux favoris',
     removeFromFavorites: 'Retirer des favoris',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Aucun',
     appBackgrounds: 'Fonds d\'écran',
     appSharingSig: 'Depuis l\'application Rooh Al-Muslim',
@@ -9528,6 +9623,7 @@ const fr: TranslationKeys = {
     notificationsRequired: 'Notifications requises',
     notificationsRequiredMsg: 'Veuillez activer les notifications dans les paramètres',
     systemNotificationsBlockedMsg: 'Les notifications sont activées dans l’application, mais bloquées au niveau du système. Vous ne recevrez aucune alerte tant que vous ne les autoriserez pas dans les paramètres de l’appareil.',
+    iosNotificationSettingsHint: 'Une fois la page des réglages de l’application ouverte : appuyez sur « Notifications », puis activez « Autoriser les notifications ».',
     openSettings: 'Ouvrir les paramètres',
     pm: 'PM',
     prayer: 'Prière',
@@ -10273,10 +10369,12 @@ const fr: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla alignée',
-    atMecca: 'Vous êtes à La Mecque 🕋',
-    atMeccaDesc: 'Pas besoin de déterminer la direction de la Qibla',
+    atMecca: 'Vous êtes près de la Sainte Kaaba 🕋',
+    atMeccaDesc: 'Faites face à la Kaaba directement',
     calibrate: 'Bougez votre téléphone en 8 pour calibrer',
     distanceToKaaba: 'À {km} km de la Kaaba',
+    enableLocationForAccuracy: "Activez l'accès à la localisation pour une direction précise",
+    enableServicesForAccuracy: 'Activez les services de localisation pour une direction précise',
     findingDirection: 'Recherche de la direction...',
     internetRequired: 'Internet requis',
     localCalc: 'Calcul local',
@@ -10455,6 +10553,8 @@ const fr: TranslationKeys = {
     settings: 'Paramètres',
     iosHint: 'Maintenez l\'écran d\'accueil enfoncé, touchez +, recherchez Rooh Al-Muslim et choisissez un widget.',
     androidHint: 'Maintenez l\'écran d\'accueil enfoncé, touchez Widgets, recherchez Rooh Al-Muslim.',
+    updatingWidgets: 'Mise à jour des widgets…',
+    widgetsUpdated: 'Widgets mis à jour',
     permissions: 'Autorisations',
     backgroundRefresh: 'Actualisation en arrière-plan',
     locationAccess: 'Accès à la localisation',
@@ -10960,6 +11060,26 @@ const fr: TranslationKeys = {
 
 // ==================== Deutsch ====================
 const de: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Benachrichtigungen deaktiviert',
+    notificationsBody: 'Du erhältst keine Adhkar, Gebetserinnerungen oder Hinweise. Aktiviere die Benachrichtigungen jetzt.',
+    exactAlarmTitle: 'Der Adhan kann sich verzögern',
+    exactAlarmBody: 'Der Adhan benötigt die Berechtigung „Wecker & Erinnerungen", um genau pünktlich auszulösen.',
+    batteryTitle: 'Damit Benachrichtigungen ankommen',
+    batteryBody: 'Die App von der Akkuoptimierung auszunehmen stellt sicher, dass Gebetsbenachrichtigungen immer ankommen.',
+    oemTitle: 'Zusätzliche {name}-Einstellungen',
+    oemBody: '{name}-Geräte benötigen aktivierten „Autostart", damit Gebetsbenachrichtigungen dich immer erreichen.',
+    locationTitle: 'Dein Standort ist nicht festgelegt',
+    locationBody: 'Die Gebetszeiten basieren derzeit auf Mekka. Aktiviere den Standort für genaue Zeiten deiner Stadt.',
+    dndTitle: '„Nicht stören" schaltet den Adhan stumm',
+    dndBody: '„Nicht stören" ist derzeit aktiv. Erlaube dem Adhan, ihn zu umgehen, damit er zur Gebetszeit nicht stummgeschaltet wird.',
+    backgroundRefreshTitle: 'Hintergrundaktualisierung ist aus',
+    backgroundRefreshBody: 'Ohne „Hintergrundaktualisierung" werden Gebetsbenachrichtigungen nach einigen Tagen möglicherweise nicht mehr erneuert. Aktiviere sie in den Einstellungen.',
+    openSettings: 'Einstellungen öffnen',
+    grantPermission: 'Berechtigung erteilen',
+    excludeApp: 'App ausnehmen',
+    thisDevice: 'dein Gerät',
+  },
   gharibQuran: {
     title: 'Seltene Koran-Wörter',
     subtitle: 'Bedeutungen schwieriger und seltener Wörter im Koran — durchsuchen oder suchen.',
@@ -11028,7 +11148,7 @@ const de: TranslationKeys = {
     favorites: 'Favoriten',
     addToFavorites: 'Zu Favoriten hinzufügen',
     removeFromFavorites: 'Aus Favoriten entfernen',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Keine',
     appBackgrounds: 'App-Hintergründe',
     appSharingSig: 'Von der Rooh Al-Muslim App',
@@ -12226,6 +12346,7 @@ const de: TranslationKeys = {
     notificationsRequired: 'Benachrichtigungen erforderlich',
     notificationsRequiredMsg: 'Bitte aktivieren Sie Benachrichtigungen in den Einstellungen',
     systemNotificationsBlockedMsg: 'Benachrichtigungen sind in der App aktiviert, aber auf Systemebene blockiert. Sie erhalten keine Hinweise, bis Sie sie in den Geräteeinstellungen erlauben.',
+    iosNotificationSettingsHint: 'Nachdem die App-Einstellungsseite geöffnet ist: Tippen Sie auf „Mitteilungen“ und aktivieren Sie „Mitteilungen erlauben“.',
     openSettings: 'Einstellungen öffnen',
     pm: 'PM',
     prayer: 'Gebet',
@@ -12971,10 +13092,12 @@ const de: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla ausgerichtet',
-    atMecca: 'Sie sind in Mekka 🕋',
-    atMeccaDesc: 'Keine Qibla-Bestimmung erforderlich',
+    atMecca: 'Sie sind nahe der heiligen Kaaba 🕋',
+    atMeccaDesc: 'Richten Sie sich direkt zur Kaaba aus',
     calibrate: 'Bewegen Sie Ihr Telefon in einer 8 zur Kalibrierung',
     distanceToKaaba: '{km} km von der Kaaba entfernt',
+    enableLocationForAccuracy: 'Standortzugriff für eine genaue Richtung aktivieren',
+    enableServicesForAccuracy: 'Standortdienste für eine genaue Richtung aktivieren',
     findingDirection: 'Richtung wird gesucht...',
     internetRequired: 'Internet erforderlich',
     localCalc: 'Lokale Berechnung',
@@ -13153,6 +13276,8 @@ const de: TranslationKeys = {
     settings: 'Einstellungen',
     iosHint: 'Halte den Startbildschirm gedrückt, tippe +, suche nach Rooh Al-Muslim und wähle ein Widget.',
     androidHint: 'Halte den Startbildschirm gedrückt, tippe auf Widgets und suche nach Rooh Al-Muslim.',
+    updatingWidgets: 'Widgets werden aktualisiert…',
+    widgetsUpdated: 'Widgets aktualisiert',
     permissions: 'Berechtigungen',
     backgroundRefresh: 'Hintergrund-Aktualisierung',
     locationAccess: 'Standortzugriff',
@@ -13658,6 +13783,26 @@ const de: TranslationKeys = {
 
 // ==================== Türkçe (Turkish) ====================
 const tr: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Bildirimler kapalı',
+    notificationsBody: 'Zikirler, namaz hatırlatıcıları veya hiçbir uyarı almazsınız. Bildirimleri şimdi etkinleştirin.',
+    exactAlarmTitle: 'Ezan gecikebilir',
+    exactAlarmBody: 'Ezanın tam vaktinde çalması için "Alarmlar ve hatırlatıcılar" iznine ihtiyacı var.',
+    batteryTitle: 'Bildirimlerin ulaşması için',
+    batteryBody: 'Uygulamayı pil optimizasyonundan hariç tutmak namaz bildirimlerinin her zaman ulaşmasını sağlar.',
+    oemTitle: 'Ek {name} ayarları',
+    oemBody: '{name} cihazlar, namaz bildirimlerinin her zaman ulaşması için "Otomatik başlatma" özelliğinin etkinleştirilmesini gerektirir.',
+    locationTitle: 'Konumunuz belirlenmedi',
+    locationBody: "Namaz vakitleri şu anda Mekke'ye dayanıyor. Şehriniz için doğru vakitler almak üzere konumu etkinleştirin.",
+    dndTitle: '"Rahatsız Etme" ezanı susturur',
+    dndBody: 'Rahatsız Etme şu anda açık. Namaz vaktinde susturulmaması için ezanın bunu geçmesine izin verin.',
+    backgroundRefreshTitle: 'Arka planda yenileme kapalı',
+    backgroundRefreshBody: '"Arka planda yenileme" olmadan namaz bildirimleri birkaç gün sonra yenilenmeyebilir. Ayarlardan etkinleştirin.',
+    openSettings: 'Ayarları aç',
+    grantPermission: 'İzin ver',
+    excludeApp: 'Uygulamayı hariç tut',
+    thisDevice: 'cihazınız',
+  },
   gharibQuran: {
     title: "Kur'an'ın Garip Kelimeleri",
     subtitle: "Kur'an'daki zor ve nadir kelimelerin anlamları — göz atın veya arayın.",
@@ -13726,7 +13871,7 @@ const tr: TranslationKeys = {
     favorites: 'Favoriler',
     addToFavorites: 'Favorilere Ekle',
     removeFromFavorites: 'Favorilerden Çıkar',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Yok',
     appBackgrounds: 'Uygulama Arka Planları',
     appSharingSig: 'Rooh Al-Muslim uygulamasından',
@@ -14924,6 +15069,7 @@ const tr: TranslationKeys = {
     notificationsRequired: 'Bildirimler Gerekli',
     notificationsRequiredMsg: 'Lütfen cihaz ayarlarından bildirimleri etkinleştirin',
     systemNotificationsBlockedMsg: 'Bildirimler uygulamada açık, ancak sistem düzeyinde engellenmiş. Cihaz ayarlarından izin vermediğiniz sürece hiçbir uyarı almazsınız.',
+    iosNotificationSettingsHint: 'Uygulama ayarları sayfası açıldıktan sonra: “Bildirimler”e dokunun, ardından “Bildirimlere İzin Ver”i açın.',
     openSettings: 'Ayarları Aç',
     pm: 'ÖS',
     prayer: 'Namaz',
@@ -15669,10 +15815,12 @@ const tr: TranslationKeys = {
   },
   qibla: {
     aligned: 'Kıble Hizalandı',
-    atMecca: 'Mekke\'desiniz 🕋',
-    atMeccaDesc: 'Kıble yönünü belirlemeye gerek yok',
+    atMecca: 'Kutsal Kâbe\'ye yakınsınız 🕋',
+    atMeccaDesc: 'Doğrudan Kâbe\'ye yönelin',
     calibrate: 'Pusulayı kalibre etmek için telefonunuzu 8 şeklinde hareket ettirin',
     distanceToKaaba: 'Kabe\'ye {km} km uzaklıkta',
+    enableLocationForAccuracy: 'Doğru yön için konum erişimini açın',
+    enableServicesForAccuracy: 'Doğru yön için konum servislerini açın',
     findingDirection: 'Yön bulunuyor...',
     internetRequired: 'İnternet Gerekli',
     localCalc: 'Yerel Hesaplama',
@@ -15851,6 +15999,8 @@ const tr: TranslationKeys = {
     settings: 'Ayarlar',
     iosHint: 'Ana ekrana uzun basın, + simgesine dokunun, Rooh Al-Muslim arayın.',
     androidHint: 'Ana ekrana uzun basın, Widget\'ları seçin, Rooh Al-Muslim arayın.',
+    updatingWidgets: 'Widget’lar güncelleniyor…',
+    widgetsUpdated: 'Widget’lar güncellendi',
     permissions: 'İzinler',
     backgroundRefresh: 'Arka plan yenileme',
     locationAccess: 'Konum erişimi',
@@ -16356,6 +16506,26 @@ const tr: TranslationKeys = {
 
 // ==================== Español ======================================
 const es: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Notificaciones desactivadas',
+    notificationsBody: 'No recibirás adhkar, recordatorios de oración ni ninguna alerta. Activa las notificaciones ahora.',
+    exactAlarmTitle: 'El adhan puede retrasarse',
+    exactAlarmBody: 'El adhan necesita el permiso de "Alarmas y recordatorios" para sonar exactamente a tiempo.',
+    batteryTitle: 'Para asegurar las notificaciones',
+    batteryBody: 'Excluir la app de la optimización de batería garantiza que las notificaciones de oración siempre lleguen.',
+    oemTitle: 'Ajustes adicionales de {name}',
+    oemBody: 'Los dispositivos {name} necesitan activar el "Inicio automático" para que las notificaciones de oración siempre te lleguen.',
+    locationTitle: 'Tu ubicación no está establecida',
+    locationBody: 'Los horarios de oración se basan actualmente en La Meca. Activa la ubicación para horarios precisos de tu ciudad.',
+    dndTitle: 'El modo "No molestar" silencia el adhan',
+    dndBody: 'El modo No molestar está activado. Permite que el adhan lo omita para que no se silencie a la hora de la oración.',
+    backgroundRefreshTitle: 'La actualización en segundo plano está desactivada',
+    backgroundRefreshBody: 'Sin la "Actualización en segundo plano", las notificaciones de oración pueden dejar de renovarse tras unos días. Actívala en Ajustes.',
+    openSettings: 'Abrir ajustes',
+    grantPermission: 'Conceder permiso',
+    excludeApp: 'Excluir la app',
+    thisDevice: 'tu dispositivo',
+  },
   gharibQuran: {
     title: 'Palabras poco comunes del Corán',
     subtitle: 'Significados de palabras difíciles y poco comunes del Corán: explora o busca.',
@@ -16424,7 +16594,7 @@ const es: TranslationKeys = {
     favorites: 'Favoritos',
     addToFavorites: 'Añadir a favoritos',
     removeFromFavorites: 'Quitar de favoritos',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Ninguno',
     appBackgrounds: 'Fondos de la aplicación',
     appSharingSig: 'Desde la aplicación Rooh Al-Muslim',
@@ -17622,6 +17792,7 @@ const es: TranslationKeys = {
     notificationsRequired: 'Notificaciones requeridas',
     notificationsRequiredMsg: 'Por favor activa las notificaciones en la configuración',
     systemNotificationsBlockedMsg: 'Las notificaciones están activadas en la aplicación, pero bloqueadas a nivel del sistema. No recibirás alertas hasta que las permitas en los ajustes del dispositivo.',
+    iosNotificationSettingsHint: 'Cuando se abra la página de ajustes de la app: toca «Notificaciones» y activa «Permitir notificaciones».',
     openSettings: 'Abrir configuración',
     pm: 'PM',
     prayer: 'Oración',
@@ -18367,10 +18538,12 @@ const es: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla alineada',
-    atMecca: 'Estás en La Meca 🕋',
-    atMeccaDesc: 'No es necesario determinar la dirección de la Qibla',
+    atMecca: 'Estás cerca de la Sagrada Kaaba 🕋',
+    atMeccaDesc: 'Oriéntate directamente hacia la Kaaba',
     calibrate: 'Mueve tu teléfono en forma de 8 para calibrar',
     distanceToKaaba: 'A {km} km de la Kaaba',
+    enableLocationForAccuracy: 'Activa el acceso a la ubicación para una dirección precisa',
+    enableServicesForAccuracy: 'Activa los servicios de ubicación para una dirección precisa',
     findingDirection: 'Buscando dirección...',
     internetRequired: 'Internet requerido',
     localCalc: 'Cálculo local',
@@ -18549,6 +18722,8 @@ const es: TranslationKeys = {
     settings: 'Configuración',
     iosHint: 'Mantén presionada la pantalla de inicio, toca +, busca Rooh Al-Muslim y elige un widget.',
     androidHint: 'Mantén presionada la pantalla de inicio, toca Widgets, busca Rooh Al-Muslim.',
+    updatingWidgets: 'Actualizando widgets…',
+    widgetsUpdated: 'Widgets actualizados',
     permissions: 'Permisos',
     backgroundRefresh: 'Actualización en segundo plano',
     locationAccess: 'Acceso a ubicación',
@@ -19053,6 +19228,26 @@ const es: TranslationKeys = {
 };
 // ==================== اردو (Urdu) ====================
 const ur: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'اطلاعات بند ہیں',
+    notificationsBody: 'آپ کو اذکار، نماز کی یاد دہانیاں یا کوئی الرٹ موصول نہیں ہوں گے۔ ابھی اطلاعات فعال کریں۔',
+    exactAlarmTitle: 'اذان میں تاخیر ہو سکتی ہے',
+    exactAlarmBody: 'اذان کو بالکل وقت پر چلنے کے لیے "الارمز اور یاد دہانیاں" کی اجازت درکار ہے۔',
+    batteryTitle: 'اطلاعات کی ترسیل یقینی بنائیں',
+    batteryBody: 'ایپ کو بیٹری کی بچت سے مستثنیٰ کرنا نماز کی اطلاعات کی ہمیشہ ترسیل کو یقینی بناتا ہے۔',
+    oemTitle: '{name} کی اضافی ترتیبات',
+    oemBody: '{name} ڈیوائسز کو نماز کی اطلاعات ہمیشہ پہنچانے کے لیے "آٹو اسٹارٹ" فعال کرنے کی ضرورت ہے۔',
+    locationTitle: 'آپ کا مقام متعین نہیں',
+    locationBody: 'نماز کے اوقات فی الحال مکہ پر مبنی ہیں۔ اپنے شہر کے درست اوقات کے لیے مقام فعال کریں۔',
+    dndTitle: '"ڈسٹرب نہ کریں" اذان کو خاموش کر دیتا ہے',
+    dndBody: 'ڈسٹرب نہ کریں اس وقت فعال ہے۔ اذان کو اس سے گزرنے کی اجازت دیں تاکہ نماز کے وقت خاموش نہ ہو۔',
+    backgroundRefreshTitle: 'پس منظر میں ایپ ریفریش بند ہے',
+    backgroundRefreshBody: '"پس منظر میں ریفریش" کے بغیر نماز کی اطلاعات چند دن بعد تجدید نہ ہوں۔ اسے ترتیبات میں فعال کریں۔',
+    openSettings: 'ترتیبات کھولیں',
+    grantPermission: 'اجازت دیں',
+    excludeApp: 'ایپ کو مستثنیٰ کریں',
+    thisDevice: 'آپ کی ڈیوائس',
+  },
   gharibQuran: {
     title: 'غریب القرآن',
     subtitle: 'قرآن کے مشکل اور نادر الفاظ کے معانی — تلاش کریں یا براؤز کریں۔',
@@ -20319,6 +20514,7 @@ const ur: TranslationKeys = {
     notificationsRequired: 'نوٹیفکیشنز ضروری ہیں',
     notificationsRequiredMsg: 'براہ کرم ڈیوائس سیٹنگز سے نوٹیفکیشنز فعال کریں',
     systemNotificationsBlockedMsg: 'نوٹیفکیشنز ایپ میں فعال ہیں لیکن سسٹم کی سطح پر بند ہیں۔ جب تک آپ ڈیوائس سیٹنگز سے اجازت نہیں دیں گے، کوئی الرٹ موصول نہیں ہوگا۔',
+    iosNotificationSettingsHint: 'ایپ کی سیٹنگز کا صفحہ کھلنے کے بعد: «Notifications» پر ٹیپ کریں، پھر «Allow Notifications» آن کریں۔',
     openSettings: 'سیٹنگز کھولیں',
     pm: 'شام',
     prayer: 'نماز',
@@ -21064,10 +21260,12 @@ const ur: TranslationKeys = {
   },
   qibla: {
     aligned: 'قبلہ سیدھ میں',
-    atMecca: 'آپ مکہ مکرمہ میں ہیں 🕋',
-    atMeccaDesc: 'قبلہ کی سمت معلوم کرنے کی ضرورت نہیں',
+    atMecca: 'آپ کعبہ مشرفہ کے قریب ہیں 🕋',
+    atMeccaDesc: 'کعبہ کا رخ سیدھا کریں',
     calibrate: 'کمپاس کو کیلیبریٹ کرنے کے لیے فون کو 8 کی شکل میں ہلائیں',
     distanceToKaaba: 'کعبہ سے {km} کلومیٹر دور',
+    enableLocationForAccuracy: 'درست سمت کے لیے مقام کی اجازت آن کریں',
+    enableServicesForAccuracy: 'درست سمت کے لیے مقام کی سروس آن کریں',
     findingDirection: 'سمت تلاش ہو رہی...',
     internetRequired: 'انٹرنیٹ ضروری',
     localCalc: 'مقامی حساب',
@@ -21246,6 +21444,8 @@ const ur: TranslationKeys = {
     settings: 'ترتیبات',
     iosHint: 'ہوم اسکرین پر طویل دبائیں، + پر ٹیپ کریں، روح المسلم تلاش کریں اور ویجٹ منتخب کریں۔',
     androidHint: 'ہوم اسکرین پر طویل دبائیں، ویجٹس منتخب کریں، روح المسلم تلاش کریں۔',
+    updatingWidgets: 'ویجٹس اپ ڈیٹ ہو رہے ہیں…',
+    widgetsUpdated: 'ویجٹس اپ ڈیٹ ہو گئے',
     permissions: 'اجازتیں',
     backgroundRefresh: 'پس منظر میں اپ ڈیٹ',
     locationAccess: 'مقام تک رسائی',
@@ -21751,6 +21951,26 @@ const ur: TranslationKeys = {
 
 // ==================== Bahasa Indonesia ======================================
 const id: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Notifikasi dinonaktifkan',
+    notificationsBody: 'Anda tidak akan menerima zikir, pengingat salat, atau peringatan apa pun. Aktifkan notifikasi sekarang.',
+    exactAlarmTitle: 'Azan mungkin tertunda',
+    exactAlarmBody: 'Azan memerlukan izin "Alarm & pengingat" agar berbunyi tepat waktu.',
+    batteryTitle: 'Agar notifikasi sampai',
+    batteryBody: 'Mengecualikan aplikasi dari pengoptimalan baterai memastikan notifikasi salat selalu sampai.',
+    oemTitle: 'Pengaturan {name} tambahan',
+    oemBody: 'Perangkat {name} perlu mengaktifkan "Mulai otomatis" agar notifikasi salat selalu sampai kepada Anda.',
+    locationTitle: 'Lokasi Anda belum diatur',
+    locationBody: 'Waktu salat saat ini mengacu pada Makkah. Aktifkan lokasi untuk waktu yang akurat di kota Anda.',
+    dndTitle: 'Mode "Jangan Ganggu" membisukan azan',
+    dndBody: 'Mode Jangan Ganggu sedang aktif. Izinkan azan melewatinya agar tidak dibisukan saat waktu salat.',
+    backgroundRefreshTitle: 'Penyegaran aplikasi di latar belakang nonaktif',
+    backgroundRefreshBody: 'Tanpa "Penyegaran latar belakang", notifikasi salat mungkin berhenti diperbarui setelah beberapa hari. Aktifkan di Pengaturan.',
+    openSettings: 'Buka Pengaturan',
+    grantPermission: 'Berikan izin',
+    excludeApp: 'Kecualikan aplikasi',
+    thisDevice: 'perangkat Anda',
+  },
   gharibQuran: {
     title: "Kosakata Sulit Al-Qur'an",
     subtitle: "Makna kata-kata sulit dan langka dalam Al-Qur'an — telusuri atau cari.",
@@ -21819,7 +22039,7 @@ const id: TranslationKeys = {
     favorites: 'Favorit',
     addToFavorites: 'Tambah ke Favorit',
     removeFromFavorites: 'Hapus dari Favorit',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Tidak ada',
     appBackgrounds: 'Latar Belakang Aplikasi',
     appSharingSig: 'Dari aplikasi Rooh Al-Muslim',
@@ -23017,6 +23237,7 @@ const id: TranslationKeys = {
     notificationsRequired: 'Notifikasi Diperlukan',
     notificationsRequiredMsg: 'Harap aktifkan notifikasi dari pengaturan perangkat',
     systemNotificationsBlockedMsg: 'Notifikasi aktif di aplikasi, tetapi diblokir di tingkat sistem. Anda tidak akan menerima peringatan sampai mengizinkannya di pengaturan perangkat.',
+    iosNotificationSettingsHint: 'Setelah halaman pengaturan aplikasi terbuka: ketuk “Notifications”, lalu aktifkan “Allow Notifications”.',
     openSettings: 'Buka Pengaturan',
     pm: 'PM',
     prayer: 'Sholat',
@@ -23762,10 +23983,12 @@ const id: TranslationKeys = {
   },
   qibla: {
     aligned: 'Kiblat Selaras',
-    atMecca: 'Anda berada di Mekah 🕋',
-    atMeccaDesc: 'Tidak perlu menentukan arah kiblat',
+    atMecca: 'Anda dekat dengan Ka\'bah 🕋',
+    atMeccaDesc: 'Hadap langsung ke Ka\'bah',
     calibrate: 'Gerakkan ponsel Anda membentuk angka 8 untuk kalibrasi',
     distanceToKaaba: '{km} km dari Ka\'bah',
+    enableLocationForAccuracy: 'Aktifkan akses lokasi untuk arah yang akurat',
+    enableServicesForAccuracy: 'Aktifkan layanan lokasi untuk arah yang akurat',
     findingDirection: 'Mencari arah...',
     internetRequired: 'Internet Diperlukan',
     localCalc: 'Perhitungan lokal',
@@ -23944,6 +24167,8 @@ const id: TranslationKeys = {
     settings: 'Pengaturan',
     iosHint: 'Tekan lama layar beranda, ketuk +, cari Rooh Al-Muslim dan pilih widget.',
     androidHint: 'Tekan lama layar beranda, pilih Widget, cari Rooh Al-Muslim.',
+    updatingWidgets: 'Memperbarui widget…',
+    widgetsUpdated: 'Widget diperbarui',
     permissions: 'Izin',
     backgroundRefresh: 'Pembaruan latar belakang',
     locationAccess: 'Akses lokasi',
@@ -24449,6 +24674,26 @@ const id: TranslationKeys = {
 
 // ==================== Bahasa Melayu ====================
 const ms: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Pemberitahuan dimatikan',
+    notificationsBody: 'Anda tidak akan menerima zikir, peringatan solat, atau sebarang amaran. Aktifkan pemberitahuan sekarang.',
+    exactAlarmTitle: 'Azan mungkin lewat',
+    exactAlarmBody: 'Azan memerlukan kebenaran "Penggera & peringatan" untuk berbunyi tepat pada masanya.',
+    batteryTitle: 'Untuk memastikan pemberitahuan sampai',
+    batteryBody: 'Mengecualikan apl daripada pengoptimuman bateri memastikan pemberitahuan solat sentiasa sampai.',
+    oemTitle: 'Tetapan {name} tambahan',
+    oemBody: 'Peranti {name} perlu mengaktifkan "Mula automatik" supaya pemberitahuan solat sentiasa sampai kepada anda.',
+    locationTitle: 'Lokasi anda belum ditetapkan',
+    locationBody: 'Waktu solat kini berdasarkan Makkah. Aktifkan lokasi untuk waktu yang tepat bagi bandar anda.',
+    dndTitle: 'Mod "Jangan Ganggu" membisukan azan',
+    dndBody: 'Mod Jangan Ganggu sedang aktif. Benarkan azan memintasnya supaya tidak dibisukan pada waktu solat.',
+    backgroundRefreshTitle: 'Segar semula apl latar belakang dimatikan',
+    backgroundRefreshBody: 'Tanpa "Segar semula latar belakang", pemberitahuan solat mungkin berhenti diperbaharui selepas beberapa hari. Aktifkannya dalam Tetapan.',
+    openSettings: 'Buka Tetapan',
+    grantPermission: 'Beri kebenaran',
+    excludeApp: 'Kecualikan apl',
+    thisDevice: 'peranti anda',
+  },
   gharibQuran: {
     title: 'Perkataan Sukar Al-Quran',
     subtitle: 'Makna perkataan sukar dan jarang dalam Al-Quran — lihat atau cari.',
@@ -24517,7 +24762,7 @@ const ms: TranslationKeys = {
     favorites: 'Kegemaran',
     addToFavorites: 'Tambah ke Kegemaran',
     removeFromFavorites: 'Buang dari Kegemaran',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Tiada',
     appBackgrounds: 'Latar Belakang Aplikasi',
     appSharingSig: 'Dari aplikasi Rooh Al-Muslim',
@@ -25715,6 +25960,7 @@ const ms: TranslationKeys = {
     notificationsRequired: 'Pemberitahuan Diperlukan',
     notificationsRequiredMsg: 'Sila aktifkan pemberitahuan dari tetapan peranti',
     systemNotificationsBlockedMsg: 'Pemberitahuan diaktifkan dalam aplikasi tetapi disekat pada peringkat sistem. Anda tidak akan menerima sebarang amaran sehingga membenarkannya dalam tetapan peranti.',
+    iosNotificationSettingsHint: 'Selepas halaman tetapan aplikasi terbuka: ketik “Notifications”, kemudian hidupkan “Allow Notifications”.',
     openSettings: 'Buka Tetapan',
     pm: 'PM',
     prayer: 'Solat',
@@ -26460,10 +26706,12 @@ const ms: TranslationKeys = {
   },
   qibla: {
     aligned: 'Kiblat Selaras',
-    atMecca: 'Anda berada di Mekah 🕋',
-    atMeccaDesc: 'Tidak perlu menentukan arah kiblat',
+    atMecca: 'Anda dekat dengan Ka\'bah 🕋',
+    atMeccaDesc: 'Hadap langsung ke Ka\'bah',
     calibrate: 'Gerakkan telefon anda dalam bentuk 8 untuk kalibrasi',
     distanceToKaaba: '{km} km dari Kaabah',
+    enableLocationForAccuracy: 'Aktifkan akses lokasi untuk arah yang akurat',
+    enableServicesForAccuracy: 'Aktifkan layanan lokasi untuk arah yang akurat',
     findingDirection: 'Mencari arah...',
     internetRequired: 'Internet Diperlukan',
     localCalc: 'Pengiraan tempatan',
@@ -26642,6 +26890,8 @@ const ms: TranslationKeys = {
     settings: 'Tetapan',
     iosHint: 'Tekan lama skrin utama, ketik +, cari Rooh Al-Muslim dan pilih widget.',
     androidHint: 'Tekan lama skrin utama, pilih Widget, cari Rooh Al-Muslim.',
+    updatingWidgets: 'Mengemas kini widget…',
+    widgetsUpdated: 'Widget dikemas kini',
     permissions: 'Kebenaran',
     backgroundRefresh: 'Penyegaran latar belakang',
     locationAccess: 'Akses lokasi',
@@ -27146,6 +27396,26 @@ const ms: TranslationKeys = {
 };
 // ==================== हिन्दी (Hindi) ======================================
 const hi: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'सूचनाएँ बंद हैं',
+    notificationsBody: 'आपको अज़कार, नमाज़ अनुस्मारक या कोई भी अलर्ट नहीं मिलेंगे। अभी सूचनाएँ चालू करें।',
+    exactAlarmTitle: 'अज़ान में देरी हो सकती है',
+    exactAlarmBody: 'अज़ान को ठीक समय पर बजने के लिए "अलार्म और अनुस्मारक" अनुमति चाहिए।',
+    batteryTitle: 'सूचनाएँ सुनिश्चित करने के लिए',
+    batteryBody: 'ऐप को बैटरी ऑप्टिमाइज़ेशन से बाहर रखने पर नमाज़ की सूचनाएँ हमेशा पहुँचती हैं।',
+    oemTitle: '{name} की अतिरिक्त सेटिंग्स',
+    oemBody: '{name} डिवाइस पर नमाज़ की सूचनाएँ हमेशा पहुँचाने के लिए "ऑटो-स्टार्ट" चालू करना ज़रूरी है।',
+    locationTitle: 'आपका स्थान सेट नहीं है',
+    locationBody: 'नमाज़ के समय फ़िलहाल मक्का पर आधारित हैं। अपने शहर के सटीक समय के लिए स्थान चालू करें।',
+    dndTitle: '"परेशान न करें" अज़ान को म्यूट करता है',
+    dndBody: 'परेशान न करें इस समय चालू है। नमाज़ के समय म्यूट न हो इसके लिए अज़ान को इसे बायपास करने दें।',
+    backgroundRefreshTitle: 'बैकग्राउंड ऐप रिफ़्रेश बंद है',
+    backgroundRefreshBody: '"बैकग्राउंड रिफ़्रेश" के बिना नमाज़ की सूचनाएँ कुछ दिनों बाद नवीनीकृत होना बंद कर सकती हैं। इसे सेटिंग्स में चालू करें।',
+    openSettings: 'सेटिंग्स खोलें',
+    grantPermission: 'अनुमति दें',
+    excludeApp: 'ऐप को बाहर रखें',
+    thisDevice: 'आपका डिवाइस',
+  },
   gharibQuran: {
     title: 'क़ुरआन के कठिन शब्द',
     subtitle: 'क़ुरआन के कठिन और दुर्लभ शब्दों के अर्थ — ब्राउज़ करें या खोजें।',
@@ -27214,7 +27484,7 @@ const hi: TranslationKeys = {
     favorites: 'पसंदीदा',
     addToFavorites: 'पसंदीदा में जोड़ें',
     removeFromFavorites: 'पसंदीदा से हटाएं',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'कोई नहीं',
     appBackgrounds: 'ऐप पृष्ठभूमि',
     appSharingSig: 'रूह अल-मुस्लिम ऐप से',
@@ -28413,6 +28683,7 @@ const hi: TranslationKeys = {
     notificationsRequired: 'अधिसूचनाएँ आवश्यक',
     notificationsRequiredMsg: 'कृपया डिवाइस सेटिंग्स से अधिसूचनाएँ सक्षम करें',
     systemNotificationsBlockedMsg: 'सूचनाएँ ऐप में सक्षम हैं लेकिन सिस्टम स्तर पर अवरुद्ध हैं। जब तक आप डिवाइस सेटिंग्स से अनुमति नहीं देंगे, कोई अलर्ट प्राप्त नहीं होगा।',
+    iosNotificationSettingsHint: 'ऐप सेटिंग्स पेज खुलने के बाद: “Notifications” पर टैप करें, फिर “Allow Notifications” चालू करें।',
     openSettings: 'सेटिंग्स खोलें',
     pm: 'PM',
     prayer: 'नमाज़',
@@ -29158,10 +29429,12 @@ const hi: TranslationKeys = {
   },
   qibla: {
     aligned: 'क़िबला सीध में',
-    atMecca: 'आप मक्का में हैं 🕋',
-    atMeccaDesc: 'क़िबला दिशा निर्धारित करने की आवश्यकता नहीं',
+    atMecca: 'आप पवित्र काबा के पास हैं 🕋',
+    atMeccaDesc: 'सीधे काबा की ओर मुख करें',
     calibrate: 'कम्पास कैलिब्रेट करने के लिए फोन को 8 के आकार में घुमाएं',
     distanceToKaaba: 'काबा से {km} किमी दूर',
+    enableLocationForAccuracy: 'सटीक दिशा के लिए स्थान पहुँच चालू करें',
+    enableServicesForAccuracy: 'सटीक दिशा के लिए स्थान सेवाएँ चालू करें',
     findingDirection: 'दिशा खोजी जा रही...',
     internetRequired: 'इंटरनेट आवश्यक',
     localCalc: 'स्थानीय गणना',
@@ -29340,6 +29613,8 @@ const hi: TranslationKeys = {
     settings: 'सेटिंग्स',
     iosHint: 'होम स्क्रीन को लंबे समय तक दबाएं, + पर टैप करें, रूह अल-मुस्लिम खोजें और विजेट चुनें।',
     androidHint: 'होम स्क्रीन को लंबे समय तक दबाएं, विजेट चुनें, रूह अल-मुस्लिम खोजें।',
+    updatingWidgets: 'विजेट अपडेट हो रहे हैं…',
+    widgetsUpdated: 'विजेट अपडेट हो गए',
     permissions: 'अनुमतियाँ',
     backgroundRefresh: 'बैकग्राउंड रिफ्रेश',
     locationAccess: 'स्थान पहुंच',
@@ -29845,6 +30120,26 @@ const hi: TranslationKeys = {
 
 // ==================== বাংলা (Bengali) ====================
 const bn: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'নোটিফিকেশন বন্ধ আছে',
+    notificationsBody: 'আপনি যিকর, নামাজের রিমাইন্ডার বা কোনো সতর্কতা পাবেন না। এখনই নোটিফিকেশন চালু করুন।',
+    exactAlarmTitle: 'আজান বিলম্বিত হতে পারে',
+    exactAlarmBody: 'আজান সঠিক সময়ে বাজার জন্য "অ্যালার্ম ও রিমাইন্ডার" অনুমতি প্রয়োজন।',
+    batteryTitle: 'নোটিফিকেশন নিশ্চিত করতে',
+    batteryBody: 'অ্যাপটিকে ব্যাটারি অপ্টিমাইজেশন থেকে বাদ দিলে নামাজের নোটিফিকেশন সবসময় পৌঁছায়।',
+    oemTitle: '{name}-এর অতিরিক্ত সেটিংস',
+    oemBody: '{name} ডিভাইসে নামাজের নোটিফিকেশন সবসময় পৌঁছাতে "অটো-স্টার্ট" চালু করা প্রয়োজন।',
+    locationTitle: 'আপনার অবস্থান নির্ধারণ করা হয়নি',
+    locationBody: 'নামাজের সময় বর্তমানে মক্কার উপর নির্ভরশীল। আপনার শহরের সঠিক সময়ের জন্য অবস্থান চালু করুন।',
+    dndTitle: '"বিরক্ত করবেন না" আজান নীরব করে দেয়',
+    dndBody: 'বিরক্ত করবেন না এখন চালু আছে। নামাজের সময় যেন নীরব না হয় সেজন্য আজানকে এটি অতিক্রম করতে দিন।',
+    backgroundRefreshTitle: 'ব্যাকগ্রাউন্ড অ্যাপ রিফ্রেশ বন্ধ',
+    backgroundRefreshBody: '"ব্যাকগ্রাউন্ড রিফ্রেশ" ছাড়া নামাজের নোটিফিকেশন কয়েক দিন পর নবায়ন বন্ধ হতে পারে। সেটিংসে এটি চালু করুন।',
+    openSettings: 'সেটিংস খুলুন',
+    grantPermission: 'অনুমতি দিন',
+    excludeApp: 'অ্যাপ বাদ দিন',
+    thisDevice: 'আপনার ডিভাইস',
+  },
   gharibQuran: {
     title: 'কুরআনের কঠিন শব্দ',
     subtitle: 'কুরআনের কঠিন ও বিরল শব্দের অর্থ — ব্রাউজ করুন বা খুঁজুন।',
@@ -29913,7 +30208,7 @@ const bn: TranslationKeys = {
     favorites: 'প্রিয়',
     addToFavorites: 'প্রিয়তে যোগ করুন',
     removeFromFavorites: 'প্রিয় থেকে সরান',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'কিছুই না',
     appBackgrounds: 'অ্যাপ ব্যাকগ্রাউন্ড',
     appSharingSig: 'রূহ আল-মুসলিম অ্যাপ থেকে',
@@ -31111,6 +31406,7 @@ const bn: TranslationKeys = {
     notificationsRequired: 'নোটিফিকেশন প্রয়োজন',
     notificationsRequiredMsg: 'অনুগ্রহ করে ডিভাইস সেটিংস থেকে নোটিফিকেশন চালু করুন',
     systemNotificationsBlockedMsg: 'অ্যাপে নোটিফিকেশন চালু আছে কিন্তু সিস্টেম স্তরে বন্ধ আছে। ডিভাইস সেটিংস থেকে অনুমতি না দিলে কোনো সতর্কতা পাবেন না।',
+    iosNotificationSettingsHint: 'অ্যাপ সেটিংস পেজ খোলার পর: “Notifications”-এ ট্যাপ করুন, তারপর “Allow Notifications” চালু করুন।',
     openSettings: 'সেটিংস খুলুন',
     pm: 'PM',
     prayer: 'নামাজ',
@@ -31856,10 +32152,12 @@ const bn: TranslationKeys = {
   },
   qibla: {
     aligned: 'কিবলা সারিবদ্ধ',
-    atMecca: 'আপনি মক্কায় আছেন 🕋',
-    atMeccaDesc: 'কিবলার দিক নির্ধারণের প্রয়োজন নেই',
+    atMecca: 'আপনি পবিত্র কাবার কাছে আছেন 🕋',
+    atMeccaDesc: 'সরাসরি কাবার দিকে মুখ করুন',
     calibrate: 'কম্পাস ক্যালিব্রেট করতে ফোনটি ৮ আকারে নাড়ান',
     distanceToKaaba: 'কাবা থেকে {km} কিমি দূরে',
+    enableLocationForAccuracy: 'সঠিক দিকের জন্য অবস্থান অ্যাক্সেস চালু করুন',
+    enableServicesForAccuracy: 'সঠিক দিকের জন্য অবস্থান পরিষেবা চালু করুন',
     findingDirection: 'দিক খোঁজা হচ্ছে...',
     internetRequired: 'ইন্টারনেট প্রয়োজন',
     localCalc: 'স্থানীয় গণনা',
@@ -32038,6 +32336,8 @@ const bn: TranslationKeys = {
     settings: 'সেটিংস',
     iosHint: 'হোম স্ক্রিনে দীর্ঘক্ষণ চাপ দিন, + ট্যাপ করুন, রূহ আল-মুসলিম খুঁজুন এবং উইজেট নির্বাচন করুন।',
     androidHint: 'হোম স্ক্রিনে দীর্ঘক্ষণ চাপ দিন, উইজেট নির্বাচন করুন, রূহ আল-মুসলিম খুঁজুন।',
+    updatingWidgets: 'উইজেট আপডেট হচ্ছে…',
+    widgetsUpdated: 'উইজেট আপডেট হয়েছে',
     permissions: 'অনুমতি',
     backgroundRefresh: 'ব্যাকগ্রাউন্ড রিফ্রেশ',
     locationAccess: 'অবস্থান অ্যাক্সেস',
@@ -32543,6 +32843,26 @@ const bn: TranslationKeys = {
 
 // ==================== Русский (Russian) ======================================
 const ru: TranslationKeys = {
+  permissions: {
+    notificationsTitle: 'Уведомления отключены',
+    notificationsBody: 'Вы не будете получать азкары, напоминания о молитве и любые оповещения. Включите уведомления сейчас.',
+    exactAlarmTitle: 'Азан может опаздывать',
+    exactAlarmBody: 'Для срабатывания азана точно вовремя нужно разрешение «Будильники и напоминания».',
+    batteryTitle: 'Чтобы уведомления доходили',
+    batteryBody: 'Исключение приложения из оптимизации батареи гарантирует, что уведомления о молитве всегда придут.',
+    oemTitle: 'Дополнительные настройки {name}',
+    oemBody: 'Устройствам {name} нужно включить «Автозапуск», чтобы уведомления о молитве всегда доходили до вас.',
+    locationTitle: 'Ваше местоположение не задано',
+    locationBody: 'Время молитв сейчас рассчитывается по Мекке. Включите геолокацию для точного времени вашего города.',
+    dndTitle: 'Режим «Не беспокоить» заглушает азан',
+    dndBody: 'Режим «Не беспокоить» сейчас включён. Разрешите азану обходить его, чтобы он не заглушался во время молитвы.',
+    backgroundRefreshTitle: 'Фоновое обновление отключено',
+    backgroundRefreshBody: 'Без «Фонового обновления» уведомления о молитве могут перестать обновляться через несколько дней. Включите его в настройках.',
+    openSettings: 'Открыть настройки',
+    grantPermission: 'Предоставить разрешение',
+    excludeApp: 'Исключить приложение',
+    thisDevice: 'ваше устройство',
+  },
   gharibQuran: {
     title: 'Редкие слова Корана',
     subtitle: 'Значения трудных и редких слов Корана — просматривайте или ищите.',
@@ -32611,7 +32931,7 @@ const ru: TranslationKeys = {
     favorites: 'Избранное',
     addToFavorites: 'Добавить в избранное',
     removeFromFavorites: 'Удалить из избранного',
-    appName: 'Rooh Muslim',
+    appName: 'Rooh Al-Muslim',
     none: 'Нет',
     appBackgrounds: 'Фоны приложения',
     appSharingSig: 'Из приложения Рух Аль-Муслим',
@@ -33809,6 +34129,7 @@ const ru: TranslationKeys = {
     notificationsRequired: 'Уведомления необходимы',
     notificationsRequiredMsg: 'Включите уведомления в настройках устройства',
     systemNotificationsBlockedMsg: 'Уведомления включены в приложении, но заблокированы на уровне системы. Вы не получите никаких оповещений, пока не разрешите их в настройках устройства.',
+    iosNotificationSettingsHint: 'После открытия страницы настроек приложения: нажмите «Уведомления», затем включите «Допуск уведомлений».',
     openSettings: 'Открыть настройки',
     pm: 'PM',
     prayer: 'Молитва',
@@ -34554,10 +34875,12 @@ const ru: TranslationKeys = {
   },
   qibla: {
     aligned: 'Кибла выравнена',
-    atMecca: 'Вы находитесь в Мекке 🕋',
-    atMeccaDesc: 'Нет необходимости определять направление Киблы',
+    atMecca: 'Вы рядом со священной Каабой 🕋',
+    atMeccaDesc: 'Обратитесь прямо к Каабе',
     calibrate: 'Двигайте телефон восьмёркой для калибровки',
     distanceToKaaba: '{km} км от Каабы',
+    enableLocationForAccuracy: 'Включите доступ к геолокации для точного направления',
+    enableServicesForAccuracy: 'Включите службы геолокации для точного направления',
     findingDirection: 'Поиск направления...',
     internetRequired: 'Требуется интернет',
     localCalc: 'Локальный расчёт',
@@ -34736,6 +35059,8 @@ const ru: TranslationKeys = {
     settings: 'Настройки',
     iosHint: 'Удерживайте главный экран, нажмите +, найдите Rooh Al-Muslim и выберите виджет.',
     androidHint: 'Удерживайте главный экран, выберите Виджеты, найдите Rooh Al-Muslim.',
+    updatingWidgets: 'Обновление виджетов…',
+    widgetsUpdated: 'Виджеты обновлены',
     permissions: 'Разрешения',
     backgroundRefresh: 'Обновление в фоне',
     locationAccess: 'Доступ к геолокации',

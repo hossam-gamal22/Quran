@@ -57,6 +57,7 @@ import { trackAzkarRead } from '@/lib/firebase-analytics';
 import { getUserId } from '@/lib/firebase-user';
 import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
 import { t } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio, type AudioTrack } from '@/contexts/GlobalAudioContext';
 import { useCelebration } from '@/contexts/CelebrationContext';
@@ -985,8 +986,7 @@ export default function CategoryAzkarScreen() {
       } else if ((zikr as CustomDhikr).translation) {
         parts.push((zikr as CustomDhikr).translation as string);
       }
-      parts.push(t('azkar.fromApp'));
-      await Share.share({ message: parts.join('\n\n') });
+      await Share.share({ message: buildShareText(parts.join('\n\n')) });
     } catch (error) {
       console.error('Error sharing:', error);
     }
@@ -2934,7 +2934,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.24,
     shadowRadius: 16,
-    elevation: 8,
+    // No Android `elevation`: bg is translucent; elevation draws an inner ghost square.
   },
   incompleteAlertIcon: {
     width: 34,

@@ -153,6 +153,14 @@ export function resolvePrayerTableState(
   } else if (rowForEpoch(rows, flatFuture)) {
     nextRow = rowForEpoch(rows, flatFuture);
     nextEpochMs = flatFuture;
+  } else if (flatFuture) {
+    // All of today's prayers have already passed (evening, after Isha) and the
+    // next future epoch (from the 7-day allPrayerEpochs) is tomorrow's first
+    // prayer — Fajr. Use it directly instead of falling through to the stale
+    // `isNext`/`nextPrayerAtEpochMs` fields, which at night still point at a
+    // PAST prayer (e.g. Maghrib) and render "بعد 0 ث" on first placement.
+    nextRow = rows[0];
+    nextEpochMs = flatFuture;
   } else if (explicitNextRow) {
     nextRow = explicitNextRow;
     nextEpochMs = usableNextAt ?? explicitNextRow.epochMs ?? flatFuture;

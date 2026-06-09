@@ -1,7 +1,7 @@
 // app/memorization/mistakes.tsx
 // قسم أخطائي — يعرض الآيات التي دخلت needs_review بعد خطأ في اختبار أو تسميع.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -54,13 +54,28 @@ export default function MistakesScreen() {
 
   const styles = makeStyles(colors, isRTL);
 
+  // Guard against double-taps marking the same ayah twice in one frame.
+  const busyRef = useRef(false);
+
   const stabilize = async (state: AyahMemoryState) => {
-    await markPassed(state.surahNumber, state.ayahNumber);
-    await recordDailyActivity();
+    if (busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markPassed(state.surahNumber, state.ayahNumber);
+      await recordDailyActivity();
+    } finally {
+      busyRef.current = false;
+    }
   };
 
   const keepWorking = async (state: AyahMemoryState) => {
-    await markFailed(state.surahNumber, state.ayahNumber);
+    if (busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markFailed(state.surahNumber, state.ayahNumber);
+    } finally {
+      busyRef.current = false;
+    }
   };
 
   return (

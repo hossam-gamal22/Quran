@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { setPumpContext, pumpThemesFromCurrentState } from '@/lib/widgets/pump';
-import { resolveWidgetTheme, RESOLVED_WIDGET_THEMES, type ResolvedWidgetTheme } from '@/lib/widgets/snapshot';
+import { resolveWidgetTheme, pruneSnapshotsToActiveState, RESOLVED_WIDGET_THEMES } from '@/lib/widgets/snapshot';
 import { reloadWidgetsFromCache } from '@/lib/widget-data-bridge';
 import { getLanguage } from '@/lib/i18n';
 import type { SharedWidgetData } from '@/lib/widget-data';
@@ -60,6 +60,16 @@ async function readDataSignature(): Promise<{
   }
 }
 
+/** Resolve the widget language the snapshot pump should bake in: explicit ar/en
+ *  override wins; 'auto' (or unset) follows the app language. Mirrors the
+ *  resolution in updateWidgetData so the foreground pump and the data bridge
+ *  agree on the baked language. */
+function resolveWidgetLang(widgetLanguage: string | undefined, appLang: string): 'ar' | 'en' {
+  if (widgetLanguage === 'ar') return 'ar';
+  if (widgetLanguage === 'en') return 'en';
+  return appLang === 'ar' || appLang === 'ur' ? 'ar' : 'en';
+}
+
 export function SnapshotPumpController() {
   const { settings } = useSettings();
   const { isPremium } = useSubscription();
@@ -69,6 +79,7 @@ export function SnapshotPumpController() {
   // triggers the effect below.
   const stableKey = JSON.stringify({
     lang: getLanguage(),
+    wlang: display.widgetLanguage,
     isPremium,
     theme: display.widgetTheme,
     numerals: display.widgetNumerals,
@@ -81,10 +92,12 @@ export function SnapshotPumpController() {
 
   /** Active-theme-first pump:
    *  1. Render the user's resolved theme synchronously (~5 s) so any placed
-   *     widget can find its PNG immediately.
-   *  2. After step 1 resolves, defer the remaining 6 themes to background work
-   *     so they're ready for iOS Edit Widget / Android theme switches without
-   *     blocking the visible UI. */
+   *     widget can find its PNG immediately, then reload the OS widgets.
+   *  2. After it resolves, do platform-specific background work:
+   *     - iOS keeps every theme baked so the native "Edit Widget" picker can
+   *       switch a widget's appearance while the app is closed.
+   *     - Android (single-state) prunes any leftover other-theme / other-language
+   *       artifacts so the on-disk footprint stays ~1×. */
   const runActiveThenBackgroundPump = React.useCallback(async (force: boolean) => {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
     const active = resolveWidgetTheme(display.widgetTheme, Appearance.getColorScheme());
@@ -95,10 +108,17 @@ export function SnapshotPumpController() {
       // up the fresh snapshot even though the file changed on disk.
       await reloadWidgetsFromCache();
     } catch {}
-    const rest = RESOLVED_WIDGET_THEMES.filter((t) => t !== active);
-    if (rest.length === 0) return;
     InteractionManager.runAfterInteractions(() => {
-      pumpThemesFromCurrentState(rest, { force, debounceMs: 0 }).catch(() => {});
+      (async () => {
+        try {
+          if (Platform.OS === 'ios') {
+            const rest = RESOLVED_WIDGET_THEMES.filter((t) => t !== active);
+            if (rest.length > 0) await pumpThemesFromCurrentState(rest, { force, debounceMs: 0 });
+          } else {
+            await pruneSnapshotsToActiveState(active, resolveWidgetLang(display.widgetLanguage, getLanguage()));
+          }
+        } catch {}
+      })();
     });
   }, [display]);
 
@@ -109,7 +129,7 @@ export function SnapshotPumpController() {
       const sigs = await readDataSignature();
       if (cancelled) return;
       setPumpContext({
-        language: getLanguage(),
+        language: resolveWidgetLang(display.widgetLanguage, getLanguage()),
         isPremium,
         display,
         ...sigs,
@@ -140,7 +160,7 @@ export function SnapshotPumpController() {
       if (state !== 'active') return;
       const sigs = await readDataSignature();
       setPumpContext({
-        language: getLanguage(),
+        language: resolveWidgetLang(display.widgetLanguage, getLanguage()),
         isPremium,
         display,
         ...sigs,

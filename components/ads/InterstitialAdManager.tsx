@@ -103,8 +103,11 @@ export const showInterstitial = async (options: ShowInterstitialOptions = {}): P
     const remainingTimeout = () => Math.max(0, timeoutMs - (Date.now() - startedAt));
     const hasTimedOut = () => remainingTimeout() <= 0;
     const { fetchAdsConfig, getAdUnitId, canShowGlobalAd, recordGlobalAdShown } = require('@/lib/ads-config');
-    const { getSubscriptionState } = require('@/lib/subscription-manager');
+    const { getSubscriptionState, isPremiumActiveSync } = require('@/lib/subscription-manager');
 
+    // Honor admin/winner (leaderboard top-3) grants that may not yet be
+    // mirrored into the persisted subscription snapshot.
+    if (isPremiumActiveSync()) return false;
     const [config, sub] = await Promise.all([fetchAdsConfig(), getSubscriptionState()]);
     if (hasTimedOut()) return false;
     if (!config.enabled || config.showInterstitials === false || sub.isPremium) return false;

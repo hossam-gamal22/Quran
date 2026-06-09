@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Typography, ModalColors } from '../constants/theme';
-import { APP_CONFIG } from '../constants/app';
+import { buildShareText } from '@/lib/share-text';
 import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBidh, getAyyamAlBidhEvent, setCachedHijriOffset } from '../lib/hijri-date';
 import type { IslamicEventDetails } from '../lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -411,8 +411,7 @@ export default function HijriScreen() {
       if (day.events.length > 0) {
         shareText += `\n🎉 ${day.events.map(e => getLocalizedEventName(e)).join(' - ')}\n`;
       }
-      shareText += `\n${APP_CONFIG.getShareSignature()}`;
-      await Share.share({ message: shareText });
+      await Share.share({ message: buildShareText(shareText) });
     } catch {}
   };
 
@@ -640,8 +639,8 @@ export default function HijriScreen() {
                 key={index}
                 style={[styles.eventCard, { flexDirection: isRTL ? 'row-reverse' : 'row', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
                 onPress={async () => {
-                  const shareText = `🌙 ${getLocalizedEventName(ev)}\n📅 ${ev.hijriDateStr}\n📆 ${ev.gregorianDate.getDate()} ${gregorianMonthNames[ev.gregorianDate.getMonth()]} ${ev.gregorianDate.getFullYear()}\n${getLocalizedEventDesc(ev) || ''}\n\n${APP_CONFIG.getShareSignature()}`;
-                  await Share.share({ message: shareText });
+                  const shareText = `🌙 ${getLocalizedEventName(ev)}\n📅 ${ev.hijriDateStr}\n📆 ${ev.gregorianDate.getDate()} ${gregorianMonthNames[ev.gregorianDate.getMonth()]} ${ev.gregorianDate.getFullYear()}\n${getLocalizedEventDesc(ev) || ''}`;
+                  await Share.share({ message: buildShareText(shareText) });
                 }}
                 activeOpacity={0.7}
               >

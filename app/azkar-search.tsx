@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
 import { Colors, DarkColors } from '@/constants/theme';
@@ -250,8 +251,8 @@ export default function AzkarSearchScreen() {
   const shareZikr = async (zikr: Zikr) => {
     try {
       const translation = getZikrTranslation(zikr, language);
-      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${transliterateReference(zikr.reference, language)}\n\n${t('common.fromApp')}`;
-      
+      const message = buildShareText(`${zikr.arabic}\n\n${translation}\n\n📖 ${transliterateReference(zikr.reference, language)}`);
+
       await Share.share({ message });
     } catch (error) {
       console.error('Error sharing:', error);

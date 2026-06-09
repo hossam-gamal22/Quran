@@ -124,7 +124,9 @@ TaskManager.defineTask(TASK_NAME, async () => {
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
       kahfReminder: n.kahfReminder,
-    });
+    }, { allowPrompt: false });
+    // Background context: never surface a system prompt. Check-only —
+    // reschedules only if permission was already granted.
 
     // ── Smart Fajr/Suhoor alarm reschedule ────────────────────────────────────
     // Re-arms the multi-day alarm cascade so it keeps firing even if the user
@@ -169,13 +171,34 @@ TaskManager.defineTask(TASK_NAME, async () => {
       // Belt-and-braces: also call the pump directly in case refreshWidgetsNow
       // hit the "snapshot generation skipped" branch silently. Force=true
       // ensures the hash check doesn't short-circuit us.
+      //
+      // iOS keeps all 7 themes baked so the native Edit Widget picker works
+      // offline. Android (single-state) bakes only the active theme + current
+      // language and prunes the rest, so a background run never re-grows the
+      // on-disk footprint that the foreground pump trimmed.
       try {
-        const { pumpFromCurrentState } = await import('./widgets/pump');
-        const pumpResult = await pumpFromCurrentState({ force: true, debounceMs: 0 });
-        if (pumpResult) {
-          console.log(
-            `[background-task] Pump direct: ran=${pumpResult.ran} reason=${pumpResult.reason} entries=${pumpResult.entries?.length ?? 0} errors=${pumpResult.errors?.length ?? 0}`,
-          );
+        if (Platform.OS === 'ios') {
+          const { pumpFromCurrentState } = await import('./widgets/pump');
+          const pumpResult = await pumpFromCurrentState({ force: true, debounceMs: 0 });
+          if (pumpResult) {
+            console.log(
+              `[background-task] Pump direct (all themes): ran=${pumpResult.ran} reason=${pumpResult.reason} entries=${pumpResult.entries?.length ?? 0} errors=${pumpResult.errors?.length ?? 0}`,
+            );
+          }
+        } else {
+          const { pumpThemesFromCurrentState, getPumpContext } = await import('./widgets/pump');
+          const { resolveWidgetTheme, pruneSnapshotsToActiveState } = await import('./widgets/snapshot');
+          const { getLanguage } = await import('./i18n');
+          const ctx = getPumpContext();
+          const active = resolveWidgetTheme(ctx?.display?.widgetTheme, null);
+          const pumpResult = await pumpThemesFromCurrentState([active], { force: true, debounceMs: 0 });
+          if (pumpResult) {
+            console.log(
+              `[background-task] Pump direct (theme=${active}): ran=${pumpResult.ran} reason=${pumpResult.reason} entries=${pumpResult.entries?.length ?? 0} errors=${pumpResult.errors?.length ?? 0}`,
+            );
+          }
+          const lang = getLanguage();
+          await pruneSnapshotsToActiveState(active, lang === 'en' ? 'en' : 'ar');
         }
       } catch (pe) {
         console.warn('[background-task] Direct pump failed (non-fatal):', pe);

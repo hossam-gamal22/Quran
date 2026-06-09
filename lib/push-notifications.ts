@@ -50,11 +50,13 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+      // Mark AFTER the prompt was actually shown, so the recovery banner only
+      // fires once the user has genuinely been asked (Android-gated).
       if (Platform.OS === 'android') {
         await markPermissionRequested('notifications');
       }
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {

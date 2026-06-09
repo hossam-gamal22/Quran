@@ -247,19 +247,21 @@ export async function saveAllNotifSettings(
 }
 
 // ─── Permission ───────────────────────────────────────────────────────────────
-// Requests notification permission only if not previously determined.
-// If the user already denied (canAskAgain === false), returns false without
-// surfacing a system prompt — avoids re-prompting on every launch.
-export async function requestNotifPermission(): Promise<boolean> {
+// Separates "check" from "request". A real OS prompt (and the markPermissionRequested
+// flag that drives the recovery banner) only ever happens on a user-initiated path
+// that passes { prompt: true }. Automatic paths (cold-start scheduling, background
+// tasks, periodic reschedules) pass the default { prompt: false } and only READ the
+// current status — they never surface a system prompt and never mark "requested".
+export async function requestNotifPermission(
+  { prompt = false }: { prompt?: boolean } = {},
+): Promise<boolean> {
   if (Platform.OS === 'web') return false;
   const { status: existing, canAskAgain } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
+  // Automatic path: check-only. No prompt, no "requested" mark.
+  if (!prompt) return false;
+  // Already denied permanently — don't re-prompt; PermissionBanner guides to Settings.
   if (existing === 'denied' && !canAskAgain) return false;
-  if (Platform.OS === 'android' && Platform.Version >= 33) {
-    await markPermissionRequested('notifications');
-    const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
-  }
   const { status } = await Notifications.requestPermissionsAsync({
     ios: {
       allowAlert: true,
@@ -267,6 +269,9 @@ export async function requestNotifPermission(): Promise<boolean> {
       allowSound: true,
     },
   });
+  // Mark AFTER the prompt was actually shown, so the recovery banner only fires
+  // once the user has genuinely been asked (and on Android, where the banner is gated).
+  if (Platform.OS === 'android') await markPermissionRequested('notifications');
   return status === 'granted';
 }
 
@@ -788,7 +793,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   quranReadingReminderTimes?: string[];
   // Phase 7: ربط ذكي بأوقات الصلاة
   azkarAutoAnchor?: boolean;
-}): Promise<void> {
+}, { allowPrompt = false }: { allowPrompt?: boolean } = {}): Promise<void> {
   // ─── Mutex Guard: Prevent concurrent scheduling ───────────────────────────
   // Multiple code paths call this function on cold start (loadSettings,
   // syncNotificationDefaults). Without this guard, one call's cancelAll can
@@ -816,7 +821,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       return;
     }
 
-    const hasPermission = await requestNotifPermission();
+    const hasPermission = await requestNotifPermission({ prompt: allowPrompt });
     if (!hasPermission) return;
 
     // ─── Clean slate for non-prayer alarms only ───────────────────────────
@@ -1977,7 +1982,8 @@ export async function sendTestNotification(
     advanceMinutes?: number;
   } = {},
 ): Promise<void> {
-  const hasPermission = await requestNotifPermission();
+  // User-initiated test button — explicitly allowed to surface the OS prompt.
+  const hasPermission = await requestNotifPermission({ prompt: true });
   if (!hasPermission) throw new Error('NO_PERMISSION');
 
   const meta = TEST_NOTIF_MAP[categoryId] ?? TEST_NOTIF_MAP.prayer;

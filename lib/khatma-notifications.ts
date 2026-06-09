@@ -58,11 +58,12 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+      // Mark AFTER the prompt was actually shown (Android-gated banner).
       if (Platform.OS === 'android') {
         await markPermissionRequested('notifications');
       }
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {

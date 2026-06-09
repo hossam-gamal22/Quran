@@ -13,7 +13,6 @@ import {
   AppState,
   AppStateStatus,
   Platform,
-  Linking,
   ActivityIndicator,
   LayoutAnimation,
   UIManager,
@@ -51,7 +50,7 @@ import { fetchDownloadableSounds, getDownloadedSounds, downloadSound, isSoundDow
 import { sendTestNotification } from '@/lib/notifications-manager';
 import { checkExactAlarmPermission, openExactAlarmSettings } from '@/services/notifications/permissions';
 import { useSmartAlarm } from '@/contexts/SmartAlarmContext';
-import { checkAllPermissions, markPermissionRequested, openBatteryOptimizationSettings } from '@/lib/permission-recovery';
+import { checkAllPermissions, markPermissionRequested, openBatteryOptimizationSettings, openNotificationSettings } from '@/lib/permission-recovery';
 
 
 // Removed: interstitial ads on sound download to reduce user frustration
@@ -772,12 +771,15 @@ export default function NotificationsScreen() {
     setPermissionStatus(status);
     setPermissionChecked(true);
     if (status !== 'granted' && settings.notifications.enabled) {
+      const blockedMsg = Platform.OS === 'ios'
+        ? `${t('notificationSounds.systemNotificationsBlockedMsg')}\n\n${t('notificationSounds.iosNotificationSettingsHint')}`
+        : t('notificationSounds.systemNotificationsBlockedMsg');
       Alert.alert(
         t('notificationSounds.notificationsDisabled'),
-        t('notificationSounds.systemNotificationsBlockedMsg'),
+        blockedMsg,
         [
           { text: t('common.cancel'), style: 'cancel' },
-          { text: t('notificationSounds.openSettings'), onPress: () => Linking.openSettings() },
+          { text: t('notificationSounds.openSettings'), onPress: () => openNotificationSettings() },
         ],
       );
     }
@@ -816,12 +818,15 @@ export default function NotificationsScreen() {
     setPermissionStatus(status);
 
     if (status !== 'granted') {
+      const requiredMsg = Platform.OS === 'ios'
+        ? `${t('notificationSounds.notificationsRequiredMsg')}\n\n${t('notificationSounds.iosNotificationSettingsHint')}`
+        : t('notificationSounds.notificationsRequiredMsg');
       Alert.alert(
         t('notificationSounds.notificationsRequired'),
-        t('notificationSounds.notificationsRequiredMsg'),
+        requiredMsg,
         [
           { text: t('common.cancel'), style: 'cancel' },
-          { text: t('notificationSounds.openSettings'), onPress: () => Linking.openSettings() },
+          { text: t('notificationSounds.openSettings'), onPress: () => openNotificationSettings() },
         ]
       );
     } else {

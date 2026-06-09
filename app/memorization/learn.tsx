@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useColors } from '@/hooks/use-colors';
 import { GlassCard, UniversalHeader } from '@/components/ui';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -39,6 +40,7 @@ import {
   toArabicDigits,
 } from '@/lib/memorization-helpers';
 import { memorizationPlayer, type MemoPlayerEvent } from '@/lib/memorization-player';
+import type { AyahRef } from '@/types/memorization';
 import { rtlChevronBack, rtlChevronForward } from '@/lib/rtl-utils';
 
 const REPEAT_OPTIONS = [3, 5, 7, 10];
@@ -81,13 +83,19 @@ export default function LearnScreen() {
     markFailed,
     updateSettings,
     recordDailyActivity,
+    isTodayReady,
   } = useMemorization();
 
-  const ayahs = useMemo(() => {
-    const list = [...todayPlan.newAyahs];
-    if (list.length === 0) return todayPlan.reviewAyahs;
-    return list;
-  }, [todayPlan]);
+  // Freeze today's ward ONCE for this session. Marking ayahs mutates the live
+  // todayPlan; without freezing, the daily list would shrink/refill mid-walk
+  // and skip ayahs. Re-entering the screen remounts → fresh snapshot.
+  const [ayahs, setAyahs] = useState<AyahRef[] | null>(null);
+  useEffect(() => {
+    if (ayahs === null && isTodayReady && activePlan) {
+      const list = [...todayPlan.newAyahs];
+      setAyahs(list.length > 0 ? list : [...todayPlan.reviewAyahs]);
+    }
+  }, [ayahs, isTodayReady, activePlan, todayPlan.newAyahs, todayPlan.reviewAyahs]);
 
   const [index, setIndex] = useState(0);
   const [repeats, setRepeats] = useState(settings.defaultRepeatCount);
@@ -115,7 +123,8 @@ export default function LearnScreen() {
   const [isPlayingRecording, setIsPlayingRecording] = useState(false);
   const [step, setStep] = useState<'idle' | 'listen' | 'recite_with' | 'recite_alone' | 'done'>('idle');
 
-  const current = ayahs[index];
+  const current = ayahs ? ayahs[index] : undefined;
+  const ayahsLen = ayahs?.length ?? 0;
   const defaultRangeSurah = useMemo(() => {
     return (
       current?.surahNumber ??
@@ -129,6 +138,21 @@ export default function LearnScreen() {
   const flowCancelledRef = useRef(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const recordingSoundRef = useRef<Audio.Sound | null>(null);
+  const markBusyRef = useRef(false);
+  // Mirror the latest recorded URI so unmount cleanup can delete the temp file.
+  const recordedUriRef = useRef<string | null>(null);
+
+  // Delete a temporary recording file so re-recording doesn't orphan audio on disk.
+  const deleteRecordedFile = useCallback(async (uri: string | null) => {
+    if (!uri) return;
+    try {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    recordedUriRef.current = recordedUri;
+  }, [recordedUri]);
 
   useEffect(() => {
     return () => {
@@ -136,6 +160,11 @@ export default function LearnScreen() {
       memorizationPlayer.stop();
       recordingSoundRef.current?.unloadAsync().catch(() => {});
       recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+      if (recordedUriRef.current) {
+        FileSystem.deleteAsync(recordedUriRef.current, { idempotent: true }).catch(
+          () => {},
+        );
+      }
     };
   }, []);
 
@@ -301,6 +330,7 @@ export default function LearnScreen() {
       }
       await recordingSoundRef.current?.unloadAsync().catch(() => {});
       recordingSoundRef.current = null;
+      await deleteRecordedFile(recordedUri);
       setRecordedUri(null);
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -314,7 +344,7 @@ export default function LearnScreen() {
     } catch (e: any) {
       Alert.alert(mt('errSave'), String(e?.message ?? e));
     }
-  }, [onStop]);
+  }, [onStop, recordedUri, deleteRecordedFile]);
 
   const stopRecording = useCallback(async () => {
     const currentRecording = recordingRef.current;
@@ -378,19 +408,33 @@ export default function LearnScreen() {
   }, [onStop, recordedUri]);
 
   const onMarkMemorized = useCallback(async () => {
-    if (!current) return;
-    await markPassed(current.surahNumber, current.ayahNumber);
-    await recordDailyActivity();
-    setStep('idle');
-    setIndex((i) => Math.min(i + 1, ayahs.length - 1));
-  }, [current, markPassed, recordDailyActivity, ayahs.length]);
+    if (!current || markBusyRef.current) return;
+    markBusyRef.current = true;
+    try {
+      await markPassed(current.surahNumber, current.ayahNumber);
+      await recordDailyActivity();
+      await deleteRecordedFile(recordedUri);
+      setRecordedUri(null);
+      setStep('idle');
+      setIndex((i) => Math.min(i + 1, (ayahs?.length ?? 1) - 1));
+    } finally {
+      markBusyRef.current = false;
+    }
+  }, [current, markPassed, recordDailyActivity, ayahs, recordedUri, deleteRecordedFile]);
 
   const onMarkNeedsReview = useCallback(async () => {
-    if (!current) return;
-    await markFailed(current.surahNumber, current.ayahNumber);
-    setStep('idle');
-    setIndex((i) => Math.min(i + 1, ayahs.length - 1));
-  }, [current, markFailed, ayahs.length]);
+    if (!current || markBusyRef.current) return;
+    markBusyRef.current = true;
+    try {
+      await markFailed(current.surahNumber, current.ayahNumber);
+      await deleteRecordedFile(recordedUri);
+      setRecordedUri(null);
+      setStep('idle');
+      setIndex((i) => Math.min(i + 1, (ayahs?.length ?? 1) - 1));
+    } finally {
+      markBusyRef.current = false;
+    }
+  }, [current, markFailed, ayahs, recordedUri, deleteRecordedFile]);
 
   const rangeSurahNumber = parsePositiveInput(listenSurah) ?? defaultRangeSurah;
   const recitalSurahNumber = parsePositiveInput(recitalSurah) ?? defaultRangeSurah;
@@ -569,7 +613,7 @@ export default function LearnScreen() {
             : learnMode === 'recital'
               ? displayRef
             : current
-              ? `${mt('currentWirdPosition', { n: index + 1, total: ayahs.length })} • ${getSurahName(current.surahNumber)}`
+              ? `${mt('currentWirdPosition', { n: index + 1, total: ayahsLen })} • ${getSurahName(current.surahNumber)}`
               : ''}
         </Text>
 
@@ -1004,9 +1048,9 @@ export default function LearnScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            disabled={index >= ayahs.length - 1}
-            onPress={() => setIndex((i) => Math.min(ayahs.length - 1, i + 1))}
-            style={[styles.navBtn, index >= ayahs.length - 1 && { opacity: 0.4 }]}
+            disabled={index >= ayahsLen - 1}
+            onPress={() => setIndex((i) => Math.min(ayahsLen - 1, i + 1))}
+            style={[styles.navBtn, index >= ayahsLen - 1 && { opacity: 0.4 }]}
           >
             <Text style={styles.navText}>{mt('next')}</Text>
             <MaterialCommunityIcons name={rtlChevronForward(isRTL) as any} size={22} color={colors.text} />

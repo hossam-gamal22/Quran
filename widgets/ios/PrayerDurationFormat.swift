@@ -26,32 +26,43 @@ import Foundation
 
 enum PrayerDurationFormat {
     /// Compact human duration. Negative inputs clamp to zero.
-    static func compact(seconds: Int, language: String) -> String {
+    ///
+    /// `roundUpMinutes` rounds a partial minute UP — used for "until next prayer"
+    /// so the value matches the wall-clock minute difference (8:06 → 8:30 reads
+    /// 24 د, not 23). Elapsed ("since") timers keep flooring.
+    static func compact(seconds: Int, language: String, roundUpMinutes: Bool = false) -> String {
         let total = max(0, seconds)
         let isArabic = (language == "ar")
         if total < 60 {
             return isArabic ? "\(total) ث" : "\(total)S"
         }
-        let totalMinutes = total / 60
+        let totalMinutes = roundUpMinutes ? (total + 59) / 60 : total / 60
         if totalMinutes < 60 {
             return isArabic ? "\(totalMinutes) د" : "\(totalMinutes)M"
         }
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
+        // \u{2002} (EN SPACE) = wider gap after «س», matching the JS twin's SIN_MINUTE_GAP.
         return isArabic
-            ? "\(hours) س \(minutes) د"
+            ? "\(hours) س\u{2002}\(minutes) د"
             : "\(hours)H \(minutes)M"
     }
 
     /// `target − now` formatted compactly. Negative deltas clamp to 0.
+    /// The prayer epoch is truncated to the minute first (rows show HH:MM, not
+    /// seconds) so the shown value matches the wall-clock HH:MM difference.
     static func until(_ target: Date, from now: Date, language: String) -> String {
-        let secs = Int(target.timeIntervalSince(now))
-        return compact(seconds: secs, language: language)
+        let targetMin = Date(timeIntervalSince1970: (target.timeIntervalSince1970 / 60).rounded(.down) * 60)
+        let secs = Int(targetMin.timeIntervalSince(now))
+        return compact(seconds: secs, language: language, roundUpMinutes: true)
     }
 
     /// `now − past` formatted compactly. Negative deltas clamp to 0.
+    /// The prayer epoch is truncated to the minute so «منذ» matches the
+    /// displayed HH:MM difference (4:33 vs Fajr 4:11 → «منذ ٢٢ د», not 21).
     static func since(_ past: Date, from now: Date, language: String) -> String {
-        let secs = Int(now.timeIntervalSince(past))
+        let pastMin = Date(timeIntervalSince1970: (past.timeIntervalSince1970 / 60).rounded(.down) * 60)
+        let secs = Int(now.timeIntervalSince(pastMin))
         return compact(seconds: secs, language: language)
     }
 

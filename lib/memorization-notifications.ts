@@ -58,10 +58,11 @@ export async function scheduleMemorizationReminder(
   try {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) {
+      const req = await Notifications.requestPermissionsAsync();
+      // Mark AFTER the prompt was actually shown (Android-gated banner).
       if (Platform.OS === 'android') {
         await markPermissionRequested('notifications');
       }
-      const req = await Notifications.requestPermissionsAsync();
       if (!req.granted) return null;
     }
 

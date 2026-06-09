@@ -25,6 +25,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings, useTranslation } from '@/contexts/SettingsContext';
 import { getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import {
   type EidInfo,
@@ -187,7 +188,7 @@ export default function EidScreen() {
 
   const shareTakbeer = useCallback(async () => {
     try {
-      await Share.share({ message: `${TAKBEERAT_EID}\n\nروح المسلم — Ruh Al-Muslim` });
+      await Share.share({ message: buildShareText(TAKBEERAT_EID) });
     } catch {}
   }, []);
 

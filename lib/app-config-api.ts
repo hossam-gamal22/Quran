@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { shouldRefetchContent, markContentFetched } from './content-manifest';
+import { logFirestoreError } from './firestore-error';
 import { APP_CONFIG } from '../constants/app';
 
 export interface WelcomeBannerConfig {
@@ -379,7 +380,7 @@ export const subscribeToAppConfig = (
       await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));
       onUpdate(mergedConfig);
     } catch (error) {
-      console.error('❌ خطأ في تحديثات Firebase:', error);
+      logFirestoreError('خطأ في تحديثات Firebase', error);
       if (onError) onError(error as Error);
     }
   })();
@@ -422,7 +423,7 @@ export const subscribeToHighlights = (
       await AsyncStorage.setItem('@highlights_cache', JSON.stringify(filtered));
       onUpdate(filtered);
     } catch (error) {
-      console.error('❌ خطأ في تحديثات الأبرز:', error);
+      logFirestoreError('خطأ في تحديثات الأبرز', error);
       if (onError) onError(error as Error);
     }
   })();
@@ -579,7 +580,7 @@ export const subscribeToSDUIScreen = (
       }
     },
     (error) => {
-      console.error(`❌ خطأ في الاشتراك بـ SDUI ${screenId}:`, error);
+      logFirestoreError(`خطأ في الاشتراك بـ SDUI ${screenId}`, error);
       if (onError) onError(error);
     }
   );
@@ -615,7 +616,7 @@ export const subscribeToAllSDUIScreens = (
       onUpdate(configs);
     },
     (error) => {
-      console.error('❌ خطأ في الاشتراك بجميع شاشات SDUI:', error);
+      logFirestoreError('خطأ في الاشتراك بجميع شاشات SDUI', error);
       if (onError) onError(error);
     }
   );
@@ -764,7 +765,7 @@ export const subscribeToHomePageConfig = (
       await AsyncStorage.setItem(HOME_PAGE_CONFIG_CACHE_KEY, JSON.stringify(data));
       onUpdate(data);
     } catch (error) {
-      console.error('❌ خطأ في تحديثات الصفحة الرئيسية:', error);
+      logFirestoreError('خطأ في تحديثات الصفحة الرئيسية', error);
       if (onError) onError(error as Error);
     }
   })();
@@ -833,7 +834,7 @@ export const fetchActiveTempPages = async (): Promise<TempPage[]> => {
     await AsyncStorage.setItem('@temp_pages_cache', JSON.stringify(active));
     return active;
   } catch (error) {
-    console.error('Error fetching temp pages:', error);
+    logFirestoreError('Error fetching temp pages', error);
     const cached = await AsyncStorage.getItem('@temp_pages_cache');
     if (cached) {
       try {
@@ -856,7 +857,7 @@ export const fetchTempPageById = async (id: string): Promise<TempPage | null> =>
     if (!snap.exists()) return null;
     return { ...snap.data(), id: snap.id } as TempPage;
   } catch (error) {
-    console.error('Error fetching temp page:', error);
+    logFirestoreError('Error fetching temp page', error);
     return null;
   }
 };

@@ -40,6 +40,7 @@ import { Platform, View, type LayoutChangeEvent, type ViewStyle } from 'react-na
 
 import {
   useAnchorRegistrar,
+  useBlankPrayerState,
   useSnapshotRootRef,
   useWidgetSnapshotCapture,
   type CaptureAnchor,
@@ -64,6 +65,17 @@ export interface AnchorReporterProps {
   direction?: CaptureAnchor['direction'];
   /** True when the live value is the compact-duration countdown string. */
   isCountdown?: boolean;
+  /** Set on the prayer NAME anchors. On Android, non-countdown anchors are
+   *  normally baked into the PNG; when this is set AND the gallery-pump capture
+   *  context has `blankPrayerState` on, the name is blanked on Android too so the
+   *  gallery fallback PNG draws the live name instead of a baked-stale one. Does
+   *  nothing for the per-state template bake (which keeps the name baked). */
+  blankOnAndroidCapture?: boolean;
+  /** Measure-only: report the rect during capture but NEVER hide the children
+   *  (no opacity:0). Used to record a region's bounds (e.g. a table row container
+   *  `prayerRowBg.<key>`) while its baked content stays in the PNG, so the live
+   *  overlay can position something — e.g. the active-row highlight — exactly. */
+  measureOnly?: boolean;
   /** What the gallery renders. The capture path hides this and reserves
    *  the same rect so layout is preserved. */
   children: React.ReactNode;
@@ -80,7 +92,18 @@ export interface AnchorReporterProps {
  */
 export function AnchorReporter(props: AnchorReporterProps): React.ReactElement {
   const capturing = useWidgetSnapshotCapture();
-  const hideDuringCapture = capturing && !(Platform.OS === 'android' && !props.isCountdown);
+  const blankPrayerState = useBlankPrayerState();
+  // Measure-only anchors report their rect but never hide their children.
+  // iOS: every anchor is overlaid live (SwiftUI), so hide all during capture.
+  // Android: anchors are baked into the PNG EXCEPT countdowns (always overlaid)
+  // and — only in the gallery pump (`blankPrayerState`) — the prayer NAME anchors,
+  // so the gallery fallback PNG draws the live name. Per-state template bakes
+  // keep the name baked (blankPrayerState is false there).
+  const hideDuringCapture = capturing && props.measureOnly !== true && (
+    Platform.OS !== 'android'
+      ? true
+      : props.isCountdown === true || (props.blankOnAndroidCapture === true && blankPrayerState)
+  );
   const register = useAnchorRegistrar();
   const rootRef = useSnapshotRootRef();
   const reportedRef = React.useRef(false);

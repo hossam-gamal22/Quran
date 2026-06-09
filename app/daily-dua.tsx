@@ -21,6 +21,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
@@ -116,8 +117,8 @@ export default function DailyDuaScreen() {
         if (dua.translation) parts.push(dua.translation);
         else parts.push(dua.arabic);
       }
-      parts.push(`📖 ${dua.reference}`, `\n${t('common.fromApp')}`);
-      await Share.share({ message: parts.join('\n\n') });
+      parts.push(`📖 ${dua.reference}`);
+      await Share.share({ message: buildShareText(parts.join('\n\n')) });
     } catch { /* ignore */ }
   };
 

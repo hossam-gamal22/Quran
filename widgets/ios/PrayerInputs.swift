@@ -124,8 +124,9 @@ enum PrayerKey: String, Codable, CaseIterable {
     }
 
     func arabicName(on date: Date) -> String {
+        // Widget Friday label is the single word «الجمعة» (replaces «الظهر»), per spec.
         if self == .dhuhr && Calendar(identifier: .gregorian).component(.weekday, from: date) == 6 {
-            return "صلاة الجمعة"
+            return "الجمعة"
         }
         switch self {
         case .fajr:    return "الفجر"

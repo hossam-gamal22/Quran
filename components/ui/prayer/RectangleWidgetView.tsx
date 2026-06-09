@@ -98,7 +98,14 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
                 resizeMode="contain"
               />
             </View>
-            <Text style={[styles.appName, { color: greenColor }]}>{t('common.appName')}</Text>
+            <Text
+              style={[styles.appName, { color: greenColor }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {t('common.appName')}
+            </Text>
           </View>
         </View>
       </View>

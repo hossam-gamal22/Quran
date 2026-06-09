@@ -7,9 +7,11 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 import {
   MemorizationPlan,
   AyahMemoryState,
@@ -17,6 +19,7 @@ import {
   MemorizationStreak,
   MemorizationStats,
   TodayPlan,
+  TodayPlanSnapshot,
   ayahKey,
 } from '@/types/memorization';
 import {
@@ -35,11 +38,18 @@ import {
   updateMemorizationSettings,
   bumpStreak,
   ensureAyahState as ensureAyahStateStorage,
+  getTodaySnapshot,
+  saveTodaySnapshot,
+  clearTodaySnapshot,
   DEFAULT_SETTINGS,
 } from '@/lib/memorization-storage';
 import { todayString } from '@/lib/memorization-srs';
 import { getAyahCount } from '@/lib/memorization-helpers';
-import { computeTodayPlan } from '@/lib/memorization-today-plan';
+import {
+  computeAssignedToday,
+  deriveTodayPlan,
+  EMPTY_TODAY_PLAN,
+} from '@/lib/memorization-today-plan';
 
 // ===== Helpers =====
 
@@ -142,6 +152,9 @@ interface MemorizationContextType {
   streak: MemorizationStreak;
   stats: MemorizationStats;
   todayPlan: TodayPlan;
+  // True once today's ward snapshot is loaded (or there is no active plan).
+  // Session screens wait for this before freezing their working queue.
+  isTodayReady: boolean;
 
   // Actions
   refresh: () => Promise<void>;
@@ -195,6 +208,11 @@ export function MemorizationProvider({ children }: ProviderProps) {
     best: 0,
     lastActivityDate: null,
   });
+  // Persisted snapshot of today's assigned ward (stable across the day).
+  const [todaySnapshot, setTodaySnapshot] = useState<TodayPlanSnapshot | null>(null);
+  // Calendar day key; ticks at midnight so the ward + due dates roll over
+  // even if the app stays open.
+  const [dayKey, setDayKey] = useState<string>(() => todayString());
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -224,9 +242,126 @@ export function MemorizationProvider({ children }: ProviderProps) {
 
   const stats = useMemo(() => computeStats(ayahStates), [ayahStates]);
 
+  // Tick the calendar day key so the ward + due dates roll over at midnight
+  // without an app restart: every minute while foregrounded, AND immediately
+  // when the app returns to the foreground (JS timers are throttled/suspended
+  // in the background, so a resume after midnight must re-check at once).
+  useEffect(() => {
+    const syncDay = () =>
+      setDayKey((prev) => {
+        const t = todayString();
+        return prev === t ? prev : t;
+      });
+    const id = setInterval(syncDay, 60_000);
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') syncDay();
+    });
+    return () => {
+      clearInterval(id);
+      sub.remove();
+    };
+  }, []);
+
+  // Ensure a persisted snapshot exists for (today, active plan). Recompute only
+  // when the date or the active plan changes — never on every mark — so the
+  // day's assigned ward stays fixed (target enforced, ring completes).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activePlan) {
+        if (!cancelled) setTodaySnapshot(null);
+        return;
+      }
+      const stored = await getTodaySnapshot();
+      if (
+        stored &&
+        stored.date === dayKey &&
+        stored.planId === activePlan.id
+      ) {
+        if (!cancelled) setTodaySnapshot(stored);
+        return;
+      }
+      const states = await getAllAyahStates();
+      const { assignedNew, assignedReview } = computeAssignedToday(
+        activePlan,
+        states,
+        dayKey,
+      );
+      const snap: TodayPlanSnapshot = {
+        date: dayKey,
+        planId: activePlan.id,
+        assignedNew,
+        assignedReview,
+      };
+      // Bail before persisting if a newer (day/plan) run superseded us, so a
+      // slow in-flight computation can't overwrite storage with a stale snapshot.
+      if (cancelled) return;
+      await saveTodaySnapshot(snap);
+      if (!cancelled) setTodaySnapshot(snap);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activePlan, dayKey]);
+
+  const isTodayReady =
+    !activePlan ||
+    (todaySnapshot != null &&
+      todaySnapshot.planId === activePlan.id &&
+      todaySnapshot.date === dayKey);
+
   const todayPlan = useMemo<TodayPlan>(() => {
-    return computeTodayPlan(activePlan, ayahStates, todayString());
-  }, [activePlan, ayahStates]);
+    if (
+      !activePlan ||
+      !todaySnapshot ||
+      todaySnapshot.planId !== activePlan.id ||
+      todaySnapshot.date !== dayKey
+    ) {
+      return { ...EMPTY_TODAY_PLAN, date: dayKey };
+    }
+    return deriveTodayPlan(todaySnapshot, ayahStates, dayKey);
+  }, [activePlan, todaySnapshot, ayahStates, dayKey]);
+
+  // Record one day's activity: bump the streak (idempotent per day) and check
+  // achievements against FRESH persisted stats (avoids the off-by-one where the
+  // memo `stats` lags the just-marked ayah). Used by markPassed/markPartial and
+  // exposed as recordDailyActivity for screens (calling twice is harmless).
+  // Serialize activity bumps. bumpActivity is fired from markPassed/markPartial
+  // AND from screens' explicit recordDailyActivity AND can be double-tapped, so
+  // concurrent runs would race the streak / unlocked-achievements RMW and could
+  // surface a duplicate achievement toast. Chaining makes each run observe the
+  // previous one's persisted result (same-day streak no-op, achievement deduped).
+  const activityLockRef = useRef<Promise<unknown>>(Promise.resolve());
+  const bumpActivity = useCallback((): Promise<MemorizationStreak> => {
+    const run = activityLockRef.current.catch(() => {}).then(async () => {
+      const nextStreak = await bumpStreak();
+      setStreak(nextStreak);
+      try {
+        const { checkAndUnlockAchievements } = await import(
+          '@/lib/memorization-achievements'
+        );
+        const { uiText } = await import('@/lib/ui-text');
+        const freshStats = computeStats(await getAllAyahStates());
+        const newly = await checkAndUnlockAchievements(freshStats, nextStreak);
+        if (newly.length > 0) {
+          const { Platform, ToastAndroid, Alert } = await import('react-native');
+          const titleFor = (id: string, ar: string) =>
+            uiText({ ar, en: achievementTitleEn[id] || id.replace(/_/g, ' ') });
+          const achievementTitle = uiText({ ar: 'إنجاز جديد', en: 'New achievement' });
+          const msg = `🏆 ${achievementTitle}: ${titleFor(newly[0].id, newly[0].titleAr)}`;
+          if (Platform.OS === 'android') ToastAndroid.show(msg, ToastAndroid.LONG);
+          else
+            Alert.alert(
+              achievementTitle,
+              newly.map((a) => `🏆 ${titleFor(a.id, a.titleAr)}`).join('\n'),
+            );
+        }
+      } catch {}
+      return nextStreak;
+    });
+    activityLockRef.current = run.catch(() => {});
+    return run;
+  }, []);
 
   const createPlanWrapped = useCallback<typeof createPlanStorage>(
     async (partial) => {
@@ -264,6 +399,10 @@ export function MemorizationProvider({ children }: ProviderProps) {
   const updatePlanWrapped = useCallback(
     async (id: string, patch: Partial<MemorizationPlan>) => {
       await updatePlanStorage(id, patch);
+      // Today's ward snapshot bakes in the daily target / assignment, so clear
+      // it after an edit and let the snapshot effect recompute a fresh ward.
+      await clearTodaySnapshot();
+      setTodaySnapshot(null);
       try {
         const updated = await (await import('@/lib/memorization-storage')).getAllPlans();
         const found = updated.find((p) => p.id === id);
@@ -281,9 +420,12 @@ export function MemorizationProvider({ children }: ProviderProps) {
     async (surah: number, ayah: number) => {
       const next = await markAyahStorage(surah, ayah, true);
       setAyahStates((prev) => ({ ...prev, [ayahKey(surah, ayah)]: next }));
+      // Any successful memorization counts as daily activity (covers every
+      // mode, incl. Hide which previously never bumped the streak).
+      void bumpActivity();
       return next;
     },
-    [],
+    [bumpActivity],
   );
 
   const markFailed = useCallback(async (surah: number, ayah: number) => {
@@ -292,11 +434,15 @@ export function MemorizationProvider({ children }: ProviderProps) {
     return next;
   }, []);
 
-  const markPartial = useCallback(async (surah: number, ayah: number) => {
-    const next = await markAyahPartialStorage(surah, ayah);
-    setAyahStates((prev) => ({ ...prev, [ayahKey(surah, ayah)]: next }));
-    return next;
-  }, []);
+  const markPartial = useCallback(
+    async (surah: number, ayah: number) => {
+      const next = await markAyahPartialStorage(surah, ayah);
+      setAyahStates((prev) => ({ ...prev, [ayahKey(surah, ayah)]: next }));
+      void bumpActivity();
+      return next;
+    },
+    [bumpActivity],
+  );
 
   const ensureAyahState = useCallback(async (surah: number, ayah: number) => {
     const next = await ensureAyahStateStorage(surah, ayah);
@@ -326,25 +472,8 @@ export function MemorizationProvider({ children }: ProviderProps) {
     [],
   );
 
-  const recordDailyActivity = useCallback(async () => {
-    const next = await bumpStreak();
-    setStreak(next);
-    // Fire-and-forget achievement check
-    try {
-      const { checkAndUnlockAchievements } = await import('@/lib/memorization-achievements');
-      const { uiText } = await import('@/lib/ui-text');
-      const newly = await checkAndUnlockAchievements(stats, next);
-      if (newly.length > 0) {
-        const { Platform, ToastAndroid, Alert } = await import('react-native');
-        const titleFor = (id: string, ar: string) => uiText({ ar, en: achievementTitleEn[id] || id.replace(/_/g, ' ') });
-        const achievementTitle = uiText({ ar: 'إنجاز جديد', en: 'New achievement' });
-        const msg = `🏆 ${achievementTitle}: ${titleFor(newly[0].id, newly[0].titleAr)}`;
-        if (Platform.OS === 'android') ToastAndroid.show(msg, ToastAndroid.LONG);
-        else Alert.alert(achievementTitle, newly.map((a) => `🏆 ${titleFor(a.id, a.titleAr)}`).join('\n'));
-      }
-    } catch {}
-    return next;
-  }, [stats]);
+  // Exposed for screens; same fresh-stats activity bump used internally.
+  const recordDailyActivity = bumpActivity;
 
   const value: MemorizationContextType = {
     isLoading,
@@ -355,6 +484,7 @@ export function MemorizationProvider({ children }: ProviderProps) {
     streak,
     stats,
     todayPlan,
+    isTodayReady,
     refresh,
     createPlan: createPlanWrapped,
     setActivePlan: setActivePlanWrapped,

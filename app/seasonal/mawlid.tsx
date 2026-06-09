@@ -25,6 +25,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 // theme constants removed — using useColors() hook instead
 import TranslatedText from '@/components/ui/TranslatedText';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
@@ -388,7 +389,7 @@ export default function MawlidScreen() {
   const handleShareSalawat = async (salawat: MawlidSalawat) => {
     try {
       await Share.share({
-        message: [salawat.title, salawat.arabic, salawat.virtue].filter(Boolean).join('\n\n'),
+        message: buildShareText([salawat.title, salawat.arabic, salawat.virtue].filter(Boolean).join('\n\n')),
         title: salawat.title,
       });
     } catch (error) {

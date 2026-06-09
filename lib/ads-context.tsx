@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAdsConfig, subscribeToAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
-import { getSubscriptionState } from './subscription-manager';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import {
   initSmartAdManager,
   canShowBanner as smartCanShowBanner,
@@ -51,7 +51,12 @@ const AdsContext = createContext<AdsContextType | undefined>(undefined);
 export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const [config, setConfig] = useState<AdsConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPremiumUser, setIsPremiumUser] = useState(false);
+  // Premium status comes from the authoritative SubscriptionContext, which
+  // merges IAP + admin/winner (leaderboard top-3) grants. Reading it reactively
+  // here — instead of the persisted `@subscription_state` snapshot — ensures a
+  // freshly-detected winner grant hides ads immediately, without waiting for a
+  // background→foreground cycle. (SubscriptionProvider wraps AdsProvider.)
+  const { isPremium: isPremiumUser } = useSubscription();
   const [isOnboardingDone, setIsOnboardingDone] = useState(false);
   const [pageViews, setPageViews] = useState(0);
   const [sessionAdsShown, setSessionAdsShown] = useState(0);
@@ -67,14 +72,12 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const loadConfig = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [adsConfig, subState, , onboardingFlag] = await Promise.all([
+      const [adsConfig, , onboardingFlag] = await Promise.all([
         fetchAdsConfig(),
-        getSubscriptionState(),
         initSmartAdManager(),
         AsyncStorage.getItem('onboarding_complete'),
       ]);
       setConfig(adsConfig);
-      setIsPremiumUser(subState.isPremium);
       setIsOnboardingDone(onboardingFlag === 'true');
     } catch (error) {
       console.error('Error loading ads config:', error);
@@ -93,16 +96,13 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [loadConfig]);
 
-  // Re-check premium & onboarding status whenever app returns to foreground
-  // This ensures mid-session purchases instantly hide ads
+  // Re-check onboarding status whenever app returns to foreground.
+  // Premium status is reactive via SubscriptionContext, so mid-session
+  // purchases and admin/winner grants hide ads without needing this refresh.
   useEffect(() => {
     const updateStatus = async () => {
       try {
-        const [subState, onboardingFlag] = await Promise.all([
-          getSubscriptionState(),
-          AsyncStorage.getItem('onboarding_complete'),
-        ]);
-        setIsPremiumUser(subState.isPremium);
+        const onboardingFlag = await AsyncStorage.getItem('onboarding_complete');
         setIsOnboardingDone(onboardingFlag === 'true');
       } catch {}
     };

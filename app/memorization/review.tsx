@@ -2,7 +2,7 @@
 // شاشة المراجعة الذكية — تستخدم SRS لاستحضار الآيات المستحقة اليوم.
 // نمط بطاقات: عرض رقم السورة + الآية، اضغط "كشف" لعرض النص، ثم نعم/جزئيًا/لا.
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ToastAndroid,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,6 +24,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useMemorization } from '@/contexts/MemorizationContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { mt } from '@/lib/memorization-i18n';
+import type { AyahRef } from '@/types/memorization';
 import {
   formatAyahProgress,
   formatSurahAyahLabel,
@@ -44,14 +46,25 @@ export default function ReviewScreen() {
     markFailed,
     markPartial,
     recordDailyActivity,
+    isTodayReady,
   } = useMemorization();
 
-  const queue = useMemo(() => [...todayPlan.reviewAyahs], [todayPlan.reviewAyahs]);
+  // Freeze the due queue ONCE for this session. Marking ayahs changes their
+  // due dates and would otherwise shrink/reorder a live-derived list mid-walk,
+  // skipping ayahs and ending early. Re-entering the screen remounts → fresh.
+  const [queue, setQueue] = useState<AyahRef[] | null>(null);
+  useEffect(() => {
+    if (queue === null && isTodayReady && activePlan) {
+      setQueue([...todayPlan.reviewAyahs]);
+    }
+  }, [queue, isTodayReady, activePlan, todayPlan.reviewAyahs]);
+
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
+  const busyRef = useRef(false);
 
-  const current = queue[index];
+  const current = queue ? queue[index] : undefined;
 
   const text = useMemo(() => {
     if (!current) return '';
@@ -61,7 +74,8 @@ export default function ReviewScreen() {
 
   const next = useCallback(async () => {
     setRevealed(false);
-    if (index + 1 >= queue.length) {
+    const total = queue?.length ?? 0;
+    if (index + 1 >= total) {
       await recordDailyActivity();
       const msg = mt('reviewDoneToast', { n: doneCount + 1 });
       if (Platform.OS === 'android') ToastAndroid.show(msg, ToastAndroid.SHORT);
@@ -70,27 +84,42 @@ export default function ReviewScreen() {
     } else {
       setIndex((i) => i + 1);
     }
-  }, [doneCount, index, queue.length, recordDailyActivity, router]);
+  }, [doneCount, index, queue, recordDailyActivity, router]);
 
   const onYes = useCallback(async () => {
-    if (!current) return;
-    await markPassed(current.surahNumber, current.ayahNumber);
-    setDoneCount((c) => c + 1);
-    next();
+    if (!current || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markPassed(current.surahNumber, current.ayahNumber);
+      setDoneCount((c) => c + 1);
+      await next();
+    } finally {
+      busyRef.current = false;
+    }
   }, [current, markPassed, next]);
 
   const onPartial = useCallback(async () => {
-    if (!current) return;
-    await markPartial(current.surahNumber, current.ayahNumber);
-    setDoneCount((c) => c + 1);
-    next();
+    if (!current || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markPartial(current.surahNumber, current.ayahNumber);
+      setDoneCount((c) => c + 1);
+      await next();
+    } finally {
+      busyRef.current = false;
+    }
   }, [current, markPartial, next]);
 
   const onNo = useCallback(async () => {
-    if (!current) return;
-    await markFailed(current.surahNumber, current.ayahNumber);
-    setDoneCount((c) => c + 1);
-    next();
+    if (!current || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markFailed(current.surahNumber, current.ayahNumber);
+      setDoneCount((c) => c + 1);
+      await next();
+    } finally {
+      busyRef.current = false;
+    }
   }, [current, markFailed, next]);
 
   const styles = makeStyles(colors, isRTL);
@@ -108,6 +137,10 @@ export default function ReviewScreen() {
         {!activePlan ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>{mt('noActivePlan')}</Text>
+          </View>
+        ) : queue === null ? (
+          <View style={styles.empty}>
+            <ActivityIndicator color={colors.primary} />
           </View>
         ) : queue.length === 0 ? (
           <View style={styles.empty}>

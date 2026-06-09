@@ -4,7 +4,7 @@
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAdsConfig, getAdUnitId, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
-import { getSubscriptionState } from './subscription-manager';
+import { getSubscriptionState, isPremiumActiveSync } from './subscription-manager';
 
 // Dynamically import google-mobile-ads
 let AppOpenAdClass: any = null;
@@ -117,7 +117,9 @@ export const showAppOpenAd = async (): Promise<boolean> => {
     if (isInSacredContext()) return false;
   } catch {}
 
-  // Skip for premium users.
+  // Skip for premium users — including admin/winner (leaderboard top-3) grants
+  // that may not yet be mirrored into the persisted subscription snapshot.
+  if (isPremiumActiveSync()) return false;
   try {
     const sub = await getSubscriptionState();
     if (sub.isPremium) return false;

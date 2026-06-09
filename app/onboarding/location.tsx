@@ -66,10 +66,11 @@ export default function LocationScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Mark AFTER the prompt was actually shown (Android-gated banner).
       if (Platform.OS === 'android') {
         await markPermissionRequested('location');
       }
-      const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status === 'granted') {
         setLocationGranted(true);
@@ -157,6 +158,14 @@ export default function LocationScreen() {
           });
         }
       }
+
+      // Boot sequence: now that coordinates are stored, immediately compute
+      // prayer times, write the shared widget payload, and reload native
+      // widgets — so the widget gallery / home-screen widget show real data the
+      // moment the user reaches them, instead of the cold-launch placeholder.
+      import('@/lib/widget-bootstrap')
+        .then((m) => m.prepareWidgetsForLocation())
+        .catch(() => {});
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {

@@ -77,7 +77,7 @@ import type { PreviewSize } from '@/components/widgets/previews/shared';
 // v28: Android live date cards preserve the gallery/iOS logical aspect ratio
 // inside launcher cells, Gregorian month subtitles use the selected full date
 // format, and the small prayer card keeps its time clear of the prayer name.
-export const WIDGET_REGISTRY_VERSION = 28; // Android small-card parity
+export const WIDGET_REGISTRY_VERSION = 45; // muted/secondary text now derives from "ink" (white/gold/black at ~62-70% opacity) instead of per-theme tinted hues — fully single-colour widgets, no contrasting greens/blues/tans
 
 export type WidgetCategory = 'date' | 'prayer' | 'quran' | 'azkar' | 'hijri';
 export type WidgetPlatform = 'ios' | 'android';
@@ -332,9 +332,13 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     titleEn: 'Verse of Day',
     sizes: ['medium'],
     platforms: ['ios', 'android'],
-    isPremium: true,
-    Preview: P.VersePreview,
-    deepLink: 'rooh-almuslim://daily-ayah',
+    isPremium: false,
+    forcedLanguage: 'ar',
+    Preview: P.CuratedVersePreview,
+    // Tap → Quran tab. The widget rotates curated verses that won't match the
+    // daily-ayah screen's verse-of-the-day, so the general Quran tab is the
+    // right destination (see widget tap-routing decision).
+    deepLink: 'rooh-almuslim://quran',
     androidProvider: 'RoohQuranSmall',
     legacyAndroidProvider: 'DailyVerseSmall',
   },
@@ -348,7 +352,8 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     sizes: ['medium'],
     platforms: ['ios', 'android'],
     isPremium: true,
-    Preview: P.AzkarMorningPreview,
+    forcedLanguage: 'ar',
+    Preview: P.CuratedAzkarMorningPreview,
     deepLink: 'rooh-almuslim://azkar/morning',
     androidProvider: 'RoohAzkarSmall',
     legacyAndroidProvider: 'AzkarProgressSmall',
@@ -361,7 +366,8 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     sizes: ['medium'],
     platforms: ['ios', 'android'],
     isPremium: true,
-    Preview: P.AzkarEveningPreview,
+    forcedLanguage: 'ar',
+    Preview: P.CuratedAzkarEveningPreview,
     deepLink: 'rooh-almuslim://azkar/evening',
     androidProvider: 'RoohAzkarSmall',
   },
@@ -373,7 +379,8 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     sizes: ['medium'],
     platforms: ['ios', 'android'],
     isPremium: true,
-    Preview: P.DailyDhikrPreview,
+    forcedLanguage: 'ar',
+    Preview: P.CuratedDailyDhikrPreview,
     deepLink: 'rooh-almuslim://daily-dhikr',
     androidProvider: 'RoohAzkarSmall',
     legacyAndroidProvider: 'DailyDhikrSmall',

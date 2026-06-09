@@ -5,7 +5,8 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { APP_CONFIG, getAppName } from '../constants/app';
+import { getAppName } from '../constants/app';
+import { buildShareText } from './share-text';
 import { t } from '@/lib/i18n';
 
 // ===============================
@@ -38,19 +39,16 @@ export function formatAyahForShare(
   translation?: string,
   options: ShareOptions = {}
 ): string {
-  const { includeAppName = true, includeTranslation = true } = options;
-  
+  const { includeTranslation = true } = options;
+
   let text = `﴿ ${arabicText} ﴾\n`;
   text += `\n📖 ${surahName} - ${t('shareService.ayahRef')} ${ayahNumber}`;
-  
+
   if (translation && includeTranslation) {
     text += `\n\n💬 ${t('shareService.translation')}:\n${translation}`;
   }
-  
-  if (includeAppName) {
-    text += APP_CONFIG.getShareSignature();
-  }
-  
+
+  // الـ footer الموحّد يُضاف مركزيًا عند المشاركة عبر shareText/buildShareText
   return text;
 }
 
@@ -61,30 +59,26 @@ export function formatZikrForShare(
   content: ShareContent,
   options: ShareOptions = {}
 ): string {
-  const { 
-    includeAppName = true, 
-    includeReference = true, 
-    includeBenefit = true 
+  const {
+    includeReference = true,
+    includeBenefit = true
   } = options;
-  
+
   let text = `📿 ${content.title || t('shareService.dhikr')}\n\n`;
   text += `「 ${content.arabicText} 」`;
-  
+
   if (content.reference && includeReference) {
     text += `\n\n📚 ${t('shareService.source')}: ${content.reference}`;
     if (content.referenceNumber) {
       text += ` (${content.referenceNumber})`;
     }
   }
-  
+
   if (content.benefit && includeBenefit) {
     text += `\n\n✨ ${t('shareService.virtue')}: ${content.benefit}`;
   }
-  
-  if (includeAppName) {
-    text += APP_CONFIG.getShareSignature();
-  }
-  
+
+  // الـ footer الموحّد يُضاف مركزيًا عند المشاركة عبر shareText/buildShareText
   return text;
 }
 
@@ -103,8 +97,8 @@ export function formatPrayerTimesForShare(
   for (const prayer of prayerTimes) {
     text += `${prayer.name}: ${prayer.time}\n`;
   }
-  
-  text += APP_CONFIG.getShareSignature();
+
+  // الـ footer الموحّد يُضاف مركزيًا عند المشاركة عبر shareText/buildShareText
   return text;
 }
 
@@ -114,7 +108,7 @@ export function formatPrayerTimesForShare(
 export async function shareText(text: string, title?: string): Promise<void> {
   try {
     await Share.share(
-      { message: text, title },
+      { message: buildShareText(text), title },
       { dialogTitle: title || t('shareService.shareFrom') + ' ' + getAppName() }
     );
   } catch (error) {
@@ -287,7 +281,7 @@ export async function captureWithBranding(
 // ===============================
 export async function copyText(text: string): Promise<void> {
   try {
-    await Clipboard.setStringAsync(text);
+    await Clipboard.setStringAsync(buildShareText(text));
   } catch (error) {
     console.error('Error copying text:', error);
   }

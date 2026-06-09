@@ -1,0 +1,218 @@
+#!/usr/bin/env node
+// scripts/generate-curated-widget-images.mjs
+//
+// Curated, bundled widget images for the Arabic-only image widgets:
+//   - verseOfDay   (آية اليوم)
+//   - azkarMorning (أذكار الصباح)
+//   - azkarEvening (أذكار المساء)
+//   - dailyDhikr   (الذكر اليومي)
+//
+// The owner drops transparent single-colour PNGs (black #000 on full
+// transparency, only the alpha matters) into assets/widget-images/<type>/.
+// The app tints them to the active theme's text colour and draws the themed
+// background natively, so every appearance setting keeps working and the
+// content rotates by date with zero network / no app-open required.
+//
+// This script:
+//   1. Ensures the four folders exist with placeholder PNGs (1080×510) for
+//      every expected filename so the owner only has to replace files.
+//   2. Validates that any existing real images are 1080×510.
+//   3. Generates lib/widgets/curated-images-index.ts (static require() data).
+//   4. Syncs the PNGs into widgets/ios/Assets.xcassets as template imagesets
+//      so UIImage(named:) resolves inside the widget extension.
+//   5. Generates widgets/ios/GeneratedCuratedImages.swift (per-type counts).
+
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  copyFileSync,
+} from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve, basename } from 'node:path';
+import sharp from 'sharp';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '..');
+
+const W = 1080;
+const H = 510;
+
+// Per-type config. `count` is AUTO-DETECTED from the files on disk (the highest
+// contiguous prefix-NNN.png), so just drop in / remove images and re-run — no
+// code edit needed. `defaultCount` is only used to seed placeholders when a
+// folder is still empty (fresh checkout before the owner adds real art).
+const TYPES = [
+  { key: 'verse', dir: 'verse', prefix: 'verse', defaultCount: 100, count: 0 },
+  { key: 'morning', dir: 'morning', prefix: 'morning', defaultCount: 25, count: 0 },
+  { key: 'evening', dir: 'evening', prefix: 'evening', defaultCount: 25, count: 0 },
+  { key: 'daily', dir: 'daily', prefix: 'daily', defaultCount: 30, count: 0 },
+];
+
+/** Count the highest contiguous prefix-001..N on disk; fall back to defaultCount
+ *  when the folder is empty (so placeholders get seeded). */
+function detectCount(t) {
+  const dir = resolve(IMAGES_ROOT, t.dir);
+  if (!existsSync(dir)) return t.defaultCount;
+  const re = new RegExp(`^${t.prefix}-(\\d{3})\\.png$`);
+  const nums = new Set(
+    readdirSync(dir)
+      .map((f) => re.exec(f))
+      .filter(Boolean)
+      .map((m) => parseInt(m[1], 10)),
+  );
+  if (nums.size === 0) return t.defaultCount;
+  let n = 0;
+  while (nums.has(n + 1)) n++;
+  return n || t.defaultCount;
+}
+
+const IMAGES_ROOT = resolve(ROOT, 'assets/widget-images');
+const INDEX_TS = resolve(ROOT, 'lib/widgets/curated-images-index.ts');
+const XCASSETS = resolve(ROOT, 'widgets/ios/Assets.xcassets');
+const SWIFT_COUNTS = resolve(ROOT, 'widgets/ios/GeneratedCuratedImages.swift');
+
+const pad = (n) => String(n).padStart(3, '0');
+const fileName = (t, i) => `${t.prefix}-${pad(i)}.png`;
+
+async function makePlaceholder(name, outPath) {
+  // Transparent canvas with a dashed border + the file name, so the owner can
+  // see exactly which slot each image fills. The grey content is just a
+  // placeholder; replacing the file is all that's required.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <rect x="6" y="6" width="${W - 12}" height="${H - 12}" rx="40"
+      fill="none" stroke="#B9B9B9" stroke-width="4" stroke-dasharray="18 14"/>
+    <text x="50%" y="46%" font-family="sans-serif" font-size="54"
+      fill="#9A9A9A" text-anchor="middle" dominant-baseline="middle">${name}</text>
+    <text x="50%" y="60%" font-family="sans-serif" font-size="30"
+      fill="#BDBDBD" text-anchor="middle" dominant-baseline="middle">placeholder · 1080×510 · transparent</text>
+  </svg>`;
+  await sharp(Buffer.from(svg)).png().toFile(outPath);
+}
+
+async function ensureImages() {
+  let created = 0;
+  const warnings = [];
+  for (const t of TYPES) {
+    const dir = resolve(IMAGES_ROOT, t.dir);
+    mkdirSync(dir, { recursive: true });
+    for (let i = 1; i <= t.count; i++) {
+      const name = fileName(t, i);
+      const p = resolve(dir, name);
+      if (!existsSync(p)) {
+        await makePlaceholder(name, p);
+        created++;
+      } else {
+        try {
+          const meta = await sharp(p).metadata();
+          if (meta.width !== W || meta.height !== H) {
+            warnings.push(`  ⚠ ${t.dir}/${name} is ${meta.width}×${meta.height}, expected ${W}×${H}`);
+          }
+        } catch {
+          warnings.push(`  ⚠ ${t.dir}/${name} could not be read as an image`);
+        }
+      }
+    }
+  }
+  return { created, warnings };
+}
+
+function generateIndexTs() {
+  const lines = [];
+  lines.push('// AUTO-GENERATED by scripts/generate-curated-widget-images.mjs — do not edit by hand.');
+  lines.push('// Static require() data for bundled, Arabic-only curated widget images.');
+  lines.push('/* eslint-disable */');
+  lines.push('');
+  lines.push('export type CuratedImageType = ' + TYPES.map((t) => `'${t.key}'`).join(' | ') + ';');
+  lines.push('');
+  for (const t of TYPES) {
+    const constName = `CURATED_${t.key.toUpperCase()}_IMAGES`;
+    lines.push(`export const ${constName}: number[] = [`);
+    for (let i = 1; i <= t.count; i++) {
+      lines.push(`  require('../../assets/widget-images/${t.dir}/${fileName(t, i)}'),`);
+    }
+    lines.push('];');
+    lines.push('');
+  }
+  lines.push('export const CURATED_IMAGE_SETS: Record<CuratedImageType, number[]> = {');
+  for (const t of TYPES) {
+    lines.push(`  ${t.key}: CURATED_${t.key.toUpperCase()}_IMAGES,`);
+  }
+  lines.push('};');
+  lines.push('');
+  lines.push('export const CURATED_IMAGE_COUNTS: Record<CuratedImageType, number> = {');
+  for (const t of TYPES) {
+    lines.push(`  ${t.key}: ${t.count},`);
+  }
+  lines.push('};');
+  lines.push('');
+  writeFileSync(INDEX_TS, lines.join('\n'));
+}
+
+function syncXcassets() {
+  // Keep a namespaced folder so we don't collide with existing imagesets.
+  mkdirSync(XCASSETS, { recursive: true });
+  for (const t of TYPES) {
+    const srcDir = resolve(IMAGES_ROOT, t.dir);
+    for (let i = 1; i <= t.count; i++) {
+      const name = fileName(t, i); // e.g. verse-001.png
+      const assetName = basename(name, '.png'); // verse-001
+      const imagesetDir = resolve(XCASSETS, `${assetName}.imageset`);
+      mkdirSync(imagesetDir, { recursive: true });
+      copyFileSync(resolve(srcDir, name), resolve(imagesetDir, name));
+      const contents = {
+        images: [{ idiom: 'universal', filename: name }],
+        info: { version: 1, author: 'xcode' },
+        properties: { 'template-rendering-intent': 'template' },
+      };
+      writeFileSync(resolve(imagesetDir, 'Contents.json'), JSON.stringify(contents, null, 2));
+    }
+  }
+  // Prune stale curated imagesets (counts shrank).
+  const valid = new Set();
+  for (const t of TYPES) for (let i = 1; i <= t.count; i++) valid.add(`${basename(fileName(t, i), '.png')}.imageset`);
+  for (const entry of readdirSync(XCASSETS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const m = entry.name.match(/^(verse|morning|evening|daily)-\d{3}\.imageset$/);
+    if (m && !valid.has(entry.name)) rmSync(resolve(XCASSETS, entry.name), { recursive: true, force: true });
+  }
+}
+
+function generateSwiftCounts() {
+  const lines = [];
+  lines.push('// AUTO-GENERATED by scripts/generate-curated-widget-images.mjs — do not edit by hand.');
+  lines.push('import Foundation');
+  lines.push('');
+  lines.push('enum GeneratedCuratedImages {');
+  for (const t of TYPES) {
+    lines.push(`    static let ${t.key}Count = ${t.count}`);
+  }
+  lines.push('}');
+  lines.push('');
+  writeFileSync(SWIFT_COUNTS, lines.join('\n'));
+}
+
+async function main() {
+  for (const t of TYPES) t.count = detectCount(t);
+  const { created, warnings } = await ensureImages();
+  generateIndexTs();
+  syncXcassets();
+  generateSwiftCounts();
+  console.log(`✅ curated widget images: ${TYPES.map((t) => `${t.key}=${t.count}`).join(', ')}`);
+  if (created) console.log(`   created ${created} placeholder PNG(s)`);
+  console.log(`   wrote ${INDEX_TS.replace(ROOT + '/', '')}`);
+  console.log(`   synced ${XCASSETS.replace(ROOT + '/', '')} (template imagesets)`);
+  console.log(`   wrote ${SWIFT_COUNTS.replace(ROOT + '/', '')}`);
+  if (warnings.length) {
+    console.log('\nDimension warnings (replace with 1080×510 transparent PNGs):');
+    console.log(warnings.join('\n'));
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -219,6 +219,20 @@ export function stripAzkarTranslationNoise(raw: string | undefined | null): stri
   if (!raw) return '';
   let t = String(raw).trim();
 
+  // Strip square-bracket notes ANYWHERE — in this data `[...]` is always an
+  // editorial/instructional note (e.g. "[For the evening, the supplication is
+  // read as follows:]"), never part of the dhikr. Without this, sentence
+  // pagination could surface such a note as a standalone page (an evening
+  // instruction leaking into the Morning widget, and vice-versa).
+  t = t.replace(/\[[^\]]*\]/g, ' ');
+
+  // Strip parenthetical INSTRUCTIONAL notes anywhere (the dhikr body itself
+  // never contains these phrases, so this can't eat real content):
+  //   "(Note: …)", "(… read as follows …)", "(… whoever says this …)",
+  //   "(… amsa instead of asbaha)".
+  t = t.replace(/\([^()]*\b(?:note\s*:|read as follows|whoever says|instead of|amsa|asbaha)\b[^()]*\)/gi, ' ');
+  t = t.replace(/\s+/g, ' ').trim();
+
   // Strip trailing balanced "(…)" chunks (paren walk handles nested parens).
   while (t.endsWith(')')) {
     let depth = 0;
@@ -271,22 +285,34 @@ export function cleanEnglishTranslation(raw: string | undefined | null): string 
   return stripAzkarTranslationNoise(raw);
 }
 
-export function splitLongEnglishAzkar(text: string, maxChars: number = 260): string[] {
+// Paginate long English azkar so a page is NEVER a mid-sentence fragment AND
+// stays readable. `maxChars` is sized so a page fills the tile at a large font;
+// longer azkar split into multiple COMPLETE-sentence pages that cycle by the
+// minute (so the user reads the whole dhikr over time, never a tiny wall of
+// text and never a mid-word fragment). Kept in sync with the Swift copy in
+// widgets/ios/RoohWidgets.swift.
+export function splitLongEnglishAzkar(text: string, maxChars: number = 220): string[] {
   const clean = String(text).replace(/\s+/g, ' ').trim();
   if (!clean) return [];
   if (clean.length <= maxChars) return [clean];
 
-  const words = clean.split(/\s+/);
+  // Split into complete sentences (terminator kept with the sentence).
+  const sentences = (clean.match(/[^.!?،؛]+[.!?،؛]?/g) ?? [clean])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (sentences.length === 0) return [clean];
+
+  // Pack whole sentences into ≤maxChars pages — never break inside a sentence.
   const chunks: string[] = [];
   let current = '';
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length <= maxChars) {
+  for (const s of sentences) {
+    const candidate = current ? `${current} ${s}` : s;
+    if (candidate.length <= maxChars || !current) {
       current = candidate;
       continue;
     }
-    if (current) chunks.push(current);
-    current = word;
+    chunks.push(current);
+    current = s;
   }
   if (current) chunks.push(current);
   return chunks.length > 0 ? chunks : [clean];
@@ -328,13 +354,15 @@ export function resolveAzkarBodyText(
   // doesn't auto-shrink into illegibility.
   if (!isArabic && slot.zikr.translation && slot.zikr.translation.length > 0) {
     const cleaned = cleanEnglishTranslation(slot.zikr.translation);
-    const full = cleaned || slot.zikr.translation;
-    return { text: pickLongEnglishAzkarPage(full, slot.chunkIndex), isQuran: false };
+    // If the translation was ENTIRELY an editorial/instructional note (so it
+    // strips to nothing), DON'T fall back to the raw note — show the Arabic
+    // dhikr instead, so an evening instruction never leaks into Morning, etc.
+    if (cleaned) {
+      return { text: pickLongEnglishAzkarPage(cleaned, slot.chunkIndex), isQuran: false };
+    }
   }
-  const chunks = slot.zikr.displayChunks;
-  const idx = slot.chunkIndex;
-  if (chunks.length > 0 && idx >= 0 && idx < chunks.length) {
-    return { text: chunks[idx]!, isQuran: false };
-  }
+  // Arabic: show the FULL dhikr (complete) — NOT a ≤140-char chunk that could
+  // end mid-sentence on a comma. The renderer's computed-fill sizing shrinks it
+  // to fit, so it always reads as one complete dhikr.
   return { text: slot.zikr.arabic ?? fallback, isQuran: false };
 }

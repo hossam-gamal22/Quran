@@ -1,7 +1,7 @@
 // app/memorization/test.tsx
 // شاشة الاختبارات — 3 أنواع تتناوب: تكميل الآية، ترتيب الكلمات، الآية التالية.
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -152,27 +152,33 @@ export default function TestScreen() {
     return JSON.stringify(arranged) === JSON.stringify(current.correctOrder);
   }, [current, reorderPicked, isReorderComplete]);
 
+  const advanceBusyRef = useRef(false);
   const onNext = useCallback(async () => {
-    if (!current) return;
-    let passed = false;
-    if (current.type === 'reorder_words') {
-      passed = isReorderCorrect;
-    } else {
-      passed = selected === current.correctIndex;
-    }
-    if (passed) {
-      setScorePassed((s) => s + 1);
-      await markPassed(current.surahNumber, current.ayahNumber);
-    } else {
-      await markFailed(current.surahNumber, current.ayahNumber);
-    }
-    if (qIndex + 1 >= questions.length) {
-      setFinished(true);
-      await recordDailyActivity();
-    } else {
-      setQIndex((i) => i + 1);
-      setSelected(null);
-      setReorderPicked([]);
+    if (!current || advanceBusyRef.current) return;
+    advanceBusyRef.current = true;
+    try {
+      let passed = false;
+      if (current.type === 'reorder_words') {
+        passed = isReorderCorrect;
+      } else {
+        passed = selected === current.correctIndex;
+      }
+      if (passed) {
+        setScorePassed((s) => s + 1);
+        await markPassed(current.surahNumber, current.ayahNumber);
+      } else {
+        await markFailed(current.surahNumber, current.ayahNumber);
+      }
+      if (qIndex + 1 >= questions.length) {
+        setFinished(true);
+        await recordDailyActivity();
+      } else {
+        setQIndex((i) => i + 1);
+        setSelected(null);
+        setReorderPicked([]);
+      }
+    } finally {
+      advanceBusyRef.current = false;
     }
   }, [current, isReorderCorrect, selected, qIndex, questions, markPassed, markFailed, recordDailyActivity, activePlan, scorePassed]);
 

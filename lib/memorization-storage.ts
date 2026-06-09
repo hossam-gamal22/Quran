@@ -9,6 +9,7 @@ import {
   MemorizationStreak,
   MemorizationSettings,
   TestResult,
+  TodayPlanSnapshot,
   ayahKey,
   ReviewOutcome,
 } from '@/types/memorization';
@@ -22,6 +23,7 @@ const K_TESTS = '@rooh_memorization_tests';
 const K_SETTINGS = '@rooh_memorization_settings';
 const K_STREAK = '@rooh_memorization_streak';
 const K_ACHIEVEMENTS = '@rooh_memorization_achievements';
+const K_TODAY = '@rooh_memorization_today';
 
 export const DEFAULT_SETTINGS: MemorizationSettings = {
   showTashkeel: true,
@@ -134,6 +136,16 @@ async function persistAyahStates(map: Record<string, AyahMemoryState>): Promise<
   await safeWriteJSON(K_STATES, map);
 }
 
+// Serialize ayah-state read-modify-write operations so two near-simultaneous
+// marks can't clobber each other (last-write-wins drop). Each op runs only
+// after the previous one settles.
+let statesWriteLock: Promise<unknown> = Promise.resolve();
+function withStatesLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = statesWriteLock.then(fn, fn);
+  statesWriteLock = run.catch(() => {});
+  return run;
+}
+
 function blankState(surah: number, ayah: number): AyahMemoryState {
   const today = todayString();
   return {
@@ -155,13 +167,15 @@ export async function ensureAyahState(
   surah: number,
   ayah: number,
 ): Promise<AyahMemoryState> {
-  const map = await getAllAyahStates();
-  const k = ayahKey(surah, ayah);
-  if (!map[k]) {
-    map[k] = blankState(surah, ayah);
-    await persistAyahStates(map);
-  }
-  return map[k];
+  return withStatesLock(async () => {
+    const map = await getAllAyahStates();
+    const k = ayahKey(surah, ayah);
+    if (!map[k]) {
+      map[k] = blankState(surah, ayah);
+      await persistAyahStates(map);
+    }
+    return map[k];
+  });
 }
 
 export async function markAyah(
@@ -169,20 +183,22 @@ export async function markAyah(
   ayah: number,
   outcome: boolean | ReviewOutcome,
 ): Promise<AyahMemoryState> {
-  const map = await getAllAyahStates();
-  const k = ayahKey(surah, ayah);
-  const cur = map[k] ?? blankState(surah, ayah);
-  const srs = computeNextReview(cur, outcome);
-  const today = todayString();
-  const next: AyahMemoryState = {
-    ...cur,
-    ...srs,
-    lastReviewDate: today,
-    updatedAt: new Date().toISOString(),
-  };
-  map[k] = next;
-  await persistAyahStates(map);
-  return next;
+  return withStatesLock(async () => {
+    const map = await getAllAyahStates();
+    const k = ayahKey(surah, ayah);
+    const cur = map[k] ?? blankState(surah, ayah);
+    const srs = computeNextReview(cur, outcome);
+    const today = todayString();
+    const next: AyahMemoryState = {
+      ...cur,
+      ...srs,
+      lastReviewDate: today,
+      updatedAt: new Date().toISOString(),
+    };
+    map[k] = next;
+    await persistAyahStates(map);
+    return next;
+  });
 }
 
 export async function markAyahPartial(
@@ -195,22 +211,26 @@ export async function markAyahPartial(
 export async function bulkUpsertAyahStates(
   ayahs: { surahNumber: number; ayahNumber: number }[],
 ): Promise<void> {
-  const map = await getAllAyahStates();
-  let changed = false;
-  for (const a of ayahs) {
-    const k = ayahKey(a.surahNumber, a.ayahNumber);
-    if (!map[k]) {
-      map[k] = blankState(a.surahNumber, a.ayahNumber);
-      changed = true;
+  return withStatesLock(async () => {
+    const map = await getAllAyahStates();
+    let changed = false;
+    for (const a of ayahs) {
+      const k = ayahKey(a.surahNumber, a.ayahNumber);
+      if (!map[k]) {
+        map[k] = blankState(a.surahNumber, a.ayahNumber);
+        changed = true;
+      }
     }
-  }
-  if (changed) await persistAyahStates(map);
+    if (changed) await persistAyahStates(map);
+  });
 }
 
 export async function resetAyahState(surah: number, ayah: number): Promise<void> {
-  const map = await getAllAyahStates();
-  delete map[ayahKey(surah, ayah)];
-  await persistAyahStates(map);
+  return withStatesLock(async () => {
+    const map = await getAllAyahStates();
+    delete map[ayahKey(surah, ayah)];
+    await persistAyahStates(map);
+  });
 }
 
 // ===== SESSIONS =====
@@ -315,6 +335,23 @@ export async function bumpStreak(): Promise<MemorizationStreak> {
   return next;
 }
 
+// ===== TODAY PLAN SNAPSHOT =====
+// Stable per-day ward assignment so the daily ward does not refill as ayahs
+// are marked. Recomputed only when the date or active plan changes.
+export async function getTodaySnapshot(): Promise<TodayPlanSnapshot | null> {
+  return safeReadJSON<TodayPlanSnapshot | null>(K_TODAY, null);
+}
+
+export async function saveTodaySnapshot(snapshot: TodayPlanSnapshot): Promise<void> {
+  await safeWriteJSON(K_TODAY, snapshot);
+}
+
+export async function clearTodaySnapshot(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(K_TODAY);
+  } catch {}
+}
+
 // ===== ACHIEVEMENTS =====
 export async function getUnlockedAchievements(): Promise<string[]> {
   return safeReadJSON<string[]>(K_ACHIEVEMENTS, []);
@@ -331,7 +368,7 @@ export async function unlockAchievement(id: string): Promise<boolean> {
 // ===== UTILITIES =====
 export async function clearAllMemorizationData(): Promise<void> {
   await Promise.all(
-    [K_PLANS, K_ACTIVE_PLAN, K_STATES, K_SESSIONS, K_TESTS, K_SETTINGS, K_STREAK, K_ACHIEVEMENTS].map(
+    [K_PLANS, K_ACTIVE_PLAN, K_STATES, K_SESSIONS, K_TESTS, K_SETTINGS, K_STREAK, K_ACHIEVEMENTS, K_TODAY].map(
       (k) => AsyncStorage.removeItem(k),
     ),
   );

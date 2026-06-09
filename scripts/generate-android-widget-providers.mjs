@@ -33,7 +33,11 @@ function rememberLockedPreview(id, size) {
 const SIZE_DIMS = {
   small: { width: 110, height: 110, targetCellWidth: 2, targetCellHeight: 2 },
   medium: { width: 250, height: 110, targetCellWidth: 3, targetCellHeight: 2 },
-  large: { width: 250, height: 250, targetCellWidth: 3, targetCellHeight: 4 },
+  // The large prayer/table content is ~square (329×345 dp) and the widget body
+  // fits it with `contain` scaling at the 3-col width, so a 4-row cell left a
+  // big empty band below the card. 3×2 hugs the content (the card already
+  // renders at the 3-col width; this just drops the unused extra height).
+  large: { width: 250, height: 170, targetCellWidth: 3, targetCellHeight: 2 },
 };
 
 const RETIRED_PICKER_PROVIDERS = [

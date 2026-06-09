@@ -26,7 +26,7 @@ import hajjIcon from '../../../assets/images/icons/seasonal/hajj.png';
 import mawlidIcon from '../../../assets/images/icons/seasonal/mawlid.png';
 import eidFitrIcon from '../../../assets/images/icons/seasonal/eid_fitr.png';
 import eidAdhaIcon from '../../../assets/images/icons/seasonal/eid_adha.png';
-import dhulHijjahIcon from '../../../assets/images/icons/seasonal/dhul_hijjah.png';
+import hijriNewYearIcon from '../../../assets/images/icons/seasonal/hijri_new_year.png';
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ type SeasonalIconKey =
   | 'mawlid'
   | 'eid_fitr'
   | 'eid_adha'
-  | 'dhul_hijjah';
+  | 'hijri_new_year';
 
 type SeasonName =
   | 'ramadan'
@@ -49,6 +49,7 @@ type SeasonName =
   | 'eid_fitr'
   | 'eid_adha'
   | 'dhul_hijjah'
+  | 'hijri_new_year'
   | 'ashura'
   | 'muharram'
   | 'rajab'
@@ -111,7 +112,7 @@ const ICONS: { key: SeasonalIconKey; nameAr: string; nameEn: string; color: stri
   { key: 'mawlid', nameAr: 'المولد النبوي', nameEn: 'Mawlid', color: '#2E8B57', image: mawlidIcon },
   { key: 'eid_fitr', nameAr: 'عيد الفطر', nameEn: 'Eid Fitr', color: '#FFD700', image: eidFitrIcon },
   { key: 'eid_adha', nameAr: 'عيد الأضحى', nameEn: 'Eid Adha', color: '#CD853F', image: eidAdhaIcon },
-  { key: 'dhul_hijjah', nameAr: 'العشر من ذي الحجة', nameEn: 'Dhul Hijjah', color: '#DAA520', image: dhulHijjahIcon },
+  { key: 'hijri_new_year', nameAr: 'رأس السنة الهجرية', nameEn: 'Hijri New Year', color: '#607D8B', image: hijriNewYearIcon },
 ];
 
 const SEASONS: { key: SeasonName; nameAr: string; nameEn: string }[] = [
@@ -121,6 +122,7 @@ const SEASONS: { key: SeasonName; nameAr: string; nameEn: string }[] = [
   { key: 'eid_fitr', nameAr: 'عيد الفطر', nameEn: 'Eid Fitr' },
   { key: 'eid_adha', nameAr: 'عيد الأضحى', nameEn: 'Eid Adha' },
   { key: 'dhul_hijjah', nameAr: 'العشر الأوائل من ذي الحجة', nameEn: 'Dhul Hijjah' },
+  { key: 'hijri_new_year', nameAr: 'رأس السنة الهجرية', nameEn: 'Hijri New Year' },
   { key: 'ashura', nameAr: 'عاشوراء', nameEn: 'Ashura' },
   { key: 'muharram', nameAr: 'محرم', nameEn: 'Muharram' },
   { key: 'rajab', nameAr: 'رجب', nameEn: 'Rajab' },
@@ -133,12 +135,26 @@ const DEFAULT_SEASONAL_MAP: Record<SeasonName, SeasonalIconKey> = {
   mawlid: 'mawlid',
   eid_fitr: 'eid_fitr',
   eid_adha: 'eid_adha',
-  dhul_hijjah: 'dhul_hijjah',
+  // Days 1–9 of Dhul-Hijjah show the single Hajj icon (the `dhul_hijjah` season
+  // wins priority over `hajj` for those days, so both map to `hajj`). Day 10
+  // flips to `eid_adha` (sheep) automatically. Keep this in lockstep with
+  // DEFAULT_SEASONAL_MAP in lib/app-icon-manager.ts.
+  dhul_hijjah: 'hajj',
+  hijri_new_year: 'hijri_new_year',
   ashura: 'default_ar',
   muharram: 'default_ar',
   rajab: 'default_ar',
   shaban: 'default_ar',
 };
+
+// Retired icon keys → replacement. Keep in lockstep with LEGACY_ICON_ALIASES in
+// lib/app-icon-manager.ts so the panel and the app resolve old data identically.
+const LEGACY_ICON_ALIASES: Record<string, SeasonalIconKey> = {
+  dhul_hijjah: 'hajj',
+};
+
+const normalizeIconKey = (key: SeasonalIconKey): SeasonalIconKey =>
+  (LEGACY_ICON_ALIASES[key] ?? key) as SeasonalIconKey;
 
 const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
   ramadan: {
@@ -164,6 +180,10 @@ const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
   mawlid: {
     ar: seasonTitleAr('mawlid', 'ذكرى المولد النبوي'),
     en: 'Mawlid Reminder',
+  },
+  hijri_new_year: {
+    ar: seasonTitleAr('hijri_new_year', 'رأس السنة الهجرية'),
+    en: 'Hijri New Year',
   },
   ashura: {
     ar: seasonTitleAr('ashura', 'عاشوراء'),
@@ -208,6 +228,10 @@ const DEFAULT_SEASONAL_ALERT_MESSAGES: SeasonalLocalizedText = {
     ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('mawlid', 'ذكرى المولد النبوي')}. ${seasonSubtitleAr('mawlid', 'صلوا على النبي ﷺ')}.`,
     en: 'The app icon has been updated for the Mawlid reminder. Peace and blessings be upon Prophet Muhammad.',
   },
+  hijri_new_year: {
+    ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('hijri_new_year', 'رأس السنة الهجرية')}. ${seasonSubtitleAr('hijri_new_year', 'كل عام وأنتم بخير — عام هجري مبارك')}.`,
+    en: 'The app icon has been updated for the new Hijri year. May Allah make it a year of goodness and blessings.',
+  },
   ashura: {
     ar: `تم تحديث أيقونة التطبيق بمناسبة ${seasonTitleAr('ashura', 'عاشوراء')}. ${seasonSubtitleAr('ashura', 'صيامه يكفر سنة ماضية')}.`,
     en: 'The app icon has been updated for Ashura. May Allah accept your fasting and good deeds.',
@@ -246,12 +270,13 @@ const DEFAULT_CONFIG: AppIconsConfig = {
   mode: 'auto',
   manualIcon: null,
   seasonalMap: { ...DEFAULT_SEASONAL_MAP },
-  enabledSeasons: ['ramadan', 'hajj', 'mawlid', 'eid_fitr', 'eid_adha', 'dhul_hijjah'],
+  enabledSeasons: ['ramadan', 'hajj', 'mawlid', 'eid_fitr', 'eid_adha', 'dhul_hijjah', 'hijri_new_year'],
   updatedAt: '',
 };
 
 const FIRESTORE_DOC = 'appConfig/appIcons';
 
+// Keep identical to SEASON_PRIORITY in lib/app-icon-manager.ts / lib/seasonal-content.ts.
 const SEASON_PRIORITY: SeasonName[] = [
   'eid_fitr',
   'eid_adha',
@@ -260,6 +285,7 @@ const SEASON_PRIORITY: SeasonName[] = [
   'ramadan',
   'dhul_hijjah',
   'hajj',
+  'hijri_new_year',
   'muharram',
   'rajab',
   'shaban',
@@ -272,6 +298,7 @@ const SEASON_RANGES: Record<SeasonName, { start: { month: number; day: number };
   eid_fitr: { start: { month: 10, day: 1 }, end: { month: 10, day: 3 } },
   eid_adha: { start: { month: 12, day: 10 }, end: { month: 12, day: 13 } },
   dhul_hijjah: { start: { month: 12, day: 1 }, end: { month: 12, day: 9 } },
+  hijri_new_year: { start: { month: 1, day: 1 }, end: { month: 1, day: 3 } },
   ashura: { start: { month: 1, day: 9 }, end: { month: 1, day: 10 } },
   muharram: { start: { month: 1, day: 1 }, end: { month: 1, day: 30 } },
   rajab: { start: { month: 7, day: 1 }, end: { month: 7, day: 30 } },
@@ -373,7 +400,8 @@ function getCurrentSeasonForPreview(date: Date = new Date()): { season: SeasonNa
 export default function AppIconManager() {
   const [config, setConfig] = useState<AppIconsConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<null | 'save' | 'announce'>(null);
+  const saving = savingAction !== null;
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeLang, setActiveLang] = useState<LangCode>('ar');
   const [activeSeasonAlert, setActiveSeasonAlert] = useState<SeasonName>('ramadan');
@@ -386,10 +414,17 @@ export default function AppIconManager() {
       (snap) => {
         if (snap.exists()) {
           const data = snap.data() as Partial<AppIconsConfig>;
+          // Normalize retired icon keys (e.g. legacy `dhul_hijjah` icon → `hajj`)
+          // coming from older saved configs so the dropdowns/preview stay valid.
+          const mergedMap = { ...DEFAULT_SEASONAL_MAP, ...(data.seasonalMap ?? {}) };
+          const seasonalMap = Object.fromEntries(
+            Object.entries(mergedMap).map(([s, ic]) => [s, normalizeIconKey(ic as SeasonalIconKey)])
+          ) as Record<SeasonName, SeasonalIconKey>;
           setConfig({
             ...DEFAULT_CONFIG,
             ...data,
-            seasonalMap: { ...DEFAULT_SEASONAL_MAP, ...(data.seasonalMap ?? {}) },
+            manualIcon: data.manualIcon ? normalizeIconKey(data.manualIcon) : data.manualIcon ?? null,
+            seasonalMap,
             alertTitleI18n: { ...DEFAULT_CONFIG.alertTitleI18n, ...(data.alertTitleI18n ?? {}) },
             alertMessageI18n: { ...DEFAULT_CONFIG.alertMessageI18n, ...(data.alertMessageI18n ?? {}) },
             seasonalAlertTitleI18n: {
@@ -417,8 +452,12 @@ export default function AppIconManager() {
 
   // ─── Save ────────────────────────────────────────────
 
-  const handleSave = async () => {
-    setSaving(true);
+  // `announce: false` (الحفظ العادي) — persists the settings WITHOUT bumping the
+  // version, so existing users are NOT re-prompted. `announce: true` (حفظ وإرسال
+  // إشعار) bumps the version, which makes the app show the icon-update alert once
+  // to every user on next open. Only announce when you genuinely want to notify.
+  const handleSave = async (announce: boolean) => {
+    setSavingAction(announce ? 'announce' : 'save');
     setSaveMessage(null);
     try {
       const updated: AppIconsConfig = {
@@ -428,19 +467,22 @@ export default function AppIconManager() {
         alertMessage: config.alertMessageI18n.ar || config.alertMessage,
         alertTitleEn: config.alertTitleI18n.en || config.alertTitleEn,
         alertMessageEn: config.alertMessageI18n.en || config.alertMessageEn,
-        version: (config.version || 0) + 1,
+        version: announce ? (config.version || 0) + 1 : config.version || 0,
         updatedAt: new Date().toISOString(),
       };
       await setDoc(doc(db, FIRESTORE_DOC), updated);
       await bumpContentVersion('appIcons');
       setConfig(updated);
-      setSaveMessage({ type: 'success', text: 'تم الحفظ بنجاح' });
+      setSaveMessage({
+        type: 'success',
+        text: announce ? 'تم الحفظ وإرسال الإشعار للمستخدمين' : 'تم الحفظ بدون إشعار',
+      });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {
       console.error('Error saving app icons config:', err);
       setSaveMessage({ type: 'error', text: `حدث خطأ: ${(err as Error).message}` });
     } finally {
-      setSaving(false);
+      setSavingAction(null);
     }
   };
 
@@ -511,8 +553,9 @@ export default function AppIconManager() {
         <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
         <div className="text-sm text-blue-300 leading-relaxed space-y-1">
           <p>
-            الأيقونات الموسمية مُجمَّعة مسبقاً داخل التطبيق. عند الحفظ يتم زيادة رقم الإصدار
-            ويُعرض تنبيه للمستخدمين عند فتح التطبيق إذا كان التنبيه مفعلاً.
+            الأيقونات الموسمية مُجمَّعة مسبقاً داخل التطبيق. زر «حفظ (بدون إشعار)» يحفظ الإعدادات
+            دون إزعاج المستخدمين الحاليين. زر «حفظ وإرسال إشعار» يزيد رقم الإصدار فيظهر تنبيه
+            التحديث مرة واحدة لكل مستخدم عند فتح التطبيق (يتطلب تفعيل «التنبيه»).
           </p>
           <p className="text-xs opacity-80">
             ⚠️ إضافة أيقونة جديدة كلياً يتطلب رفع نسخة جديدة على المتجر. هنا تتحكم فقط في التبديل
@@ -983,14 +1026,36 @@ export default function AppIconManager() {
       </div>
 
       {/* Save */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <button
-          onClick={handleSave}
+          onClick={() => handleSave(false)}
           disabled={saving}
           className="bg-accent hover:bg-accent/80 text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? 'جاري الحفظ...' : 'حفظ'}
+          {savingAction === 'save' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {savingAction === 'save' ? 'جاري الحفظ...' : 'حفظ (بدون إشعار)'}
+        </button>
+
+        <button
+          onClick={() => handleSave(true)}
+          disabled={saving || !config.alertEnabled}
+          title={
+            config.alertEnabled
+              ? 'حفظ وزيادة رقم الإصدار لعرض تنبيه التحديث لكل المستخدمين مرة واحدة'
+              : 'فعّل «التنبيه» أولاً لإرسال الإشعار'
+          }
+          className="bg-admin-surface-light hover:bg-admin-surface-light/70 border border-admin-border text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {savingAction === 'announce' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Bell className="w-4 h-4" />
+          )}
+          {savingAction === 'announce' ? 'جاري الإرسال...' : 'حفظ وإرسال إشعار'}
         </button>
 
         {saveMessage && (

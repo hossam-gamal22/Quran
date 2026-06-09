@@ -21,6 +21,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -179,8 +180,7 @@ export default function SunnahDuaDailyScreen() {
       }
       if (currentDua.reference) parts.push(`📖 ${currentDua.reference}`);
       if (categoryLabel) parts.push(`📿 ${categoryLabel}`);
-      parts.push(`\n${t('common.fromApp')}`);
-      await Share.share({ message: parts.join('\n\n') });
+      await Share.share({ message: buildShareText(parts.join('\n\n')) });
     } catch { /* ignore */ }
   };
 

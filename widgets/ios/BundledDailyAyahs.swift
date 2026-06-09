@@ -21,6 +21,9 @@ import Foundation
 struct BundledDailyAyah {
     let arabic: String
     let ref: String
+    /// Romanized surah name (e.g. "Ash-Sharh") so English-language widgets
+    /// render an English label instead of the Arabic `ref`.
+    let refEn: String
     let translation: String
     let surah: Int
     let ayah: Int
@@ -32,19 +35,19 @@ enum BundledDailyAyahs {
     /// removed in JS, mirror the change here so the in-app screen and the
     /// home-screen widget show the same ayah on the same day.
     static let all: [BundledDailyAyah] = [
-        BundledDailyAyah(arabic: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا", ref: "الشرح ٥",
+        BundledDailyAyah(arabic: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا", ref: "الشرح ٥", refEn: "Ash-Sharh",
                          translation: "For indeed, with hardship will be ease.", surah: 94, ayah: 5),
-        BundledDailyAyah(arabic: "وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ", ref: "الطلاق ٣",
+        BundledDailyAyah(arabic: "وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ", ref: "الطلاق ٣", refEn: "At-Talaq",
                          translation: "And whoever relies upon Allah - then He is sufficient for him.", surah: 65, ayah: 3),
-        BundledDailyAyah(arabic: "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", ref: "البقرة ١٥٣",
+        BundledDailyAyah(arabic: "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", ref: "البقرة ١٥٣", refEn: "Al-Baqarah",
                          translation: "Indeed, Allah is with the patient.", surah: 2, ayah: 153),
-        BundledDailyAyah(arabic: "وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ", ref: "الحديد ٤",
+        BundledDailyAyah(arabic: "وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ", ref: "الحديد ٤", refEn: "Al-Hadid",
                          translation: "And He is with you wherever you are.", surah: 57, ayah: 4),
-        BundledDailyAyah(arabic: "فَاذْكُرُونِي أَذْكُرْكُمْ", ref: "البقرة ١٥٢",
+        BundledDailyAyah(arabic: "فَاذْكُرُونِي أَذْكُرْكُمْ", ref: "البقرة ١٥٢", refEn: "Al-Baqarah",
                          translation: "So remember Me; I will remember you.", surah: 2, ayah: 152),
-        BundledDailyAyah(arabic: "وَاللَّهُ يُحِبُّ الْمُحْسِنِينَ", ref: "آل عمران ١٣٤",
+        BundledDailyAyah(arabic: "وَاللَّهُ يُحِبُّ الْمُحْسِنِينَ", ref: "آل عمران ١٣٤", refEn: "Ali 'Imran",
                          translation: "And Allah loves the doers of good.", surah: 3, ayah: 134),
-        BundledDailyAyah(arabic: "إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ", ref: "التوبة ١٢٠",
+        BundledDailyAyah(arabic: "إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ", ref: "التوبة ١٢٠", refEn: "At-Tawbah",
                          translation: "Indeed, Allah does not allow to be lost the reward of the doers of good.", surah: 9, ayah: 120),
     ]
 

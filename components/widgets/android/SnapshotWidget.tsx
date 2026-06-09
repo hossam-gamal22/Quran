@@ -21,7 +21,9 @@ import { androidWidgetProviderTarget } from '@/lib/widgets/registry';
 import { resolveWidgetTheme, type ResolvedWidgetTheme } from '@/lib/widgets/snapshot';
 import { formatPrayerDurationWithPrefix } from '@/lib/widget-format-duration';
 import { resolvePrayerTableState } from '@/lib/widget-prayer-table-state';
-import { APP_ICON, FONT, paletteFor, applyNumerals, resolveIsArabic, watermarkFontFor } from './shared';
+import { getPrayerNameAr, getPrayerNameEn } from '@/lib/prayer-times';
+import { FONT, paletteFor, applyNumerals, resolveIsArabic, watermarkFontFor } from './shared';
+import { WidgetFallbackNotice } from './WidgetFallbackNotice';
 // Pure-math Hijri converter (NO i18n dependency) — safe inside the headless
 // RNAW widget process where the app's i18n module may be uninitialised. Using
 // getLocalizedHijriDate here previously threw and silently fell back to the
@@ -29,6 +31,7 @@ import { APP_ICON, FONT, paletteFor, applyNumerals, resolveIsArabic, watermarkFo
 // instead of the gallery's "١٦ ذي الحجة".
 import { getHijriDate } from '@/lib/hijri-date';
 import { formatDateSample, type WidgetDateFormat } from '@/components/widgets/previews/shared';
+import { deviceUses24Hour, formatClockHHMM } from '@/lib/widget-clock-format';
 
 // ─── Live date widget (no PNG — always reads new Date()) ─────────────────────
 
@@ -144,7 +147,10 @@ function LiveDateWidget({
   // text colour renders blank on the live widget. The previews use a translucent
   // fillStrong/fillFaint; reproduce that here by blending over the tile bg so the
   // text/watermark land on the exact same RGB without an alpha channel.
-  const strongText = p.text;
+  // Date/Hijri hero text uses the unified per-theme widget ink (gold on
+  // olive/desert, white on dark/green/blue/slate, black on light/auto) so every
+  // widget — curated images included — shows the SAME text colour per theme.
+  const strongText = p.ink;
   const faintWatermark = blendOver(p.isLight ? '#000000' : '#FFFFFF', 0.1, p.bg);
 
   const widgetFont = (data.widgetFontVariant ?? 'widget1') === 'widget2' ? FONT.widget2 : FONT.widget;
@@ -193,9 +199,10 @@ function LiveDateWidget({
     // Mirrors DayDigitalPreview: HH:MM in Rubik-Bold, plus a date subtitle that
     // prefers the natural Hijri "DD من MONTH YEAR" form for Arabic/Hijri, else
     // the configured slash-style sample.
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const timeStr = applyNumerals(`${hh}:${mm}`, numerals, isAr);
+    // Follows the device 12/24-hour clock (carried on the payload, with a live
+    // fallback for the headless process).
+    const use24 = data.use24Hour ?? deviceUses24Hour();
+    const timeStr = applyNumerals(formatClockHHMM(now, use24), numerals, isAr);
     let dateStr = '';
     if (useHijri && isAr) {
       dateStr = `${applyNumerals(hijriDay, numerals, true)} من ${hijriMonthName} ${applyNumerals(hijriYear, numerals, true)}`;
@@ -208,7 +215,7 @@ function LiveDateWidget({
       <FlexWidget
         style={{ width: tileWidth, height: tileHeight, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: tileRadius }}
       >
-        <TextWidget text={timeStr} style={{ fontFamily: FONT.rubikBold, fontSize: s(size === 'small' ? 44 : 58), color: p.text, textAlign: 'center', letterSpacing: -1 }} allowFontScaling={false} maxLines={1} />
+        <TextWidget text={timeStr} style={{ fontFamily: FONT.rubikBold, fontSize: s(size === 'small' ? 44 : 58), color: p.ink, textAlign: 'center', letterSpacing: -1 }} allowFontScaling={false} maxLines={1} />
         {dateStr ? <TextWidget text={dateStr} style={{ fontFamily: FONT.rubik, fontSize: s(size === 'small' ? 12 : 14), color: p.muted, textAlign: 'center', marginTop: s(10) }} allowFontScaling={false} maxLines={1} /> : null}
       </FlexWidget>
     );
@@ -325,9 +332,9 @@ function LiveDateWidget({
     <FlexWidget
       style={{ width: tileWidth, height: tileHeight, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, borderRadius: tileRadius }}
     >
-      <TextWidget text={displayWeekday} style={{ fontFamily: FONT.rubikBold, fontSize: s(daySimpleWeekdayFs), color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-      <TextWidget text={displayDay} style={{ fontFamily: FONT.rubikBold, fontSize: s(daySimpleDayFs), color: p.text, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
-      <TextWidget text={displayMonth} style={{ fontFamily: FONT.rubikMedium, fontSize: s(daySimpleMonthFs), color: p.muted, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+      <TextWidget text={displayWeekday} style={{ fontFamily: FONT.rubikBold, fontSize: s(daySimpleWeekdayFs), color: p.ink, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+      <TextWidget text={displayDay} style={{ fontFamily: FONT.rubikBold, fontSize: s(daySimpleDayFs), color: p.ink, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
+      <TextWidget text={displayMonth} style={{ fontFamily: FONT.rubikMedium, fontSize: s(daySimpleMonthFs), color: p.ink, textAlign: 'center' }} allowFontScaling={false} maxLines={1} />
     </FlexWidget>
   );
 }
@@ -547,6 +554,13 @@ function prayerTemplateTextOverlays(
 const PRAYER_ANCHOR_WIDGET_IDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
 const PRAYER_ROW_KEY_ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
+// Widget-scoped prayer name: Friday Dhuhr → the single word «الجمعة» / "Jumuah"
+// (the prayer tab keeps the app-wide getPrayerNameAr «صلاة الجمعة» unchanged).
+function widgetPrayerName(key: string, isAr: boolean, date: Date): string {
+  if (key === 'dhuhr' && date.getDay() === 5) return isAr ? 'الجمعة' : 'Jumuah';
+  return isAr ? getPrayerNameAr(key as any, date) : getPrayerNameEn(key as any, date);
+}
+
 interface ManifestAnchor {
   id: string;
   x: number;
@@ -572,12 +586,38 @@ interface AnchorStaticItem {
   fontFamily: string;
   color: string;
   textAlign: 'left' | 'right' | 'center';
+  /** Mirror of the gallery `<Text>` letterSpacing for this value so the live
+   *  RNAW overlay has the same glyph advance/width as the baked render. */
+  letterSpacing: number;
+}
+
+/**
+ * letterSpacing the gallery render uses for each prayer value (see
+ * PrayerTablePreview / PrayerSimplePreview in components/widgets/previews):
+ * the big times use −1, the per-prayer row times use −0.3. Matching it keeps the
+ * live overlay's width/centering identical to the baked chrome.
+ */
+function anchorLetterSpacing(anchorId: string): number {
+  if (anchorId.startsWith('prayerRowTime.')) return -0.3;
+  if (
+    anchorId === 'prayerHeroTime'
+    || anchorId === 'prayerNextTime'
+    || anchorId === 'prayerPrevTime'
+  ) return -1;
+  return 0;
 }
 
 interface AnchorCountdownSpec {
   anchor: ManifestAnchor;
   direction: 'until' | 'since';
   withLabel: boolean;
+}
+
+interface AnchorHighlightSpec {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 function anchorTextAlign(alignment: ManifestAnchor['alignment'], rtl: boolean): 'left' | 'right' | 'center' {
@@ -607,7 +647,15 @@ function buildPrayerAnchorOverlays(
   textColor: string,
   mutedColor: string,
   now: Date,
-): { statics: AnchorStaticItem[]; countdowns: AnchorCountdownSpec[] } | null {
+  // True only when serving the gallery-snapshot fallback PNG (no per-state
+  // template on disk). That PNG was baked with name + highlight + active colors
+  // BLANKED (gallery pump sets `blankPrayerState`), so the live next/prev/hero
+  // NAME and the active-row HIGHLIGHT are drawn here from the same
+  // `resolvePrayerTableState` that drives the time — they can never disagree.
+  // When a per-state template IS used, this is false: name + highlight stay
+  // baked (no overlay, no double-draw, pixel-identical to the gallery).
+  overlayNames: boolean,
+): { statics: AnchorStaticItem[]; countdowns: AnchorCountdownSpec[]; highlight?: AnchorHighlightSpec } | null {
   if (!PRAYER_ANCHOR_WIDGET_IDS.has(widgetId) || !anchors || anchors.length === 0) return null;
   const tableState = resolvePrayerTableState(data.prayer, now.getTime());
   const rows = tableState.rows;
@@ -619,12 +667,16 @@ function buildPrayerAnchorOverlays(
   const countdowns: AnchorCountdownSpec[] = [];
 
   for (const a of anchors) {
-    if (a.isCountdown || a.id === 'prayerHeroCountdown' || a.id === 'prayerUntilCountdown') {
-      countdowns.push({ anchor: a, direction: 'until', withLabel: widgetId === 'prayerTable' && size === 'large' });
-      continue;
-    }
+    // The since-countdown also carries `isCountdown: true`, so it MUST be tested
+    // before the generic countdown branch below — otherwise the previous-prayer
+    // timer is mis-typed as 'until' and both cards render "بعد …" instead of
+    // one "منذ …" + one "بعد …".
     if (a.id === 'prayerSinceCountdown') {
       countdowns.push({ anchor: a, direction: 'since', withLabel: false });
+      continue;
+    }
+    if (a.isCountdown || a.id === 'prayerHeroCountdown' || a.id === 'prayerUntilCountdown') {
+      countdowns.push({ anchor: a, direction: 'until', withLabel: widgetId === 'prayerTable' && size === 'large' });
       continue;
     }
     let text = '';
@@ -635,21 +687,47 @@ function buildPrayerAnchorOverlays(
       const row = idx >= 0 ? rows[idx] : undefined;
       text = fmt(row?.time);
       color = row?.isNext ? textColor : mutedColor;
+    } else if (overlayNames && a.id.startsWith('prayerRowName.')) {
+      // Gallery-fallback only: every row name was blanked in this PNG, so redraw
+      // all six live from the SAME resolvePrayerTableState rows the gallery's
+      // prayerRowsFromShared uses — so the name text + active/muted color match
+      // the gallery exactly (including the Friday «صلاة الجمعة» row label).
+      const key = a.id.slice('prayerRowName.'.length);
+      const idx = PRAYER_ROW_KEY_ORDER.indexOf(key);
+      const row = idx >= 0 ? rows[idx] : undefined;
+      text = (isAr ? row?.nameAr : row?.name) ?? '';
+      color = row?.isNext ? textColor : mutedColor;
     } else if (a.id === 'prayerHeroTime' || a.id === 'prayerNextTime') {
       text = fmt(next?.time ?? data.prayer?.nextPrayerTime);
       color = textColor;
     } else if (a.id === 'prayerPrevTime') {
       text = fmt(previous?.time);
       color = textColor;
+    } else if (overlayNames && (a.id === 'prayerHeroName' || a.id === 'prayerNextName')) {
+      // Gallery-fallback only: the name was blanked in this PNG, so draw the live
+      // next-prayer name. Recompute from the CURRENT date — Friday Dhuhr shows the
+      // widget label «الجمعة» (single word), matching the baked templates.
+      text = (next?.key
+        ? widgetPrayerName(next.key, isAr, now)
+        : (isAr ? next?.nameAr : next?.name))
+        ?? (isAr ? data.prayer?.nextPrayerNameAr : data.prayer?.nextPrayerName)
+        ?? '';
+      color = textColor;
+    } else if (overlayNames && a.id === 'prayerPrevName') {
+      text = (previous?.key
+        ? widgetPrayerName(previous.key, isAr, now)
+        : (isAr ? previous?.nameAr : previous?.name))
+        ?? (isAr ? data.prayer?.previousPrayerNameAr : data.prayer?.previousPrayerName)
+        ?? '';
+      color = textColor;
     } else {
-      // Names (prayerHeroName/prayerNextName/prayerPrevName) and prayer-row
-      // LABELS are baked into the per-state PNG on Android (AnchorReporter does
-      // not blank non-countdown content there), and the task handler already
-      // selects the PNG for the current prayer state — so they must NOT be
-      // overlaid again or they'd double-draw. Only the blanked TIMES + the live
-      // countdown are drawn here.
+      // Per-state template path: the hero/next/prev NAME and the prayer-row
+      // LABELS are baked into the PNG (the task handler selects the PNG for the
+      // current prayer state), so they must NOT be overlaid again or they'd
+      // double-draw. Only the blanked TIMES + the live countdown are drawn here.
       continue;
     }
+    if (!text) continue;
     statics.push({
       key: a.id,
       text,
@@ -661,10 +739,19 @@ function buildPrayerAnchorOverlays(
       fontFamily: anchorFontFamily(a.fontWeight),
       color,
       textAlign: anchorTextAlign(a.alignment, isAr),
+      letterSpacing: anchorLetterSpacing(a.id),
     });
   }
-  if (statics.length === 0 && countdowns.length === 0) return null;
-  return { statics, countdowns };
+  // Gallery-fallback only: the active-row highlight was NOT baked into this PNG,
+  // so draw it live at the captured row-container rect (`prayerRowBg.<key>`) for
+  // the resolved next prayer. Per-state templates keep the highlight baked.
+  let highlight: AnchorHighlightSpec | undefined;
+  if (overlayNames && widgetId === 'prayerTable' && next?.key) {
+    const bg = anchors.find((a) => a.id === `prayerRowBg.${next.key}`);
+    if (bg) highlight = { x: bg.x, y: bg.y, width: bg.width, height: bg.height };
+  }
+  if (statics.length === 0 && countdowns.length === 0 && !highlight) return null;
+  return { statics, countdowns, highlight };
 }
 
 function liveText(
@@ -678,9 +765,9 @@ function liveText(
     case 'none':
       return '';
     case 'currentTime': {
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      return applyNumerals(`${hh}:${mm}`, numerals, isAr);
+      // Device 12/24-hour clock (payload value, live fallback for headless).
+      const use24 = data.use24Hour ?? deviceUses24Hour();
+      return applyNumerals(formatClockHHMM(now, use24), numerals, isAr);
     }
     case 'prayerNextCountdown':
       return formatCountdownFromEpoch(resolveNextPrayerEpoch(data, now), isAr, numerals, now, data.prayer?.prayerDataUpdatedAt);
@@ -844,30 +931,92 @@ export function SnapshotWidget({
   const imagePath = snapshotPath ?? manifestEntry?.path ?? snapshotFilePathForKey(imageKey);
   const p = paletteFor(resolvedTheme);
   const numerals = data.widgetNumerals as 'auto' | 'arabic' | 'western' | undefined;
+
+  // No real location yet → intentional "enable location" card for prayer
+  // widgets, instead of the Makkah/sample fallback baked into the PNG. Single
+  // early return through the one render path (no second resolver/provider).
+  if (PRAYER_ANCHOR_WIDGET_IDS.has(widgetId) && data.prayer?.needsLocation) {
+    const titleFs = size === 'small' ? 15 : 18;
+    const subFs = size === 'small' ? 11 : 13;
+    return (
+      <FlexWidget
+        style={{
+          width: 'match_parent',
+          height: 'match_parent',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: p.bg,
+          borderRadius: TILE_RADIUS[size],
+          paddingLeft: 14,
+          paddingRight: 14,
+        }}
+        clickAction={clickAction}
+        clickActionData={clickUri ? { uri: clickUri } : undefined}
+      >
+        <TextWidget
+          text={isAr ? '📍 فعّل الموقع' : '📍 Enable location'}
+          style={{ fontFamily: FONT.rubikBold, fontSize: titleFs, color: p.ink, textAlign: 'center' }}
+          allowFontScaling={false}
+          maxLines={1}
+        />
+        {size !== 'small' ? (
+          <TextWidget
+            text={isAr ? 'لعرض مواقيت الصلاة' : 'to show prayer times'}
+            style={{ fontFamily: FONT.rubikMedium, fontSize: subFs, color: p.muted, textAlign: 'center', marginTop: 8 }}
+            allowFontScaling={false}
+            maxLines={2}
+          />
+        ) : null}
+      </FlexWidget>
+    );
+  }
+
   const overlays = overlaysFor(widgetId, size, isAr);
   const overlayNow = new Date();
   const prayerEpochCandidates = prayerEpochRows(data).map((row) => row.epochMs);
 
+  // ── Language guard (Problem 2 fix) ────────────────────────────────────────
+  // The prayer PNG is a direction-specific blank chrome and its captured anchors
+  // are recorded in the language it was baked in. On the first AR↔EN switch the
+  // live payload (names/times + isAr coordinate picks) flips one tick before the
+  // new-language re-bake commits, so without this guard new-language text lands on
+  // old-direction anchor rects → the reported overlapping/mixed AR/EN glitch.
+  // When the baked language disagrees with the current one, suppress the localized
+  // overlays for that frame and show the blank chrome only — invisible and correct
+  // until the matching bake lands (the next widget tick re-renders cleanly).
+  const curLang: 'ar' | 'en' = isAr ? 'ar' : 'en';
+  const isPrayerOverlayWidget = PRAYER_ANCHOR_WIDGET_IDS.has(widgetId) || isPrayerStaticTemplate;
+  const bakedLang = manifestEntry?.language;
+  const langMatches = !isPrayerOverlayWidget || !bakedLang || bakedLang === curLang;
+
   // Captured-anchor path (preferred): positions come straight from the gallery
   // bake, so the live times/names/countdown land exactly where the gallery drew
   // them. Falls back to the legacy hand-tuned coords when no anchors exist.
-  const prayerAnchorOverlays = buildPrayerAnchorOverlays(
-    widgetId,
-    size,
-    manifestEntry?.anchors as ManifestAnchor[] | undefined,
-    data,
-    isAr,
-    numerals,
-    p.text,
-    p.muted,
-    overlayNow,
-  );
+  const prayerAnchorOverlays = langMatches
+    ? buildPrayerAnchorOverlays(
+        widgetId,
+        size,
+        manifestEntry?.anchors as ManifestAnchor[] | undefined,
+        data,
+        isAr,
+        numerals,
+        p.ink,
+        p.muted,
+        overlayNow,
+        // Draw the live prayer NAME only when serving the gallery-fallback PNG
+        // (name blanked there). Per-state templates keep the name baked.
+        !isPrayerStaticTemplate,
+      )
+    : null;
 
-  const templateTextOverlays = prayerAnchorOverlays
+  const templateTextOverlays = !langMatches
     ? []
-    : isPrayerStaticTemplate
-      ? prayerTemplateTextOverlays(widgetId, size, data, isAr, numerals, p.text, p.muted)
-      : [];
+    : prayerAnchorOverlays
+      ? []
+      : isPrayerStaticTemplate
+        ? prayerTemplateTextOverlays(widgetId, size, data, isAr, numerals, p.ink, p.muted)
+        : [];
 
   const buildNativeFromAnchorCountdown = (spec: AnchorCountdownSpec): NativePrayerTextOverlay => {
     const a = spec.anchor;
@@ -892,7 +1041,11 @@ export function SnapshotWidget({
       direction: spec.direction,
       labelKind: spec.withLabel ? 'nextPrayer' : 'duration',
       language: isAr ? 'ar' : 'en',
-      arabicNumerals: numerals === 'arabic' || (numerals !== 'western' && isAr),
+      // Pin the live countdown to WESTERN digits. The JS seed text
+      // (formatPrayerDurationWithPrefix) is already western, so matching it here
+      // stops the native minute-tick from re-rendering arabic-indic and flicking
+      // the digits back and forth ("بعد 2 س 27 د" stays stable).
+      arabicNumerals: false,
       compact: false,
       leftFraction: Math.max(0, scaledX) / targetWidth,
       topFraction: Math.max(0, top) / targetHeight,
@@ -906,7 +1059,9 @@ export function SnapshotWidget({
     };
   };
 
-  const nativeTextOverlays: NativePrayerTextOverlay[] = prayerAnchorOverlays
+  const nativeTextOverlays: NativePrayerTextOverlay[] = !langMatches
+    ? []
+    : prayerAnchorOverlays
     ? prayerAnchorOverlays.countdowns.map(buildNativeFromAnchorCountdown)
     : overlays
         .filter((ov) => isNativePrayerTextOverlay(ov.kind))
@@ -929,7 +1084,11 @@ export function SnapshotWidget({
             direction: isPrevious ? 'since' : 'until',
             labelKind: ov.kind === 'prayerNextCountdownWithLabel' ? 'nextPrayer' : 'duration',
             language: isAr ? 'ar' : 'en',
-            arabicNumerals: numerals === 'arabic' || (numerals !== 'western' && isAr),
+            // Pin the live countdown to WESTERN digits. The JS seed text
+      // (formatPrayerDurationWithPrefix) is already western, so matching it here
+      // stops the native minute-tick from re-rendering arabic-indic and flicking
+      // the digits back and forth ("بعد 2 س 27 د" stays stable).
+      arabicNumerals: false,
             compact: ov.compact === true,
             leftFraction: Math.max(0, scaledX - scaledWidth / 2) / targetWidth,
             topFraction: Math.max(0, top) / targetHeight,
@@ -938,7 +1097,7 @@ export function SnapshotWidget({
             widgetWidth: targetWidth,
             widgetHeight: targetHeight,
             fontSize: scaledFontSize,
-            color: ov.kind === 'currentTime' ? p.text : p.muted,
+            color: ov.kind === 'currentTime' ? p.ink : p.muted,
             textAlign: ov.textAlign ?? 'center',
           };
         });
@@ -947,7 +1106,11 @@ export function SnapshotWidget({
     ...(nativeTextOverlays.length ? { nativeTextOverlays } : {}),
   };
 
-  // Branded loading state — rendered ONLY when no PNG is on disk.
+  // No baked PNG on disk yet (fresh add before the first foreground bake,
+  // cleared cache, or a generation failure). Show the bundled preview (so it
+  // looks like the real widget) plus an "open the app to refresh" banner so the
+  // user knows the action that makes it go live. WidgetFallbackNotice falls back
+  // to a branded card + the same hint when no preview asset exists for this id.
   if (!hasSnapshot) {
     if (__DEV__) {
       console.warn(
@@ -955,46 +1118,16 @@ export function SnapshotWidget({
       );
     }
     return (
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          height: 'match_parent',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: p.bg,
-          borderRadius: 0,
-          padding: 12,
-        }}
-        clickAction={clickAction}
-        clickActionData={clickUri ? { uri: clickUri } : undefined}
-      >
-        <ImageWidget image={APP_ICON} imageWidth={28} imageHeight={28} radius={6} />
-        <TextWidget
-          text="روح المسلم"
-          style={{
-            fontSize: 13,
-            color: p.text,
-            fontFamily: FONT.widget,
-            marginTop: 8,
-            textAlign: 'center',
-          }}
-        />
-        {__DEV__ && missingKey ? (
-          <TextWidget
-            text={`Missing: ${missingKey}`}
-            style={{
-              fontSize: 8,
-              color: p.muted,
-              fontFamily: FONT.rubik,
-              marginTop: 6,
-              textAlign: 'center',
-            }}
-            maxLines={2}
-            truncate="END"
-          />
-        ) : null}
-      </FlexWidget>
+      <WidgetFallbackNotice
+        widgetId={widgetId}
+        size={size}
+        theme={resolvedTheme}
+        isArabic={isAr}
+        widgetWidth={widgetWidth}
+        widgetHeight={widgetHeight}
+        clickAction={clickAction === 'OPEN_URI' ? 'OPEN_URI' : 'OPEN_APP'}
+        clickUri={clickUri}
+      />
     );
   }
 
@@ -1042,6 +1175,28 @@ export function SnapshotWidget({
         imageHeight={renderedImageHeight}
         radius={0}
       />
+      {prayerAnchorOverlays?.highlight ? (() => {
+        const h = prayerAnchorOverlays.highlight!;
+        // Drawn over the (highlight-blanked) gallery PNG, under the text overlays.
+        // Translucent tone matches the gallery's activeBg so the baked row label
+        // shows through; the live row time sits crisply on top. Alpha kept in
+        // sync with `activeBg` in previews/index.tsx (~12% light / ~18% dark) so
+        // the band reads clearly on the cream light theme.
+        const highlightColor = p.isLight ? '#1F000000' : '#2EFFFFFF';
+        return (
+          <FlexWidget
+            key="anchor-row-highlight"
+            style={{
+              width: h.width * renderScale,
+              height: h.height * renderScale,
+              marginLeft: imageOffsetX + h.x * renderScale,
+              marginTop: imageOffsetY + h.y * renderScale,
+              backgroundColor: highlightColor,
+              borderRadius: (size === 'large' ? 10 : 6) * renderScale,
+            }}
+          />
+        );
+      })() : null}
       {templateTextOverlays.map((ov) => {
         const scaledWidth = ov.width * renderScale;
         const scaledFontSize = ov.fontSize * renderScale;
@@ -1082,6 +1237,10 @@ export function SnapshotWidget({
                   color: it.color as any,
                   fontFamily: it.fontFamily,
                   textAlign: it.textAlign,
+                  // RNAW converts letterSpacing → em by dividing by the (scaled)
+                  // fontSize, so scale the gallery value by renderScale to keep
+                  // the exact same em ratio the baked render used.
+                  letterSpacing: it.letterSpacing * renderScale,
                   // Anchor x/y are the captured top-left of the gallery rect, so
                   // place the TextWidget's top-left there directly (no centering).
                   marginLeft: imageOffsetX + it.x * renderScale,
@@ -1111,7 +1270,7 @@ export function SnapshotWidget({
             style={{
               width: scaledWidth,
               fontSize: scaledFontSize,
-              color: ov.kind === 'currentTime' ? p.text : p.muted,
+              color: ov.kind === 'currentTime' ? p.ink : p.muted,
               fontFamily: ov.fontFamily,
               textAlign: ov.textAlign ?? 'center',
               marginLeft: scaledX - scaledWidth / 2,

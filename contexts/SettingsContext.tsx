@@ -949,7 +949,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             kahfTime: n.kahfTime,
             // Phase 7
             azkarAutoAnchor: n.azkarAutoAnchor === true,
-          }).then(() => {
+          }, { allowPrompt: false }).then(() => {
+            // Cold start: check-only, never surface a system prompt. Schedules
+            // only if the user already granted; otherwise skips silently.
+            // First-time grant happens in onboarding / when the user enables a reminder.
             // Mark initial scheduling complete so admin sync can safely proceed
             setInitialSchedulingDone(true);
           }).catch((e) => {
@@ -1121,8 +1124,22 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const newSettings = { ...settings, language };
     await saveSettings(newSettings);
 
-    // تحديث بيانات الويدجت باللغة الجديدة
-    try { await updateSharedData(); } catch (e) { console.log('Widget data update failed:', e); }
+    // تحديث بيانات الويدجت باللغة الجديدة — FORCE a full, awaited re-bake so every
+    // baked prayer name/row-label PNG (active gallery snapshot + per-state
+    // templates) regenerates in the new language and triggerNativeWidgetReload
+    // fires BEFORE the app reloads. A bare updateSharedData() (force:false) lets
+    // the hash/signature skip — and swallows a partial-bake failure — so the
+    // widget kept the previous-language names until the debounced post-reload
+    // pump finished (only the live time overlay flipped right away).
+    try {
+      const { updateWidgetData } = require('@/lib/widget-data-bridge');
+      // clearSnapshotCache drops the stored per-theme content hashes (no PNG
+      // deletion) so a signature collision can never let the bake hash-skip — the
+      // new-language PNGs + captured anchors are guaranteed to commit before
+      // triggerNativeWidgetReload fires and before the app reloads. Combined with
+      // the home-side language guard, this closes the first-switch AR/EN scramble.
+      await updateWidgetData(undefined, undefined, { forceSnapshots: true, clearSnapshotCache: true });
+    } catch (e) { console.log('Widget language re-bake failed:', e); }
 
     // تحديث أيقونة التطبيق على الشاشة الرئيسية
     try { await switchAppIcon(language); } catch (e) { console.log('App icon switch failed:', e); }
@@ -1271,7 +1288,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       kahfTime: n.kahfTime,
       // Phase 7
       azkarAutoAnchor: n.azkarAutoAnchor === true,
-    });
+    }, { allowPrompt: true });
+    // User-initiated update (toggled a reminder in settings): contextual path —
+    // surface the OS permission prompt now if not yet granted.
   }, [settings]);
 
   // ========================================

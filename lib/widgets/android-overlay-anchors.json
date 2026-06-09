@@ -17,8 +17,8 @@
       "x": 78,
       "y": 130,
       "width": 118,
-      "fontSize": 10,
-      "fontKey": "rubikMedium",
+      "fontSize": 12,
+      "fontKey": "rubikBold",
       "textAlign": "center",
       "lineHeight": 18
     }
@@ -26,12 +26,12 @@
   "prayerTable_small": [
     {
       "kind": "prayerNextCountdown",
-      "x": 44,
-      "y": 18,
-      "width": 82,
-      "fontSize": 9,
-      "fontKey": "rubikMedium",
-      "textAlign": "left",
+      "x": 12,
+      "y": 35,
+      "width": 80,
+      "fontSize": 11,
+      "fontKey": "rubikBold",
+      "textAlign": "right",
       "compact": true,
       "lineHeight": 16
     }
@@ -42,8 +42,8 @@
       "x": 247,
       "y": 128,
       "width": 112,
-      "fontSize": 9,
-      "fontKey": "rubikMedium",
+      "fontSize": 11,
+      "fontKey": "rubikBold",
       "textAlign": "center",
       "lineHeight": 16
     }
@@ -51,12 +51,12 @@
   "prayerTable_large": [
     {
       "kind": "prayerNextCountdownWithLabel",
-      "x": 236,
+      "x": 300,
       "y": 106,
       "width": 190,
-      "fontSize": 10,
-      "fontKey": "rubikMedium",
-      "textAlign": "center",
+      "fontSize": 14,
+      "fontKey": "rubikBold",
+      "textAlign": "left",
       "lineHeight": 18
     }
   ],
@@ -66,8 +66,8 @@
       "x": 91,
       "y": 126,
       "width": 118,
-      "fontSize": 9,
-      "fontKey": "rubikMedium",
+      "fontSize": 11,
+      "fontKey": "rubikBold",
       "textAlign": "center",
       "lineHeight": 16
     },
@@ -76,8 +76,8 @@
       "x": 238,
       "y": 126,
       "width": 118,
-      "fontSize": 9,
-      "fontKey": "rubikMedium",
+      "fontSize": 11,
+      "fontKey": "rubikBold",
       "textAlign": "center",
       "lineHeight": 16
     }
@@ -88,8 +88,8 @@
       "x": 91,
       "y": 126,
       "width": 118,
-      "fontSize": 9,
-      "fontKey": "rubikMedium",
+      "fontSize": 11,
+      "fontKey": "rubikBold",
       "textAlign": "center",
       "lineHeight": 16
     },
@@ -98,8 +98,8 @@
       "x": 238,
       "y": 126,
       "width": 118,
-      "fontSize": 9,
-      "fontKey": "rubikMedium",
+      "fontSize": 11,
+      "fontKey": "rubikBold",
       "textAlign": "center",
       "lineHeight": 16
     }

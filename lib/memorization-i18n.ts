@@ -67,6 +67,11 @@ const ar: Dict = {
 
   // New plan
   newPlanTitle: 'خطة حفظ جديدة',
+  editPlanTitle: 'تعديل الخطة',
+  editPlan: 'تعديل',
+  saveChanges: 'حفظ التعديلات',
+  editScopeLocked: 'لا يمكن تغيير نطاق الحفظ بعد الإنشاء — أنشئ خطة جديدة لذلك',
+  planUpdated: 'تم حفظ التعديلات',
   continuePlan: 'استكمال خطة سابقة',
   continuePlanHint: 'اختر خطة موجودة بدل إنشاء خطة جديدة',
   externalReviewHint: 'لو عندك خطة خارج التطبيق، اختر آيات محددة للمراجعة السريعة',
@@ -297,6 +302,11 @@ const en: Dict = {
   failuresCount: '{n} mistakes',
 
   newPlanTitle: 'New Memorization Plan',
+  editPlanTitle: 'Edit plan',
+  editPlan: 'Edit',
+  saveChanges: 'Save changes',
+  editScopeLocked: 'Scope cannot be changed after creation — create a new plan instead',
+  planUpdated: 'Changes saved',
   continuePlan: 'Continue previous plan',
   continuePlanHint: 'Choose an existing plan instead of creating a new one',
   externalReviewHint: 'If you follow a plan outside the app, choose custom ayahs for quick review',

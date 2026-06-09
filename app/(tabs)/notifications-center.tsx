@@ -212,7 +212,7 @@ export default function NotificationsCenterScreen() {
   }, [settings, updateAndSave]);
 
   const handleRequestPermission = async () => {
-    const granted = await requestNotifPermission();
+    const granted = await requestNotifPermission({ prompt: true });
     setHasPermission(granted);
     setPermissionChecked(true);
     if (!granted) {

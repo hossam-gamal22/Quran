@@ -22,6 +22,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getDateLocale } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -524,7 +525,7 @@ export default function FavoritesScreen() {
         // Web: share text
         const label = selectedBookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse');
         await Share.share({
-          message: `${selectedBookmark.ayahText}\n\n﻿ ﴿ ${selectedBookmark.surahName} • ${label} ${selectedBookmark.ayahNumber} ﴾\n\n${t('common.appName')}`,
+          message: buildShareText(`${selectedBookmark.ayahText}\n\n﻿ ﴿ ${selectedBookmark.surahName} • ${label} ${selectedBookmark.ayahNumber} ﴾`),
         });
       }
     } catch (e) {
@@ -538,7 +539,7 @@ export default function FavoritesScreen() {
   const handleShareText = useCallback(async (bookmark: Bookmark) => {
     const label = bookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse');
     await Share.share({
-      message: `${bookmark.ayahText}\n\n﴿ ${bookmark.surahName} • ${label} ${bookmark.ayahNumber} ﴾\n\n${t('common.appName')} 🕌`,
+      message: buildShareText(`${bookmark.ayahText}\n\n﴿ ${bookmark.surahName} • ${label} ${bookmark.ayahNumber} ﴾`),
       title: `${t('favorites.verseFrom')} ${bookmark.surahName}`,
     });
   }, [t]);
@@ -565,7 +566,7 @@ export default function FavoritesScreen() {
   // Share azkar as text
   const handleShareAzkar = useCallback(async (zikr: Zikr) => {
     await Share.share({
-      message: `${stripAzkarBrackets(zikr.arabic)}\n\n📿 ${zikr.reference}\n\n${t('favorites.repeatCount')}: ${zikr.count}`,
+      message: buildShareText(`${stripAzkarBrackets(zikr.arabic)}\n\n📿 ${zikr.reference}\n\n${t('favorites.repeatCount')}: ${zikr.count}`),
     });
   }, [t]);
 

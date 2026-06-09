@@ -38,7 +38,7 @@ import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useIsRTL } from '@/hooks/use-is-rtl';
-import { ModalColors } from '@/constants/theme';
+import { ModalColors, softCardShadow } from '@/constants/theme';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { usePrayerTracker } from '@/contexts/WorshipContext';
@@ -700,9 +700,11 @@ export default function SalatiScreen() {
                     color={info.iconColor}
                   />
                 </View>
-                <Text style={[
+                <Text
+                  numberOfLines={1}
+                  style={[
                   styles.prayerCardText,
-                  { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight },
+                  { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' },
                   !isAvailable && !isCompleted && { opacity: 0.5 },
                 ]}>
                   {getPrayerName(prayer, 'ar')}
@@ -760,9 +762,11 @@ export default function SalatiScreen() {
                     color={info.iconColor}
                   />
                 </View>
-                <Text style={[
+                <Text
+                  numberOfLines={1}
+                  style={[
                   styles.prayerCardText,
-                  { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight },
+                  { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' },
                   !isAvailable && !isCompleted && { opacity: 0.5 },
                 ]}>
                   {getPrayerName(prayer, 'ar')}
@@ -820,9 +824,11 @@ export default function SalatiScreen() {
                     color={info.iconColor}
                   />
                 </View>
-                <Text style={[
+                <Text
+                  numberOfLines={1}
+                  style={[
                   styles.prayerCardText,
-                  { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight },
+                  { color: isCompleted ? ACCENT_GREEN : isSelected ? ACCENT_GREEN : isAvailable ? colors.text : colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' },
                   !isAvailable && !isCompleted && { opacity: 0.5 },
                 ]}>
                   {getPrayerName(prayer, 'ar')}
@@ -871,13 +877,13 @@ export default function SalatiScreen() {
             <Text
               style={[
                 styles.prayerCardText,
-                { color: selectedPrayer?.kind === 'temporary' ? ACCENT_GREEN : colors.text },
+                { color: selectedPrayer?.kind === 'temporary' ? ACCENT_GREEN : colors.text, writingDirection: isRTL ? 'rtl' : 'ltr' },
               ]}
-              numberOfLines={2}
+              numberOfLines={1}
             >
               {selectedPrayer?.kind === 'temporary' ? selectedPrayer.name : t('smartTracker.otherPrayer')}
             </Text>
-            <Text style={[styles.otherPrayerHint, { color: colors.textLight }]} numberOfLines={1}>
+            <Text style={[styles.otherPrayerHint, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {selectedPrayer?.kind === 'temporary'
                 ? `${selectedPrayer.rakats} ${t('smartTracker.rakats')}`
                 : t('smartTracker.otherPrayerHint')}
@@ -1428,12 +1434,10 @@ const _styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: 'transparent',
-    // Light mode shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    // iOS-only soft shadow — never Android `elevation` here: the card background is
+    // translucent (dark mode / selected state), and elevation on a translucent view
+    // makes Android draw an inner rounded-rect "ghost square". Token enforces this.
+    ...softCardShadow,
   },
   prayerCardSelected: {
     borderWidth: 2,

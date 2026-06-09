@@ -3,7 +3,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h, timeStringToDate, getPrayerNameAr, getPrayerNameEn } from './prayer-times';
+import { PrayerTimes, getNextPrayer, getTimeRemaining, formatPrayerTime, timeStringToDate, getPrayerNameAr, getPrayerNameEn } from './prayer-times';
 import { getOfflinePrayerTimesRange } from './prayer-week-cache';
 import type { CanonicalPrayerSnapshot } from './canonical-prayer-snapshot';
 import { getLocalizedHijriDate, HIJRI_MONTHS_EN } from './hijri-date';
@@ -11,7 +11,7 @@ import { getAllAzkar, resolveTranslationValue } from '@/lib/azkar-api';
 import type { Language as AzkarLanguage } from '@/lib/azkar-api';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { t, getDateLocale, getLanguage, isRTL } from '@/lib/i18n';
-import { formatPrayerDurationCompact } from '@/lib/widget-format-duration';
+import { formatPrayerDurationCompact, truncateEpochToMinute } from '@/lib/widget-format-duration';
 import { getTodayAyah, QuranAyah } from '@/lib/api/quran-cloud-api';
 import { detectQuranTitle, splitAzkarChunks, quranTitleToEnglish } from '@/lib/widget-azkar-helpers';
 
@@ -109,6 +109,11 @@ export interface WidgetPrayerData {
   previousPrayerAtEpochMs?: number;
   calculationLocation?: string;
   timezone?: string;
+  /** True when no real location is available yet (no stored coords / no snapshot /
+   *  no offline calc). Readers (gallery previews, iOS/Android widgets) MUST render
+   *  an intentional "enable location" placeholder instead of the Makkah/sample
+   *  fallback values when this is set. */
+  needsLocation?: boolean;
   prayerDataUpdatedAt?: string;
   canonicalSnapshot?: CanonicalPrayerSnapshot;
   latitude?: number;
@@ -243,6 +248,11 @@ export interface WidgetSnapshotManifestEntry {
   id: string;
   size: 'small' | 'medium' | 'large' | string;
   theme: string;
+  /** Language this PNG was baked in. The placed widget refuses to render an
+   *  entry whose language ≠ its own resolved language (app language), so a
+   *  stale other-language PNG can never be overlaid with mismatched text —
+   *  it shows the "updating" fallback until the matching bake lands. */
+  language?: 'ar' | 'en';
   updatedAt: string;
   /** Captured-frame dimensions in dp — the (x, y, width, height) inside each
    *  `anchors` entry are relative to this frame. Native side scales by
@@ -291,6 +301,10 @@ export interface SharedWidgetData {
   prayerCompletion: PrayerCompletionData;
   settings: WidgetSettings;
   language?: string;
+  /** Device 12/24-hour clock preference at the time the payload was built.
+   *  Drives every widget time string (baked rows + live overlays) so the home
+   *  widget matches the phone's clock format — independent of app language. */
+  use24Hour?: boolean;
   /** User-selected default Arabic widget font for Date/Prayer variants. Adhkar widgets always use WidgetFont2. */
   widgetFontVariant?: 'widget1' | 'widget2';
   widgetCalendar?: string;
@@ -430,6 +444,8 @@ export const preparePrayerWidgetData = async (
   location?: string,
   language: string = 'ar',
   canonicalSnapshot?: CanonicalPrayerSnapshot | null,
+  use24Hour: boolean = false,
+  needsLocation: boolean = false,
 ): Promise<WidgetPrayerData> => {
   const now = new Date();
   // Resolve TODAY's Hijri date through the same 4-layer service the rest
@@ -482,19 +498,27 @@ export const preparePrayerWidgetData = async (
   const nextPrayerTime = isTomorrowFajr && effectivePrayerTimes?.tomorrowFajr
     ? effectivePrayerTimes.tomorrowFajr
     : (effectivePrayerTimes?.[nextPrayerKey as keyof PrayerTimes] as string || nextPrayerResult?.time || '--:--');
+  // Truncate the prayer epoch to the minute (the row shows HH:MM, not seconds)
+  // so the remaining minutes match the wall-clock HH:MM difference.
   const canonicalRemainingSeconds = canonicalSnapshot?.nextPrayerAtEpochMs
-    ? Math.max(0, Math.floor((canonicalSnapshot.nextPrayerAtEpochMs - now.getTime()) / 1000))
+    ? Math.max(0, Math.floor((truncateEpochToMinute(canonicalSnapshot.nextPrayerAtEpochMs) - now.getTime()) / 1000))
     : null;
   const timeRemaining = canonicalRemainingSeconds === null && effectivePrayerTimes ? getTimeRemaining(effectivePrayerTimes) : null;
   
   // أسماء الصلوات
+  // Widget-scoped Friday label: Dhuhr renders the single word «الجمعة» (NOT the
+  // app-wide «صلاة الجمعة») per spec. Only the widget data layer is overridden —
+  // the prayer tab keeps using getPrayerNameAr unchanged.
+  const isFridayNow = now.getDay() === 5;
+  const wAr = (k: string) => (k === 'dhuhr' && isFridayNow ? 'الجمعة' : getPrayerNameAr(k as any, now));
+  const wEn = (k: string) => getPrayerNameEn(k as any, now);
   const prayerNames: Record<string, { en: string; ar: string }> = {
-    fajr: { en: getPrayerNameEn('fajr', now), ar: getPrayerNameAr('fajr', now) },
-    sunrise: { en: getPrayerNameEn('sunrise', now), ar: getPrayerNameAr('sunrise', now) },
-    dhuhr: { en: getPrayerNameEn('dhuhr', now), ar: getPrayerNameAr('dhuhr', now) },
-    asr: { en: getPrayerNameEn('asr', now), ar: getPrayerNameAr('asr', now) },
-    maghrib: { en: getPrayerNameEn('maghrib', now), ar: getPrayerNameAr('maghrib', now) },
-    isha: { en: getPrayerNameEn('isha', now), ar: getPrayerNameAr('isha', now) },
+    fajr: { en: wEn('fajr'), ar: wAr('fajr') },
+    sunrise: { en: wEn('sunrise'), ar: wAr('sunrise') },
+    dhuhr: { en: wEn('dhuhr'), ar: wAr('dhuhr') },
+    asr: { en: wEn('asr'), ar: wAr('asr') },
+    maghrib: { en: wEn('maghrib'), ar: wAr('maghrib') },
+    isha: { en: wEn('isha'), ar: wAr('isha') },
   };
 
   // تحضير قائمة الصلوات
@@ -537,7 +561,7 @@ export const preparePrayerWidgetData = async (
     return {
       name: prayerNames[prayer]?.en || prayer,
       nameAr: prayerNames[prayer]?.ar || prayer,
-      time: formatTime12h(time),
+      time: formatPrayerTime(time, use24Hour),
       epochMs: prayerDate.getTime(),
       isPassed: prayerDate < now,
       isNext: prayer === nextPrayerKey,
@@ -642,13 +666,14 @@ export const preparePrayerWidgetData = async (
     nextPrayer: nextPrayerKey,
     nextPrayerName: prayerNames[nextPrayerKey]?.en || nextPrayerKey,
     nextPrayerNameAr: prayerNames[nextPrayerKey]?.ar || nextPrayerKey,
-    nextPrayerTime: effectivePrayerTimes ? formatTime12h(nextPrayerTime) : '--:--',
+    nextPrayerTime: effectivePrayerTimes ? formatPrayerTime(nextPrayerTime, use24Hour) : '--:--',
     nextPrayerAtEpochMs,
     previousPrayerName: previousPrayer ? (prayerNames[previousPrayer.name]?.en || previousPrayer.name) : undefined,
     previousPrayerNameAr: previousPrayer ? (prayerNames[previousPrayer.name]?.ar || previousPrayer.name) : undefined,
     previousPrayerAtEpochMs,
     calculationLocation: canonicalSnapshot?.locationName || location || '',
     timezone: canonicalSnapshot?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    needsLocation,
     prayerDataUpdatedAt: canonicalSnapshot?.prayerDataUpdatedAt || updatedAt,
     canonicalSnapshot: canonicalSnapshot ?? undefined,
     latitude: canonicalSnapshot?.latitude,
@@ -661,15 +686,16 @@ export const preparePrayerWidgetData = async (
     // task handler and any direct `data.prayer.timeRemaining` reader pick
     // up the new shape automatically.
     timeRemaining: canonicalRemainingSeconds !== null
-      ? formatPrayerDurationCompact(canonicalRemainingSeconds, isRTL() ? 'ar' : 'en')
+      ? formatPrayerDurationCompact(canonicalRemainingSeconds, isRTL() ? 'ar' : 'en', true)
       : (timeRemaining
         ? formatPrayerDurationCompact(
             (timeRemaining.hours * 60 + timeRemaining.minutes) * 60,
             isRTL() ? 'ar' : 'en',
+            true,
           )
         : ''),
     timeRemainingMinutes: canonicalRemainingSeconds !== null
-      ? Math.floor(canonicalRemainingSeconds / 60)
+      ? Math.ceil(canonicalRemainingSeconds / 60)
       : (timeRemaining
         ? timeRemaining.hours * 60 + timeRemaining.minutes
         : 0),
@@ -938,6 +964,21 @@ export const prepareVerseWidgetData = async (
             .trim() || '';
         } catch {}
       }
+      // Romanized surah name (e.g. "Az-Zukhruf") so English-language widgets
+      // render an English label instead of the Arabic ref. The Arabic `ref`
+      // ("البقرة ١٥٢") was previously reused for both fields, which left the
+      // English gallery/home-screen widget showing the Arabic surah name.
+      let surahNameEn = '';
+      if (chosen.surah > 0) {
+        try {
+          const quran = require('@/data/json/quran-uthmani.json') as Array<{
+            number: number;
+            englishName?: string;
+          }>;
+          surahNameEn = (quran.find((s) => s.number === chosen.surah)?.englishName ?? '').trim();
+        } catch {}
+      }
+
       const verseData: VerseWidgetData = {
         arabic: chosen.arabic,
         // Always publish English translation — widget decides whether to
@@ -946,7 +987,7 @@ export const prepareVerseWidgetData = async (
         // widget silently showing Arabic in English mode.
         translation: chosen.trans || undefined,
         surahName: chosen.ref,           // already Arabic e.g. "البقرة ١٥٢"
-        surahNameEn: chosen.ref,         // English ref reuses same string until split
+        surahNameEn: surahNameEn || chosen.ref,
         surahNumber: chosen.surah,
         ayahNumber: chosen.ayah,
         numberInSurah: chosen.ayah,

@@ -18,6 +18,9 @@ import {
   type PermissionIssue,
 } from '@/lib/permission-recovery';
 import { useColors } from '@/hooks/use-colors';
+import { getLanguage } from '@/lib/i18n';
+
+const RTL_LANGS = new Set(['ar', 'ur', 'fa']);
 
 interface PermissionBannerProps {
   excludedKeys?: PermissionKey[];
@@ -61,6 +64,7 @@ export function PermissionBanner({ excludedKeys = [], onlyKeys }: PermissionBann
   const isCritical = issue.severity === 'critical';
   const accentColor = isCritical ? '#dc2626' : '#f59e0b';
   const iconName = isCritical ? 'alert-circle' : 'alert';
+  const isRTL = RTL_LANGS.has(getLanguage());
 
   const handleAction = async () => {
     try {
@@ -90,21 +94,21 @@ export function PermissionBanner({ excludedKeys = [], onlyKeys }: PermissionBann
       <BlurView intensity={Platform.OS === 'ios' ? 80 : 40} tint="light" style={styles.blur}>
         <View style={[styles.accent, { backgroundColor: accentColor }]} />
         <View style={styles.content}>
-          <View style={styles.row}>
+          <View style={[styles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name={iconName as any} size={22} color={accentColor} />
-            <Text style={[styles.title, { color: colors.text }]}>{issue.titleAr}</Text>
+            <Text style={[styles.title, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{issue.title}</Text>
             <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <MaterialCommunityIcons name="close" size={18} color={colors.textLight} />
             </TouchableOpacity>
           </View>
-          <Text style={[styles.body, { color: colors.textLight }]}>{issue.bodyAr}</Text>
+          <Text style={[styles.body, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{issue.body}</Text>
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: accentColor }]}
+            style={[styles.button, { backgroundColor: accentColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleAction}
             activeOpacity={0.85}
           >
-            <Text style={styles.buttonText}>{issue.actionLabelAr}</Text>
-            <MaterialCommunityIcons name="chevron-left" size={18} color="#fff" />
+            <Text style={styles.buttonText}>{issue.actionLabel}</Text>
+            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -137,7 +141,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   row: {
-    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
   },
@@ -145,18 +148,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: 'Rubik-Bold',
-    textAlign: 'right',
-    writingDirection: 'rtl',
   },
   body: {
     fontSize: 13,
     fontFamily: 'Rubik-Regular',
     lineHeight: 20,
-    textAlign: 'right',
-    writingDirection: 'rtl',
   },
   button: {
-    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,

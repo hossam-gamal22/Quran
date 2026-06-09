@@ -317,7 +317,8 @@ const _styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
       },
-      android: { elevation: 2 },
+      // No Android `elevation`: the pill bg is translucent; elevation draws an inner ghost square.
+      android: {},
     }),
   },
   tabButton: {

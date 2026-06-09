@@ -1,7 +1,7 @@
 // app/memorization/index.tsx
 // شاشة Hub رئيسية لوضع الحفظ — تعرض ورد اليوم + 4 أوضاع + إحصائيات سريعة.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
@@ -54,73 +53,11 @@ export default function MemorizationHub() {
     [router],
   );
 
-  // Snapshot today's initial counts so the rings shrink as the user completes ayahs.
-  // Stored in AsyncStorage keyed by date so it survives re-renders / app restarts.
-  const todayKey = todayPlan.date;
-  const [initialCounts, setInitialCounts] = useState<{
-    date: string;
-    newAyahs: number;
-    reviewAyahs: number;
-  } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const STORAGE_KEY = '@memorization_today_initial';
-    const currentNew = todayPlan.newAyahs.length;
-    const currentReview = todayPlan.reviewAyahs.length;
-
-    (async () => {
-      let stored: { date: string; newAyahs: number; reviewAyahs: number } | null = null;
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (
-            parsed &&
-            typeof parsed.date === 'string' &&
-            typeof parsed.newAyahs === 'number' &&
-            typeof parsed.reviewAyahs === 'number'
-          ) {
-            stored = parsed;
-          }
-        }
-      } catch {
-        stored = null;
-      }
-
-      // If the stored snapshot is for a different day, start fresh from current counts.
-      // Otherwise keep the max(stored, current) so we always remember the day's high-water mark.
-      const baseNew = stored && stored.date === todayKey ? stored.newAyahs : currentNew;
-      const baseReview = stored && stored.date === todayKey ? stored.reviewAyahs : currentReview;
-      const next = {
-        date: todayKey,
-        newAyahs: Math.max(baseNew, currentNew),
-        reviewAyahs: Math.max(baseReview, currentReview),
-      };
-
-      if (
-        !stored ||
-        stored.date !== next.date ||
-        stored.newAyahs !== next.newAyahs ||
-        stored.reviewAyahs !== next.reviewAyahs
-      ) {
-        try {
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // ignore storage errors
-        }
-      }
-
-      if (!cancelled) setInitialCounts(next);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [todayKey, todayPlan.newAyahs.length, todayPlan.reviewAyahs.length]);
-
-  const initialNew = Math.max(initialCounts?.newAyahs ?? todayPlan.newAyahs.length, 1);
-  const initialReview = Math.max(initialCounts?.reviewAyahs ?? todayPlan.reviewAyahs.length, 1);
+  // Stable ring denominators come from the persisted daily snapshot
+  // (assigned counts), so the rings shrink as the user completes ayahs and
+  // complete at 0 instead of being stuck full by the old refill behaviour.
+  const initialNew = Math.max(todayPlan.assignedNewCount, 1);
+  const initialReview = Math.max(todayPlan.assignedReviewCount, 1);
   const mistakesCount = Object.values(ayahStates).filter(
     (state) => state.status === 'needs_review',
   ).length;
@@ -180,7 +117,19 @@ export default function MemorizationHub() {
             </View>
           ) : (
             <>
-              <Text style={styles.planName}>{activePlan.name}</Text>
+              <View style={styles.planNameRow}>
+                <Text style={styles.planName}>{activePlan.name}</Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(`/memorization/edit?planId=${activePlan.id}` as any)
+                  }
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.editPlanBtn}
+                >
+                  <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.primary} />
+                  <Text style={styles.editPlanText}>{mt('editPlan')}</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.todayRow}>
                 <DurationRing
                   value={toArabicDigits(todayPlan.newAyahs.length)}
@@ -431,12 +380,33 @@ const makeStyles = (colors: ReturnType<typeof useColors>, isRTL: boolean) =>
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
     },
+    planNameRow: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
     planName: {
+      flex: 1,
       color: colors.text,
       fontFamily: 'Rubik-SemiBold',
       fontSize: 14,
       textAlign: isRTL ? 'right' : 'left',
       writingDirection: isRTL ? 'rtl' : 'ltr',
+    },
+    editPlanBtn: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      backgroundColor: 'rgba(13,142,98,0.12)',
+    },
+    editPlanText: {
+      color: colors.primary,
+      fontFamily: 'Rubik-SemiBold',
+      fontSize: 12,
     },
     emptyBox: { alignItems: 'center', gap: 12, paddingVertical: 12 },
     emptyText: { color: colors.textLight, fontFamily: 'Rubik-Regular', fontSize: 13 },

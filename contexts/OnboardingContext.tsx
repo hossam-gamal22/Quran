@@ -393,8 +393,19 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }
       }
       
+      // Defensive boot step: ensure widget data is computed + published for the
+      // granted location before the user reaches the main app. Idempotent with
+      // the call already fired on the location step; guards against any earlier
+      // silent failure. Fire-and-forget so navigation isn't blocked on the
+      // network (the offline-fast write inside completes in ~100ms).
+      if (preferences.locationEnabled) {
+        import('@/lib/widget-bootstrap')
+          .then((m) => m.prepareWidgetsForLocation())
+          .catch(() => {});
+      }
+
       setIsOnboardingComplete(true);
-      
+
       // التوجيه للصفحة الرئيسية
       router.replace('/(tabs)');
     } catch (error) {
@@ -451,8 +462,17 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         console.error('Error bridging skip-onboarding preferences:', e);
       }
       
+      // Defensive: if the user enabled location during a partial run, publish
+      // widget data before entering the app. When location was skipped this is
+      // a no-op (the cold-launch sync already wrote the needsLocation state).
+      if (preferences.locationEnabled) {
+        import('@/lib/widget-bootstrap')
+          .then((m) => m.prepareWidgetsForLocation())
+          .catch(() => {});
+      }
+
       setIsOnboardingComplete(true);
-      
+
       // التوجيه للصفحة الرئيسية
       router.replace('/(tabs)');
     } catch (error) {

@@ -24,6 +24,7 @@ import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { getLanguage } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -104,7 +105,7 @@ export default function HadithSifatScreen() {
 
   const shareHadith = async (hadith: DivineTrait) => {
     await Share.share({
-      message: `${hadith.arabic}\n\n${t('hadithSifat.narrator')}: ${transliterateReference(hadith.narrator, language)}\n${t('hadithSifat.source')}: ${transliterateReference(hadith.source, language)}\n\n${t('hadithSifat.shareText')}`,
+      message: buildShareText(`${hadith.arabic}\n\n${t('hadithSifat.narrator')}: ${transliterateReference(hadith.narrator, language)}\n${t('hadithSifat.source')}: ${transliterateReference(hadith.source, language)}`),
     });
   };
 

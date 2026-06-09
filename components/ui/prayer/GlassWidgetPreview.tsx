@@ -70,8 +70,15 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
           style={styles.logo}
         />
 
-        {/* App name (static) */}
-        <Text style={styles.appName}>{t('common.appName')}</Text>
+        {/* App name (static) - keep on a single line */}
+        <Text
+          style={styles.appName}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {t('common.appName')}
+        </Text>
 
         {/* Countdown timer (dynamic) */}
         <Text style={[styles.countdown, { color: textColor }]}>

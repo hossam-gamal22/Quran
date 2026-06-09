@@ -35,6 +35,12 @@ export const APP_CONFIG = {
     ios: APP_STORE_URL,
   },
   
+  // الـ footer الموحّد لكل مشاركة نصية: سطر التوقيع + رابطا المتجرين دائمًا (language-aware)
+  getShareFooter: () => {
+    const line = isRTL() ? 'من تطبيق روح المسلم 💚📖' : 'From Rooh Al-Muslim app 💚📖';
+    return `${line}\n\n${PLAY_STORE_URL}\n${APP_STORE_URL}`;
+  },
+
   // التوقيع للمشاركة (language-aware)
   getShareSignature: () => {
     const name = getLocalizedName();

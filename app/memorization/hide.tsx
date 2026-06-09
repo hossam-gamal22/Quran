@@ -1,7 +1,7 @@
 // app/memorization/hide.tsx
 // وضع الإخفاء التدريجي — 4 مستويات (25/50/75/100%) لإخفاء الكلمات. اضغط مطولًا لكشف كلمة.
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,6 +24,7 @@ import { mt } from '@/lib/memorization-i18n';
 import { formatAyahMarker, formatAyahProgress, getAyahText, getSurahName } from '@/lib/memorization-helpers';
 import { pickHiddenIndices } from '@/lib/memorization-test-builders';
 import { rtlChevronBack, rtlChevronForward } from '@/lib/rtl-utils';
+import type { AyahRef } from '@/types/memorization';
 
 type HideLevel = 1 | 2 | 3 | 4;
 
@@ -31,19 +33,25 @@ export default function HideScreen() {
   const colors = useColors();
   const { settings: appSettings } = useSettings();
   const isRTL = useIsRTL();
-  const { activePlan, todayPlan, markPassed, markFailed } = useMemorization();
+  const { activePlan, todayPlan, markPassed, markFailed, isTodayReady } =
+    useMemorization();
 
-  const ayahs = useMemo(() => {
-    const list = [...todayPlan.newAyahs, ...todayPlan.reviewAyahs];
-    return list.length > 0 ? list : todayPlan.newAyahs;
-  }, [todayPlan]);
+  // Freeze today's ward ONCE for this session so marking ayahs (which mutates
+  // the live todayPlan) cannot shrink/reorder the list mid-walk and skip ayahs.
+  const [ayahs, setAyahs] = useState<AyahRef[] | null>(null);
+  useEffect(() => {
+    if (ayahs === null && isTodayReady && activePlan) {
+      setAyahs([...todayPlan.newAyahs, ...todayPlan.reviewAyahs]);
+    }
+  }, [ayahs, isTodayReady, activePlan, todayPlan.newAyahs, todayPlan.reviewAyahs]);
 
   const [index, setIndex] = useState(0);
   const [level, setLevel] = useState<HideLevel>(1);
   const [revealedAll, setRevealedAll] = useState(false);
   const [peekIndex, setPeekIndex] = useState<number | null>(null);
+  const busyRef = useRef(false);
 
-  const current = ayahs[index];
+  const current = ayahs ? ayahs[index] : undefined;
 
   const ayahWords = useMemo(() => {
     if (!current) return [];
@@ -62,8 +70,8 @@ export default function HideScreen() {
   const onNext = useCallback(() => {
     setRevealedAll(false);
     setPeekIndex(null);
-    setIndex((i) => Math.min(ayahs.length - 1, i + 1));
-  }, [ayahs.length]);
+    setIndex((i) => Math.min((ayahs?.length ?? 1) - 1, i + 1));
+  }, [ayahs]);
 
   const onPrev = useCallback(() => {
     setRevealedAll(false);
@@ -72,20 +80,30 @@ export default function HideScreen() {
   }, []);
 
   const onPass = useCallback(async () => {
-    if (!current) return;
-    await markPassed(current.surahNumber, current.ayahNumber);
-    onNext();
+    if (!current || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markPassed(current.surahNumber, current.ayahNumber);
+      onNext();
+    } finally {
+      busyRef.current = false;
+    }
   }, [current, markPassed, onNext]);
 
   const onFail = useCallback(async () => {
-    if (!current) return;
-    await markFailed(current.surahNumber, current.ayahNumber);
-    onNext();
+    if (!current || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await markFailed(current.surahNumber, current.ayahNumber);
+      onNext();
+    } finally {
+      busyRef.current = false;
+    }
   }, [current, markFailed, onNext]);
 
   const styles = makeStyles(colors, isRTL);
 
-  if (!activePlan || !current) {
+  if (!activePlan || ayahs === null || !current) {
     return (
       <BackgroundWrapper
         backgroundKey={appSettings.display.appBackground}
@@ -96,9 +114,13 @@ export default function HideScreen() {
         <SafeAreaView style={styles.safe} edges={['top']}>
           <UniversalHeader title={mt('hideTitle')} onBack={() => router.back()} />
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              {!activePlan ? mt('noActivePlan') : mt('noAyahsToday')}
-            </Text>
+            {ayahs === null && activePlan ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={styles.emptyText}>
+                {!activePlan ? mt('noActivePlan') : mt('noAyahsToday')}
+              </Text>
+            )}
           </View>
         </SafeAreaView>
       </BackgroundWrapper>

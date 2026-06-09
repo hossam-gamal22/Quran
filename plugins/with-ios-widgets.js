@@ -62,6 +62,13 @@ const WIDGET_SWIFT_FILES = [
   // read this directly so dhikr widgets are fully autonomous — they
   // never need shared data from the app to function.
   'BundledAzkar.swift',
+  // Bundled, Arabic-only curated image widgets (verse/azkar/dhikr). The owner
+  // ships single-colour transparent PNGs that are synced into Assets.xcassets
+  // by scripts/generate-curated-widget-images.mjs; these are tinted to the
+  // theme and picked by date — fully offline, no app open required.
+  'CuratedWidgetImages.swift',
+  // GENERATED: per-type curated image counts (verse/morning/evening/daily).
+  'GeneratedCuratedImages.swift',
 ];
 
 /**

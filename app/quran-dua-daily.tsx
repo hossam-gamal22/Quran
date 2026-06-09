@@ -30,6 +30,7 @@ import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/I
 import { getAzkarByCategory, getZikrTranslation, type Zikr, type Language } from '@/lib/azkar-api';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
+import { buildShareText } from '@/lib/share-text';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
@@ -118,8 +119,7 @@ export default function QuranDuaDailyScreen() {
         parts.push(translationText);
       }
       if (currentDua.reference) parts.push(`📖 ${currentDua.reference}`);
-      parts.push(`\n${t('common.fromApp')}`);
-      await Share.share({ message: parts.join('\n\n') });
+      await Share.share({ message: buildShareText(parts.join('\n\n')) });
     } catch { /* ignore */ }
   };
 

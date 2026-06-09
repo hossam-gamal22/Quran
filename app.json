@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.2.3",
+    "version": "1.2.4",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
@@ -29,7 +29,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "108",
+      "buildNumber": "109",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.rooh.almuslim"
@@ -86,11 +86,11 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icons/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/icons/android-icon-background.png",
+        "backgroundColor": "#11161c",
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 79,
+      "versionCode": 80,
       "permissions": [
         "INTERNET",
         "VIBRATE",
@@ -306,8 +306,8 @@
             "image": "./assets/images/icons/seasonal/eid_adha.png",
             "prerendered": true
           },
-          "dhul_hijjah": {
-            "image": "./assets/images/icons/seasonal/dhul_hijjah.png",
+          "hijri_new_year": {
+            "image": "./assets/images/icons/seasonal/hijri_new_year.png",
             "prerendered": true
           }
         }

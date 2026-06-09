@@ -59,7 +59,14 @@ describe('adhan asset integrity', () => {
 
   it('no orphan CAF files without a matching shipped voice', () => {
     const caf = readdirSync(FULL_ADHAN_CAF_DIR).filter((f) => f.endsWith('.caf'));
-    const expected = new Set(SHIPPED_VOICES.map((v) => `adhan_full_${v}.caf`));
+    // Two legitimate CAF shapes ship in this dir, both keyed by shipped voice:
+    //   • adhan_full_<voice>.caf — full 35s adhan (iOS notification sound)
+    //   • <voice>.caf            — short adhan clip (resolve-notification-sound.ts
+    //                              builds `${soundType}.caf` for iOS short adhan)
+    const expected = new Set([
+      ...SHIPPED_VOICES.map((v) => `adhan_full_${v}.caf`),
+      ...SHIPPED_VOICES.map((v) => `${v}.caf`),
+    ]);
     const orphans = caf.filter((f) => !expected.has(f));
     expect(orphans).toEqual([]);
   });
@@ -227,6 +234,7 @@ describe('Android channel resolution (channels.ts)', () => {
     'alhamdulillah', 'complete', 'evening_adhkar', 'istighfar', 'morning_adhkar',
     'notif_after_prayer', 'notif_daily_summary', 'notif_kahf', 'notif_khatma',
     'notif_sleep', 'notif_verse', 'notif_wakeup', 'salawat', 'subhanallah', 'tasbih',
+    'alarm_classic', 'alarm_digital', 'alarm_buzzer', 'alarm_radar', 'alarm_chime',
   ]);
 
   it('runtime ADHAN_SOUND_FILES keys exactly match SHIPPED_VOICES ∪ {silent}', () => {

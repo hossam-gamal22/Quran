@@ -29,6 +29,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { t } from '@/lib/i18n';
+import { buildShareText } from '@/lib/share-text';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { ScreenContainer } from '@/components/screen-container';
@@ -638,7 +639,7 @@ export default function StoryOfDayScreen() {
       if (Platform.OS === 'ios') {
         const label = isArabic ? dayData.surahName : dayData.surahEnglish;
         await Share.share({
-          message: `${dayData.ayahText}\n\n${label}`,
+          message: buildShareText(`${dayData.ayahText}\n\n${label}`),
           url: shareUri,
         });
       } else {
