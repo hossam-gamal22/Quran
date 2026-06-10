@@ -4,7 +4,11 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
-import { MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
+import {
+  MAKKAH_FALLBACK_DEFAULTS,
+  isFallbackLocation,
+  isExactMakkahFallbackCoords,
+} from '@/lib/country-prayer-defaults';
 import {
   dateForTimeZoneCalendarDay,
   epochForTimeStringOnDateInTimeZone,
@@ -40,6 +44,11 @@ export interface Location {
   country?: string;
   /** IANA timezone for these coordinates, persisted from the AlAdhan response. */
   timezone?: string;
+  /**
+   * Marks the in-memory Makkah placeholder used when GPS/permission is
+   * unavailable. Never persisted — saveLocation refuses fallback locations.
+   */
+  isFallback?: boolean;
 }
 
 export interface PrayerSettings {
@@ -184,9 +193,9 @@ const DEFAULT_SETTINGS: PrayerSettings = {
   },
 };
 
-const LOCATION_STABILITY_KM = 5;
+export const LOCATION_STABILITY_KM = 5;
 
-const distanceKm = (a: Location, b: Location): number => {
+export const distanceKm = (a: Location, b: Location): number => {
   const toRad = (v: number) => (v * Math.PI) / 180;
   const earthKm = 6371;
   const dLat = toRad(b.latitude - a.latitude);
@@ -624,6 +633,14 @@ export const getPrayerSettings = async (): Promise<PrayerSettings> => {
  */
 export const saveLocation = async (location: Location): Promise<void> => {
   try {
+    // The Makkah placeholder must stay in-memory only. Persisting it once
+    // poisons user_location forever (the app trusts any stored location and
+    // never re-reads GPS), so this is the single enforcement point for all
+    // callers (timezone resolver, post-API save, re-geocode, canonical publish).
+    if (isFallbackLocation(location)) {
+      console.log('[PrayerCanonical] refusing to persist fallback location');
+      return;
+    }
     const existingRaw = await AsyncStorage.getItem(STORAGE_KEYS.LOCATION);
     if (existingRaw) {
       const existing = JSON.parse(existingRaw) as Location;
@@ -659,6 +676,71 @@ export const getStoredLocation = async (): Promise<Location | null> => {
   } catch (error) {
     console.error('Error getting stored location:', error);
     return null;
+  }
+};
+
+const FALLBACK_PURGE_FLAG = '@makkah_fallback_purged_v1';
+
+/**
+ * One-time recovery for users whose stored location was poisoned by the
+ * persisted Makkah fallback (saveLocation used to accept it). Detects the
+ * exact fallback constants — a real GPS fix never matches them exactly — and
+ * deletes the location plus every payload derived from it, so the next prayer
+ * screen visit re-reads real GPS (or shows the explicit fallback state).
+ * Returns true when a poisoned location was purged.
+ */
+export const purgePoisonedFallbackLocation = async (): Promise<boolean> => {
+  try {
+    const alreadyPurged = await AsyncStorage.getItem(FALLBACK_PURGE_FLAG);
+    if (alreadyPurged) return false;
+
+    let poisoned = false;
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.LOCATION);
+    if (raw) {
+      try {
+        const loc = JSON.parse(raw) as Location;
+        poisoned =
+          loc?.isFallback === true ||
+          (typeof loc?.latitude === 'number' &&
+            typeof loc?.longitude === 'number' &&
+            isExactMakkahFallbackCoords(loc.latitude, loc.longitude));
+      } catch {
+        poisoned = true; // unparseable location is useless either way
+      }
+    }
+
+    if (poisoned) {
+      // Keys are owned by canonical-prayer-snapshot / widget-prayer-calculator /
+      // widget-data-bridge; literal strings avoid import cycles with those modules.
+      const toRemove = [
+        STORAGE_KEYS.LOCATION,
+        '@canonical_prayer_snapshot_v1',
+        '@widget_prayer_inputs',
+        'widget_shared_data',
+      ];
+      // Day/week prayer caches were computed from the poisoned coordinates and
+      // would feed the offline chain Makkah times even after the purge.
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        toRemove.push(
+          ...allKeys.filter(
+            (k) => k.startsWith(STORAGE_KEYS.PRAYER_TIMES) || k.startsWith('@prayer_week_cache'),
+          ),
+        );
+      } catch {}
+      await AsyncStorage.multiRemove(toRemove);
+      console.log('[PrayerCanonical] purged poisoned Makkah fallback location + derived caches');
+      // Flip widgets to their needsLocation placeholder instead of stale Makkah times.
+      import('./widget-bootstrap')
+        .then(({ prepareWidgetsForLocation }) => prepareWidgetsForLocation())
+        .catch(() => {});
+    }
+
+    await AsyncStorage.setItem(FALLBACK_PURGE_FLAG, '1');
+    return poisoned;
+  } catch (error) {
+    console.error('Error purging fallback location:', error);
+    return false;
   }
 };
 

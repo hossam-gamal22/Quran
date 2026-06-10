@@ -866,6 +866,18 @@ export default function RootLayout() {
         3000
       );
 
+      // One-time recovery: delete a stored location poisoned by the persisted
+      // Makkah fallback (plus the prayer/widget payloads derived from it) so
+      // the prayer screen re-reads real GPS instead of showing the wrong country.
+      await initWithTimeout(
+        async () => {
+          const { purgePoisonedFallbackLocation } = await import('@/lib/prayer-times');
+          await purgePoisonedFallbackLocation();
+        },
+        'Fallback location purge',
+        3000
+      );
+
       // Kick off Firebase anonymous sign-in early (non-blocking).
       // Provides request.auth.uid for Firestore rules; survives restarts via AsyncStorage.
       ensureFirebaseUser().catch((e) => {

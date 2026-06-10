@@ -36,6 +36,38 @@ export const MAKKAH_FALLBACK_DEFAULTS: CountryDefaults = {
   asrSchool: 0,
 };
 
+/** Near-match against the Makkah fallback constants (runtime guards). */
+export function isMakkahFallbackCoords(lat: number, lng: number): boolean {
+  return (
+    Math.abs(lat - MAKKAH_FALLBACK_DEFAULTS.lat) < 0.0001 &&
+    Math.abs(lng - MAKKAH_FALLBACK_DEFAULTS.lng) < 0.0001
+  );
+}
+
+/**
+ * Strict equality against the fallback constants. Real GPS fixes carry ~6+
+ * decimals of noise and never land exactly on the constant, so an exact match
+ * can only come from the fallback path — safe to purge without touching
+ * genuine Makkah residents.
+ */
+export function isExactMakkahFallbackCoords(lat: number, lng: number): boolean {
+  return lat === MAKKAH_FALLBACK_DEFAULTS.lat && lng === MAKKAH_FALLBACK_DEFAULTS.lng;
+}
+
+/**
+ * True when a location is the Makkah placeholder rather than a real fix.
+ * Structurally typed: prayer-times.ts imports this module, so it cannot
+ * import the Location type back without a cycle. Old persisted locations
+ * lack the isFallback field and are treated as real (coords check covers
+ * legacy poisoned values).
+ */
+export function isFallbackLocation(
+  loc: { latitude: number; longitude: number; isFallback?: boolean } | null | undefined,
+): boolean {
+  if (!loc) return false;
+  return loc.isFallback === true || isMakkahFallbackCoords(loc.latitude, loc.longitude);
+}
+
 /**
  * Maps aladhan.com method IDs to adhan npm CalculationMethod factories.
  * Not all IDs have a 1:1 match; we use the closest equivalent.

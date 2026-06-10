@@ -25,10 +25,20 @@ const PRESERVED_KEYS = [
   '@notification_settings',
   '@prayer_notification_settings',
   '@prayer_settings',
+  'prayer_settings', // real key written by lib/prayer-times.ts (no @ prefix)
   '@prayer_location',
+  'user_location', // real location key (lib/prayer-times.ts STORAGE_KEYS.LOCATION)
   '@calculation_method',
   '@hijri_date_offset',
+  '@hijri_user_country',
   '@hide_next_prayer_alert',
+  '@makkah_fallback_purged_v1',
+
+  // Widget shared data — wiping these leaves home-screen widgets on a stale
+  // placeholder until the app is reopened; they must survive version updates.
+  'widget_shared_data',
+  '@widget_prayer_inputs',
+  '@canonical_prayer_snapshot_v1',
 
   // Custom user content
   '@custom_tasbihat',

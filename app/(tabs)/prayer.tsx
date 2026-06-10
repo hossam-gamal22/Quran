@@ -51,9 +51,11 @@ import {
   getTimeRemaining,
   getPrayerTranslationKey,
   isPrayerPassed,
+  distanceKm,
+  LOCATION_STABILITY_KM,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
-import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
+import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS, isFallbackLocation } from '@/lib/country-prayer-defaults';
 import { setUserCountry, getSavedUserCountry } from '@/services/hijriCalendarService';
 import { calculationMethods } from '@/lib/prayer-times';
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
@@ -159,11 +161,6 @@ const getAsrMethods = (t: (key: string) => string) => [
   { value: 0, label: t('prayer.asrMethodHanafi'), subtitle: t('prayer.asrMethodHanafiDesc') },
   { value: 1, label: t('prayer.asrMethodShafii'), subtitle: t('prayer.asrMethodShafiiDesc') },
 ];
-
-const isMakkahFallbackLocation = (loc: LocationType | null | undefined) =>
-  !!loc &&
-  Math.abs(loc.latitude - MAKKAH_FALLBACK_DEFAULTS.lat) < 0.0001 &&
-  Math.abs(loc.longitude - MAKKAH_FALLBACK_DEFAULTS.lng) < 0.0001;
 
 export default function PrayerScreen() {
   const { isDarkMode, t, settings, updatePrayer } = useSettings();
@@ -562,6 +559,7 @@ export default function PrayerScreen() {
         longitude: MAKKAH_FALLBACK_DEFAULTS.lng,
         city: t('prayer.defaultCity'),
         country: t('prayer.defaultCountry'),
+        isFallback: true,
       };
     }
   };
@@ -632,6 +630,42 @@ export default function PrayerScreen() {
   // offsets locally without a full API refetch. Declared above loadPrayerTimes so
   // the closure binding is resolved before the function is invoked.
   const rawPrayerTimesRef = useRef<PrayerTimes | null>(null);
+
+  // Self-healing: once per session, with permission already granted (never
+  // prompts), compare a fresh GPS fix against the stored location. The cached
+  // path above trusts whatever is stored, so without this a stale/poisoned
+  // location would survive indefinitely even when the user has moved country.
+  const didRevalidateLocationRef = useRef(false);
+  const revalidateLocationInBackground = async () => {
+    if (didRevalidateLocationRef.current) return;
+    didRevalidateLocationRef.current = true;
+    try {
+      const perm = await Location.getForegroundPermissionsAsync();
+      if (perm.status !== 'granted') return;
+      const stored = await getStoredLocation();
+      const pos = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('gps_timeout')), 5000)),
+      ]);
+      const fresh: LocationType = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      const moved =
+        !stored ||
+        isFallbackLocation(stored) ||
+        distanceKm(stored, fresh) >= LOCATION_STABILITY_KM;
+      if (!moved) return;
+      console.log('📍 Location revalidation: stored location missing/stale — refreshing from GPS');
+      // fetchLocation geocodes, persists, updates country/method and reschedules
+      // notifications; then refresh the screen and republish widget data.
+      const updated = await fetchLocation();
+      if (!updated || isFallbackLocation(updated)) return;
+      await loadPrayerTimes(true);
+      import('@/lib/widget-bootstrap')
+        .then(({ prepareWidgetsForLocation }) => prepareWidgetsForLocation())
+        .catch(() => {});
+    } catch {
+      // Best-effort: GPS timeout/failure just means the next session retries.
+    }
+  };
 
   const loadPrayerTimes = async (forceRefresh = false) => {
     try {
@@ -724,11 +758,13 @@ export default function PrayerScreen() {
         } catch {}
       };
 
-      // Always load location for display
+      // Always load location for display. A residual fallback location (legacy
+      // poisoned cache) must never be treated as real: no re-geocode, no
+      // country/method writes — let the fetchLocation path below take over.
       let currentLoc: LocationType | null = location;
       if (!currentLoc) {
         const stored = await getStoredLocation();
-        if (stored) {
+        if (stored && !isFallbackLocation(stored)) {
           // Re-geocode stored coordinates with current language
           currentLoc = stored;
           try {
@@ -855,13 +891,15 @@ export default function PrayerScreen() {
         placeholderText: { color: '#fff', fontSize: 18, opacity: 0.7, fontFamily: fontBold() },
       });
 
-      let loc = currentLoc || await fetchLocation();
+      // A fallback in component state (from a previous failed attempt) must not
+      // short-circuit a real GPS retry.
+      let loc = (currentLoc && !isFallbackLocation(currentLoc)) ? currentLoc : await fetchLocation();
       if (!loc) throw new Error(t('messages.locationRequired'));
       loc = await ensurePrayerLocationTimezone(loc, true);
       setLocation(loc);
       const prayerCalendarDate = getPrayerCalendarDate();
       today = formatDateKey(prayerCalendarDate);
-      const effectiveSettings = isMakkahFallbackLocation(loc) && settings.prayer.methodManuallySet !== true
+      const effectiveSettings = isFallbackLocation(loc) && settings.prayer.methodManuallySet !== true
         ? {
             ...settingsFromStore,
             calculationMethod: MAKKAH_FALLBACK_DEFAULTS.method as CalculationMethod,
@@ -907,7 +945,9 @@ export default function PrayerScreen() {
       setPrayerTimes(times);
       setDataSource('live');
       setCacheAgeDays(0);
-      setUsingMakkahFallback(false);
+      // A successful API fetch for fallback coords is still a fallback —
+      // keep the enable-location banner visible.
+      setUsingMakkahFallback(isFallbackLocation(loc));
 
       // Build week cache from monthly API for offline resilience
       try {
@@ -1002,6 +1042,9 @@ export default function PrayerScreen() {
       setIsRefreshing(false);
       lastFetchAtRef.current = Date.now();
       lastFetchDayRef.current = getPrayerCalendarDateKey();
+      // Runs on every exit path (including the cached early-returns above);
+      // internally once-per-session and never blocks the UI.
+      revalidateLocationInBackground().catch(() => {});
     }
   };
 

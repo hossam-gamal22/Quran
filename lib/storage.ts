@@ -128,12 +128,18 @@ export async function saveSettings(settings: Partial<AppSettings>): Promise<void
 }
 
 // ─── Prayer Location ──────────────────────────────────────────────────────────
+/**
+ * @deprecated Use saveLocation from '@/lib/prayer-times' — it owns the
+ * `user_location` key and enforces the fallback/drift guards. This delegate
+ * only exists so any future caller cannot bypass them with a raw write.
+ */
 export async function savePrayerLocation(location: {
   latitude: number;
   longitude: number;
   city?: string;
 }): Promise<void> {
-  await AsyncStorage.setItem(KEYS.LAST_PRAYER_LOCATION, JSON.stringify(location));
+  const { saveLocation } = await import('./prayer-times');
+  await saveLocation(location);
 }
 
 export async function getPrayerLocation(): Promise<{

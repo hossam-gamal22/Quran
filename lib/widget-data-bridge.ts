@@ -20,6 +20,7 @@ import { getLanguage } from './i18n';
 import type { AndroidWidgetDecision } from './android-widget-task-handler';
 import { deviceUses24Hour } from './widget-clock-format';
 import { type Location, type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes, applyAdjustments, isFridayDate } from './prayer-times';
+import { isFallbackLocation } from './country-prayer-defaults';
 import { getOfflinePrayerTimes } from './prayer-week-cache';
 import {
   buildCanonicalPrayerSnapshot,
@@ -280,8 +281,13 @@ async function writeToSharedStorage(key: string, value: string): Promise<void> {
 export async function writePrayerInputs(): Promise<PrayerWidgetInputs | null> {
   try {
     const location = await getStoredLocation();
-    if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
-      if (__DEV__) console.log('[writePrayerInputs] no stored location — skipping inputs write');
+    if (
+      !location ||
+      typeof location.latitude !== 'number' ||
+      typeof location.longitude !== 'number' ||
+      isFallbackLocation(location)
+    ) {
+      if (__DEV__) console.log('[writePrayerInputs] no real stored location — skipping inputs write');
       return null;
     }
 
@@ -689,7 +695,10 @@ export async function updateWidgetData(
     const settings = await getWidgetSettings();
 
     const effectiveCalc = await getEffectivePrayerCalcSettings();
-    const storedLocation = await getStoredLocation();
+    // A residual Makkah-fallback location must not feed widgets — treat it as
+    // "no location" so the needsLocation placeholder path renders instead.
+    let storedLocation = await getStoredLocation();
+    if (isFallbackLocation(storedLocation)) storedLocation = null;
     const displayTimezone = deviceTimezone();
     let canonicalSnapshot: CanonicalPrayerSnapshot | null = await loadCanonicalPrayerSnapshot({
       settings: {
