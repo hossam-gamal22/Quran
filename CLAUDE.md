@@ -17,7 +17,7 @@ pnpm ios            # run on iOS
 
 - **Router**: Expo Router (file-based routing in `app/`)
 - **State**: React Context (SettingsContext, QuranContext, RemoteConfigContext, NotificationsContext, WorshipContext, KhatmaContext, SeasonalContext, OnboardingContext)
-- **Styling**: NativeWind (Tailwind CSS for RN) + `global.css` + constants/theme.ts
+- **Styling**: React Native `StyleSheet` + `constants/theme.ts` (theme-aware colors via the `useColors()` hook). No NativeWind/Tailwind — `className` is not used in the app.
 - **Storage**: AsyncStorage for local persistence, Drizzle ORM for structured data
 - **Backend**: Firebase (Firestore, Auth, Storage) — project: rooh-almuslim
 - **Fonts**: 604 QCF page fonts for Mushaf rendering (`assets/fonts/qcf/`), Orbitron for digital clock

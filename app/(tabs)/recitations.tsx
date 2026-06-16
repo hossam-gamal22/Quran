@@ -453,7 +453,7 @@ export default function RecitationsScreen() {
   };
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']}>
+    <ScreenContainer edges={['top', 'left', 'right']}>
       <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.iconBtn} onPress={() => setShowReciterModal(true)}>
           <IconSymbol name="music.microphone" size={18} color={colors.foreground} />

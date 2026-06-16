@@ -443,7 +443,7 @@ export default function HijriCalendarScreen() {
   };
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']} screenKey="hijri" inTabScreen>
+    <ScreenContainer edges={['top', 'left', 'right']} screenKey="hijri" inTabScreen>
       {/* Header */}
       <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.iconBtn} onPress={handleCopy}>

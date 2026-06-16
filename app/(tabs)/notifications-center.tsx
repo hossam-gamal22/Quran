@@ -282,7 +282,7 @@ export default function NotificationsCenterScreen() {
   const ADVANCE_OPTIONS = [0, 5, 10, 15] as const;
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={s.header}>
         <Text style={s.title}>{t('settings.notificationsCenter')}</Text>
         <Text style={s.subtitle}>{t('settings.manageReminders')}</Text>

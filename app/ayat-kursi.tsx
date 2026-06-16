@@ -307,7 +307,7 @@ export default function AyatKursiScreen() {
 
   return (
     <BackgroundWrapper style={{ flex: 1 }}>
-      <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']} screenKey="ayat-kursi">
+      <ScreenContainer edges={['top', 'left', 'right']} screenKey="ayat-kursi">
         <ScrollView
           style={[styles.container, { backgroundColor: bgColor }]}
           contentContainerStyle={styles.scrollContent}

@@ -1,4 +1,3 @@
-import { ThemedView } from "@/components/themed-view";
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
 import { getCloudBackupMeta, downloadFromCloud } from "@/lib/cloud-sync";
@@ -6,13 +5,15 @@ import { isLocalDataEmpty } from "@/lib/backup-utils";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Text } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { t } from "@/lib/i18n";
 import { uiText } from "@/lib/ui-text";
+import { useColors } from "@/hooks/use-colors";
 
 export default function OAuthCallback() {
   const router = useRouter();
+  const colors = useColors();
   const params = useLocalSearchParams<{
     code?: string;
     state?: string;
@@ -293,37 +294,62 @@ export default function OAuthCallback() {
   }, [params.code, params.state, params.error, params.sessionToken, params.user, router]);
 
   return (
-    <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-      <ThemedView className="flex-1 items-center justify-center gap-4 p-5">
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom", "left", "right"]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {status === "processing" && (
           <>
             <ActivityIndicator size="large" />
-            <Text className="mt-4 text-base leading-6 text-center text-foreground">
+            <Text style={[styles.bodyText, { color: colors.foreground, marginTop: 16 }]}>
               {uiText({ ar: 'جارٍ إكمال تسجيل الدخول...', en: 'Completing authentication...' })}
             </Text>
           </>
         )}
         {status === "success" && (
           <>
-            <Text className="text-base leading-6 text-center text-foreground">
+            <Text style={[styles.bodyText, { color: colors.foreground }]}>
               {uiText({ ar: 'تم تسجيل الدخول بنجاح!', en: 'Authentication successful!' })}
             </Text>
-            <Text className="text-base leading-6 text-center text-foreground">
+            <Text style={[styles.bodyText, { color: colors.foreground }]}>
               {uiText({ ar: 'جارٍ التحويل...', en: 'Redirecting...' })}
             </Text>
           </>
         )}
         {status === "error" && (
           <>
-            <Text className="mb-2 text-xl font-bold leading-7 text-error">
+            <Text style={[styles.errorTitle, { color: colors.error }]}>
               {uiText({ ar: 'فشل تسجيل الدخول', en: 'Authentication failed' })}
             </Text>
-            <Text className="text-base leading-6 text-center text-foreground">
+            <Text style={[styles.bodyText, { color: colors.foreground }]}>
               {errorMessage}
             </Text>
           </>
         )}
-      </ThemedView>
+      </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    padding: 20,
+  },
+  bodyText: {
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: "center",
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    lineHeight: 28,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+});

@@ -419,7 +419,7 @@ export default function DailyAyahVideoScreen() {
   return (
     <>
     <Stack.Screen options={{ headerShown: false }} />
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="daily_ayah">
+    <ScreenContainer edges={['top', 'left', 'right', 'bottom']} screenKey="daily_ayah">
       {/* Header */}
       <UniversalHeader
         style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
