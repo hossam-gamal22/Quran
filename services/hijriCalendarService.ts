@@ -7,7 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Localization from 'expo-localization';
-import { gregorianToHijri, getHijriMonthDays, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN, setCachedHijriOffset } from '@/lib/hijri-date';
+import { gregorianToHijri, getHijriMonthDays, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN, setCachedHijriOffset, setHijriSystemOffset, getHijriSystemOffset, hydrateHijriOffset } from '@/lib/hijri-date';
 import { getFirestoreOverride } from '@/lib/hijri-overrides';
 import { fetchMoonSightingNews } from '@/services/moonSightingNews';
 
@@ -136,6 +136,9 @@ export async function setUserCountry(countryCode: string): Promise<void> {
     await subscribeToHijriOverridesForUser(() => {
       updateSharedData().catch(() => {});
     });
+    // The new country may roll over on a different day → recompute the
+    // synchronous-display correction for the new region right away.
+    await syncHijriSystemOffset(countryCode).catch(() => {});
     updateSharedData().catch(() => {});
   } catch {}
 }
@@ -342,8 +345,15 @@ async function fetchFromAlAdhan(
 
 function calculateTabular(date: Date, userAdj: number): Omit<HijriResult, 'source' | 'confidence' | 'countryCode'> {
   const adjusted = new Date(date);
-  if (userAdj !== 0) {
-    adjusted.setDate(adjusted.getDate() + userAdj);
+  // Offline last-resort: the network layers (AlAdhan) are unreachable here, so
+  // mirror the AUTHORITATIVE date by applying the last-synced system offset on
+  // top of the user's manual ±N. This keeps the widget + app date correct (and
+  // advancing day-by-day) while offline, until the device is back online and a
+  // fresh sync runs. Without it, an offline device silently reverts to the raw
+  // tabular calc — a day behind Umm al-Qura and ignoring the admin override.
+  const totalOffset = userAdj + getHijriSystemOffset();
+  if (totalOffset !== 0) {
+    adjusted.setDate(adjusted.getDate() + totalOffset);
   }
   const hijri = gregorianToHijri(adjusted);
   const monthLength: 29 | 30 = (getHijriMonthDays(hijri.year, hijri.month) as 29 | 30);
@@ -367,6 +377,10 @@ export async function getHijriDate(
 ): Promise<HijriResult> {
   const country = countryCode || await getUserCountry();
   const userAdj = await getUserAdjustment();
+  // Ensure the persisted system offset is in memory before any tabular
+  // fallback runs. Cold/headless widget contexts start with an empty module
+  // cache; hydrate is idempotent so this is a no-op in the warm app process.
+  try { await hydrateHijriOffset(); } catch {}
 
   // Serve from cache immediately (no loading flash)
   const cached = await getCachedResult(country, gregorianDate, userAdj);
@@ -451,6 +465,77 @@ export async function getHijriDate(
 }
 
 // ============================================
+// System auto-correction offset
+// ============================================
+//
+// Bridges the authoritative (async, network) calendar into the synchronous
+// tabular call-sites the home/prayer/calendar screens use. Resolves "today"
+// via the override + AlAdhan layers WITHOUT the user's manual ±N (that stays
+// an independent layer), then stores the integer day-delta so every tabular
+// conversion lands on the official rollover. Returns null when offline so we
+// never overwrite a previously-correct offset with a guess.
+
+async function resolveAuthoritativeToday(
+  date: Date,
+  country: string,
+): Promise<{ year: number; month: number; day: number } | null> {
+  const approx = gregorianToHijri(date);
+
+  // LAYER 1 — admin override (no user adjustment)
+  try {
+    const override = await getActiveFirestoreOverride(country, approx.year, approx.month, date, 0);
+    if (override) {
+      const r = buildFromOverride(override, date, country, 0);
+      return { year: r.year, month: r.month, day: r.day };
+    }
+  } catch {}
+
+  // LAYER 2 — AlAdhan per country
+  try {
+    const api = await fetchFromAlAdhan(date, country);
+    if (api) return { year: api.year, month: api.month, day: api.day };
+  } catch {}
+
+  return null; // offline / unavailable → caller leaves the stored offset intact
+}
+
+/**
+ * Recompute and persist the tabular→authoritative correction for today.
+ * Safe to call repeatedly (no-op when unchanged). Wired into app init, the
+ * admin-override snapshot callback, country switch, push sync, and background
+ * refresh.
+ */
+export async function syncHijriSystemOffset(countryCode?: string): Promise<number | null> {
+  try {
+    // Empty country is fine: AlAdhan gToH (Layer 2) doesn't need one, and the
+    // admin override (Layer 1) just won't match. This keeps the correction
+    // working on simulators / devices where region detection returns nothing.
+    const country = countryCode || (await getUserCountry()) || '';
+    const today = new Date();
+    const authoritative = await resolveAuthoritativeToday(today, country);
+    if (!authoritative) return null;
+
+    // Find the integer day-shift N where the raw tabular calc for (today + N)
+    // equals the authoritative {year,month,day}. Robust across month-length
+    // and year boundaries; ±4 covers every real moon-sighting divergence.
+    for (let n = -4; n <= 4; n++) {
+      const probe = new Date(today);
+      probe.setDate(probe.getDate() + n);
+      const tab = gregorianToHijri(probe);
+      if (tab.year === authoritative.year && tab.month === authoritative.month && tab.day === authoritative.day) {
+        if (__DEV__) console.log('[hijri-fix] systemOffset =', n, '→ authoritative', authoritative.day, authoritative.month, authoritative.year);
+        setHijriSystemOffset(n);
+        return n;
+      }
+    }
+    // No match within range → keep the last known offset (don't reset to 0).
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
 // Background refresh (call from app init)
 // ============================================
 
@@ -459,6 +544,11 @@ export async function refreshHijriInBackground(): Promise<void> {
     const country = await getUserCountry();
     const today = new Date();
     const approx = gregorianToHijri(today);
+
+    // Recompute the tabular→authoritative correction so the home/prayer/
+    // calendar screens (which read the synchronous tabular calc) roll over to
+    // the official date too. Runs before the early-return below.
+    await syncHijriSystemOffset(country).catch(() => {});
 
     // Try Layer 1
     try {
@@ -527,6 +617,12 @@ export async function subscribeToHijriOverridesForUser(
       // result for up to an hour.
       try {
         await invalidateHijriCache(country, today);
+      } catch {}
+      // Recompute the synchronous-display correction so the home/prayer/
+      // calendar screens reflect the admin's decision immediately (the home
+      // date line + calendar grid re-render via subscribeToHijriOffsetChanges).
+      try {
+        await syncHijriSystemOffset(country);
       } catch {}
       // Notify caller (typically: trigger widget data refresh).
       if (onChange) {

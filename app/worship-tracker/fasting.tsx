@@ -30,7 +30,7 @@ import Animated, {
 import { useFastingTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { DailyFastingRecord } from '@/lib/worship-storage';
-import { getHijriDateObject, gregorianToHijri } from '@/lib/hijri-date';
+import { getHijriDateObject } from '@/lib/hijri-date';
 import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -321,7 +321,10 @@ export default function FastingTrackerScreen() {
     
     for (let day = 1; day <= daysInMonth; day++) {
       try {
-        const hijri = gregorianToHijri(new Date(year, month, day));
+        // getHijriDateObject applies the effective offset (user ±N + system
+        // authoritative correction) so Ramadan-day detection matches the
+        // admin-resolved calendar shown everywhere else.
+        const hijri = getHijriDateObject(new Date(year, month, day));
         if (hijri.month === 9) {
           ramadanDays.push(day);
         }
@@ -433,8 +436,8 @@ export default function FastingTrackerScreen() {
       return;
     }
 
-    // تحويل التاريخ لهجري لمعرفة إذا كان في رمضان
-    const hijriDate = gregorianToHijri(dayDate);
+    // تحويل التاريخ لهجري لمعرفة إذا كان في رمضان (مع تطبيق التصحيح الموحّد)
+    const hijriDate = getHijriDateObject(dayDate);
     const isRamadanDay = hijriDate.month === 9;
 
     if (isRamadanDay) {

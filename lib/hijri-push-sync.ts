@@ -9,7 +9,7 @@ import {
   removeCachedHijriOverride,
   type HijriOverride,
 } from '@/lib/hijri-overrides';
-import { invalidateHijriCache } from '@/services/hijriCalendarService';
+import { invalidateHijriCache, syncHijriSystemOffset } from '@/services/hijriCalendarService';
 import { updateSharedData } from '@/lib/widget-data';
 
 const TASK_NAME = 'HIJRI_OVERRIDE_PUSH_SYNC';
@@ -88,6 +88,10 @@ export async function applyHijriOverridePushPayload(payload: any): Promise<boole
   }
 
   await invalidateHijriCache(override.countryCode);
+  // Recompute the tabular→authoritative correction so the home date line,
+  // prayer tab and calendar grid (synchronous tabular call-sites) reflect the
+  // admin's decision the moment the push lands — not just the widget.
+  await syncHijriSystemOffset(override.countryCode).catch(() => {});
   await AsyncStorage.setItem(LAST_SYNC_KEY, JSON.stringify({
     countryCode: override.countryCode,
     hijriYear: override.hijriYear,

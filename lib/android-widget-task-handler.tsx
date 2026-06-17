@@ -731,6 +731,15 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   const { widgetInfo, widgetAction, renderWidget } = props;
   const widgetName = widgetInfo.widgetName;
 
+  // Load the persisted Hijri offsets (manual ±N + last-synced authoritative
+  // system offset) into this (headless, cold) JS context BEFORE any synchronous
+  // getLocalizedHijriDate() call below. Keeps the offline widget date correct
+  // and rolling over day-by-day until the app is reopened online.
+  try {
+    const { hydrateHijriOffset } = require('./hijri-date');
+    await hydrateHijriOffset();
+  } catch {}
+
   try {
   switch (widgetAction) {
     case 'WIDGET_ADDED': {

@@ -1140,11 +1140,20 @@ export default function RootLayout() {
     // need for the user to relaunch the app or wait for cache expiry.
     initWithTimeout(
       async () => {
-        const { subscribeToHijriOverridesForUser } = require('@/services/hijriCalendarService');
+        const { subscribeToHijriOverridesForUser, syncHijriSystemOffset } = require('@/services/hijriCalendarService');
         const { updateSharedData } = require('@/lib/widget-data');
         await subscribeToHijriOverridesForUser(() => {
-          updateSharedData().catch(() => {});
+          // Recompute the tabular→authoritative correction first (so home/
+          // prayer/calendar roll over), then refresh widget shared data.
+          syncHijriSystemOffset()
+            .catch(() => {})
+            .finally(() => updateSharedData().catch(() => {}));
         });
+        // Compute the tabular→authoritative correction once on launch so the
+        // home/prayer/calendar date lines roll over to the official date even
+        // though they read the synchronous tabular calc. The screens re-render
+        // via subscribeToHijriOffsetChanges when this resolves.
+        await syncHijriSystemOffset().catch(() => {});
       },
       'Hijri-override Firestore subscription',
       5000,

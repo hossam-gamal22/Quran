@@ -15,7 +15,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Typography, ModalColors } from '../constants/theme';
 import { buildShareText } from '@/lib/share-text';
-import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBidh, getAyyamAlBidhEvent, setCachedHijriOffset } from '../lib/hijri-date';
+import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBidh, getAyyamAlBidhEvent, setCachedHijriOffset, getHijriSystemOffset, subscribeToHijriOffsetChanges } from '../lib/hijri-date';
 import type { IslamicEventDetails } from '../lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -138,7 +138,13 @@ export default function HijriScreen() {
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [showOffsetModal, setShowOffsetModal] = useState(false);
   const [hijriOffset, setHijriOffset] = useState(0);
+  // Automatic authoritative correction (admin override → AlAdhan). Tracked in
+  // state so the grid re-renders when syncHijriSystemOffset resolves a new
+  // value (e.g. an admin publishes a moon-sighting decision while open).
+  const [systemOffset, setSystemOffset] = useState(() => getHijriSystemOffset());
   const [ISLAMIC_EVENTS, setIslamicEvents] = useState<IslamicEventDetails[]>(DEFAULT_ISLAMIC_EVENTS);
+
+  useEffect(() => subscribeToHijriOffsetChanges(() => setSystemOffset(getHijriSystemOffset())), []);
 
   // ============================================
   // تحميل الإعدادات
@@ -256,13 +262,17 @@ export default function HijriScreen() {
     }
 
     return days;
-  }, [displayYear, displayMonth, hijriOffset]);
+  }, [displayYear, displayMonth, hijriOffset, systemOffset]);
 
   function buildCalendarDay(date: Date, isCurrentMonth: boolean): CalendarDay {
     try {
       const adjusted = new Date(date);
-      if (hijriOffset !== 0) {
-        adjusted.setDate(adjusted.getDate() + hijriOffset);
+      // Combine the user's manual ±N with the automatic authoritative
+      // correction so the calendar grid rolls over on the same day as the
+      // home date line, the seasonal banner and the widgets.
+      const totalOffset = hijriOffset + systemOffset;
+      if (totalOffset !== 0) {
+        adjusted.setDate(adjusted.getDate() + totalOffset);
       }
       const hijri = gregorianToHijri(adjusted);
       const events = ISLAMIC_EVENTS.filter(e => {

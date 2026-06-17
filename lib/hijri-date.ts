@@ -14,8 +14,19 @@ export interface HijriDate {
 
 const HIJRI_OFFSET_STORAGE_KEY = '@hijri_date_offset';
 const HIJRI_USER_ADJUSTMENT_STORAGE_KEY = '@hijri_user_adjustment';
+// Auto-correction layer: the integer day-delta between the authoritative
+// (admin override → AlAdhan → news) Hijri date and the raw tabular calc for
+// "today". Computed by services/hijriCalendarService.syncHijriSystemOffset()
+// and persisted so every synchronous tabular call-site (home date line,
+// prayer tab, calendar grid, widget offline fallback) lands on the same
+// official rollover that the seasonal banner + widgets already use.
+const HIJRI_SYSTEM_OFFSET_STORAGE_KEY = '@hijri_system_offset';
 
+// The user's manual ±N adjustment (moon-sighting taste). Kept under the
+// historical name so existing call-sites/keys stay byte-compatible.
 let cachedHijriOffset = 0;
+// The automatic correction toward the authoritative calendar (see above).
+let cachedHijriSystemOffset = 0;
 let hijriOffsetLoaded = false;
 let hijriOffsetLoadPromise: Promise<number> | null = null;
 const hijriOffsetListeners = new Set<(offset: number) => void>();
@@ -25,8 +36,26 @@ function normalizeHijriOffset(offset: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** The user's manual ±N adjustment only (no auto-correction). */
 export function getCachedHijriOffset(): number {
   return cachedHijriOffset;
+}
+
+/** The auto-correction toward the authoritative calendar (no user input). */
+export function getHijriSystemOffset(): number {
+  return cachedHijriSystemOffset;
+}
+
+/** Total offset actually applied to every tabular conversion. */
+export function getEffectiveHijriOffset(): number {
+  return cachedHijriOffset + cachedHijriSystemOffset;
+}
+
+function notifyHijriOffsetListeners(): void {
+  const effective = getEffectiveHijriOffset();
+  hijriOffsetListeners.forEach((listener) => {
+    try { listener(effective); } catch {}
+  });
 }
 
 export function setCachedHijriOffset(offset: number): void {
@@ -35,10 +64,24 @@ export function setCachedHijriOffset(offset: number): void {
   cachedHijriOffset = next;
   hijriOffsetLoaded = true;
   if (changed) {
-    hijriOffsetListeners.forEach((listener) => {
-      try { listener(cachedHijriOffset); } catch {}
-    });
+    notifyHijriOffsetListeners();
   }
+}
+
+/**
+ * Set the automatic correction (authoritative − tabular) and notify all
+ * subscribers (the home screen re-renders its date line on change). Persisted
+ * separately from the user adjustment so the two never clobber each other.
+ */
+export function setHijriSystemOffset(offset: number): void {
+  const next = normalizeHijriOffset(offset);
+  if (next === cachedHijriSystemOffset) return;
+  cachedHijriSystemOffset = next;
+  notifyHijriOffsetListeners();
+  import('@react-native-async-storage/async-storage')
+    .then(({ default: AsyncStorage }) =>
+      AsyncStorage.setItem(HIJRI_SYSTEM_OFFSET_STORAGE_KEY, String(next)))
+    .catch(() => {});
 }
 
 export function subscribeToHijriOffsetChanges(listener: (offset: number) => void): () => void {
@@ -49,7 +92,7 @@ export function subscribeToHijriOffsetChanges(listener: (offset: number) => void
 }
 
 function applyCachedHijriOffset(date: Date): Date {
-  const offset = getCachedHijriOffset();
+  const offset = getEffectiveHijriOffset();
   if (offset === 0) return date;
   const adjusted = new Date(date);
   adjusted.setDate(adjusted.getDate() + offset);
@@ -66,6 +109,11 @@ export async function hydrateHijriOffset(): Promise<number> {
       const userAdjustment = await AsyncStorage.getItem(HIJRI_USER_ADJUSTMENT_STORAGE_KEY);
       const legacyOffset = await AsyncStorage.getItem(HIJRI_OFFSET_STORAGE_KEY);
       const value = userAdjustment ?? legacyOffset ?? '0';
+      // Restore the last known auto-correction first so the very first paint
+      // (before the async authoritative resolve completes) already reflects the
+      // official rollover instead of the raw tabular calc.
+      const systemOffsetRaw = await AsyncStorage.getItem(HIJRI_SYSTEM_OFFSET_STORAGE_KEY);
+      cachedHijriSystemOffset = normalizeHijriOffset(systemOffsetRaw ?? '0');
       setCachedHijriOffset(normalizeHijriOffset(value));
 
       // Keep the legacy display key and the resolver key aligned after app updates.
@@ -469,6 +517,16 @@ export function gregorianToHijri(date: Date = new Date()): HijriDate {
     }
   }
 
+  // الخطوة 4: تحصين حدّ السنة — الناتج الخام قد يُعطي شهرًا = 0 عند بداية
+  // السنة الهجرية، وهو ما يجعل HIJRI_MONTHS_AR[-1] = undefined (اسم شهر فارغ).
+  if (hijriMonth < 1) {
+    hijriMonth += 12;
+    hijriYear -= 1;
+  } else if (hijriMonth > 12) {
+    hijriMonth -= 12;
+    hijriYear += 1;
+  }
+
   return {
     day: hijriDay,
     month: hijriMonth,
@@ -613,7 +671,7 @@ export function getUpcomingEvents(count: number = 5): Array<IslamicEvent & {
 }> {
   const today = new Date();
   const hijriToday = getHijriDate(today);
-  const offset = getCachedHijriOffset();
+  const offset = getEffectiveHijriOffset();
   const events: Array<IslamicEvent & { hijriDate: string; gregorianDate: string; daysUntil: number }> = [];
   const names = getLocalizedDateNames();
 
@@ -682,8 +740,8 @@ export function getHijriMonthCalendar(hijriYear: number, hijriMonth: number): Ar
   const daysInMonth = getHijriMonthDays(hijriYear, hijriMonth);
   const today = new Date();
   const todayHijri = getHijriDate(today);
-  const offset = getCachedHijriOffset();
-  
+  const offset = getEffectiveHijriOffset();
+
   for (let day = 1; day <= daysInMonth; day++) {
     const gregorianDate = hijriToGregorian(hijriYear, hijriMonth, day);
     if (offset !== 0) {

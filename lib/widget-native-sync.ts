@@ -4,7 +4,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { getLocalizedHijriDate } from './hijri-date';
+import { getLocalizedHijriDate, hydrateHijriOffset } from './hijri-date';
 import { getDateLocale } from './i18n';
 import { updateWidgetData } from './widget-data-bridge';
 
@@ -128,6 +128,11 @@ function getCurrentHijriData(): HijriWidgetNativeData {
  * - Android: AsyncStorage (react-native-android-widget reads via task handler)
  */
 export async function syncWidgetDataToNative(): Promise<void> {
+  // Hydrate the persisted Hijri offsets (manual ±N + last-synced system offset)
+  // before the synchronous getCurrentHijriData() below, so the date written to
+  // native storage stays authoritative even offline / in a cold context.
+  try { await hydrateHijriOffset(); } catch {}
+
   // 1. Sync legacy per-type data to AsyncStorage (for in-app gallery previews)
   const ayah = getTodayAyah();
   const azkar = getCurrentDhikr();

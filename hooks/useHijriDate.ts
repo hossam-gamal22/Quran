@@ -11,7 +11,7 @@ import {
   refreshHijriInBackground,
   type HijriResult,
 } from '@/services/hijriCalendarService';
-import { gregorianToHijri, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN } from '@/lib/hijri-date';
+import { getHijriDateObject, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN } from '@/lib/hijri-date';
 
 interface UseHijriDateReturn {
   hijri: HijriResult | null;
@@ -49,9 +49,9 @@ export function useHijriDate(initialDate?: Date): UseHijriDateReturn {
       setHijri(result);
     } catch (e: any) {
       setError(e?.message || 'Failed to get Hijri date');
-      // Fallback to pure calculation
+      // Fallback to tabular calc WITH the effective offset (user + system)
       const date = initialDate || new Date();
-      const calc = gregorianToHijri(date);
+      const calc = getHijriDateObject(date);
       setHijri({
         day: calc.day,
         month: calc.month,
@@ -94,7 +94,7 @@ export function useHijriDate(initialDate?: Date): UseHijriDateReturn {
     try {
       return await getHijriDate(date, countryCode);
     } catch {
-      const calc = gregorianToHijri(date);
+      const calc = getHijriDateObject(date);
       return {
         day: calc.day,
         month: calc.month,

@@ -17,7 +17,10 @@ import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { uiText } from '@/lib/ui-text';
 import { getLanguage } from '@/lib/i18n';
-import { gregorianToHijri } from '@/lib/hijri-date';
+// getHijriDateObject applies the effective offset (user ±N + system
+// authoritative correction) so Suhoor white-day / occasion detection + the
+// day labels match the admin-resolved calendar used across the app.
+import { getHijriDateObject } from '@/lib/hijri-date';
 
 interface SuhoorDatePickerProps {
   visible: boolean;
@@ -72,7 +75,7 @@ function datesForWhiteDays(): string[] {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     try {
-      const h = gregorianToHijri(d).day;
+      const h = getHijriDateObject(d).day;
       if (h === 13 || h === 14 || h === 15) {
         out.push(toDateStr(d.getFullYear(), d.getMonth(), d.getDate()));
       }
@@ -93,7 +96,7 @@ function datesForHijriOccasion(hijriMonth: number, hijriDays: number[]): string[
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     try {
-      const h = gregorianToHijri(d);
+      const h = getHijriDateObject(d);
       if (h.month === hijriMonth && hijriDays.includes(h.day)) {
         out.push(toDateStr(d.getFullYear(), d.getMonth(), d.getDate()));
       }
@@ -252,7 +255,7 @@ export function SuhoorDatePicker({
                 const isSelected = selected.has(dateStr);
                 const hijriDay = (() => {
                   try {
-                    return gregorianToHijri(dayDate).day;
+                    return getHijriDateObject(dayDate).day;
                   } catch {
                     return null;
                   }
