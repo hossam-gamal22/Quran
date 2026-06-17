@@ -30,6 +30,12 @@ const PRESERVED_KEYS = [
   'user_location', // real location key (lib/prayer-times.ts STORAGE_KEYS.LOCATION)
   '@calculation_method',
   '@hijri_date_offset',
+  '@hijri_user_adjustment',
+  // Last-synced authoritative correction (tabular→admin/AlAdhan). Wiping it on a
+  // version bump makes the date fall back to the raw tabular calc (a day behind
+  // Umm al-Qura) on the first launch of a new build until syncHijriSystemOffset
+  // re-runs — and stays wrong if that launch is offline. Must survive updates.
+  '@hijri_system_offset',
   '@hijri_user_country',
   '@hide_next_prayer_alert',
   '@makkah_fallback_purged_v1',
@@ -115,6 +121,9 @@ const PRESERVED_PREFIXES = [
   '@adhkar_',
   '@user_',
   '@rooh_',
+  // Cached admin Hijri overrides — so the official per-country date survives a
+  // version bump and still resolves offline right after an app update.
+  '@hijri_override_cache_',
 ];
 
 // Prefixes for background-related caches that MUST be cleared
