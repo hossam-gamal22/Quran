@@ -297,6 +297,13 @@ service cloud.firestore {
       allow write: if adminWrite();
     }
 
+    // Per-country Hijri source mode (admin override vs AlAdhan API).
+    // Public read (the app resolves the date from it); admin-only write.
+    match /hijri_overrides_config/{docId} {
+      allow read: if true;
+      allow write: if adminWrite();
+    }
+
     match /pdfTemplates/{templateId} {
       allow read: if true;
       allow write: if adminWrite();

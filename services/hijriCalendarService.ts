@@ -183,7 +183,13 @@ function getCacheKey(countryCode: string, date: Date, userAdj: number = 0): stri
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const yyyy = date.getFullYear();
-  return `${CACHE_PREFIX}${countryCode}_${yyyy}-${mm}-${dd}_adj_${userAdj}`;
+  // Include the system offset in the key. The Layer-4 tabular fallback shifts
+  // by (userAdj + systemOffset); a result cached while the offset was still 0
+  // (cold/offline first paint, before syncHijriSystemOffset resolves) must NOT
+  // be served once the authoritative offset is learned — otherwise the date
+  // sticks a day behind Umm al-Qura until the 24h TTL expires.
+  const sys = getHijriSystemOffset();
+  return `${CACHE_PREFIX}${countryCode}_${yyyy}-${mm}-${dd}_adj_${userAdj}_sys_${sys}`;
 }
 
 export async function invalidateHijriCache(countryCode?: string, date?: Date): Promise<void> {
@@ -218,6 +224,79 @@ async function cacheResult(countryCode: string, date: Date, result: HijriResult,
     const key = getCacheKey(countryCode, date, userAdj);
     await AsyncStorage.setItem(key, JSON.stringify({ ...result, _cachedAt: Date.now() }));
   } catch {}
+}
+
+// ============================================
+// Per-country source mode (admin override vs API)
+// ============================================
+//
+// Stored by the admin panel in `hijri_overrides_config/sourceModes`:
+//   { countries: { SA: 'api', EG: 'admin', ... } }
+// Absent / 'admin' = current behaviour (a verified override wins, else API).
+// 'api' = ignore the admin override entirely and follow AlAdhan (and, offline,
+// the tabular calc + the system offset that was itself derived from the API).
+// A live onSnapshot in subscribeToHijriOverridesForUser keeps this fresh.
+
+const SOURCE_MODE_COLLECTION = 'hijri_overrides_config';
+const SOURCE_MODE_DOC = 'sourceModes';
+const SOURCE_MODE_CACHE_KEY = '@hijri_source_modes';
+
+type CountrySourceMode = 'admin' | 'api';
+let _sourceModesCache: Record<string, CountrySourceMode> | null = null;
+
+function setSourceModesCache(modes: Record<string, CountrySourceMode>): void {
+  _sourceModesCache = modes;
+  AsyncStorage.setItem(SOURCE_MODE_CACHE_KEY, JSON.stringify(modes)).catch(() => {});
+}
+
+function normalizeSourceModes(raw: any): Record<string, CountrySourceMode> {
+  const src = (raw && typeof raw === 'object' && raw.countries && typeof raw.countries === 'object')
+    ? raw.countries
+    : (raw && typeof raw === 'object' ? raw : {});
+  const out: Record<string, CountrySourceMode> = {};
+  for (const key of Object.keys(src)) {
+    if (src[key] === 'api') out[key.toUpperCase()] = 'api';
+  }
+  return out;
+}
+
+async function loadSourceModes(): Promise<Record<string, CountrySourceMode>> {
+  if (_sourceModesCache) return _sourceModesCache;
+  // Firestore first (authoritative), AsyncStorage as the offline fallback.
+  try {
+    const { doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('@/lib/firebase-config');
+    const snap = await getDoc(doc(db, SOURCE_MODE_COLLECTION, SOURCE_MODE_DOC));
+    if (snap.exists()) {
+      const modes = normalizeSourceModes(snap.data());
+      setSourceModesCache(modes);
+      return modes;
+    }
+  } catch {}
+  try {
+    const rawCache = await AsyncStorage.getItem(SOURCE_MODE_CACHE_KEY);
+    if (rawCache) {
+      _sourceModesCache = JSON.parse(rawCache);
+      return _sourceModesCache!;
+    }
+  } catch {}
+  return {};
+}
+
+export async function getCountrySourceMode(countryCode?: string): Promise<CountrySourceMode> {
+  const country = (countryCode || '').toUpperCase();
+  if (!country) return 'admin';
+  try {
+    const modes = await loadSourceModes();
+    return modes[country] === 'api' ? 'api' : 'admin';
+  } catch {
+    return 'admin';
+  }
+}
+
+/** @internal — reset the in-memory source-mode cache (test seam only). */
+export function __resetHijriSourceModeCache(): void {
+  _sourceModesCache = null;
 }
 
 // ============================================
@@ -294,6 +373,10 @@ async function getActiveFirestoreOverride(
   gregorianDate: Date,
   userAdj: number,
 ) {
+  // Per-country source mode: when the admin set this country to follow the API,
+  // skip the override entirely so getHijriDate / resolveAuthoritativeToday /
+  // refreshHijriInBackground all fall through to AlAdhan.
+  if ((await getCountrySourceMode(countryCode)) === 'api') return null;
   for (const candidate of getAdjacentHijriMonthKeys(approxYear, approxMonth)) {
     const override = await getFirestoreOverride(countryCode, candidate.year, candidate.month);
     if (override && override.isVerified && isDateInsideOverride(override, gregorianDate, userAdj)) {
@@ -524,7 +607,15 @@ export async function syncHijriSystemOffset(countryCode?: string): Promise<numbe
       const tab = gregorianToHijri(probe);
       if (tab.year === authoritative.year && tab.month === authoritative.month && tab.day === authoritative.day) {
         if (__DEV__) console.log('[hijri-fix] systemOffset =', n, '→ authoritative', authoritative.day, authoritative.month, authoritative.year);
+        const changed = n !== getHijriSystemOffset();
         setHijriSystemOffset(n);
+        // When the correction actually changes, drop today's resolved-date
+        // cache so getHijriDate recomputes immediately instead of serving an
+        // entry computed under the previous offset (belt-and-suspenders with
+        // the offset-aware cache key).
+        if (changed) {
+          await invalidateHijriCache(country, today).catch(() => {});
+        }
         return n;
       }
     }
@@ -640,6 +731,23 @@ export async function subscribeToHijriOverridesForUser(
         },
       );
     });
+
+    // Also live-watch the per-country source-mode doc, so flipping a country
+    // between «API» and «admin» in the panel takes effect on devices without
+    // an app reopen (refresh the in-memory mode cache, then run the same
+    // invalidate → resync → widget-refresh chain).
+    unsubscribers.push(
+      onSnapshot(
+        doc(db, SOURCE_MODE_COLLECTION, SOURCE_MODE_DOC),
+        (snap) => {
+          setSourceModesCache(snap.exists() ? normalizeSourceModes(snap.data()) : {});
+          notifyChange();
+        },
+        (err) => {
+          if (__DEV__) console.warn('[hijri] source-mode snapshot error:', err);
+        },
+      ),
+    );
 
     const unsub = () => {
       unsubscribers.forEach(unsubscribe => {

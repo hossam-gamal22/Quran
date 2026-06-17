@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { firestoreState } = vi.hoisted(() => ({
+const { firestoreState, sourceModeState } = vi.hoisted(() => ({
   firestoreState: {
     override: null as null | {
       countryCode: string;
@@ -14,6 +14,8 @@ const { firestoreState } = vi.hoisted(() => ({
       isVerified: boolean;
     },
   },
+  // Controls the `hijri_overrides_config/sourceModes` doc read by getCountrySourceMode.
+  sourceModeState: { data: null as any },
 }));
 
 vi.mock('expo-localization', () => ({
@@ -28,7 +30,22 @@ vi.mock('@/services/moonSightingNews', () => ({
   fetchMoonSightingNews: vi.fn(async () => null),
 }));
 
-import { getHijriDate, syncHijriSystemOffset } from '@/services/hijriCalendarService';
+// getCountrySourceMode reads Firestore directly — drive the per-country source
+// mode deterministically without touching the network. Keep every other
+// firebase/firestore export real (config/firebase.ts needs getFirestore at
+// import time); only override doc/getDoc/onSnapshot.
+vi.mock('@/lib/firebase-config', () => ({ db: {} }));
+vi.mock('firebase/firestore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('firebase/firestore')>();
+  return {
+    ...actual,
+    doc: () => ({}),
+    getDoc: async () => ({ exists: () => sourceModeState.data != null, data: () => sourceModeState.data }),
+    onSnapshot: () => () => {},
+  };
+});
+
+import { getHijriDate, syncHijriSystemOffset, __resetHijriSourceModeCache } from '@/services/hijriCalendarService';
 import { gregorianToHijri, getHijriSystemOffset, setHijriSystemOffset, getEffectiveHijriOffset } from '@/lib/hijri-date';
 
 function mockAlAdhanHijri(day: number, month = 12, year = 1447) {
@@ -56,6 +73,8 @@ describe('Hijri calendar service source reconciliation', () => {
 
   beforeEach(async () => {
     firestoreState.override = null;
+    sourceModeState.data = null;
+    __resetHijriSourceModeCache();
     await AsyncStorage.clear();
     vi.restoreAllMocks();
     vi.stubGlobal('fetch', vi.fn());
@@ -102,6 +121,8 @@ describe('Hijri calendar service source reconciliation', () => {
 describe('syncHijriSystemOffset — tabular→authoritative bridge', () => {
   beforeEach(async () => {
     firestoreState.override = null;
+    sourceModeState.data = null;
+    __resetHijriSourceModeCache();
     await AsyncStorage.clear();
     vi.restoreAllMocks();
     vi.stubGlobal('fetch', vi.fn());
@@ -167,5 +188,92 @@ describe('syncHijriSystemOffset — tabular→authoritative bridge', () => {
       month: expected.month,
       year: expected.year,
     });
+  });
+});
+
+describe('per-country source mode (admin override vs API)', () => {
+  const today = new Date('2026-05-18T12:00:00.000Z');
+
+  beforeEach(async () => {
+    firestoreState.override = null;
+    sourceModeState.data = null;
+    __resetHijriSourceModeCache();
+    await AsyncStorage.clear();
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
+    setHijriSystemOffset(0);
+  });
+
+  it("source mode 'api' ignores a verified admin override and follows AlAdhan", async () => {
+    sourceModeState.data = { countries: { SA: 'api' } };
+    firestoreState.override = {
+      countryCode: 'SA',
+      countryName: 'Saudi Arabia',
+      hijriYear: 1447,
+      hijriMonth: 12,
+      monthLength: 30,
+      hijriStartGregorian: '2026-05-15', // would resolve to day 4
+      source: 'Admin override',
+      isVerified: true,
+    };
+    mockAlAdhanHijri(5); // API says day 5
+
+    const resolved = await getHijriDate(today, 'SA');
+
+    expect(resolved.source).toBe('aladhan_api');
+    expect(resolved.day).toBe(5); // override (4) ignored, API (5) used
+  });
+
+  it("source mode 'admin' (default) still uses the verified override", async () => {
+    sourceModeState.data = { countries: { EG: 'api' } }; // a DIFFERENT country
+    firestoreState.override = {
+      countryCode: 'SA',
+      countryName: 'Saudi Arabia',
+      hijriYear: 1447,
+      hijriMonth: 12,
+      monthLength: 30,
+      hijriStartGregorian: '2026-05-15',
+      source: 'Admin override',
+      isVerified: true,
+    };
+    mockAlAdhanHijri(5);
+
+    const resolved = await getHijriDate(today, 'SA');
+
+    expect(resolved.source).toBe('admin_override');
+    expect(resolved.day).toBe(4); // SA stays on the override
+  });
+});
+
+describe('resolved-date cache is system-offset-aware', () => {
+  beforeEach(async () => {
+    firestoreState.override = null;
+    sourceModeState.data = null;
+    __resetHijriSourceModeCache();
+    await AsyncStorage.clear();
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
+    setHijriSystemOffset(0);
+  });
+
+  it('does not serve a stale offset-0 entry once the system offset becomes +1', async () => {
+    // Offline, no override → Layer 4 calculation, cached per (date, offset).
+    vi.mocked(global.fetch).mockRejectedValue(new Error('offline'));
+    const date = new Date('2026-05-18T12:00:00.000Z');
+
+    setHijriSystemOffset(0);
+    const first = await getHijriDate(date, 'SA'); // cached under …_sys_0
+    expect(first.source).toBe('calculation');
+
+    // The authoritative correction is learned → offset becomes +1.
+    await AsyncStorage.setItem('@hijri_system_offset', '1');
+    setHijriSystemOffset(1);
+    const second = await getHijriDate(date, 'SA'); // must NOT reuse the sys_0 entry
+
+    const raw = gregorianToHijri(date);
+    const shifted = gregorianToHijri(new Date(date.getTime() + 86400000));
+    expect({ d: first.day, m: first.month }).toEqual({ d: raw.day, m: raw.month });
+    expect({ d: second.day, m: second.month }).toEqual({ d: shifted.day, m: shifted.month });
+    expect(second.day).not.toBe(first.day); // proves the stale entry wasn't served
   });
 });
