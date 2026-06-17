@@ -130,7 +130,11 @@ export default function HijriScreen() {
   const ahSuffix = t('calendar.ahSuffix') || (settings.language === 'ar' ? 'هـ' : 'AH');
 
   // Per-country Hijri date hook
-  const { hijri: hijriResult } = useHijriDate();
+  // Called for its side-effect: on mount it runs refreshHijriInBackground →
+  // syncHijriSystemOffset, so opening the calendar re-syncs the authoritative
+  // correction. The resolved value itself is no longer displayed (the source
+  // badge was removed); the grid renders via the shared system offset.
+  useHijriDate();
 
   // الحالات
   const [displayYear, setDisplayYear] = useState(today.getFullYear());
@@ -546,30 +550,9 @@ export default function HijriScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ============================================ */}
-        {/* شارة الثقة — Confidence Badge */}
-        {/* ============================================ */}
-        {hijriResult && hijriResult.confidence === 'high' && (
-          <View style={[styles.confidenceBadge, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.12)', borderColor: isDarkMode ? 'rgba(34,197,94,0.35)' : 'rgba(34,197,94,0.25)' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="check-decagram" size={14} color={colors.primary} />
-            <Text style={[styles.confidenceBadgeText, { color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {t('hijriCalendar.officialConfirmed')}
-            </Text>
-            {hijriResult.note && (
-              <Text style={[styles.confidenceSource, { color: colors.primaryText }]} numberOfLines={1}>
-                — {hijriResult.note}
-              </Text>
-            )}
-          </View>
-        )}
-        {hijriResult && hijriResult.confidence === 'low' && (
-          <View style={[styles.confidenceBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)', borderColor: isDarkMode ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.2)' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={14} color={isDarkMode ? '#F59E0B' : '#92630B'} />
-            <Text style={[styles.confidenceBadgeText, { color: isDarkMode ? '#F59E0B' : '#92630B', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {t('hijriCalendar.estimatedDate')}
-            </Text>
-          </View>
-        )}
+        {/* Source/confidence badge intentionally hidden — the resolved date is
+            already unified on the authoritative source; the status row added
+            visual noise to the calendar header. */}
 
         {/* ============================================ */}
         {/* رؤوس أيام الأسبوع */}
