@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
-import { Plus, Trash2, Edit2, Check, X, Globe, Calendar, ExternalLink, Shield, ShieldCheck, Minus, Save, RefreshCw } from 'lucide-react';
+import { collection, doc, setDoc, deleteDoc, Timestamp, onSnapshot, writeBatch } from 'firebase/firestore';
+import { Plus, Trash2, Edit2, Check, X, Globe, Calendar, ExternalLink, Shield, ShieldCheck, Minus, Save, RefreshCw, Layers, AlertTriangle, CheckCheck, Loader2 } from 'lucide-react';
 import { sendHijriOverrideSyncNotification } from '../services/pushNotifications';
 
 // ============================================
@@ -44,6 +44,22 @@ interface CountryDraft {
   sourceUrl: string;
   isVerified: boolean;
 }
+
+// Shared values applied to many countries in one bulk operation.
+interface BulkEditForm {
+  day: number;
+  month: number;
+  year: number;
+  monthLength: 29 | 30;
+  source: string;
+  sourceUrl: string;
+  isVerified: boolean;
+}
+
+// Where a bulk operation is applied.
+//  - 'selected' → only the rows the admin ticked
+//  - 'all'      → every country in the table (loud confirmation required)
+type BulkScope = 'selected' | 'all';
 
 // ============================================
 // Constants
@@ -108,6 +124,10 @@ const PRESETS = [
 
 const DEFAULT_SOURCE = 'تعديل لوحة التحكم';
 const MS_PER_DAY = 86400000;
+// Firestore caps a single batch at 500 writes; chunk below that with headroom.
+const BATCH_CHUNK = 450;
+// Throttle between per-country push pings so we don't hammer the Expo endpoint.
+const PUSH_THROTTLE_MS = 80;
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -222,6 +242,31 @@ const HijriOverrides: React.FC = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [savingCountry, setSavingCountry] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, CountryDraft>>({});
+
+  // ---- Bulk selection + bulk edit state (additive; never touches single-row flow) ----
+  const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkScope, setBulkScope] = useState<BulkScope>('selected');
+  const [bulkStep, setBulkStep] = useState<'edit' | 'confirm'>('edit');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [bulkForm, setBulkForm] = useState<BulkEditForm>({
+    day: 1,
+    month: 9,
+    year: 1447,
+    monthLength: 30,
+    source: DEFAULT_SOURCE,
+    sourceUrl: '',
+    isVerified: true,
+  });
+
+  // Auto-dismiss the toast after a few seconds.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const pushHijriSync = async (payload: {
     countryCode: string;
@@ -545,6 +590,148 @@ const HijriOverrides: React.FC = () => {
   };
 
   // ============================================
+  // Bulk selection + bulk edit
+  // ============================================
+
+  const allSelected = selectedCountries.size === COUNTRIES.length && COUNTRIES.length > 0;
+  const someSelected = selectedCountries.size > 0 && !allSelected;
+
+  const toggleCountrySelection = (countryCode: string) => {
+    setSelectedCountries(prev => {
+      const next = new Set(prev);
+      if (next.has(countryCode)) next.delete(countryCode);
+      else next.add(countryCode);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedCountries(prev =>
+      prev.size === COUNTRIES.length ? new Set() : new Set(COUNTRIES.map(c => c.code))
+    );
+  };
+
+  const clearSelection = () => setSelectedCountries(new Set());
+
+  // Countries that a bulk operation will actually touch, given the chosen scope.
+  const bulkTargetCodes = useMemo(
+    () => (bulkScope === 'all' ? COUNTRIES.map(c => c.code) : Array.from(selectedCountries)),
+    [bulkScope, selectedCountries]
+  );
+
+  const openBulkModal = (scope: BulkScope) => {
+    // Seed shared fields from the calculated "today" so the form is sensible.
+    setBulkForm({
+      day: approximateToday.day,
+      month: approximateToday.month,
+      year: approximateToday.year,
+      monthLength: approximateToday.monthLength,
+      source: DEFAULT_SOURCE,
+      sourceUrl: '',
+      isVerified: true,
+    });
+    setBulkScope(scope);
+    setBulkStep('edit');
+    setShowBulkModal(true);
+  };
+
+  const closeBulkModal = () => {
+    if (bulkSaving) return; // never close mid-write
+    setShowBulkModal(false);
+    setBulkStep('edit');
+  };
+
+  const updateBulkForm = (patch: Partial<BulkEditForm>) =>
+    setBulkForm(prev => ({ ...prev, ...patch }));
+
+  // Applies the shared bulk values to every targeted country:
+  //   1. Firestore writeBatch (chunked under the 500-op limit) → atomic per chunk
+  //   2. Per-country push sync (throttled, best-effort) so devices refresh
+  // Mirrors the exact document shape written by saveCountryDate so the app /
+  // widget read path and the single-row flow stay byte-compatible.
+  const runBulkSave = async () => {
+    const targets = bulkTargetCodes
+      .map(code => COUNTRIES.find(c => c.code === code))
+      .filter((c): c is typeof COUNTRIES[number] => Boolean(c));
+    if (targets.length === 0) return;
+
+    const safeDay = Math.max(1, Math.min(bulkForm.monthLength, bulkForm.day));
+    const hijriStartGregorian = deriveMonthStartFromToday(safeDay);
+    const source = bulkForm.source.trim() || DEFAULT_SOURCE;
+
+    setBulkSaving(true);
+    setBulkProgress({ done: 0, total: targets.length });
+
+    try {
+      // 1) Batched Firestore writes — each chunk commits atomically.
+      for (let i = 0; i < targets.length; i += BATCH_CHUNK) {
+        const batch = writeBatch(db);
+        const chunk = targets.slice(i, i + BATCH_CHUNK);
+        chunk.forEach(country => {
+          const docId = `${country.code}_${bulkForm.year}_${bulkForm.month}`;
+          batch.set(doc(db, 'hijri_overrides', docId), {
+            countryCode: country.code,
+            countryName: country.en,
+            hijriYear: bulkForm.year,
+            hijriMonth: bulkForm.month,
+            monthLength: bulkForm.monthLength,
+            hijriStartGregorian,
+            source,
+            sourceUrl: bulkForm.sourceUrl.trim() || '',
+            announcedAt: Timestamp.now(),
+            updatedBy: 'admin',
+            isVerified: bulkForm.isVerified,
+          });
+        });
+        await batch.commit();
+      }
+
+      // 2) Best-effort push sync, country by country (pushHijriSync never throws).
+      for (let i = 0; i < targets.length; i++) {
+        const country = targets[i];
+        await pushHijriSync({
+          countryCode: country.code,
+          countryName: country.en,
+          hijriYear: bulkForm.year,
+          hijriMonth: bulkForm.month,
+          monthLength: bulkForm.monthLength,
+          hijriStartGregorian,
+          source,
+          sourceUrl: bulkForm.sourceUrl.trim() || '',
+          isVerified: bulkForm.isVerified,
+        });
+        setBulkProgress({ done: i + 1, total: targets.length });
+        if (i + 1 < targets.length) {
+          await new Promise(resolve => setTimeout(resolve, PUSH_THROTTLE_MS));
+        }
+      }
+
+      // 3) Clear stale local drafts for touched countries + reset selection.
+      setDrafts(prev => {
+        const next = { ...prev };
+        targets.forEach(country => delete next[country.code]);
+        return next;
+      });
+      clearSelection();
+      setShowBulkModal(false);
+      setBulkStep('edit');
+      setToast({
+        type: 'success',
+        message: `تم تحديث ${targets.length} دولة ونشرها بنجاح`,
+      });
+    } catch (err) {
+      console.error('Bulk save failed:', err);
+      setToast({
+        type: 'error',
+        message: 'حدث خطأ أثناء الحفظ الجماعي. قد لا تكون كل الدول قد تحدّثت — راجع الجدول وأعد المحاولة.',
+      });
+    } finally {
+      setBulkSaving(false);
+      setBulkProgress(null);
+    }
+  };
+
+  // ============================================
   // "Set today's Hijri date" quick-override
   // ============================================
   //
@@ -720,6 +907,23 @@ const HijriOverrides: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast / snackbar feedback */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] max-w-md" dir="rtl">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm ${
+            toast.type === 'success'
+              ? 'bg-emerald-600 border-emerald-400 text-white'
+              : 'bg-red-600 border-red-400 text-white'
+          }`}>
+            {toast.type === 'success' ? <CheckCheck className="w-5 h-5 flex-shrink-0" /> : <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} className="text-white/80 hover:text-white" aria-label="إغلاق">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -768,10 +972,18 @@ const HijriOverrides: React.FC = () => {
               عدّل اليوم الهجري لكل دولة. الحفظ يكتب مباشرة في Firestore ويصل لمستخدمي الدولة فوراً.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
             <span className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300">
               {overrides.filter(override => override.isVerified && isTodayInsideOverride(override)).length} تعديل نشط
             </span>
+            <button
+              onClick={() => openBulkModal('all')}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-lg transition-colors"
+              title="تطبيق نفس التاريخ على جميع الدول دفعة واحدة"
+            >
+              <Layers className="w-4 h-4" />
+              تطبيق على كل الدول
+            </button>
             <button
               onClick={() => setDrafts({})}
               className="inline-flex items-center gap-2 px-3 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
@@ -782,10 +994,46 @@ const HijriOverrides: React.FC = () => {
           </div>
         </div>
 
+        {/* Bulk action bar — appears only when rows are selected */}
+        {selectedCountries.size > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-accent/10 border-b border-accent/30">
+            <div className="flex items-center gap-2 text-sm text-emerald-200">
+              <CheckCheck className="w-4 h-4" />
+              تم تحديد <span className="font-bold">{selectedCountries.size}</span> دولة
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openBulkModal('selected')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                <Layers className="w-4 h-4" />
+                تعديل الدول المحددة
+              </button>
+              <button
+                onClick={clearSelection}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-lg transition-colors text-sm"
+              >
+                <X className="w-4 h-4" />
+                إلغاء التحديد
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-admin-surface text-slate-400 border-b border-admin-border">
+                <th className="text-center px-4 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected; }}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 accent-accent cursor-pointer align-middle"
+                    aria-label="تحديد كل الدول"
+                  />
+                </th>
                 <th className="text-right px-4 py-3">الدولة</th>
                 <th className="text-center px-4 py-3">المعروض حالياً</th>
                 <th className="text-center px-4 py-3">اليوم</th>
@@ -806,8 +1054,19 @@ const HijriOverrides: React.FC = () => {
                   draft.monthLength !== current.monthLength ||
                   draft.source !== (current.override?.source || DEFAULT_SOURCE);
 
+                const isSelected = selectedCountries.has(country.code);
+
                 return (
-                  <tr key={country.code} className="border-b border-admin-border/50 hover:bg-admin-surface/30 transition-colors">
+                  <tr key={country.code} className={`border-b border-admin-border/50 transition-colors ${isSelected ? 'bg-accent/10' : 'hover:bg-admin-surface/30'}`}>
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleCountrySelection(country.code)}
+                        className="w-4 h-4 accent-accent cursor-pointer align-middle"
+                        aria-label={`تحديد ${country.name}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-white">{country.name}</div>
                       <div className="text-xs text-slate-500" dir="ltr">{country.code} · {country.en}</div>
@@ -1258,6 +1517,260 @@ const HijriOverrides: React.FC = () => {
                 إلغاء
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk edit modal — selected countries OR all countries */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-admin-surface rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Layers className="w-5 h-5 text-accent-light" />
+                {bulkStep === 'edit' ? 'تعديل جماعي للتاريخ الهجري' : 'تأكيد التعديل الجماعي'}
+              </h2>
+              <button onClick={closeBulkModal} disabled={bulkSaving} className="text-slate-400 hover:text-white disabled:opacity-40" aria-label="إغلاق">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {bulkStep === 'edit' ? (
+              <div className="space-y-4">
+                {/* Scope switcher */}
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">نطاق التطبيق</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setBulkScope('selected')}
+                      disabled={selectedCountries.size === 0}
+                      className={`px-3 py-2 rounded-lg border text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        bulkScope === 'selected'
+                          ? 'bg-accent border-accent text-white'
+                          : 'bg-admin-surface-light border-admin-border text-slate-300'
+                      }`}
+                    >
+                      الدول المحددة ({selectedCountries.size})
+                    </button>
+                    <button
+                      onClick={() => setBulkScope('all')}
+                      className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                        bulkScope === 'all'
+                          ? 'bg-amber-500 border-amber-500 text-white'
+                          : 'bg-admin-surface-light border-admin-border text-slate-300'
+                      }`}
+                    >
+                      كل الدول ({COUNTRIES.length})
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  «اليوم» هو تاريخ اليوم الهجري كما تريد أن يظهر للمستخدمين، وسيتم حساب بداية الشهر الميلادية
+                  وباقي الأيام تلقائياً — تماماً مثل النشر الفردي لكل دولة.
+                </p>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">اليوم</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={bulkForm.monthLength}
+                      value={bulkForm.day}
+                      onChange={e => updateBulkForm({ day: Math.max(1, Math.min(bulkForm.monthLength, parseInt(e.target.value) || 1)) })}
+                      className="w-full bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border text-center"
+                      aria-label="اليوم الهجري"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">الشهر</label>
+                    <select
+                      value={bulkForm.month}
+                      onChange={e => {
+                        const month = parseInt(e.target.value);
+                        updateBulkForm({ month, monthLength: getHijriMonthDays(bulkForm.year, month) });
+                      }}
+                      className="w-full bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border"
+                      aria-label="الشهر الهجري"
+                    >
+                      {HIJRI_MONTHS.map(m => (
+                        <option key={m.num} value={m.num}>{m.ar}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">السنة</label>
+                    <input
+                      type="number"
+                      value={bulkForm.year}
+                      onChange={e => {
+                        const year = parseInt(e.target.value) || approximateToday.year;
+                        updateBulkForm({ year, monthLength: getHijriMonthDays(year, bulkForm.month) });
+                      }}
+                      className="w-full bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border text-center"
+                      aria-label="السنة الهجرية"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">طول الشهر</label>
+                  <div className="flex gap-2">
+                    {[29, 30].map(len => (
+                      <button
+                        key={len}
+                        onClick={() => updateBulkForm({ monthLength: len as 29 | 30, day: Math.min(bulkForm.day, len) })}
+                        className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+                          bulkForm.monthLength === len
+                            ? 'bg-accent text-white border-accent'
+                            : 'bg-admin-surface-light text-slate-300 border-admin-border'
+                        }`}
+                      >
+                        {len} يوم
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">المصدر الرسمي</label>
+                  <input
+                    type="text"
+                    value={bulkForm.source}
+                    onChange={e => updateBulkForm({ source: e.target.value })}
+                    placeholder={DEFAULT_SOURCE}
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border text-right"
+                    aria-label="المصدر الرسمي"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">رابط المصدر (اختياري)</label>
+                  <input
+                    type="url"
+                    value={bulkForm.sourceUrl}
+                    onChange={e => updateBulkForm({ sourceUrl: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                    aria-label="رابط المصدر"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-sm text-slate-300">موثق رسمياً</span>
+                  <button
+                    onClick={() => updateBulkForm({ isVerified: !bulkForm.isVerified })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${bulkForm.isVerified ? 'bg-accent' : 'bg-admin-surface-light'}`}
+                    aria-label="حالة التوثيق"
+                  >
+                    <span className={`absolute left-0.5 top-0.5 inline-block h-4 w-4 rounded-full bg-white transition-transform ${bulkForm.isVerified ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setBulkStep('confirm')}
+                    disabled={bulkTargetCodes.length === 0 || !bulkForm.source.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+                  >
+                    متابعة ({bulkTargetCodes.length} دولة)
+                  </button>
+                  <button onClick={closeBulkModal} className="px-4 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-xl transition-colors">
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Confirmation step */}
+                <div className={`rounded-xl border p-4 ${bulkScope === 'all' ? 'bg-amber-500/10 border-amber-500/40' : 'bg-accent/10 border-accent/40'}`}>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className={`w-6 h-6 flex-shrink-0 mt-0.5 ${bulkScope === 'all' ? 'text-amber-400' : 'text-accent-light'}`} />
+                    <div className="text-sm">
+                      {bulkScope === 'all' ? (
+                        <p className="text-amber-200 leading-relaxed">
+                          سيتم تطبيق هذا التاريخ على <span className="font-bold">كل الدول ({COUNTRIES.length} دولة)</span> دفعة واحدة،
+                          واستبدال أي تواريخ معروضة حالياً. هذا إجراء واسع النطاق ويصل لجميع المستخدمين فوراً.
+                        </p>
+                      ) : (
+                        <p className="text-emerald-200 leading-relaxed">
+                          سيتم تطبيق هذا التاريخ على <span className="font-bold">{bulkTargetCodes.length} دولة محددة</span>،
+                          والنشر يصل لمستخدمي هذه الدول فوراً.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary of values */}
+                <div className="rounded-xl border border-admin-border bg-admin-surface-light/60 p-4 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">التاريخ</span>
+                    <span className="font-semibold text-white">
+                      {bulkForm.day} {HIJRI_MONTHS[bulkForm.month - 1]?.ar} {bulkForm.year} هـ
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">طول الشهر</span>
+                    <span className="font-semibold text-white">{bulkForm.monthLength} يوم</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">المصدر</span>
+                    <span className="font-semibold text-white">{bulkForm.source.trim() || DEFAULT_SOURCE}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">بداية الشهر (ميلادي)</span>
+                    <span className="font-semibold text-white" dir="ltr">
+                      {deriveMonthStartFromToday(Math.max(1, Math.min(bulkForm.monthLength, bulkForm.day)))}
+                    </span>
+                  </div>
+                </div>
+
+                {bulkProgress && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>جاري النشر...</span>
+                      <span>{bulkProgress.done} / {bulkProgress.total}</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-admin-surface-light overflow-hidden">
+                      <div
+                        className="h-full bg-accent transition-all"
+                        style={{ width: `${bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={runBulkSave}
+                    disabled={bulkSaving}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 disabled:opacity-60 text-white rounded-xl transition-colors ${bulkScope === 'all' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-accent hover:bg-accent-dark'}`}
+                  >
+                    {bulkSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        جاري النشر...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCheck className="w-4 h-4" />
+                        تأكيد ونشر على {bulkTargetCodes.length} دولة
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setBulkStep('edit')}
+                    disabled={bulkSaving}
+                    className="px-4 py-2 bg-admin-surface-light hover:bg-slate-600 disabled:opacity-40 text-slate-300 rounded-xl transition-colors"
+                  >
+                    رجوع
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
