@@ -72,7 +72,11 @@ if (!IS_EXPO_GO) {
 interface SubscriptionContextType {
   isPremium: boolean;
   premiumSource: PremiumSource;
+  /** adminPremium.grantedBy when premiumSource is 'admin' — 'auto_reward_system' / 'reward_system' for honor-board winners, 'admin' for manual gifts */
+  premiumGrantedBy: string | null;
   currentPlan: SubscriptionPlan | null;
+  /** ISO expiry of the active premium (null for lifetime / unknown) */
+  expiresAt: string | null;
   products: SubscriptionProduct[];
   config: SubscriptionConfig;
   isLoading: boolean;
@@ -100,7 +104,9 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType>({
   isPremium: false,
   premiumSource: null,
+  premiumGrantedBy: null,
   currentPlan: null,
+  expiresAt: null,
   products: [],
   config: DEFAULT_SUBSCRIPTION_CONFIG,
   isLoading: true,
@@ -219,6 +225,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [config, setConfig] = useState<SubscriptionConfig>(DEFAULT_SUBSCRIPTION_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const [premiumSource, setPremiumSource] = useState<PremiumSource>(null);
+  const [premiumGrantedBy, setPremiumGrantedBy] = useState<string | null>(null);
   const stateRef = useRef<SubscriptionState>(state);
   const premiumSourceRef = useRef<PremiumSource>(null);
   const [featureGating, setFeatureGating] = useState<FeatureGatingConfig>(DEFAULT_FEATURE_GATING);
@@ -312,6 +319,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     premiumSourceRef.current = 'admin';
                     setState(adminState);
                     setPremiumSource('admin');
+                    setPremiumGrantedBy(adminPremium.grantedBy || null);
                     setSubscriptionState(adminState).catch(() => {});
                   }
 
@@ -358,6 +366,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     premiumSourceRef.current = null;
                     setState(clearedState);
                     setPremiumSource(null);
+                    setPremiumGrantedBy(null);
                     setSubscriptionState(clearedState).catch(() => {});
                   }
                   try {
@@ -384,6 +393,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   premiumSourceRef.current = null;
                   setState(clearedState);
                   setPremiumSource(null);
+                  setPremiumGrantedBy(null);
                   setSubscriptionState(clearedState).catch(() => {});
                 }
               }
@@ -520,6 +530,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
               if (mounted) {
                 setState(newState);
                 setPremiumSource('iap');
+                setPremiumGrantedBy(null);
               }
               // Finish the transaction — critical for both Sandbox (TestFlight) and Production
               try {
@@ -816,6 +827,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           await setSubscriptionState(restoredState);
           setState(restoredState);
           setPremiumSource('iap');
+          setPremiumGrantedBy(null);
           Alert.alert(t('subscription.restoreSuccess'), t('subscription.restoreSuccessMessage'));
           return true;
         }
@@ -892,7 +904,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       value={{
         isPremium: state.isPremium,
         premiumSource,
+        premiumGrantedBy,
         currentPlan: state.plan,
+        expiresAt: state.expiresAt,
         products,
         config,
         isLoading,

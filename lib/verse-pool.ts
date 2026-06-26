@@ -295,3 +295,59 @@ export async function ensureVersePool(now: Date = new Date()): Promise<VersePool
   }
   return pool;
 }
+
+/**
+ * Synchronous, allocation-cheap equivalent of reading `pool.entries[idx]` from
+ * the persisted pool — WITHOUT touching AsyncStorage. Because the pool order is
+ * a pure function of the fixed `VERSE_POOL_SEED` (deterministic Fisher-Yates),
+ * the entry at any index can be reproduced on demand. A partial shuffle (only
+ * the first `idx + 1` positions) is enough: in Fisher-Yates a position is final
+ * once its own iteration runs, so this returns the IDENTICAL entry the async
+ * `ensureVersePool()` persists at the same index. Memoised per index.
+ */
+const entryAtCache = new Map<number, VersePoolEntry | null>();
+function getVersePoolEntryAt(idx: number): VersePoolEntry | null {
+  if (entryAtCache.has(idx)) return entryAtCache.get(idx)!;
+  const flat = loadFlatAyat();
+  const n = flat.length;
+  if (n === 0 || idx < 0 || idx >= n) { entryAtCache.set(idx, null); return null; }
+  const rand = seededRandom(VERSE_POOL_SEED);
+  const indices = new Array<number>(n);
+  for (let i = 0; i < n; i++) indices[i] = i;
+  for (let i = 0; i <= idx; i++) {
+    const j = i + Math.floor(rand() * (n - i));
+    const tmp = indices[i];
+    indices[i] = indices[j];
+    indices[j] = tmp;
+  }
+  const ref = flat[indices[idx]];
+  const text = getAyahText(ref.surah, ref.ayah);
+  if (!text) { entryAtCache.set(idx, null); return null; }
+  const qcf = getVerseQcfData(ref.surah, ref.ayah);
+  const entry: VersePoolEntry = {
+    arabic: text.arabic,
+    surahName: text.surahName,
+    surahNumber: ref.surah,
+    ayahNumber: ref.ayah,
+    translation: text.translation || '',
+    englishSurahName: text.englishSurahName || '',
+    qcfPage: qcf?.page,
+    qcfGlyphs: qcf?.glyphs ?? [],
+  };
+  entryAtCache.set(idx, entry);
+  return entry;
+}
+
+/**
+ * Today's verse-pool entry, resolved synchronously. Mirrors EXACTLY the index
+ * math the async path uses (`daysSinceSeed % VERSE_POOL_SIZE` against the fixed
+ * seed anchor), so the in-app screen's first-paint seed equals the verse the
+ * widgets and the async resolver land on — no first-render verse swap.
+ */
+export function getVersePoolEntrySync(now: Date = new Date()): VersePoolEntry | null {
+  const elapsed =
+    (now.getFullYear() - VERSE_POOL_SEED_YEAR) * 365 + (dayOfYear(now) - VERSE_POOL_SEED_DOY);
+  const safeElapsed = Math.max(0, elapsed);
+  const idx = ((safeElapsed % VERSE_POOL_SIZE) + VERSE_POOL_SIZE) % VERSE_POOL_SIZE;
+  return getVersePoolEntryAt(idx);
+}

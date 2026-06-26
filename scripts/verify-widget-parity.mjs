@@ -202,20 +202,23 @@ function main() {
   assertContains(errors, androidSnapshot, 'OverlapWidget', 'Android true overlay container');
   assertContains(errors, androidSnapshot, 'ANDROID_OVERLAY_ANCHORS', 'Android live countdown overlay anchors');
   assertContains(errors, androidSnapshot, 'NATIVE_TEXT_VERTICAL_SAFETY', 'Android native countdown text safety inset');
-  assertNotContains(errors, androidNativeOverlay, 'localized.replace("\\\\s".toRegex(), "")', 'Android native countdown preserves gallery whitespace');
+  assertContains(errors, androidNativeOverlay, 'if (config.optBoolean("compact", false)) localized.replace("\\\\s".toRegex(), "") else localized', 'Android native countdown strips whitespace only for compact anchors');
   assertNotContains(errors, androidSnapshot, "overlayText.replace(/\\s/g, '')", 'Android initial countdown render preserves gallery whitespace');
   assertNotContains(errors, androidSnapshot, "overlayStr.replace(/\\s/g, '')", 'Android fallback countdown render preserves gallery whitespace');
   assertNotContains(errors, iosSwift, 'remaining.replacingOccurrences(of: " ", with: "")', 'iOS compact countdown preserves gallery whitespace');
   assertNotContains(errors, iosSwift, 'raw.replacingOccurrences(of: " ", with: "")', 'iOS fallback countdown render preserves gallery whitespace');
   assertContains(errors, androidWidgetPatch, 'android:includeFontPadding="true"', 'Android native countdown keeps Arabic font padding');
   assertContains(errors, androidWidgetPatch, `.replace(/android:includeFontPadding="false"/g, 'android:includeFontPadding="true"')`, 'Android native countdown patch migrates old clipped layouts');
-  assertContains(errors, androidSnapshot, "'#0000001A' : '#FFFFFF1A'", 'Android watermark RGBA opacity order');
+  assertContains(errors, androidSnapshot, "blendOver(p.isLight ? '#000000' : '#FFFFFF', 0.1, p.bg)", 'Android watermark pre-flattened to solid RGB (RNAW drops 8-digit hex)');
   assertNotContains(errors, androidSnapshot, "'#1A000000' : '#1AFFFFFF'", 'Android watermark must not use ARGB in React Native styles');
   assertNotContains(errors, androidSnapshot, "widgetId === 'monthSimple' || widgetId === 'monthThuluth'", 'Android month widgets must not share one broken renderer');
   assertContains(errors, androidSnapshot, "widgetId === 'monthSimple'", 'Android monthSimple renderer');
   assertContains(errors, androidSnapshot, "widgetId === 'monthThuluth'", 'Android monthThuluth renderer');
   assertNotContains(errors, androidSnapshot, "'Amiri-Bold'", 'Android daySimple must match iOS Rubik typography');
-  assertNotContains(errors, androidSnapshot, 'fontFamily: isAr ? widgetFont', 'Android day/month labels must not switch to decorative font');
+  // The gallery renders Arabic day/month labels in the user-selected widget
+  // font (`ar ? widgetFont : 'Rubik-Bold'` in previews/index.tsx) — the live
+  // Android render must mirror that or home diverges from gallery.
+  assertContains(errors, androidSnapshot, 'fontFamily: isAr ? widgetFont : FONT.rubikBold', 'Android day/month labels use the gallery widget font for Arabic');
   assertContains(errors, androidSnapshot, 'nextPrayerAtEpochMs', 'Android countdown from absolute prayer timestamp');
   assertContains(errors, androidSnapshot, 'backgroundColor: p.bg', 'Android themed PNG backing shell');
   if (androidSnapshot.includes("backgroundColor: '#E3E0DB'") || androidSnapshot.includes('backgroundColor: "#E3E0DB"')) {
@@ -232,24 +235,23 @@ function main() {
   assertContains(errors, androidTask, 'widgetWidth={widgetBounds?.width}', 'Android task passes launcher width');
   assertContains(errors, androidTask, 'widgetHeight={widgetBounds?.height}', 'Android task passes launcher height');
   assertContains(errors, bridgeTs, 'renderWidget: (widgetInfo:', 'Android immediate refresh receives launcher widget info');
-  assertContains(errors, bridgeTs, 'renderWidgetByName(\n                widgetName,\n                sharedData,\n                widgetInfo,', 'Android immediate refresh passes launcher bounds');
-  assertContains(errors, bridgeTs, 'snapshotOverrides.get(widgetName)', 'Android immediate refresh passes prayer static template overrides');
-  assertContains(errors, bridgeTs, 'resolveAndroidSnapshotRenderOverride', 'Android immediate refresh resolves the same prayer template as the task handler');
-  assertContains(errors, bridgeTs, 'immediate prayer static override', 'Android immediate refresh logs prayer static override selection');
-  assertContains(errors, bridgeTs, 'isPrayerStaticTemplate: true', 'Android immediate refresh uses live prayer text overlays on static templates');
-  assertContains(errors, bridgeTs, 'widgetWidth: widgetBounds?.width', 'Android immediate refresh passes launcher width');
-  assertContains(errors, bridgeTs, 'widgetHeight: widgetBounds?.height', 'Android immediate refresh passes launcher height');
-  assertContains(errors, bridgeTs, 'priority prayer templates ready', 'Android settings refresh generates only visible prayer templates before reload');
-  assertContains(errors, bridgeTs, 'targets: priorityTargets', 'Android settings refresh scopes prayer template generation to placed widgets');
+  // Round 3 removed the per-state prayer template subsystem: every prayer
+  // widget now serves the gallery-fallback PNG + live anchor overlays through
+  // the SINGLE decideAndroidWidget/renderAndroidWidgetDecision resolver. The
+  // immediate refresh must use the same resolver (no second render path) and
+  // must NOT resurrect the template-override plumbing.
+  assertContains(errors, bridgeTs, 'await decideAndroidWidget(widgetName, sharedData)', 'Android immediate refresh precomputes decisions via the single resolver');
+  assertContains(errors, bridgeTs, 'renderAndroidWidgetDecision(decision, sharedData, widgetInfo)', 'Android immediate refresh renders through the single resolver');
+  assertNotContains(errors, bridgeTs, 'resolveAndroidSnapshotRenderOverride', 'Android immediate refresh must not resurrect per-state prayer template overrides');
+  assertNotContains(errors, bridgeTs, 'ensureAndroidPrayerStaticTemplates?.(', 'Android pump must not re-bake the removed per-state prayer templates');
   assertContains(errors, bridgeTs, '}, 5000);', 'Android background prayer prewarm is delayed after the visible reload');
   assertContains(errors, bridgeTs, 'displayOverride?: WidgetDisplayOverride', 'Android settings refresh can bypass stale stored display values');
   assertContains(errors, bridgeTs, "applied immediate display override (updateWidgetData)", 'Android settings refresh applies the just-selected display value immediately');
   assertContains(errors, bridgeTs, 'refreshWidgetDisplayNow', 'Widget settings have a display-only fast refresh path');
   assertContains(errors, bridgeTs, 'displayOnlyWriteMs', 'Widget display-only refresh writes shared data before full prayer sync');
   assertContains(errors, bridgeTs, 'RESOLVED_WIDGET_THEMES', 'Android background prewarm prepares placed widgets for all themes');
-  assertContains(errors, bridgeTs, 'androidPrayerStaticAllStateTargetsForRouteKeys', 'Android background prewarm prepares all prayer states for placed prayer widgets');
-  assertContains(errors, appWidget, 'immediate widget sync queued', 'Widget settings start native sync as soon as an option is picked');
-  assertContains(errors, snapshotTs, 'targets?: AndroidPrayerStaticTemplateTarget[]', 'Android prayer static templates support priority subsets');
+  assertContains(errors, appWidget, 'applyWidgetSetting', 'Widget settings apply + persist each picked option immediately');
+  assertContains(errors, appWidget, 'syncInFlightRef', 'Widget settings coalesce concurrent re-bakes into one trailing sync');
   assertContains(
     errors,
     snapshotPumpController,
@@ -368,7 +370,10 @@ function main() {
         const expectedTargetCells = {
           small: { width: 2, height: 2 },
           medium: { width: 3, height: 2 },
-          large: { width: 3, height: 4 },
+          // large is 3×3 with minHeight 260dp — the ~square prayer-table card
+          // contain-fits the 3-col width; a 4-row cell left an empty band below
+          // (see SIZE_DIMS in generate-android-widget-providers.mjs).
+          large: { width: 3, height: 3 },
         }[size];
         if (expectedTargetCells) {
           assertContains(errors, xml, `android:targetCellWidth="${expectedTargetCells.width}"`, `Android XML:${className}`);
@@ -412,7 +417,35 @@ function main() {
   assertContains(errors, androidTask, 'LockedWidget', 'Android premium locked state');
   assertContains(errors, androidTask, 'AsyncStorage.setItem(WIDGET_DATA_KEY', 'Android persists fresh offline prayer calculation');
   assertContains(errors, androidPreviewGenerator, 'pickerDynamicOverlaySvg', 'Android picker dynamic thumbnail overlays');
-  assertContains(errors, androidPreviewGenerator, 'ANDROID_OVERLAY_ANCHORS', 'Android picker thumbnails use the live overlay anchor table');
+  // Picker thumbnails replay the SAME anchors SnapshotWidget draws live,
+  // pulled from the device manifest next to the snapshot PNGs. Prayer widgets
+  // bake all dynamic text as blanks, so a missing anchor set must abort the
+  // generator instead of silently emitting blank prayer previews.
+  assertContains(errors, androidPreviewGenerator, 'MANIFEST_ANCHORS', 'Android picker thumbnails replay the pulled device anchor manifest');
+  assertContains(errors, androidPreviewGenerator, 'PRAYER_PICKER_IDS', 'Android picker prayer thumbnails fail loudly without pulled anchors');
+  assertFile(errors, resolve(ROOT, 'tmp/widget-previews/anchors.json'), 'Android picker anchor manifest (run scripts/pull-android-widget-snapshots.mjs)');
+  try {
+    const pulledAnchors = JSON.parse(readFileSync(resolve(ROOT, 'tmp/widget-previews/anchors.json'), 'utf8'));
+    const PRAYER_ROUTES = ['prayerSingle_small', 'prayerTable_small', 'prayerTable_medium', 'prayerTable_large', 'prayerNextPrevious_medium'];
+    const PRAYER_KEYS = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    for (const route of PRAYER_ROUTES) {
+      const entry = pulledAnchors[route];
+      if (!entry?.anchors?.length) {
+        fail(errors, `Picker anchors:${route}: missing — its launcher preview would render blank`);
+        continue;
+      }
+      if (route.startsWith('prayerTable')) {
+        // Mirror the runtime completeness guard in SnapshotWidget: a table
+        // preview without all six row-time anchors cannot render its rows.
+        const ids = new Set(entry.anchors.map((a) => a.id));
+        for (const key of PRAYER_KEYS) {
+          if (!ids.has(`prayerRowTime.${key}`)) fail(errors, `Picker anchors:${route}: missing prayerRowTime.${key}`);
+        }
+      }
+    }
+  } catch (e) {
+    fail(errors, `Picker anchors: unreadable (${e?.message ?? e})`);
+  }
   assertNotContains(errors, androidPreviewGenerator, 'font-family="Arial, sans-serif"', 'Android picker countdown typography must match live Rubik overlay');
   assertNotContains(errors, androidPreviewGenerator, 'y="136"', 'Android picker countdown must not use old clipped y coordinate');
   assertNotContains(errors, androidPreviewGenerator, 'y="134"', 'Android picker countdown must not use old clipped y coordinate');

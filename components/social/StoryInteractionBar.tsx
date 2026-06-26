@@ -122,6 +122,9 @@ export function StoryInteractionBar({ storyId, section, storyTitle }: Props) {
             size={18}
             color={liked ? LIKE_COLOR : colors.text}
           />
+          <Text style={[styles.label, { color: liked ? LIKE_COLOR : colors.text }]}>
+            {t('social.like')}
+          </Text>
           <Text style={[styles.count, { color: colors.text }]}>
             {formatCount(counts.likeCount)}
           </Text>
@@ -142,6 +145,9 @@ export function StoryInteractionBar({ storyId, section, storyTitle }: Props) {
           ]}
         >
           <MaterialCommunityIcons name="comment-outline" size={18} color={colors.text} />
+          <Text style={[styles.label, { color: colors.text }]}>
+            {t('social.comment')}
+          </Text>
           <Text style={[styles.count, { color: colors.text }]}>
             {formatCount(counts.commentCount)}
           </Text>
@@ -183,5 +189,9 @@ const styles = StyleSheet.create({
       ios: { fontFamily: 'System' },
       android: { fontFamily: 'sans-serif-medium' },
     }),
+  },
+  label: {
+    fontWeight: '600',
+    fontSize: 12,
   },
 });

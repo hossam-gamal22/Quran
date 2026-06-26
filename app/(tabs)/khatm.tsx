@@ -29,6 +29,7 @@ import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getUserId } from '@/lib/firebase-user';
 import { syncMonthlyEngagementFromLocalWorship } from '@/lib/rewards-manager';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -56,6 +57,10 @@ export default function KhatmScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const adBottomInset = useAdBottomInset();
+  const scrollBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  }) + adBottomInset;
   const [stats, setStats] = useState<KhatmStats | null>(null);
   const [allKhatm, setAllKhatm] = useState<KhatmRecord[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -221,7 +226,7 @@ export default function KhatmScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 + adBottomInset }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: scrollBottomSpacing }}>
         {/* Stats */}
         <View style={[s.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 16 }]}>
           <View style={s.statCard}>

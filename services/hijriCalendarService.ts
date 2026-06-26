@@ -81,7 +81,7 @@ export const COUNTRY_GROUPS: Record<string, string[]> = {
 // Storage Keys & Cache Durations
 // ============================================
 
-const CACHE_PREFIX = 'hijri_cache_';
+const CACHE_PREFIX = 'hijri_cache_v2_';
 const USER_COUNTRY_KEY = '@hijri_user_country';
 const USER_ADJUSTMENT_KEY = '@hijri_user_adjustment';
 
@@ -303,6 +303,36 @@ export function __resetHijriSourceModeCache(): void {
 // LAYER 1 — Admin Firestore Override
 // ============================================
 
+function parseGregorianDateOnly(value: string): { year: number; month: number; day: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  return { year, month, day };
+}
+
+function localDayOrdinal(date: Date): number {
+  return Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86400000);
+}
+
+function gregorianDateOnlyOrdinal(value: string): number | null {
+  const parts = parseGregorianDateOnly(value);
+  if (!parts) return null;
+  return Math.floor(new Date(parts.year, parts.month - 1, parts.day).getTime() / 86400000);
+}
+
+function daysSinceGregorianDateOnly(startGregorian: string, gregorianDate: Date, userAdj: number): number | null {
+  const startOrdinal = gregorianDateOnlyOrdinal(startGregorian);
+  if (startOrdinal === null) return null;
+  const adjusted = new Date(gregorianDate);
+  if (userAdj !== 0) {
+    adjusted.setDate(adjusted.getDate() + userAdj);
+  }
+  return localDayOrdinal(adjusted) - startOrdinal;
+}
+
 function buildFromOverride(
   override: {
     hijriYear: number;
@@ -315,12 +345,7 @@ function buildFromOverride(
   countryCode: string,
   userAdj: number,
 ): HijriResult {
-  const startDate = new Date(override.hijriStartGregorian);
-  const adjusted = new Date(gregorianDate);
-  if (userAdj !== 0) {
-    adjusted.setDate(adjusted.getDate() + userAdj);
-  }
-  const diffDays = Math.floor((adjusted.getTime() - startDate.getTime()) / 86400000);
+  const diffDays = daysSinceGregorianDateOnly(override.hijriStartGregorian, gregorianDate, userAdj) ?? 0;
   const hijriDay = Math.max(1, Math.min(diffDays + 1, override.monthLength));
 
   return {
@@ -355,14 +380,8 @@ function isDateInsideOverride(
   gregorianDate: Date,
   userAdj: number,
 ): boolean {
-  const startDate = new Date(override.hijriStartGregorian);
-  if (Number.isNaN(startDate.getTime())) return false;
-
-  const adjusted = new Date(gregorianDate);
-  if (userAdj !== 0) {
-    adjusted.setDate(adjusted.getDate() + userAdj);
-  }
-  const diffDays = Math.floor((adjusted.getTime() - startDate.getTime()) / 86400000);
+  const diffDays = daysSinceGregorianDateOnly(override.hijriStartGregorian, gregorianDate, userAdj);
+  if (diffDays === null) return false;
   return diffDays >= 0 && diffDays < override.monthLength;
 }
 

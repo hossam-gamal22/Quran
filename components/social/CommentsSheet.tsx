@@ -17,6 +17,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -56,6 +57,7 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
   const colors = useColors();
   const isRTL = useIsRTL();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<StoryComment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -98,12 +100,17 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
     const unsubComments = subscribeToFirstCommentsPage(storyId, (latest) => {
       setComments((prev) => {
         if (!prev.length) return latest;
+        const latestIds = new Set(latest.map((l) => l.id));
         const oldestNewMs = latest[latest.length - 1]?.createdAt?.toMillis?.() || 0;
-        const oldestNewId = latest[latest.length - 1]?.id;
+        // Keep only older comments already loaded via pagination that fall
+        // outside the live first-page window. Dedupe by id FIRST — a freshly
+        // posted comment fires the listener twice (pending copy has a null
+        // createdAt → ms 0), and a timestamp-only check would keep that stale
+        // pending copy alongside the confirmed one, duplicating the key.
         const tail = prev.filter((c) => {
+          if (latestIds.has(c.id)) return false;
           const ms = c.createdAt?.toMillis?.() || 0;
-          if (oldestNewMs && ms < oldestNewMs) return true;
-          return !latest.some((l) => l.id === c.id) && c.id !== oldestNewId;
+          return oldestNewMs ? ms < oldestNewMs : false;
         });
         return [...latest, ...tail];
       });
@@ -163,6 +170,9 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
       case 'empty':
         setError(t('social.errorEmpty'));
         break;
+      case 'auth':
+        setError(t('social.errorAuth'));
+        break;
       case 'network':
       default:
         setError(t('social.errorNetwork'));
@@ -173,7 +183,7 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
     return !!displayName && !ban && text.trim().length > 0 && text.length <= MAX_COMMENT_LENGTH;
   }, [displayName, ban, text]);
 
-  const sheetBg = colors.isDarkMode ? '#0d1419' : '#ffffff';
+  const sheetBg = colors.modalSurface;
   const borderColor = colors.isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
   const inputBg = colors.isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
   const inputBorderActive = ACCENT;
@@ -284,11 +294,12 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
           style={[styles.sheet, { backgroundColor: sheetBg }]}
         >
           <View style={styles.grabber} />
@@ -305,6 +316,7 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
                 isOwn={!!currentUserId && item.userId === currentUserId}
                 currentUserId={currentUserId}
                 displayName={displayName}
+                storyTitle={storyTitle}
                 onDeleted={() => setComments((prev) => prev.filter((c) => c.id !== item.id))}
               />
             )}
@@ -320,10 +332,20 @@ export function CommentsSheet({ visible, onClose, storyId, section, storyTitle }
               ) : null
             }
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           />
 
           {!ban && !!displayName && (
-            <View style={[styles.inputWrap, { borderTopColor: borderColor, backgroundColor: sheetBg }]}>
+            <View
+              style={[
+                styles.inputWrap,
+                {
+                  borderTopColor: borderColor,
+                  backgroundColor: sheetBg,
+                  paddingBottom: Math.max(insets.bottom, 12) + 6,
+                },
+              ]}
+            >
               <View
                 style={[
                   styles.inputAuthor,

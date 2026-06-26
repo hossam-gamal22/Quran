@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
   contactInfo: {
     email: 'hossamgamal290@gmail.com',
-    website: 'https://roohmuslim.com',
+    website: 'https://hossamgamal.web.app/',
   },
   shareModal: {
     enabled: true,

@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import Slider from '@react-native-community/slider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 
 import { BannerAdComponent } from '@/components/ads/BannerAd';
@@ -40,7 +41,15 @@ import { expandProphetEnglishTranscript, expandProphetTranscript } from '@/data/
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { SourcesList } from '@/components/ui/SourcesList';
 import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
+import {
+  getSavedPlaybackProgress,
+  clearPlaybackProgress,
+  shouldOfferResume,
+  type AudioResumeEntry,
+} from '@/lib/audio-resume-store';
+import { AudioResumePromptModal, formatResumeHint } from '@/components/ui/AudioResumePromptModal';
 import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
+import { StoryNotificationsBell } from '@/components/social/StoryNotificationsBell';
 
 const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.16)';
@@ -216,6 +225,7 @@ function AudioStatusModal({
   const labels = copy();
   const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
+  const insets = useSafeAreaInsets();
   const isLoading = mode === 'loading';
   const title = titleOverride || (isLoading ? labels.loadingAudioTitle : mode === 'offline' ? labels.noInternetTitle : labels.audioErrorTitle);
   const body = bodyOverride || (isLoading ? labels.loadingAudioBody : mode === 'offline' ? labels.noInternetBody : labels.audioErrorBody);
@@ -225,8 +235,8 @@ function AudioStatusModal({
   const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={s.modalOverlay}>
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <View style={[s.modalOverlay, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <View
           style={[
             s.modalCard,
@@ -245,12 +255,15 @@ function AudioStatusModal({
           {isLoading ? (
             <Pressable
               onPress={onClose}
-              style={[s.modalButton, s.modalButtonSecondary, { marginTop: 14, paddingHorizontal: 36, flex: 0 }]}
+              // Centered pill (flex:0 so it never stretches on the column's
+              // vertical axis; not full-width so it reads as clearly inside the
+              // card). flex:1 only belongs to the row-laid error actions below.
+              style={[s.modalButton, s.modalButtonSecondary, { flex: 0, alignSelf: 'center', paddingHorizontal: 40, marginTop: 4 }]}
             >
               <Text style={[s.modalButtonText, { color: colors.text }]}>{labels.close}</Text>
             </Pressable>
           ) : (
-            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 18 }]}>
+            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Pressable onPress={onClose} style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight }]}>
                 <Text style={[s.modalButtonText, { color: colors.text }]}>{labels.close}</Text>
               </Pressable>
@@ -381,6 +394,13 @@ function StoryListening({
   const [isFav, setIsFav] = useState(false);
   const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
+  const [savedResume, setSavedResume] = useState<AudioResumeEntry | null>(null);
+  const [resumePromptVisible, setResumePromptVisible] = useState(false);
+  const pendingResumeRef = useRef<AudioResumeEntry | null>(null);
+  // Position to begin playback from, applied only AFTER the resume prompt has
+  // fully dismissed — see handleResumePromptDismissed (prevents the iOS
+  // modal-handoff freeze).
+  const pendingPlaybackRef = useRef<number | null>(null);
   const favoriteId = useMemo(() => `story_${story.id}`, [story.id]);
   const trackId = useMemo(() => `religious-story-${story.id}`, [story.id]);
 
@@ -463,6 +483,19 @@ function StoryListening({
     }
   }, [story.id, story.audioUrl]);
 
+  // Per-story durable resume position for the inline hint. Refreshed whenever
+  // this story stops being the live track so the hint reflects what is stored.
+  useEffect(() => {
+    if (isThisStoryAudio) return;
+    let cancelled = false;
+    getSavedPlaybackProgress(trackId)
+      .then((entry) => {
+        if (!cancelled) setSavedResume(entry);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [trackId, isThisStoryAudio]);
+
   const handleTrackComplete = useCallback(() => {
     if (finishAdShownRef.current) return;
     if (prePlayAdDisplayedRef.current) return;
@@ -507,6 +540,59 @@ function StoryListening({
     }
   }, [audioAttempted, currentPosition, duration, isPlaying]);
 
+  const startPlayback = useCallback(async (initialPositionMs: number) => {
+    try {
+      // Resolve/prepare the audio in the background while the ad is on
+      // screen, so playback can begin as soon as the ad closes.
+      const preparedPromise = resolveAudioForPlayback();
+      preparedPromise.catch(() => {}); // rethrown at the await below
+
+      if (!prePlayAdShownRef.current) {
+        prePlayAdShownRef.current = true;
+        const didShowPrePlayAd = await showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
+      }
+
+      const prepared = await preparedPromise;
+
+      // Do NOT dismiss the modal here — keep it visible through expo-av's
+      // buffer wait. The auto-dismiss effect closes it the moment playback
+      // actually starts (isPlaying or position > 0).
+      await playAzkarQueue(
+        [{
+          id: trackId,
+          title: getStoryAudioDisplayTitle(story),
+          subtitle: labels.audio,
+          url: prepared.uri,
+          forceExpoAv: true,
+          resumeKey: trackId,
+          initialPositionMs,
+        }],
+        0,
+        '/religious-stories',
+        { onTrackComplete: handleTrackComplete },
+      );
+    } catch (audioError) {
+      setAudioModalDismissed(false);
+      setAudioResolveState('error');
+      setAudioStartError(true);
+      console.log('Religious story audio playback failed', audioError);
+    }
+  }, [
+    handleTrackComplete,
+    labels.audio,
+    playAzkarQueue,
+    resolveAudioForPlayback,
+    story,
+    trackId,
+  ]);
+
   const handlePlayPress = useCallback(async () => {
     setAudioAttempted(true);
     setAudioModalDismissed(false);
@@ -535,56 +621,64 @@ function StoryListening({
       return;
     }
 
-    try {
-      if (!prePlayAdShownRef.current && !hasStartedCurrentAudio) {
-        prePlayAdShownRef.current = true;
-        const didShowPrePlayAd = await showInterstitial({
-          allowInSacredContext: false,
-          ignoreSmartFrequencyCaps: true,
-          ignoreSmartSessionDelay: true,
-          ignoreGlobalCooldown: true,
-          timeoutMs: 5000,
-        }).catch(() => {});
-        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
-      }
-
-      const prepared = await resolveAudioForPlayback();
-
-      // Do NOT dismiss the modal here — keep it visible through expo-av's
-      // buffer wait. The auto-dismiss effect closes it the moment playback
-      // actually starts (isPlaying or position > 0).
-      await playAzkarQueue(
-        [{
-          id: trackId,
-          title: getStoryAudioDisplayTitle(story),
-          subtitle: labels.audio,
-          url: prepared.uri,
-          forceExpoAv: true,
-        }],
-        0,
-        '/religious-stories',
-        { onTrackComplete: handleTrackComplete },
-      );
-    } catch (audioError) {
-      setAudioModalDismissed(false);
-      setAudioResolveState('error');
-      setAudioStartError(true);
-      console.log('Religious story audio playback failed', audioError);
+    // Fresh start of this story: check the durable resume position first.
+    // Read from storage (not component state) so the decision is never stale.
+    const saved = await getSavedPlaybackProgress(trackId).catch(() => null);
+    if (shouldOfferResume(saved)) {
+      pendingResumeRef.current = saved;
+      setSavedResume(saved);
+      setResumePromptVisible(true);
+      return;
     }
+
+    // Too early to matter or practically finished — restart silently.
+    if (saved) {
+      clearPlaybackProgress(trackId).catch(() => {});
+      setSavedResume(null);
+    }
+    await startPlayback(0);
   }, [
     globalAudioState.isLoading,
-    handleTrackComplete,
     currentPosition,
     duration,
     isPlaying,
     isThisStoryAudio,
-    labels.audio,
-    playAzkarQueue,
-    resolveAudioForPlayback,
-    story,
+    startPlayback,
+    story.audioUrl,
+    story.id,
     toggleGlobalAudio,
     trackId,
   ]);
+
+  // Resume/restart only *record the intent* and close the prompt. Playback —
+  // which presents the loading/status modal — is started from the prompt's
+  // onDismiss, so the two native modals never transition in the same commit.
+  const handleResumeChoice = useCallback(() => {
+    const saved = pendingResumeRef.current;
+    pendingResumeRef.current = null;
+    pendingPlaybackRef.current = saved ? saved.positionMs : 0;
+    setResumePromptVisible(false);
+  }, []);
+
+  const handleRestartChoice = useCallback(() => {
+    pendingResumeRef.current = null;
+    setSavedResume(null);
+    clearPlaybackProgress(trackId).catch(() => {});
+    pendingPlaybackRef.current = 0;
+    setResumePromptVisible(false);
+  }, [trackId]);
+
+  const dismissResumePrompt = useCallback(() => {
+    pendingResumeRef.current = null;
+    pendingPlaybackRef.current = null;
+    setResumePromptVisible(false);
+  }, []);
+
+  const handleResumePromptDismissed = useCallback(() => {
+    const startAt = pendingPlaybackRef.current;
+    pendingPlaybackRef.current = null;
+    if (startAt != null) startPlayback(startAt);
+  }, [startPlayback]);
 
   const handleDownloadAudio = useCallback(async () => {
     if (!story.audioUrl || audioDownloadState === 'downloading') return;
@@ -643,9 +737,9 @@ function StoryListening({
         onBack={onBack}
         backStyle={{ backgroundColor: 'rgba(109, 93, 252, 0.16)', borderRadius: 14 }}
         rightActions={[{
-          icon: isFav ? 'heart' : 'heart-outline',
+          icon: isFav ? 'bookmark' : 'bookmark-outline',
           onPress: handleToggleFav,
-          color: isFav ? '#ef4444' : colors.text,
+          color: isFav ? colors.primary : colors.text,
           size: 22,
           style: { backgroundColor: 'rgba(109, 93, 252, 0.16)' },
         }]}
@@ -708,8 +802,8 @@ function StoryListening({
               value={sliderPosition}
               disabled={!canSeekAudio}
               minimumTrackTintColor={ACCENT}
-              maximumTrackTintColor="rgba(6,79,47,0.18)"
-              thumbTintColor={canSeekAudio ? ACCENT : 'rgba(255,255,255,0.45)'}
+              maximumTrackTintColor={colors.isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(6,79,47,0.20)'}
+              thumbTintColor={canSeekAudio ? ACCENT : (colors.isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(6,79,47,0.45)')}
               onSlidingStart={handleSeekStart}
               onValueChange={handleSeekChange}
               onSlidingComplete={handleSeekComplete}
@@ -742,6 +836,12 @@ function StoryListening({
                 );
               })}
             </View>
+
+            {!isThisStoryAudio && shouldOfferResume(savedResume) && (
+              <Text style={[s.resumeHintText, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {formatResumeHint(savedResume.positionMs)}
+              </Text>
+            )}
 
             {!!audioDownloadError && (
               <Text style={[s.downloadErrorText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
@@ -796,8 +896,16 @@ function StoryListening({
         )}
       </ScrollView>
 
+      <AudioResumePromptModal
+        visible={resumePromptVisible}
+        savedPositionMs={pendingResumeRef.current?.positionMs ?? savedResume?.positionMs ?? 0}
+        onResume={handleResumeChoice}
+        onRestart={handleRestartChoice}
+        onClose={dismissResumePrompt}
+        onDismiss={handleResumePromptDismissed}
+      />
       <AudioStatusModal
-        visible={showAudioModal}
+        visible={showAudioModal && !resumePromptVisible}
         mode={audioModalMode}
         colors={colors}
         onRetry={handlePlayPress}
@@ -871,7 +979,10 @@ export default function ReligiousStoriesScreen() {
   return (
     <ScreenContainer edges={['top', 'left', 'right']} screenKey={SCREEN_KEY}>
       <View style={s.container}>
-        <UniversalHeader backStyle={{ backgroundColor: 'rgba(109, 93, 252, 0.16)', borderRadius: 14 }}>
+        <UniversalHeader
+          backStyle={{ backgroundColor: 'rgba(109, 93, 252, 0.16)', borderRadius: 14 }}
+          rightExtra={<StoryNotificationsBell style={{ backgroundColor: 'rgba(109, 93, 252, 0.16)' }} />}
+        >
           <Text style={[s.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {labels.title}
           </Text>
@@ -1191,6 +1302,13 @@ const _s = StyleSheet.create({
     fontFamily: fontSemiBold(),
     fontSize: 12,
     lineHeight: 18,
+  },
+  resumeHintText: {
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    textAlign: 'center',
   },
   errorText: {
     color: '#ef4444',

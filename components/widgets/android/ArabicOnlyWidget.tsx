@@ -65,6 +65,8 @@ export function ArabicOnlyWidget({
         height: 'match_parent',
         alignItems: 'center',
         justifyContent: 'center',
+        // Transparent outer host: the centered tile keeps the gallery's exact
+        // aspect (1:1 parity).
         backgroundColor: '#00000000',
       }}
       clickAction="OPEN_URI"

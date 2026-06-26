@@ -8,6 +8,12 @@
  *  - Single line, centered horizontally
  *  - Auto-shrinks to fit width (respects width budget like adjustsFontSizeToFit)
  *  - Supports onLongPress for ayah bookmarking
+ *
+ * IMPORTANT — bidi: Skia's <Text> is a non-bidi, left-to-right glyph painter.
+ * It does NOT reorder Arabic (RTL) runs the way React Native's native <Text>
+ * does. Callers MUST pass `text` already in VISUAL (right-to-left → left-to-right
+ * paint) order. For QCF word glyphs that means reversing the logical word
+ * sequence before passing it in (see the caller in app/surah/[id].tsx).
  */
 
 import React, { useMemo } from 'react';

@@ -471,9 +471,15 @@ export async function schedulePrayerNotifications(
         ? notifSettings.prayers[prayerKeyOfNotif] !== false
         : true;
 
-      if (isPrayerTimeNotif && triggerMs !== null && prayerStillEnabled) {
-        const msUntilFire = triggerMs - cancelCheckNow;
-        if (msUntilFire > 0 && msUntilFire <= CRITICAL_PRAYER_NOTIFICATION_WINDOW_MS) {
+      if (isPrayerTimeNotif && prayerStillEnabled) {
+        const msUntilFire = triggerMs !== null ? triggerMs - cancelCheckNow : null;
+        // An unparseable trigger (triggerMs === null) means we cannot prove the
+        // notification is NOT imminent — treat it like the imminent case and
+        // only cancel when a fresh replacement has a safe lead, so a corrupted
+        // trigger shape can never silence an adhan that was about to fire.
+        const maybeImminent = msUntilFire === null
+          || (msUntilFire > 0 && msUntilFire <= CRITICAL_PRAYER_NOTIFICATION_WINDOW_MS);
+        if (maybeImminent) {
           const freshTriggerMs = resolveFreshPrayerTriggerMs(n.identifier, scheduleDays, notifSettings.advanceMinutes);
           const freshHasSafeLead = freshTriggerMs !== null
             && freshTriggerMs > cancelCheckNow + MIN_SAFE_PRAYER_RESCHEDULE_LEAD_MS;
@@ -486,7 +492,7 @@ export async function schedulePrayerNotifications(
             if (canonicalId) protectedPrayerNotificationIds.add(canonicalId);
             protectedNativePrayerAlarmCount++;
             preservedImminentCount++;
-            console.log(`[prayer-notif] 🛡️ KEEP critical imminent ${n.identifier} (canonical=${canonicalId || 'unknown'}; fires in ${Math.round(msUntilFire / 1000)}s; fresh=${freshTriggerMs ? new Date(freshTriggerMs).toISOString() : 'unknown'})`);
+            console.log(`[prayer-notif] 🛡️ KEEP critical imminent ${n.identifier} (canonical=${canonicalId || 'unknown'}; fires in ${msUntilFire !== null ? Math.round(msUntilFire / 1000) + 's' : 'unknown'}; fresh=${freshTriggerMs ? new Date(freshTriggerMs).toISOString() : 'unknown'})`);
             continue;
           }
         }

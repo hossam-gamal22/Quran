@@ -1,7 +1,7 @@
 {
   "name": "rooh-almuslim",
   "main": "index.js",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "scripts": {
     "start": "expo start",
     "dev": "expo start --dev-client",
@@ -15,6 +15,7 @@
     "icons:build": "node scripts/build-app-icons.mjs",
     "widgets:generate-azkar": "node scripts/generate-bundled-azkar.mjs",
     "widgets:curated-images": "node scripts/generate-curated-widget-images.mjs",
+    "widgets:pull": "node scripts/pull-android-widget-snapshots.mjs",
     "widgets:generate": "node scripts/generate-bundled-azkar.mjs && node scripts/generate-widget-enum.mjs && node scripts/generate-android-widget-preview-images.mjs && node scripts/generate-android-widget-providers.mjs && node scripts/generate-curated-widget-images.mjs",
     "verify:widgets": "node scripts/verify-widget-parity.mjs",
     "translate": "node scripts/islamic-translator.js",
@@ -116,6 +117,7 @@
     "@types/react": "~19.1.10",
     "expo-module-scripts": "^55.0.2",
     "firebase-tools": "^15.14.0",
+    "sharp": "^0.34.5",
     "typescript": "~5.9.2",
     "vitest": "^4.1.5"
   },

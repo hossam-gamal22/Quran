@@ -53,6 +53,7 @@ import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { getVerseQcfData, getPageQcfData, getQcfFontSize, getFirstAyahOnPage } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 
 const basmalaImg = require('@/assets/images/quran/basmala.png');
 
@@ -335,6 +336,10 @@ export default function FavoritesScreen() {
 
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const listBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  });
   // Local overrides for glass card and accent that differ from hook values
   const cardBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
   const cardBorder = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
@@ -1095,7 +1100,7 @@ export default function FavoritesScreen() {
             keyExtractor={item => item.id}
             renderItem={renderBookmark}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
+            contentContainerStyle={{ paddingBottom: listBottomSpacing, paddingTop: 4 }}
             ListEmptyComponent={
               <View style={s.emptyWrap}>
                 <MaterialCommunityIcons name="book-open-variant" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
@@ -1113,7 +1118,7 @@ export default function FavoritesScreen() {
             keyExtractor={item => String(item.id)}
             renderItem={renderAzkarItem}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
+            contentContainerStyle={{ paddingBottom: listBottomSpacing, paddingTop: 4 }}
             ListEmptyComponent={
               <View style={s.emptyWrap}>
                 <AppIcon name="🤲" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
@@ -1127,7 +1132,7 @@ export default function FavoritesScreen() {
         ) : (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4, paddingHorizontal: 16 }}
+            contentContainerStyle={{ paddingBottom: listBottomSpacing, paddingTop: 4, paddingHorizontal: 16 }}
           >
             {/* أسماء الله الحسنى المحفوظة */}
             {namesFavorites.length > 0 && (

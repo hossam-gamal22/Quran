@@ -18,3 +18,4 @@ export { BackButton } from "./BackButton";
 export { UniversalHeader } from "./UniversalHeader";
 export type { HeaderAction } from "./UniversalHeader";
 export { default as MarqueeText } from "./MarqueeText";
+export { AudioResumePromptModal, formatResumeHint } from "./AudioResumePromptModal";

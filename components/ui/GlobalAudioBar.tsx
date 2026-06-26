@@ -275,7 +275,7 @@ export function GlobalAudioBar() {
                 value={currentPosition}
                 onSlidingComplete={(v) => handleSeek(v)}
                 minimumTrackTintColor={ACCENT}
-                maximumTrackTintColor={colors.border}
+                maximumTrackTintColor={isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(6,79,47,0.20)'}
                 thumbTintColor={ACCENT}
               />
               <Text style={[styles.time, { color: textSecondary }]}>{formatAudioTime(currentDuration)}</Text>

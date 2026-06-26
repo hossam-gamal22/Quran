@@ -104,6 +104,38 @@ describe('Hijri calendar service source reconciliation', () => {
     });
   });
 
+  it('counts admin override days by local calendar date around early-morning timezone boundaries', async () => {
+    const previousTz = process.env.TZ;
+    process.env.TZ = 'Asia/Dubai';
+    try {
+      firestoreState.override = {
+        countryCode: 'SA',
+        countryName: 'Saudi Arabia',
+        hijriYear: 1448,
+        hijriMonth: 1,
+        monthLength: 30,
+        hijriStartGregorian: '2026-06-16',
+        source: 'Admin moon-sighting correction',
+        isVerified: true,
+      };
+
+      const resolved = await getHijriDate(new Date('2026-06-18T02:00:00+04:00'), 'SA');
+
+      expect(resolved).toMatchObject({
+        day: 3,
+        month: 1,
+        year: 1448,
+        source: 'admin_override',
+      });
+    } finally {
+      if (previousTz === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = previousTz;
+      }
+    }
+  });
+
   it('does not jump when the admin override is removed after the API catches up', async () => {
     mockAlAdhanHijri(4);
 

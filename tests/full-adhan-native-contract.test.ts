@@ -66,4 +66,41 @@ describe('full adhan native bridge contract', () => {
     expect(prayerNotifications).toContain('FullAdhanModule?.cancelFullAdhanFrom');
     expect(prayerNotifications).toContain('protectedFullAdhanAlarmCount');
   });
+
+  // Regression guard: the native full-adhan alarm MUST schedule via setAlarmClock(),
+  // matching the patched expo-notifications path (plugins/with-alarm-clock-scheduling.js).
+  // If it ever reverts to setExactAndAllowWhileIdle as the primary path, the adhan
+  // playback fires up to ~15-30 min late on Doze / OEM devices while the visual
+  // notification fires on time — the delayed-and-looks-duplicated adhan bug.
+  it('schedules the native full-adhan alarm via setAlarmClock (Doze/OEM-exempt)', () => {
+    const native = readFileSync(
+      join(ROOT, 'android', 'app', 'src', 'main', 'java', 'com', 'rooh', 'almuslim', 'adhan', 'FullAdhanModule.kt'),
+      'utf-8',
+    );
+    const plugin = readFileSync(join(ROOT, 'plugins', 'with-android-full-adhan.js'), 'utf-8');
+
+    for (const source of [native, plugin]) {
+      const schedule = source.slice(source.indexOf('fun scheduleFullAdhan('));
+      // setAlarmClock must be the PRIMARY path, before any inexact fallback.
+      const alarmClockIdx = schedule.indexOf('setAlarmClock(');
+      const inexactIdx = schedule.indexOf('setAndAllowWhileIdle(');
+      expect(alarmClockIdx).toBeGreaterThan(-1);
+      expect(alarmClockIdx).toBeLessThan(inexactIdx === -1 ? Number.MAX_SAFE_INTEGER : inexactIdx);
+    }
+  });
+
+  // Regression guard: the playback service must suppress a duplicate ACTION_PLAY
+  // (alarm + patched-notification + FCM race) so two MediaPlayers never overlap.
+  it('the playback service guards against duplicate ACTION_PLAY (no double audio)', () => {
+    const native = readFileSync(
+      join(ROOT, 'android', 'app', 'src', 'main', 'java', 'com', 'rooh', 'almuslim', 'adhan', 'AdhanPlaybackService.kt'),
+      'utf-8',
+    );
+    const plugin = readFileSync(join(ROOT, 'plugins', 'with-android-full-adhan.js'), 'utf-8');
+
+    for (const source of [native, plugin]) {
+      expect(source).toContain('DUPLICATE_PLAY_WINDOW_MS');
+      expect(source).toContain('lastPlayStartElapsedMs');
+    }
+  });
 });

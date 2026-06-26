@@ -44,6 +44,11 @@ let _isScheduling = false;
 let _pendingReschedule: Record<string, any> | null = null;
 let _schedulingStartedAt = 0;
 const MUTEX_TIMEOUT_MS = 30_000; // Force-release after 30 seconds
+// Generation token: bumped every time a run acquires the mutex. When a stalled
+// run is force-released and a newer run starts, the stalled run's generation
+// goes stale — it must not keep cancelling/scheduling over the newer run's
+// work, nor release the mutex / drain the queue on the newer run's behalf.
+let _schedulingGeneration = 0;
 
 // ─── Refresh Reminder Constants ──────────────────────────────────────────────
 const REFRESH_REMINDER_PREFIX = 'refresh_reminder';
@@ -814,6 +819,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   }
   _isScheduling = true;
   _schedulingStartedAt = Date.now();
+  const myGeneration = ++_schedulingGeneration;
+  const runSuperseded = () => myGeneration !== _schedulingGeneration;
 
   try {
     if (!notifSettings.enabled) {
@@ -823,6 +830,10 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     const hasPermission = await requestNotifPermission({ prompt: allowPrompt });
     if (!hasPermission) return;
+    if (runSuperseded()) {
+      console.warn('[notifications-manager] Run superseded after permission check — aborting');
+      return;
+    }
 
     // ─── Clean slate for non-prayer alarms only ───────────────────────────
     // Keep existing prayer notifications until schedulePrayerNotifications()
@@ -1091,6 +1102,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       didYouPraySnoozeMinutes: notifSettings.didYouPraySnoozeMinutes,
       ...(iosBudget && { iosScheduleDays: iosBudget.prayerDays }),
     };
+    // A stalled run that was force-released must not cancel/reschedule prayer
+    // notifications over the newer run that replaced it.
+    if (runSuperseded()) {
+      console.warn('[notifications-manager] Run superseded before prayer scheduling — aborting');
+      return;
+    }
     // Phase B+C: Catch prayer scheduling errors so they don't kill the
     // entire reschedule. Log the failure and continue with other categories.
     let prayerScheduleWarning = '';
@@ -1694,18 +1711,23 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   } catch (error) {
     console.error('Error scheduling notifications from settings:', error);
   } finally {
-    // Release mutex — always runs even on error
-    _isScheduling = false;
+    // Only the current-generation run may release the mutex and drain the
+    // queue. A stalled run waking up after a force-release would otherwise
+    // release the mutex out from under the newer run (re-opening the
+    // concurrent cancel/schedule window) or double-drain the queue.
+    if (!runSuperseded()) {
+      _isScheduling = false;
 
-    // If another call was queued while we were scheduling, run it now
-    // with the latest settings so the user's most recent changes take effect.
-    if (_pendingReschedule) {
-      const pending = _pendingReschedule;
-      _pendingReschedule = null;
-      console.log('[notifications-manager] Running queued reschedule with latest settings');
-      scheduleNotificationsFromSettings(pending as any).catch(e =>
-        console.warn('[notifications-manager] Queued reschedule failed:', e)
-      );
+      // If another call was queued while we were scheduling, run it now
+      // with the latest settings so the user's most recent changes take effect.
+      if (_pendingReschedule) {
+        const pending = _pendingReschedule;
+        _pendingReschedule = null;
+        console.log('[notifications-manager] Running queued reschedule with latest settings');
+        scheduleNotificationsFromSettings(pending as any).catch(e =>
+          console.warn('[notifications-manager] Queued reschedule failed:', e)
+        );
+      }
     }
   }
 }

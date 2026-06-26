@@ -23,6 +23,8 @@ interface UniversalHeaderProps {
   backColor?: string;
   backStyle?: StyleProp<ViewStyle>;
   rightActions?: HeaderAction[];
+  /** Custom node rendered in the trailing actions area (e.g. a badge button). */
+  rightExtra?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   titleStyle?: StyleProp<TextStyle>;
   children?: React.ReactNode;
@@ -36,6 +38,7 @@ export function UniversalHeader({
   backColor,
   backStyle,
   rightActions = [],
+  rightExtra,
   style,
   titleStyle,
   children,
@@ -107,6 +110,7 @@ export function UniversalHeader({
             />
           </TouchableOpacity>
         ))}
+        {rightExtra}
       </View>
     </View>
   );

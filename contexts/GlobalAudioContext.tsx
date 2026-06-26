@@ -6,11 +6,13 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { Audio } from 'expo-av';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { audioPlayer, type PlaybackState } from '@/lib/audio-player';
+import { savePlaybackProgress, clearPlaybackProgress } from '@/lib/audio-resume-store';
 import { radioPlayer } from '@/lib/radio-player';
 import { audioCoordinator } from '@/lib/audio-coordinator';
 import { markTrackPlayerSetupDone, isTrackPlayerSetupDone, onTrackPlayerSetupDone } from '@/lib/track-player-ready';
+import { addBreadcrumb } from '@/lib/diagnostics-breadcrumbs';
 import { getCategoryTrimMs } from '@/lib/azkar-audio-config';
 import { getAzkarAudioUri } from '@/lib/azkar-audio-cache';
 import { Asset } from 'expo-asset';
@@ -124,6 +126,13 @@ export interface AudioTrack {
   countsForRepeat?: boolean;
   /** Use expo-av even when TrackPlayer is ready. Useful for remote archive streams. */
   forceExpoAv?: boolean;
+  /**
+   * Durable resume key for long-form audio. When set, listening progress is
+   * persisted to the audio-resume store and cleared on completion.
+   */
+  resumeKey?: string;
+  /** Start playback from this offset (ms) instead of 0 — used for resume. */
+  initialPositionMs?: number;
 }
 
 interface PlayAzkarQueueOptions {
@@ -278,6 +287,11 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const suppressAzkarCompletionRef = useRef(false);
   const progressRef = useRef({ position: 0, duration: 0 });
   const azkarRunIdRef = useRef(0);
+  // Last known progress of the active resumable track (resumeKey set).
+  // Updated only from real progress callbacks; flushed to durable storage on
+  // pause/stop/track-change/app-background and every few seconds while playing.
+  const resumeTrackingRef = useRef<{ key: string; positionMs: number; durationMs: number } | null>(null);
+  const lastResumeSaveAtRef = useRef(0);
 
   // Keep refs in sync
   useEffect(() => { sourceRef.current = source; }, [source]);
@@ -304,6 +318,34 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     }, 250);
   }, []);
 
+  // Record live progress for a resumable track; throttled durable save while playing.
+  const trackResumeProgress = useCallback((track: AudioTrack | undefined, positionMs: number, durationMs: number) => {
+    const key = track?.resumeKey;
+    if (!key || durationMs <= 0 || positionMs < 1000) return;
+    resumeTrackingRef.current = { key, positionMs, durationMs };
+    const now = Date.now();
+    if (now - lastResumeSaveAtRef.current >= 5000) {
+      lastResumeSaveAtRef.current = now;
+      savePlaybackProgress(key, positionMs, durationMs).catch(() => {});
+    }
+  }, []);
+
+  // Immediately persist the latest tracked position (pause/stop/background).
+  const flushResumeProgress = useCallback(() => {
+    const tracked = resumeTrackingRef.current;
+    if (!tracked) return;
+    lastResumeSaveAtRef.current = Date.now();
+    savePlaybackProgress(tracked.key, tracked.positionMs, tracked.durationMs).catch(() => {});
+  }, []);
+
+  // Persist on app background so a later OS kill can't lose more than a moment.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') flushResumeProgress();
+    });
+    return () => sub.remove();
+  }, [flushResumeProgress]);
+
   const shouldDelayBeforeTrack = useCallback((from?: AudioTrack, to?: AudioTrack): boolean => {
     if (!from || !to) return false;
     if (from.countsForRepeat === false) return false;
@@ -314,6 +356,14 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const markAzkarTrackComplete = useCallback((idx: number) => {
     const track = azkarQueue.current[idx];
     if (!track || track.countsForRepeat === false) return;
+
+    // Finished content should not offer resume next time.
+    if (track.resumeKey) {
+      if (resumeTrackingRef.current?.key === track.resumeKey) {
+        resumeTrackingRef.current = null;
+      }
+      clearPlaybackProgress(track.resumeKey).catch(() => {});
+    }
 
     const completionKey = `${idx}:${track.id}:${track.repeatIndex ?? 1}:${track.repeatPartIndex ?? 1}`;
     if (completedAzkarTracksRef.current.has(completionKey)) return;
@@ -376,6 +426,13 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
             looksFinished
           ) {
             markAzkarTrackComplete(previousIndex);
+          }
+
+          // Persist the outgoing track's resume position (no-op if it just
+          // completed — markAzkarTrackComplete cleared the tracking ref).
+          if (previousIndex !== index) {
+            flushResumeProgress();
+            resumeTrackingRef.current = null;
           }
 
           clearAzkarDelayTimer();
@@ -445,12 +502,17 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       Event.PlaybackState,
       async (event) => {
         if (sourceRef.current !== 'azkar') return;
+        // expo-av (forceExpoAv tracks) owns play/pause state for its path; a
+        // stray idle-TrackPlayer state event must not override it.
+        if (azkarSound.current) return;
         const isPlaying = event.state === State.Playing;
         const isLoading = event.state === State.Loading || event.state === State.Buffering;
         setAzkarPlaying(isPlaying);
         azkarPlayingRef.current = isPlaying;
         setAzkarLoading(isLoading);
         if (isPlaying) setAzkarDelayPending(false);
+        // Covers lock-screen/notification pause where togglePlayPause never runs.
+        if (!isPlaying && !isLoading) flushResumeProgress();
       }
     );
     trackPlayerListeners.current.push(() => stateListener.remove());
@@ -458,6 +520,13 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     // Start progress poller for azkar
     progressPoller.current = setInterval(async () => {
       if (sourceRef.current !== 'azkar' || !TrackPlayer) return;
+      // When the active track plays through expo-av (forceExpoAv tracks such as
+      // the long-form Seerah/stories archive streams), TrackPlayer's queue is
+      // empty/reset, so getProgress() returns 0/0. Polling it here would clobber
+      // the real position/duration coming from the expo-av status callback on
+      // every tick — the visible "time flicker" between real values and 0:00 /
+      // --:--. expo-av owns progress for that path; skip the TrackPlayer poll.
+      if (azkarSound.current) return;
       try {
         const progress = await TrackPlayer.getProgress();
         const pos = progress.position;
@@ -467,6 +536,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         progressRef.current = { position: positionMs, duration: durationMs };
         setPosition(positionMs);
         setDuration(durationMs);
+        trackResumeProgress(azkarQueue.current[queueIndexRef.current], positionMs, durationMs);
       } catch {}
     }, 500) as unknown as number;
 
@@ -478,10 +548,14 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         progressPoller.current = null;
       }
     };
-  }, [clearAzkarDelayTimer, markAzkarTrackComplete, shouldDelayBeforeTrack, tpReady]);
+  }, [clearAzkarDelayTimer, flushResumeProgress, markAzkarTrackComplete, shouldDelayBeforeTrack, trackResumeProgress, tpReady]);
 
   // Cleanup azkar sound (both TrackPlayer and expo-av)
   const cleanupAzkar = useCallback(async () => {
+    // Persist the resumable position before tearing the player down — this is
+    // the single choke point for stop/focus-loss/queue-replacement paths.
+    flushResumeProgress();
+    resumeTrackingRef.current = null;
     suppressAzkarCompletionRef.current = true;
     clearAzkarDelayTimer();
     if (isTrackPlayerReady() && TrackPlayer) {
@@ -499,7 +573,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       azkarSound.current = null;
     }
     finishSuppressingAzkarCompletionSoon();
-  }, [clearAzkarDelayTimer, finishSuppressingAzkarCompletionSoon]);
+  }, [clearAzkarDelayTimer, finishSuppressingAzkarCompletionSoon, flushResumeProgress]);
 
   // Play a specific item from the azkar queue by index
   const playAzkarAtIndex = useCallback(async (idx: number) => {
@@ -519,8 +593,11 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     }
 
     const track = queue[idx];
+    const initialPositionMs = Math.max(0, Math.floor(track.initialPositionMs ?? 0));
     queueIndexRef.current = idx;
-    progressRef.current = { position: 0, duration: 0 };
+    progressRef.current = { position: initialPositionMs, duration: 0 };
+    setPosition(initialPositionMs);
+    setDuration(0);
     setQueueIndex(idx);
     setCurrentTrackId(track.id);
     setTrackTitle(cleanAudioDisplayText(track.title));
@@ -593,15 +670,16 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         setAzkarLoading(false);
         finishSuppressingAzkarCompletionSoon();
 
-        // Apply intro trim for current track if configured
+        // Apply resume offset or intro trim for current track if configured
         const trimMs = track.categoryId ? getCategoryTrimMs(track.categoryId) : 0;
-        if (trimMs > 0) {
+        const startOffsetMs = initialPositionMs > 0 ? initialPositionMs : trimMs;
+        if (startOffsetMs > 0) {
           // Small delay to let TrackPlayer initialize, then seek
           setTimeout(async () => {
             try {
-              await TrackPlayer?.seekTo(trimMs / 1000); // TrackPlayer uses seconds
+              await TrackPlayer?.seekTo(startOffsetMs / 1000); // TrackPlayer uses seconds
             } catch (e) {
-              console.error('[GlobalAudio] Failed to apply TrackPlayer intro trim:', e);
+              console.error('[GlobalAudio] Failed to apply TrackPlayer start offset:', e);
             }
           }, 100);
         }
@@ -622,7 +700,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         const resolvedUri = await resolveAzkarTrackUri(track);
         const { sound } = await Audio.Sound.createAsync(
           track.localSource ? track.localSource : { uri: resolvedUri },
-          { shouldPlay: false, rate: playbackSpeed },
+          { shouldPlay: false, rate: playbackSpeed, positionMillis: initialPositionMs },
           async (status: any) => {
             if (status.isLoaded) {
               setPosition(status.positionMillis || 0);
@@ -631,6 +709,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
                 position: status.positionMillis || 0,
                 duration: status.durationMillis || 0,
               };
+              trackResumeProgress(track, status.positionMillis || 0, status.durationMillis || 0);
               setAzkarPlaying(status.isPlaying);
               azkarPlayingRef.current = status.isPlaying;
               setAzkarLoading(false);
@@ -666,15 +745,19 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         );
         azkarSound.current = sound;
 
-        // Apply intro trim AFTER sound is created
-        if (trimMs > 0) {
+        // Apply resume offset or intro trim AFTER the sound is created —
+        // Android's ExoPlayer ignores initialStatus.positionMillis on remote
+        // streams, so an explicit seek is the only reliable path there.
+        const startOffsetMs = initialPositionMs > 0 ? initialPositionMs : trimMs;
+        if (startOffsetMs > 0) {
           try {
             const status = await sound.getStatusAsync();
-            if (status.isLoaded && status.durationMillis && status.durationMillis > trimMs) {
-              await sound.setPositionAsync(trimMs);
+            const knownDurationMs = status.isLoaded ? status.durationMillis : undefined;
+            if (status.isLoaded && (!knownDurationMs || knownDurationMs > startOffsetMs)) {
+              await sound.setPositionAsync(startOffsetMs);
             }
           } catch (e) {
-            console.error('[GlobalAudio] Failed to apply intro trim:', e);
+            console.error('[GlobalAudio] Failed to apply start offset:', e);
           }
         }
 
@@ -696,6 +779,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     markAzkarTrackComplete,
     playbackSpeed,
     shouldDelayBeforeTrack,
+    trackResumeProgress,
   ]);
 
   // Subscribe to Quran audio changes
@@ -741,6 +825,10 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     options?: PlayAzkarQueueOptions,
   ) => {
     if (tracks.length === 0) return;
+    // Diagnostics: audio (TrackPlayer/expo-av) is a leading source of NATIVE
+    // crashes that never produce a JS stack. Trailing "audio started" lets a
+    // later crash report be attributed to the playback path.
+    addBreadcrumb('audio', `azkar-play(${tracks.length})`);
     azkarRunIdRef.current += 1;
     azkarQueue.current = tracks;
     completedAzkarTracksRef.current = new Set();
@@ -786,6 +874,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       }
       setSource('radio');
       setSourceRoute(undefined);
+      addBreadcrumb('audio', `radio-play(${station?.id ?? 'unknown'})`);
       await radioPlayer.play(station);
     } catch (error) {
       console.error('[GlobalAudio] playRadio error:', error);
@@ -819,6 +908,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
               setAzkarPlaying(false);
               azkarPlayingRef.current = false;
               await azkarSound.current.pauseAsync();
+              flushResumeProgress();
             } else {
               setAzkarPlaying(true);
               azkarPlayingRef.current = true;
@@ -831,6 +921,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
             setAzkarPlaying(false);
             azkarPlayingRef.current = false;
             try { await TrackPlayer.pause(); } catch {}
+            flushResumeProgress();
           } else {
             setAzkarPlaying(true);
             azkarPlayingRef.current = true;
@@ -843,7 +934,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     } finally {
       isTogglingRef.current = false;
     }
-  }, [clearAzkarDelayTimer]);
+  }, [clearAzkarDelayTimer, flushResumeProgress]);
 
   const stop = useCallback(async () => {
     const currentSource = sourceRef.current;
@@ -877,6 +968,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       audioPlayer.seekTo(targetPosition);
     } else if (currentSource === 'azkar') {
       setPosition(targetPosition);
+      // Keep the resume snapshot honest so a kill right after a seek
+      // restores the seeked position, not the pre-seek one.
+      trackResumeProgress(azkarQueue.current[queueIndexRef.current], targetPosition, progressRef.current.duration);
       if (azkarSound.current) {
         try {
           const status = await azkarSound.current.getStatusAsync();
@@ -886,7 +980,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         await TrackPlayer.seekTo(targetPosition / 1000); // TrackPlayer uses seconds
       }
     }
-  }, []);
+  }, [trackResumeProgress]);
 
   const next = useCallback(async () => {
     const currentSource = sourceRef.current;

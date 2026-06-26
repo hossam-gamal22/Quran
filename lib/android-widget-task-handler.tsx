@@ -10,38 +10,15 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SharedWidgetData } from './widget-data';
-import { getPrayerNameAr, getPrayerNameEn, isFridayDate } from './prayer-times';
+import { getPrayerNameAr, getPrayerNameEn } from './prayer-times';
 import { formatEpochTimeInTimeZone } from './widget-timezone';
 import { deviceUses24Hour } from './widget-clock-format';
-import { nextPrayerStaticState, resolvePrayerTableState } from './widget-prayer-table-state';
-import {
-  prayerStaticAssetName,
-  prayerStaticAssetPath,
-  prayerStaticAssetExistsOnDevice,
-  defaultPreviousFor,
-  type PrayerLang,
-  type PrayerStateKey,
-  type PrayerTheme,
-} from './widget-android-asset-resolver';
 
-/**
- * Map the resolved next/previous prayer state to the asset token, applying the
- * Friday "Jumuah" override: on Fridays a Dhuhr slot uses the baked "صلاة الجمعة"
- * variant. Runs in the headless task too, so Friday is correct even closed-app
- * (the per-state jumuah templates are always baked up front).
- */
-function resolveFridayPrayerStates(prayer: SharedWidgetData['prayer'], now: Date): { active: PrayerStateKey | null; previous: PrayerStateKey } {
-  const rawActive = nextPrayerStaticState(prayer);
-  const validStates = new Set<PrayerStateKey>(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']);
-  let active: PrayerStateKey | null = rawActive && validStates.has(rawActive as PrayerStateKey) ? (rawActive as PrayerStateKey) : null;
-  const ts = resolvePrayerTableState(prayer, now.getTime());
-  let previous: PrayerStateKey = (ts.previousKey as PrayerStateKey | undefined) ?? (active ? defaultPreviousFor(active) : 'sunrise');
-  if (isFridayDate(now)) {
-    if (active === 'dhuhr') active = 'jumuah';
-    if (previous === 'dhuhr') previous = 'jumuah';
-  }
-  return { active, previous };
-}
+// NOTE: the per-state prayer TEMPLATE selection (resolveFridayPrayerStates +
+// prayerStaticAsset* from widget-android-asset-resolver) was removed — prayer
+// widgets now always serve the gallery-blank PNG + full live overlays. Friday's
+// «صلاة الجمعة» comes from getPrayerNameAr('dhuhr', now) inside
+// refreshPrayerWidgetData → data.prayer.allPrayers, not from a baked variant.
 
 import {
   SnapshotWidget,
@@ -325,6 +302,25 @@ function isPrayerWidget(widgetName: string): boolean {
   return !!t && PRAYER_WIDGET_IDS.has(t.id);
 }
 
+function freshHijriPrayerFields(now: Date): Partial<SharedWidgetData['prayer']> {
+  try {
+    const { getLocalizedHijriDate, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN } = require('./hijri-date');
+    const hijri = getLocalizedHijriDate(now);
+    if (!hijri || typeof hijri.day !== 'number') return {};
+    const monthAr = HIJRI_MONTHS_AR[hijri.month - 1] || hijri.monthName || '';
+    const monthEn = HIJRI_MONTHS_EN[hijri.month - 1] || '';
+    return {
+      hijriDate: `${hijri.day} ${monthAr} ${hijri.year}`,
+      hijriDay: hijri.day,
+      hijriMonth: monthAr,
+      hijriMonthEn: monthEn,
+      hijriYear: hijri.year,
+    };
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Refresh prayer widgets without requiring the foreground app.
  *
@@ -358,27 +354,49 @@ async function refreshPrayerWidgetData(
     if (cachedNext) {
       const cachedPrevious = [...cachedRows].reverse().find((row) => row.epochMs <= now.getTime());
       const remainingSeconds = Math.max(0, Math.floor((cachedNext.epochMs - now.getTime()) / 1000));
+      // Re-derive display names from TODAY's date instead of carrying the
+      // cached strings: rows cached on Thursday say «الظهر» and must flip to
+      // «صلاة الجمعة» on Friday (and back on Saturday). These names now feed
+      // the LIVE row-name overlays on the prayer table directly.
+      const freshName = (key: string | undefined, en?: string, ar?: string) => {
+        const k = key as 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' | undefined;
+        if (!k) return { en: en ?? '', ar: ar ?? '' };
+        try {
+          return { en: getPrayerNameEn(k, now), ar: getPrayerNameAr(k, now) };
+        } catch {
+          return { en: en ?? '', ar: ar ?? '' };
+        }
+      };
+      const nextFresh = freshName(cachedNext.key, cachedNext.name, cachedNext.nameAr);
+      const prevFresh = cachedPrevious
+        ? freshName(cachedPrevious.key, cachedPrevious.name, cachedPrevious.nameAr)
+        : undefined;
+      const hijriFields = freshHijriPrayerFields(now);
       const merged: SharedWidgetData = {
         ...data,
         prayer: {
           ...(data.prayer ?? {}),
+          ...hijriFields,
           nextPrayer: cachedNext.key,
-          nextPrayerName: cachedNext.name,
-          nextPrayerNameAr: cachedNext.nameAr,
+          nextPrayerName: nextFresh.en,
+          nextPrayerNameAr: nextFresh.ar,
           nextPrayerTime: cachedNext.time,
           nextPrayerAtEpochMs: cachedNext.epochMs,
-          previousPrayerName: cachedPrevious?.name ?? data.prayer?.previousPrayerName,
-          previousPrayerNameAr: cachedPrevious?.nameAr ?? data.prayer?.previousPrayerNameAr,
+          previousPrayerName: prevFresh?.en ?? data.prayer?.previousPrayerName,
+          previousPrayerNameAr: prevFresh?.ar ?? data.prayer?.previousPrayerNameAr,
           previousPrayerAtEpochMs: cachedPrevious?.epochMs ?? data.prayer?.previousPrayerAtEpochMs,
           timeRemainingMinutes: Math.floor(remainingSeconds / 60),
-          allPrayers: cachedRows.map((row) => ({
-            name: row.name,
-            nameAr: row.nameAr,
-            time: row.time,
-            epochMs: row.epochMs,
-            isPassed: row.epochMs <= now.getTime(),
-            isNext: row.epochMs === cachedNext.epochMs,
-          })),
+          allPrayers: cachedRows.map((row) => {
+            const names = freshName(row.key, row.name, row.nameAr);
+            return {
+              name: names.en,
+              nameAr: names.ar,
+              time: row.time,
+              epochMs: row.epochMs,
+              isPassed: row.epochMs <= now.getTime(),
+              isNext: row.epochMs === cachedNext.epochMs,
+            };
+          }),
         } as SharedWidgetData['prayer'],
       };
       if (__DEV__) {
@@ -410,6 +428,7 @@ async function refreshPrayerWidgetData(
     };
     const nextNames = nameMap[snapshot.next] ?? nameMap.fajr;
     const prevNames = nameMap[snapshot.previous] ?? nameMap.isha;
+    const hijriFields = freshHijriPrayerFields(now);
     const allPrayers = (PRAYER_ORDER as string[]).map((key) => ({
       name: nameMap[key].en,
       nameAr: nameMap[key].ar,
@@ -422,6 +441,7 @@ async function refreshPrayerWidgetData(
       ...data,
       prayer: {
         ...(data.prayer ?? {}),
+        ...hijriFields,
         nextPrayer: snapshot.next,
         nextPrayerName: nextNames.en,
         nextPrayerNameAr: nextNames.ar,
@@ -467,7 +487,7 @@ async function refreshPrayerWidgetData(
 export type AndroidWidgetDecision =
   | { kind: 'arabicOnly'; size: AndroidSize; theme: string }
   | { kind: 'location'; size: AndroidSize; theme: string; isArabic: boolean; clickUri: string }
-  | { kind: 'curated'; id: CuratedWidgetId; size: 'small' | 'medium'; theme: string; clickUri: string }
+  | { kind: 'curated'; id: CuratedWidgetId; size: 'small' | 'medium'; theme: string; clickUri: string; imageUri?: string }
   | {
       kind: 'snapshot';
       id: string;
@@ -540,12 +560,35 @@ export async function decideAndroidWidget(
   // 3) Curated bundled-image widgets (verse/azkar/dhikr): Arabic-only, tinted to
   // the theme over a native themed background, picked by date — offline-forever.
   if (isCuratedWidget(target.id)) {
+    // DEV-only: resolve the bundled image to a cached file:// URI. In release the
+    // require() resolves to an APK drawable that the native renderer decodes
+    // directly — always works. In dev it resolves to a Metro HTTP URL that the
+    // native side fetches with HttpURLConnection; a headless update with Metro
+    // unreachable made that fetch fail silently → blank themed tile (the
+    // reported empty «آية اليوم»). expo-asset caches the file on the first
+    // resolution (foreground fan-out runs through this same decision), so later
+    // headless renders keep working offline in dev too.
+    let imageUri: string | undefined;
+    if (__DEV__) {
+      try {
+        const { Asset } = require('expo-asset');
+        const { curatedImageSource } = require('@/lib/widgets/curated-images');
+        const asset = Asset.fromModule(curatedImageSource(target.id as CuratedWidgetId, new Date()));
+        if (!asset.localUri) await asset.downloadAsync();
+        if (typeof asset.localUri === 'string' && asset.localUri.startsWith('file:///data/')) {
+          imageUri = asset.localUri;
+        }
+      } catch {
+        // Fall back to the require() source.
+      }
+    }
     return {
       kind: 'curated',
       id: target.id as CuratedWidgetId,
       size: target.size as 'small' | 'medium',
       theme,
       clickUri,
+      imageUri,
     };
   }
 
@@ -554,39 +597,24 @@ export async function decideAndroidWidget(
     const routeKey = snapshotRouteKeyForPlacement(target.id, target.size, theme);
     const manifestEntry = data.snapshotManifest?.[routeKey];
     const widgetLang = lang;
-    let snapshotKey = manifestEntry?.key ?? routeKey;
-    let path = manifestEntry?.path ?? (manifestEntry?.key
+    const snapshotKey = manifestEntry?.key ?? routeKey;
+    const path = manifestEntry?.path ?? (manifestEntry?.key
       ? snapshotFilePathForKey(manifestEntry.key)
       : snapshotFilePath(target.id, target.size, theme));
-    let isPrayerStaticTemplate = false;
-    if (PRAYER_WIDGET_IDS.has(target.id)) {
-      const now = new Date();
-      const { active, previous } = resolveFridayPrayerStates(data.prayer, now);
-      if (active) {
-        const templateOpts = {
-          widgetId: target.id as 'prayerSingle' | 'prayerTable' | 'prayerNextPrevious',
-          size: target.size,
-          theme: theme as PrayerTheme,
-          language: widgetLang as PrayerLang,
-          active,
-          previous,
-          // Friday: the table swaps to the Jumuah-labeled per-state variant so the
-          // Dhuhr row reads «صلاة الجمعة» all day (not just while Dhuhr is next).
-          friday: isFridayDate(now),
-        };
-        if (await prayerStaticAssetExistsOnDevice(templateOpts)) {
-          snapshotKey = prayerStaticAssetName(templateOpts);
-          path = prayerStaticAssetPath(templateOpts);
-          isPrayerStaticTemplate = true;
-        }
-      }
-    }
+    // Per-state prayer TEMPLATES are intentionally NOT served anymore. They
+    // baked sample times/real names into the PNG but were positioned by the
+    // GALLERY PNG's anchors (the template bake never captures its own), so any
+    // layout drift between the two bakes broke the table (stale hero time, 5/6
+    // row times invisible). Prayer widgets now ALWAYS serve the gallery-blank
+    // PNG + full live overlays (names incl. Friday «صلاة الجمعة» via
+    // getPrayerNameAr, times, highlight, countdown) drawn from `data.prayer`,
+    // which `refreshPrayerWidgetData` keeps correct offline on every
+    // WIDGET_UPDATE. One PNG generation, one anchor source — can't drift.
+    const isPrayerStaticTemplate = false;
     // Language guard: never serve a gallery PNG baked in a different language
     // than `widgetLang` — overlaying resolved-language names/times on stale
-    // other-language chrome is what produced the AR/EN text overlap. Per-state
-    // prayer templates are language-keyed in their filename already.
-    const langMismatch = !isPrayerStaticTemplate
-      && !!manifestEntry?.language
+    // other-language chrome is what produced the AR/EN text overlap.
+    const langMismatch = !!manifestEntry?.language
       && manifestEntry.language !== widgetLang;
     let hasSnapshot = false;
     let fallbackReason: string | undefined;
@@ -597,6 +625,28 @@ export async function decideAndroidWidget(
       else if (langMismatch) fallbackReason = `lang_mismatch:${manifestEntry?.language}!=${widgetLang}`;
     } catch (e) {
       fallbackReason = `stat_failed:${(e as Error)?.message ?? 'unknown'}`;
+    }
+    // Anchor-completeness guard (gallery-fallback prayer PNGs only): that PNG
+    // is blank chrome — names/times/highlight are drawn live from the manifest
+    // anchors. An old-schema manifest (persisted across an app update) without
+    // the full anchor set would render a table with missing times. Refuse to
+    // serve it; WidgetFallbackNotice (bundled preview + "open the app" hint)
+    // shows instead, and the next foreground pump (SCHEMA_VERSION bump)
+    // re-bakes PNG + anchors as one generation. Per-state templates carry
+    // their state baked and are version-gated separately, so they're exempt.
+    if (hasSnapshot && !isPrayerStaticTemplate && PRAYER_WIDGET_IDS.has(target.id)) {
+      const anchorIds = new Set(
+        ((manifestEntry?.anchors ?? []) as Array<{ id: string }>).map((a) => a.id),
+      );
+      const required = target.id === 'prayerTable'
+        ? ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'].map((k) => `prayerRowTime.${k}`)
+        : target.id === 'prayerSingle'
+          ? ['prayerHeroTime']
+          : ['prayerNextTime', 'prayerPrevTime'];
+      if (!required.every((id) => anchorIds.has(id))) {
+        hasSnapshot = false;
+        fallbackReason = 'anchors_incomplete';
+      }
     }
     if (__DEV__) {
       const action = hasSnapshot ? 'loaded' : 'fallback';
@@ -644,7 +694,14 @@ export function renderAndroidWidgetDecision(
       );
     case 'location':
       return (
-        <LocationNeededWidget theme={decision.theme} isArabic={decision.isArabic} clickUri={decision.clickUri} />
+        <LocationNeededWidget
+          theme={decision.theme}
+          isArabic={decision.isArabic}
+          clickUri={decision.clickUri}
+          size={decision.size}
+          widgetWidth={bounds?.width}
+          widgetHeight={bounds?.height}
+        />
       );
     case 'curated':
       return (
@@ -653,6 +710,7 @@ export function renderAndroidWidgetDecision(
           size={decision.size}
           theme={decision.theme}
           clickUri={decision.clickUri}
+          imageUri={decision.imageUri}
           widgetWidth={bounds?.width}
           widgetHeight={bounds?.height}
         />
@@ -749,7 +807,15 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       if (!isAndroidLockWidgetProvider(widgetName) && !FREE_WIDGET_NAMES.includes(widgetName)) {
         const premium = await isUserPremium();
         if (!premium) {
-          renderWidget(<LockedWidget widgetName={widgetName} data={data} />);
+          renderWidget(
+            <LockedWidget
+              widgetName={widgetName}
+              data={data}
+              size={resolveTarget(widgetName)?.size}
+              widgetWidth={widgetInfo.width}
+              widgetHeight={widgetInfo.height}
+            />,
+          );
           return;
         }
       }
@@ -769,7 +835,13 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // the app has launched once. Before that, show instructions instead of
       // silently writing generic Makkah/sample data.
       if (!data && !appOpened) {
-        renderWidget(<AppNotOpenedWidget />);
+        renderWidget(
+          <AppNotOpenedWidget
+            size={resolveTarget(widgetName)?.size}
+            widgetWidth={widgetInfo.width}
+            widgetHeight={widgetInfo.height}
+          />,
+        );
         return;
       }
 
@@ -809,7 +881,15 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       if (!isAndroidLockWidgetProvider(widgetName) && !FREE_WIDGET_NAMES.includes(widgetName)) {
         const premium = await isUserPremium();
         if (!premium) {
-          renderWidget(<LockedWidget widgetName={widgetName} data={data} />);
+          renderWidget(
+            <LockedWidget
+              widgetName={widgetName}
+              data={data}
+              size={resolveTarget(widgetName)?.size}
+              widgetWidth={widgetInfo.width}
+              widgetHeight={widgetInfo.height}
+            />,
+          );
           return;
         }
       }
@@ -817,7 +897,13 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       const appOpened = await hasAppEverOpened();
 
       if (!data && !appOpened) {
-        renderWidget(<AppNotOpenedWidget />);
+        renderWidget(
+          <AppNotOpenedWidget
+            size={resolveTarget(widgetName)?.size}
+            widgetWidth={widgetInfo.width}
+            widgetHeight={widgetInfo.height}
+          />,
+        );
         return;
       }
 
@@ -865,7 +951,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         const data = await loadWidgetData();
         renderWidgetFallbackNotice(target, data, renderWidget, widgetInfo);
       } else {
-        renderWidget(<AppNotOpenedWidget />);
+        renderWidget(
+          <AppNotOpenedWidget widgetWidth={widgetInfo.width} widgetHeight={widgetInfo.height} />,
+        );
       }
     } catch {
       try { renderWidget(<AppNotOpenedWidget />); } catch {}

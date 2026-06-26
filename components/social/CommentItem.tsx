@@ -1,6 +1,6 @@
 // components/social/CommentItem.tsx
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -23,9 +24,13 @@ import {
   addReply,
   deleteOwnReply,
   reportReply,
+  hasUserLikedComment,
+  toggleCommentLike,
+  fetchCommentLikers,
   type ReportReason,
   type StoryComment,
   type StoryReply,
+  type CommentLiker,
 } from '@/lib/story-interactions';
 import { getDisplayName } from '@/lib/firebase-user';
 import { MAX_COMMENT_LENGTH } from '@/lib/profanity-filter';
@@ -36,6 +41,7 @@ interface Props {
   isOwn: boolean;
   currentUserId: string;
   displayName: string | null;
+  storyTitle?: string;
   onDeleted?: () => void;
 }
 
@@ -83,7 +89,96 @@ const stringToColor = (s: string): string => {
   return PALETTE[Math.abs(hash) % PALETTE.length];
 };
 
-export function CommentItem({ storyId, comment, isOwn, currentUserId, displayName, onDeleted }: Props) {
+// Shared report UI: clear reason cards, plus a free-text note when "other" is
+// chosen (the note is stored on the report doc for admins to read). Remounted
+// fresh each time the menu opens (parent keys it on `menuOpen`).
+function ReportMenuContent({
+  colors,
+  isRTL,
+  reporting,
+  onReport,
+}: {
+  colors: ReturnType<typeof useColors>;
+  isRTL: boolean;
+  reporting: boolean;
+  onReport: (reason: ReportReason, note?: string) => void;
+}) {
+  const [noteMode, setNoteMode] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const rowBg = colors.isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+  const rowBorder = colors.isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+
+  if (noteMode) {
+    return (
+      <View style={{ gap: 10 }}>
+        <View
+          style={[
+            styles.noteInputRow,
+            {
+              backgroundColor: colors.isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              borderColor: ACCENT,
+            },
+          ]}
+        >
+          <TextInput
+            value={noteText}
+            onChangeText={setNoteText}
+            placeholder={t('social.reportNotePlaceholder')}
+            placeholderTextColor={colors.textLight}
+            multiline
+            maxLength={500}
+            autoFocus
+            style={[styles.noteInput, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+          />
+        </View>
+        <Pressable
+          onPress={() => onReport('other', noteText.trim() || undefined)}
+          disabled={reporting}
+          style={[styles.menuRow, { borderColor: ACCENT, backgroundColor: ACCENT, justifyContent: 'center' }]}
+        >
+          {reporting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={[styles.menuRowText, { color: '#fff', flex: 0, textAlign: 'center' }]}>
+              {t('social.reportSend')}
+            </Text>
+          )}
+        </Pressable>
+        <Pressable onPress={() => setNoteMode(false)} style={{ alignItems: 'center', paddingVertical: 4 }}>
+          <Text style={{ color: colors.textLight, fontSize: 13, fontWeight: '600' }}>{t('common.cancel')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {REPORT_REASONS.map((r) => (
+        <Pressable
+          key={r.key}
+          onPress={() => (r.key === 'other' ? setNoteMode(true) : onReport(r.key))}
+          disabled={reporting}
+          style={[
+            styles.menuRow,
+            { borderColor: rowBorder, flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: rowBg },
+          ]}
+        >
+          <MaterialCommunityIcons name="flag-outline" size={18} color={colors.textLight} />
+          <Text style={[styles.menuRowText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t(r.labelKey)}
+          </Text>
+        </Pressable>
+      ))}
+      {reporting && (
+        <View style={{ marginTop: 8 }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      )}
+    </>
+  );
+}
+
+export function CommentItem({ storyId, comment, isOwn, currentUserId, displayName, storyTitle, onDeleted }: Props) {
   const colors = useColors();
   const isRTL = useIsRTL();
   const lang = getLanguage();
@@ -107,18 +202,78 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
     setReplyCount(comment.replyCount || 0);
   }, [comment.replyCount]);
 
+  // Likes state
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(comment.likeCount || 0);
+  const [likersOpen, setLikersOpen] = useState(false);
+  const [likers, setLikers] = useState<CommentLiker[]>([]);
+  const [likersLoading, setLikersLoading] = useState(false);
+  const likePending = useRef(false);
+
+  useEffect(() => {
+    setLikeCount(comment.likeCount || 0);
+  }, [comment.likeCount]);
+
+  useEffect(() => {
+    let mounted = true;
+    hasUserLikedComment(storyId, comment.id).then((v) => {
+      if (mounted) setLiked(v);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [storyId, comment.id]);
+
+  const handleLike = useCallback(async () => {
+    if (likePending.current) return;
+    likePending.current = true;
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((n) => Math.max(0, n + (next ? 1 : -1)));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      const res = await toggleCommentLike(storyId, comment.id, {
+        authorUserId: comment.userId,
+        storyTitle,
+        commentText: comment.text,
+      });
+      if (res.liked !== next) {
+        setLiked(res.liked);
+        setLikeCount((n) => Math.max(0, n + (res.liked ? 1 : -1) - (next ? 1 : -1)));
+      }
+    } catch {
+      // revert on failure
+      setLiked(!next);
+      setLikeCount((n) => Math.max(0, n + (next ? -1 : 1)));
+    } finally {
+      likePending.current = false;
+    }
+  }, [liked, storyId, comment.id, comment.userId, comment.text, storyTitle]);
+
+  const openLikers = useCallback(async () => {
+    Haptics.selectionAsync().catch(() => {});
+    setLikersOpen(true);
+    setLikersLoading(true);
+    const list = await fetchCommentLikers(storyId, comment.id);
+    setLikers(list);
+    setLikersLoading(false);
+  }, [storyId, comment.id]);
+
   const createdMs = comment.createdAt?.toMillis?.() || Date.now();
   const relative = formatRelativeTime(createdMs, lang);
   const direction = /^[؀-ۿ]/.test(comment.text) ? 'rtl' : 'ltr';
 
   const handleReport = useCallback(
-    async (reason: ReportReason) => {
+    async (reason: ReportReason, note?: string) => {
       setReporting(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      const res = await reportComment(storyId, comment.id, reason);
+      const res = await reportComment(storyId, comment.id, reason, note);
       setReporting(false);
       setMenuOpen(false);
-      if (res.ok) setReported(true);
+      if (res.ok) {
+        setReported(true);
+        Alert.alert(t('social.reportConfirmTitle'), t('social.reportedThanks'));
+      }
     },
     [storyId, comment.id],
   );
@@ -162,7 +317,7 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
     setSubmittingReply(true);
     setReplyError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const res = await addReply(storyId, comment.id, replyText);
+    const res = await addReply(storyId, comment.id, replyText, storyTitle);
     setSubmittingReply(false);
     if (res.ok) {
       setReplyText('');
@@ -193,7 +348,7 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
       default:
         setReplyError(t('social.errorNetwork'));
     }
-  }, [replyText, storyId, comment.id, submittingReply, loadRepliesNow]);
+  }, [replyText, storyId, comment.id, submittingReply, loadRepliesNow, storyTitle]);
 
   const handleReplyDeleted = useCallback(async (replyId: string) => {
     const ok = await deleteOwnReply(storyId, comment.id, replyId);
@@ -253,6 +408,23 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
 
           {/* Reply actions row */}
           <View style={[styles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Pressable onPress={handleLike} hitSlop={6} style={styles.actionBtn}>
+              <MaterialCommunityIcons
+                name={liked ? 'heart' : 'heart-outline'}
+                size={15}
+                color={liked ? '#ef4444' : colors.textLight}
+              />
+              <Text style={[styles.actionText, { color: liked ? '#ef4444' : colors.textLight }]}>
+                {t('social.like')}
+              </Text>
+            </Pressable>
+            {likeCount > 0 && (
+              <Pressable onPress={openLikers} hitSlop={6} style={styles.actionBtn}>
+                <Text style={[styles.actionText, { color: colors.textLight, textDecorationLine: 'underline' }]}>
+                  {likeCount}
+                </Text>
+              </Pressable>
+            )}
             <Pressable onPress={startReply} hitSlop={6} style={styles.actionBtn}>
               <MaterialCommunityIcons name="reply-outline" size={14} color={ACCENT} />
               <Text style={[styles.actionText, { color: ACCENT }]}>{t('social.reply')}</Text>
@@ -286,12 +458,7 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
 
       {/* Replies thread */}
       {repliesOpen && (
-        <View
-          style={[
-            styles.repliesThread,
-            isRTL ? { paddingRight: 36, paddingLeft: 0 } : { paddingLeft: 36, paddingRight: 0 },
-          ]}
-        >
+        <View style={styles.repliesThread}>
           {loadingReplies && (
             <View style={{ paddingVertical: 10 }}>
               <ActivityIndicator color={ACCENT} size="small" />
@@ -394,7 +561,7 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
             style={[
               styles.menuCard,
               {
-                backgroundColor: colors.isDarkMode ? '#1a222a' : '#ffffff',
+                backgroundColor: colors.modalSurface,
                 borderColor,
               },
             ]}
@@ -408,37 +575,27 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
               <Pressable
                 onPress={handleDelete}
                 disabled={deleting}
-                style={[styles.menuRow, { borderColor }]}
+                style={[styles.menuRow, { borderColor, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'center' }]}
               >
                 {deleting ? (
                   <ActivityIndicator color="#ef4444" />
                 ) : (
                   <>
                     <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ef4444" />
-                    <Text style={[styles.menuRowText, { color: '#ef4444' }]}>
+                    <Text style={[styles.menuRowText, { color: '#ef4444', flex: 0, textAlign: 'center' }]}>
                       {t('social.deleteComment')}
                     </Text>
                   </>
                 )}
               </Pressable>
             ) : (
-              <>
-                {REPORT_REASONS.map((r) => (
-                  <Pressable
-                    key={r.key}
-                    onPress={() => handleReport(r.key)}
-                    disabled={reporting}
-                    style={[styles.menuRow, { borderColor }]}
-                  >
-                    <Text style={[styles.menuRowText, { color: colors.text }]}>{t(r.labelKey)}</Text>
-                  </Pressable>
-                ))}
-                {reporting && (
-                  <View style={{ marginTop: 8 }}>
-                    <ActivityIndicator color={colors.primary} />
-                  </View>
-                )}
-              </>
+              <ReportMenuContent
+                key={String(menuOpen)}
+                colors={colors}
+                isRTL={isRTL}
+                reporting={reporting}
+                onReport={handleReport}
+              />
             )}
 
             <Pressable
@@ -448,6 +605,63 @@ export function CommentItem({ storyId, comment, isOwn, currentUserId, displayNam
               <Text style={[styles.menuCloseText, { color: colors.textLight }]}>
                 {t('common.close')}
               </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Likers list */}
+      <Modal
+        visible={likersOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLikersOpen(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setLikersOpen(false)}>
+          <Pressable
+            style={[styles.menuCard, { backgroundColor: colors.modalSurface, borderColor }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.likersTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <MaterialCommunityIcons name="heart" size={18} color="#ef4444" />
+              <Text style={[styles.menuTitle, { color: colors.text, marginBottom: 0 }]}>
+                {t('social.likedByTitle')}
+              </Text>
+            </View>
+
+            {likersLoading ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator color={ACCENT} />
+              </View>
+            ) : likers.length === 0 ? (
+              <Text style={[styles.likersEmpty, { color: colors.textLight }]}>
+                {t('social.likesEmpty')}
+              </Text>
+            ) : (
+              <View style={{ maxHeight: 320 }}>
+                {likers.map((l) => (
+                  <View
+                    key={l.userId}
+                    style={[styles.likerRow, { flexDirection: isRTL ? 'row-reverse' : 'row', borderColor }]}
+                  >
+                    <View style={[styles.likerAvatar, { backgroundColor: stringToColor(l.userId || l.displayName || 'x') }]}>
+                      <Text style={styles.likerInitial}>
+                        {(l.displayName || '?').trim().charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.likerName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+                      numberOfLines={1}
+                    >
+                      {l.displayName || '—'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <Pressable onPress={() => setLikersOpen(false)} style={[styles.menuClose, { borderColor }]}>
+              <Text style={[styles.menuCloseText, { color: colors.textLight }]}>{t('common.close')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -484,17 +698,22 @@ function ReplyItem({
   const direction = /^[؀-ۿ]/.test(reply.text) ? 'rtl' : 'ltr';
   const avatarColor = stringToColor(reply.userId || reply.displayName || 'x');
   const initial = (reply.displayName || '?').trim().charAt(0).toUpperCase();
-  const cardBg = colors.isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  // Replies share the main comment's footprint but sit on a darker fill so the
+  // thread hierarchy still reads at a glance.
+  const cardBg = colors.isDarkMode ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.06)';
   const borderColor = colors.isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
 
   const handleReport = useCallback(
-    async (reason: ReportReason) => {
+    async (reason: ReportReason, note?: string) => {
       setReporting(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      const res = await reportReply(storyId, commentId, reply.id, reason);
+      const res = await reportReply(storyId, commentId, reply.id, reason, note);
       setReporting(false);
       setMenuOpen(false);
-      if (res.ok) setReported(true);
+      if (res.ok) {
+        setReported(true);
+        Alert.alert(t('social.reportConfirmTitle'), t('social.reportedThanks'));
+      }
     },
     [storyId, commentId, reply.id],
   );
@@ -566,7 +785,7 @@ function ReplyItem({
           <Pressable
             style={[
               styles.menuCard,
-              { backgroundColor: colors.isDarkMode ? '#1a222a' : '#ffffff', borderColor },
+              { backgroundColor: colors.modalSurface, borderColor },
             ]}
             onPress={(e) => e.stopPropagation()}
           >
@@ -574,36 +793,26 @@ function ReplyItem({
               {isOwn ? t('social.actions') : t('social.reportReason')}
             </Text>
             {isOwn ? (
-              <Pressable onPress={handleDelete} disabled={deleting} style={[styles.menuRow, { borderColor }]}>
+              <Pressable onPress={handleDelete} disabled={deleting} style={[styles.menuRow, { borderColor, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'center' }]}>
                 {deleting ? (
                   <ActivityIndicator color="#ef4444" />
                 ) : (
                   <>
                     <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ef4444" />
-                    <Text style={[styles.menuRowText, { color: '#ef4444' }]}>
+                    <Text style={[styles.menuRowText, { color: '#ef4444', flex: 0, textAlign: 'center' }]}>
                       {t('social.deleteReply')}
                     </Text>
                   </>
                 )}
               </Pressable>
             ) : (
-              <>
-                {REPORT_REASONS.map((r) => (
-                  <Pressable
-                    key={r.key}
-                    onPress={() => handleReport(r.key)}
-                    disabled={reporting}
-                    style={[styles.menuRow, { borderColor }]}
-                  >
-                    <Text style={[styles.menuRowText, { color: colors.text }]}>{t(r.labelKey)}</Text>
-                  </Pressable>
-                ))}
-                {reporting && (
-                  <View style={{ marginTop: 8 }}>
-                    <ActivityIndicator color={colors.primary} />
-                  </View>
-                )}
-              </>
+              <ReportMenuContent
+                key={String(menuOpen)}
+                colors={colors}
+                isRTL={isRTL}
+                reporting={reporting}
+                onReport={handleReport}
+              />
             )}
             <Pressable
               onPress={() => setMenuOpen(false)}
@@ -651,34 +860,34 @@ const styles = StyleSheet.create({
   actionText: { fontSize: 12, fontWeight: '600' },
   menuBtn: { padding: 4 },
 
-  // Replies thread
-  repliesThread: { marginTop: 6, gap: 6 },
+  // Replies thread — same footprint as the main comment card, darker fill.
+  repliesThread: { marginTop: 8, gap: 8 },
   replyCard: {
     alignItems: 'flex-start',
-    padding: 10,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 0,
   },
   replyAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  replyAvatarText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  replyAvatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   replyBody: { flex: 1, minWidth: 0 },
   replyHeaderRow: {
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
-    gap: 6,
+    marginBottom: 4,
+    gap: 8,
   },
-  replyName: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  replyTime: { fontSize: 10 },
-  replyText: { fontSize: 13, lineHeight: 19 },
+  replyName: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  replyTime: { fontSize: 11 },
+  replyText: { fontSize: 14, lineHeight: 21 },
 
   // Reply input
   replyInputWrap: { marginTop: 4, gap: 6 },
@@ -740,6 +949,41 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   menuRowText: { fontSize: 14, fontWeight: '600', textAlign: 'center', flex: 1 },
+  noteInputRow: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  noteInput: {
+    minHeight: 70,
+    maxHeight: 140,
+    fontSize: 14,
+    paddingVertical: 4,
+  },
+  likersTitleRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  likersEmpty: { fontSize: 13, textAlign: 'center', paddingVertical: 20 },
+  likerRow: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  likerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  likerInitial: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  likerName: { fontSize: 14, fontWeight: '600', flex: 1 },
   menuClose: {
     marginTop: 8,
     paddingVertical: 12,

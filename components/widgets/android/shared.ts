@@ -54,19 +54,30 @@ export interface WidgetPalette {
   ink: `#${string}`;
 }
 
-// `muted` is now derived from `ink` at ~70% opacity (AARRGGBB hex) so every
-// piece of text on a widget — heading AND secondary/countdown/list rows —
-// shares the SAME hue per theme (white-on-white, gold-on-gold, never a
-// contrasting tint like the old per-theme greens/blues/tans).
+// `muted` = ink at ~70% over the tile bg, PRE-FLATTENED to a SOLID #RRGGBB.
+// Live RNAW TextWidgets render BLANK when given an 8-digit AARRGGBB colour
+// (empirically — the same quirk blendOver() in SnapshotWidget.tsx works
+// around for the date widgets). The translucent `#B3......` values here were
+// exactly why the prayer table's non-active row names/times disappeared on
+// the home screen while the solid-ink active row rendered fine.
+function solidMuted(ink: string, bg: string, opacity = 0.7): `#${string}` {
+  const h = (v: string) => parseInt(v, 16);
+  const f = { r: h(ink.slice(1, 3)), g: h(ink.slice(3, 5)), b: h(ink.slice(5, 7)) };
+  const b = { r: h(bg.slice(1, 3)), g: h(bg.slice(3, 5)), b: h(bg.slice(5, 7)) };
+  const c = (fg: number, bk: number) =>
+    Math.max(0, Math.min(255, Math.round(bk + (fg - bk) * opacity))).toString(16).padStart(2, '0');
+  return `#${c(f.r, b.r)}${c(f.g, b.g)}${c(f.b, b.b)}`;
+}
+
 export const THEME_PALETTES: Record<WidgetThemeKey, WidgetPalette> = {
-  auto: { bg: '#E3E0DB', surface: '#4DFFFFFF', text: '#3A3A39', muted: '#B3000000', isLight: true, ink: '#000000' },
-  dark: { bg: '#373737', surface: '#1FFFFFFF', text: '#FFFFFF', muted: '#B3FFFFFF', isLight: false, ink: '#FFFFFF' },
-  light: { bg: '#E3E0DB', surface: '#4DFFFFFF', text: '#3A3A39', muted: '#B3000000', isLight: true, ink: '#000000' },
-  olive: { bg: '#293126', surface: '#1FFFFFFF', text: '#F2F3E8', muted: '#B3F9E8CB', isLight: false, ink: '#f9e8cb' },
-  green: { bg: '#0E3B2E', surface: '#1AFFFFFF', text: '#E8F4EC', muted: '#B3FFFFFF', isLight: false, ink: '#FFFFFF' },
-  blue: { bg: '#0F2B4D', surface: '#1AFFFFFF', text: '#E2ECF8', muted: '#B3FFFFFF', isLight: false, ink: '#FFFFFF' },
-  desert: { bg: '#4C3523', surface: '#1AFFFFFF', text: '#F1E2C8', muted: '#B3F9E8CB', isLight: false, ink: '#f9e8cb' },
-  slate: { bg: '#2A2D31', surface: '#1AFFFFFF', text: '#E5E8EC', muted: '#B3FFFFFF', isLight: false, ink: '#FFFFFF' },
+  auto: { bg: '#E3E0DB', surface: '#4DFFFFFF', text: '#3A3A39', muted: solidMuted('#000000', '#E3E0DB'), isLight: true, ink: '#000000' },
+  dark: { bg: '#373737', surface: '#1FFFFFFF', text: '#FFFFFF', muted: solidMuted('#FFFFFF', '#373737'), isLight: false, ink: '#FFFFFF' },
+  light: { bg: '#E3E0DB', surface: '#4DFFFFFF', text: '#3A3A39', muted: solidMuted('#000000', '#E3E0DB'), isLight: true, ink: '#000000' },
+  olive: { bg: '#293126', surface: '#1FFFFFFF', text: '#F2F3E8', muted: solidMuted('#F9E8CB', '#293126'), isLight: false, ink: '#f9e8cb' },
+  green: { bg: '#0E3B2E', surface: '#1AFFFFFF', text: '#E8F4EC', muted: solidMuted('#FFFFFF', '#0E3B2E'), isLight: false, ink: '#FFFFFF' },
+  blue: { bg: '#0F2B4D', surface: '#1AFFFFFF', text: '#E2ECF8', muted: solidMuted('#FFFFFF', '#0F2B4D'), isLight: false, ink: '#FFFFFF' },
+  desert: { bg: '#4C3523', surface: '#1AFFFFFF', text: '#F1E2C8', muted: solidMuted('#F9E8CB', '#4C3523'), isLight: false, ink: '#f9e8cb' },
+  slate: { bg: '#2A2D31', surface: '#1AFFFFFF', text: '#E5E8EC', muted: solidMuted('#FFFFFF', '#2A2D31'), isLight: false, ink: '#FFFFFF' },
 };
 
 /**

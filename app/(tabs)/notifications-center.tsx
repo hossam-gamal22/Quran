@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -35,6 +36,7 @@ import {
 } from '@/lib/notifications-manager';
 import { getPrayerTranslationKey } from '@/lib/prayer-times';
 import { fadeOutAndStop } from '@/lib/sound-manager';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 
 // ─── Time Picker Modal ────────────────────────────────────────────────────────
 interface TimePickerProps {
@@ -125,8 +127,13 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function NotificationsCenterScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { isDarkMode, settings: appSettings } = useSettings();
   const isRTL = useIsRTL();
+  const scrollBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  });
   const [settings, setSettings] = useState<AllNotificationSettings>(DEFAULT_ALL_NOTIF);
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
@@ -293,7 +300,7 @@ export default function NotificationsCenterScreen() {
         </View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: scrollBottomSpacing }}>
 
         {/* Permission Banner */}
         {permissionChecked && !hasPermission && (

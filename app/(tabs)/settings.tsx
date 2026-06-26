@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -46,6 +46,7 @@ import { getDisplayName, setDisplayName, getUserId, getOriginalDeviceUserId, syn
 import { saveDisplayName } from '@/lib/rewards-manager';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { uiText } from '@/lib/ui-text';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 
 // ========================================
 // مكونات فرعية
@@ -180,6 +181,7 @@ export default function SettingsScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const params = useLocalSearchParams<{ editName?: string }>();
+  const insets = useSafeAreaInsets();
   const {
     settings,
     isDarkMode,
@@ -190,6 +192,10 @@ export default function SettingsScreen() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const { isPremium } = useSubscription();
+  const scrollBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  });
 
   const appVersion = Constants.expoConfig?.version || '1.2.1';
 
@@ -469,7 +475,7 @@ export default function SettingsScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomSpacing }]}
         showsVerticalScrollIndicator={false}
       >
 
@@ -689,7 +695,6 @@ export default function SettingsScreen() {
           />
         </SettingSection>
 
-        <View style={styles.bottomSpace} />
       </ScrollView>
 
       {/* مودال اقتراح ميزة */}
@@ -783,7 +788,7 @@ export default function SettingsScreen() {
             activeOpacity={1}
             onPress={() => setNameModalVisible(false)}
           />
-          <View style={[styles.suggestCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.suggestCard, { backgroundColor: isDarkMode ? '#0f1a14' : '#ffffff', borderWidth: 1, borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]}>
             <Text style={[styles.suggestTitle, { color: colors.text }]}>
               {t('settings.editName')}
             </Text>
@@ -971,9 +976,6 @@ const _styles = StyleSheet.create({
     marginHorizontal: 8,
     lineHeight: 24,
     includeFontPadding: false,
-  },
-  bottomSpace: {
-    height: 100,
   },
   suggestOverlay: {
     flex: 1,

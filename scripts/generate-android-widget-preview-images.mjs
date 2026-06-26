@@ -29,7 +29,6 @@ const DEFAULT_IN_DIR = resolve(ROOT, 'tmp/widget-previews');
 const IN_DIR = process.argv[2] ? resolve(ROOT, process.argv[2]) : DEFAULT_IN_DIR;
 const THEME = process.argv[3] ?? 'light';
 const SKIP_DYNAMIC_OVERLAY = process.env.ROOH_SKIP_PICKER_DYNAMIC_OVERLAY === '1';
-const ANDROID_OVERLAY_ANCHORS = JSON.parse(readFileSync(resolve(ROOT, 'lib/widgets/android-overlay-anchors.json'), 'utf8'));
 
 const SIZE_DIMS = {
   small: { width: 155, height: 155 },
@@ -170,53 +169,134 @@ function escapeSvg(value) {
     .replace(/>/g, '&gt;');
 }
 
-function pickerOverlayKey(id, size) {
-  const key = `${id}_${size}`;
-  return key === 'prayerNextPrevious_medium' ? `${key}_ar` : key;
-}
+// ── Manifest-anchor overlay ──────────────────────────────────────────────────
+// tmp/widget-previews/anchors.json is pulled from the device TOGETHER with the
+// snapshot PNGs (scripts/pull-android-widget-snapshots.mjs), so both come from
+// the same pump generation. These are the SAME anchors SnapshotWidget.tsx
+// replays live on the home screen; drawing sample values at those rects makes
+// the picker thumbnail show exactly what a placed widget renders — same chrome
+// PNG, same coordinates, same fonts, same active-row highlight.
+const MANIFEST_ANCHORS_PATH = resolve(ROOT, 'tmp/widget-previews/anchors.json');
+const MANIFEST_ANCHORS = existsSync(MANIFEST_ANCHORS_PATH)
+  ? JSON.parse(readFileSync(MANIFEST_ANCHORS_PATH, 'utf8'))
+  : {};
+// Widgets whose dynamic text exists ONLY as live overlays (blanked in the
+// gallery bake). Their picker thumbnail MUST synthesize the overlay — emitting
+// the bare chrome PNG reintroduces the "blank prayer preview" bug, so fail loudly.
+const PRAYER_PICKER_IDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
 
-function pickerOverlayText(kind, compact) {
-  // dayDigital bakes its time directly into the gallery PNG, so overlaying a
-  // sample time here would double-draw and produce overlapping digits. Skip it.
-  if (kind === 'currentTime') return '';
-  // Wider gap after «س» (U+2002 EN SPACE) — mirrors SIN_MINUTE_GAP in
-  // lib/widget-format-duration so every surface shows the same س↔minute spacing.
-  const GAP = ' ';
-  if (kind === 'prayerPreviousCountdown') return `منذ ٤ س${GAP}١ د`;
-  if (kind === 'prayerNextCountdownWithLabel') return `الصلاة القادمة بعد ٢ س${GAP}٢٧ د`;
-  if (kind === 'prayerNextCountdown') {
-    // Only the small prayer-table anchor is `compact: true` — the spaced string
-    // is too wide for the 2×2 card and clips, so cram it there. Strip only ASCII
-    // spaces so the wide GAP after «س» survives ("بعد٢س ٢٧د").
-    const value = `بعد ٢ س${GAP}٢٧ د`;
-    return compact ? value.replace(/ /g, '') : value;
+// Wider gap after «س» (U+2002 EN SPACE) — mirrors SIN_MINUTE_GAP in
+// lib/widget-format-duration so every surface shows the same gap spacing.
+const GAP = ' ';
+// Representative sample state, formatted exactly like the live pipeline:
+// prayer times use Arabic-Indic digits + ص/م (formatEpochTimeInTimeZone, ar);
+// countdowns use western digits + Arabic words (formatPrayerDurationWithPrefix).
+const PRAYER_SAMPLE = {
+  nextKey: 'fajr',
+  rows: {
+    fajr: { name: 'الفجر', time: '٤:١٦ ص' },
+    sunrise: { name: 'الشروق', time: '٥:٤٧ ص' },
+    dhuhr: { name: 'الظهر', time: '١٢:١٧ م' },
+    asr: { name: 'العصر', time: '٣:٣٢ م' },
+    maghrib: { name: 'المغرب', time: '٦:٤٢ م' },
+    isha: { name: 'العشاء', time: '٨:١٩ م' },
+  },
+  prev: { name: 'العشاء', time: '١٠:٠١ م' },
+  until: `بعد 2 س${GAP}27 د`,
+  since: 'منذ 40 د',
+};
+
+// Mirrors buildPrayerAnchorOverlays in SnapshotWidget.tsx (gallery-fallback
+// branch, overlayNames=true): which sample value + color each anchor id gets.
+function manifestAnchorTextAndColor(id, size, anchor) {
+  const ink = '#403E3A';
+  const muted = '#6B6862';
+  const aId = anchor.id;
+  if (aId === 'currentTime') return null; // dayDigital bakes its digits into the PNG
+  if (aId.startsWith('prayerRowTime.') || aId.startsWith('prayerRowName.')) {
+    const key = aId.split('.')[1];
+    const row = PRAYER_SAMPLE.rows[key];
+    if (!row) return null;
+    const active = key === PRAYER_SAMPLE.nextKey;
+    return { text: aId.startsWith('prayerRowTime.') ? row.time : row.name, color: active ? ink : muted };
   }
-  return '';
+  if (aId === 'prayerHeroName' || aId === 'prayerNextName') {
+    return { text: PRAYER_SAMPLE.rows[PRAYER_SAMPLE.nextKey].name, color: ink };
+  }
+  if (aId === 'prayerHeroTime' || aId === 'prayerNextTime') {
+    return { text: PRAYER_SAMPLE.rows[PRAYER_SAMPLE.nextKey].time, color: ink };
+  }
+  if (aId === 'prayerPrevName') return { text: PRAYER_SAMPLE.prev.name, color: ink };
+  if (aId === 'prayerPrevTime') return { text: PRAYER_SAMPLE.prev.time, color: ink };
+  if (aId === 'prayerHeroCountdown') {
+    // Same labelling rules as the live overlay: the large table prefixes the
+    // next-prayer label; the 2x2 table crams the string (strip ASCII spaces
+    // only, the U+2002 gap survives) so it fits its header slot.
+    if (id === 'prayerTable' && size === 'large') return { text: `الصلاة القادمة ${PRAYER_SAMPLE.until}`, color: muted };
+    if (id === 'prayerTable' && size === 'small') return { text: PRAYER_SAMPLE.until.replace(/ /g, ''), color: muted };
+    return { text: PRAYER_SAMPLE.until, color: muted };
+  }
+  if (aId === 'prayerUntilCountdown') return { text: PRAYER_SAMPLE.until, color: muted };
+  if (aId === 'prayerSinceCountdown') return { text: PRAYER_SAMPLE.since, color: muted };
+  return null;
 }
 
-function pickerTextAnchor(align) {
-  if (align === 'left') return 'start';
-  if (align === 'right') return 'end';
-  return 'middle';
+// Mirrors anchorLetterSpacing in SnapshotWidget.tsx so glyph advances match
+// the live overlay / gallery render.
+function manifestLetterSpacing(anchorId) {
+  if (anchorId.startsWith('prayerRowTime.')) return -0.3;
+  if (anchorId === 'prayerHeroTime' || anchorId === 'prayerNextTime' || anchorId === 'prayerPrevTime') return -1;
+  return 0;
+}
+
+// alignment is in writing-direction terms (leading/trailing); all pulled
+// anchors are Arabic (RTL): leading = right edge, trailing = left edge.
+function manifestAnchorPosition(anchor) {
+  const side = anchor.alignment === 'leading' ? 'right' : anchor.alignment === 'trailing' ? 'left' : 'center';
+  if (side === 'right') return { x: anchor.x + anchor.width, textAnchor: 'start' }; // RTL start = right edge
+  if (side === 'left') return { x: anchor.x, textAnchor: 'end' }; // RTL end = left edge
+  return { x: anchor.x + anchor.width / 2, textAnchor: 'middle' };
 }
 
 function pickerDynamicOverlaySvg(id, size, width, height) {
   if (THEME !== 'light') return null;
-  const foreground = '#403E3A';
-  const muted = '#6B6862';
-  const anchors = ANDROID_OVERLAY_ANCHORS[pickerOverlayKey(id, size)] ?? [];
-  if (!anchors.length) return null;
-  const nodes = anchors
-    .map((anchor) => {
-      const value = pickerOverlayText(anchor.kind, anchor.compact === true);
-      if (!value) return '';
-      const color = anchor.kind === 'currentTime' ? foreground : muted;
-      const weight = anchor.fontKey === 'rubikBold' ? 700 : 500;
-      return `<text x="${anchor.x}" y="${anchor.y}" text-anchor="${pickerTextAnchor(anchor.textAlign)}" direction="rtl" dominant-baseline="central" font-family="Rubik, Rubik-Medium, sans-serif" font-size="${anchor.fontSize}" font-weight="${weight}" fill="${color}">${escapeSvg(value)}</text>`;
-    })
-    .join('\n  ');
+  const entry = MANIFEST_ANCHORS[`${id}_${size}`];
+  if (!entry?.anchors?.length) {
+    if (PRAYER_PICKER_IDS.has(id)) {
+      throw new Error(`No pulled anchors for ${id}_${size} — run scripts/pull-android-widget-snapshots.mjs first (its picker preview would render blank).`);
+    }
+    return null;
+  }
+  if (entry.language && entry.language !== 'ar') {
+    throw new Error(`Anchors for ${id}_${size} were pulled from an ${entry.language} bake — picker assets are Arabic; re-pull with the device language set to ar.`);
+  }
+  // Snapshots are captured at dp scale (155/329/345) and the thumbnail is
+  // resized to the same dims, so these are normally 1; kept for safety.
+  const sx = width / (entry.capturedWidth || width);
+  const sy = height / (entry.capturedHeight || height);
+  const nodes = [];
+  // Active-row highlight band, identical to the gallery/live overlay:
+  // rgba(0,0,0,0.12) on light, radius 6 (small/medium) or 10 (large).
+  if (id === 'prayerTable') {
+    const bg = entry.anchors.find((a) => a.id === `prayerRowBg.${PRAYER_SAMPLE.nextKey}`);
+    if (bg) {
+      nodes.push(`<rect x="${bg.x * sx}" y="${bg.y * sy}" width="${bg.width * sx}" height="${bg.height * sy}" rx="${size === 'large' ? 10 : 6}" fill="#000000" fill-opacity="0.12"/>`);
+    }
+  }
+  for (const anchor of entry.anchors) {
+    const resolved = manifestAnchorTextAndColor(id, size, anchor);
+    if (!resolved) continue;
+    const { x, textAnchor } = manifestAnchorPosition(anchor);
+    const y = (anchor.y + anchor.height / 2) * sy;
+    const weight = anchor.fontWeight === 'bold' || anchor.fontWeight === 'semibold' ? 700 : anchor.fontWeight === 'medium' ? 500 : 400;
+    const ls = manifestLetterSpacing(anchor.id);
+    nodes.push(
+      `<text x="${x * sx}" y="${y}" text-anchor="${textAnchor}" direction="rtl" dominant-baseline="central" font-family="Rubik, Rubik-Medium, sans-serif" font-size="${anchor.fontSize * sx}" font-weight="${weight}"${ls ? ` letter-spacing="${ls}"` : ''} fill="${resolved.color}">${escapeSvg(resolved.text)}</text>`,
+    );
+  }
+  if (!nodes.length) return null;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  ${nodes}
+  ${nodes.join('\n  ')}
 </svg>`;
 }
 

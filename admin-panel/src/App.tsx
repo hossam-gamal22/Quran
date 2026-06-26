@@ -139,6 +139,7 @@ import RouteGuide from './pages/RouteGuide';
 import AppContentManager from './pages/AppContentManager';
 import EngagementNotifications from './pages/EngagementNotifications';
 import CommentsModeration from './pages/CommentsModeration';
+import CrashLogs from './pages/CrashLogs';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -221,6 +222,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/users', icon: Users, label: 'المستخدمين' },
       { path: '/comments-moderation', icon: ShieldCheck, label: 'إشراف التعليقات' },
+      { path: '/crash-logs', icon: AlertTriangle, label: 'سجل الأعطال' },
       { path: '/suggestions', icon: MessageSquare, label: 'الاقتراحات' },
       { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
       { path: '/purchase-history', icon: CreditCard, label: 'سجل المشتريات' },
@@ -548,6 +550,7 @@ const App: React.FC = () => {
               <Route path="/route-guide" element={<RouteGuide />} />
               <Route path="/app-content" element={<AppContentManager />} />
               <Route path="/comments-moderation" element={<CommentsModeration />} />
+              <Route path="/crash-logs" element={<CrashLogs />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

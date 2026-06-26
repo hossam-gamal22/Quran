@@ -13,6 +13,35 @@ import type { SeasonType } from '@/lib/seasonal-content';
 import { getHijriDate } from '@/lib/hijri-date';
 import { buildAndroidLauncherIconRequest } from '@/lib/android-launcher-icon-request';
 import { RoohLauncherIcon } from '@/modules/rooh-launcher-icon';
+import {
+  computeIconState,
+  normalizeIconKey,
+  DEFAULT_SEASONAL_MAP,
+  DEFAULT_ENABLED_SEASONS,
+  pickPrioritySeason as pickPrioritySeasonResolver,
+  type AppIconsConfig,
+  type SeasonalIconKey,
+  type IconMode,
+  type LocalizedText,
+  type SeasonalLocalizedText,
+  type SeasonName,
+} from '@/lib/app-icon-resolver';
+
+// Re-export the shared (pure) types & constants so existing importers of this
+// module keep working unchanged. The priority logic now lives ONLY in
+// lib/app-icon-resolver.ts (shared with the admin panel) — see that file.
+export {
+  normalizeIconKey,
+  DEFAULT_SEASONAL_MAP,
+  DEFAULT_ENABLED_SEASONS,
+};
+export type {
+  AppIconsConfig,
+  SeasonalIconKey,
+  IconMode,
+  LocalizedText,
+  SeasonalLocalizedText,
+};
 
 // True when running inside Expo Go (no compiled native modules).
 // SDK 54: `Constants.appOwnership` is deprecated and may be null even in Expo Go,
@@ -31,91 +60,10 @@ const ICON_PENDING_KEY = '@app_icon_pending';
 const ICON_ANNOUNCED_KEY = '@app_icon_announced';
 const ENGLISH_ICON = 'app_icon_english';
 
-// ─── Types ──────────────────────────────────────────────
-
-export type SeasonalIconKey =
-  | 'default_ar'
-  | 'default_en'
-  | 'ramadan'
-  | 'hajj'
-  | 'mawlid'
-  | 'eid_fitr'
-  | 'eid_adha'
-  | 'hijri_new_year';
-
-// Icon keys that have been retired from the bundle but may still live in stored
-// Firestore configs (`appConfig/appIcons`) or persisted state (`@app_icon_variant`).
-// They are normalized to their replacement so old data never resolves to a
-// missing native icon. `dhul_hijjah` was merged into the single `hajj` icon for
-// the first 9 days of Dhul-Hijjah.
-const LEGACY_ICON_ALIASES: Record<string, SeasonalIconKey> = {
-  dhul_hijjah: 'hajj',
-};
-
-export function normalizeIconKey(key: string | null | undefined): SeasonalIconKey {
-  if (!key) return 'default_ar';
-  return (LEGACY_ICON_ALIASES[key] ?? key) as SeasonalIconKey;
-}
-
-export type IconMode = 'auto' | 'manual' | 'language_only';
-
-export type LocalizedText = Partial<Record<Language, string>>;
-export type SeasonalLocalizedText = Partial<Record<Exclude<SeasonType, 'none'>, LocalizedText>>;
-
-export interface AppIconsConfig {
-  version: number;
-  alertEnabled: boolean;
-  // Legacy AR/EN fields (kept for backward compat).
-  alertTitle: string;
-  alertMessage: string;
-  alertTitleEn: string;
-  alertMessageEn: string;
-  // New per-language maps (override legacy when present).
-  alertTitleI18n?: LocalizedText;
-  alertMessageI18n?: LocalizedText;
-  // Optional per-season alert text. Falls back to generic alert text.
-  seasonalAlertTitleI18n?: SeasonalLocalizedText;
-  seasonalAlertMessageI18n?: SeasonalLocalizedText;
-  // Seasonal icon control.
-  mode?: IconMode;
-  manualIcon?: SeasonalIconKey | null;
-  seasonalMap?: Partial<Record<Exclude<SeasonType, 'none'>, SeasonalIconKey>>;
-  enabledSeasons?: Exclude<SeasonType, 'none'>[];
-  updatedAt?: string;
-}
-
-// ─── Defaults ───────────────────────────────────────────
-
-export const DEFAULT_SEASONAL_MAP: Record<Exclude<SeasonType, 'none'>, SeasonalIconKey> = {
-  ramadan: 'ramadan',
-  hajj: 'hajj',
-  mawlid: 'mawlid',
-  eid_fitr: 'eid_fitr',
-  eid_adha: 'eid_adha',
-  // Days 1–9 of Dhul-Hijjah show the single Hajj icon. The `dhul_hijjah` season
-  // wins the priority over `hajj` for days 1–9 (see SEASON_PRIORITY), so we map
-  // BOTH period-seasons to the same `hajj` asset — making the first-9-days icon
-  // deterministic regardless of which season resolves. Day 10 flips to the sheep
-  // (eid_adha) automatically via its higher priority. The standalone
-  // `dhul_hijjah` icon asset is intentionally no longer referenced.
-  dhul_hijjah: 'hajj',
-  hijri_new_year: 'hijri_new_year',
-  // Months without dedicated icons fall back to language default.
-  ashura: 'default_ar',
-  muharram: 'default_ar',
-  rajab: 'default_ar',
-  shaban: 'default_ar',
-};
-
-export const DEFAULT_ENABLED_SEASONS: Exclude<SeasonType, 'none'>[] = [
-  'ramadan',
-  'hajj',
-  'mawlid',
-  'eid_fitr',
-  'eid_adha',
-  'dhul_hijjah',
-  'hijri_new_year',
-];
+// ─── Types & defaults ───────────────────────────────────
+// SeasonalIconKey, IconMode, AppIconsConfig, normalizeIconKey, DEFAULT_SEASONAL_MAP
+// and DEFAULT_ENABLED_SEASONS are imported & re-exported from the shared resolver
+// above. Only app-specific alert text defaults live here.
 
 export const DEFAULT_SEASONAL_ALERT_TITLES: SeasonalLocalizedText = {
   ramadan: {
@@ -211,24 +159,6 @@ export const DEFAULT_SEASONAL_ALERT_MESSAGES: SeasonalLocalizedText = {
   },
 };
 
-// Priority order for overlapping seasons (most specific event wins).
-// NOTE: keep this identical to SEASON_PRIORITY in lib/seasonal-content.ts.
-const SEASON_PRIORITY: Exclude<SeasonType, 'none'>[] = [
-  'eid_fitr',
-  'eid_adha',
-  'mawlid',
-  'ashura',
-  'ramadan',
-  'dhul_hijjah',
-  'hajj',
-  // Short, specific Hijri-new-year window (1–3 Muharram) must out-prioritize the
-  // month-wide `muharram` season (which maps to the default icon).
-  'hijri_new_year',
-  'muharram',
-  'rajab',
-  'shaban',
-];
-
 // ─── Native module loader (graceful fallback in Expo Go) ──
 
 interface DynamicIconModule {
@@ -310,43 +240,37 @@ function toNativeIconName(key: SeasonalIconKey): string | null {
 
 /**
  * Resolve which icon should be active given current config, season, and language.
- * Priority: manual override → seasonal auto → language default.
+ * Delegates to the shared, pure resolver (lib/app-icon-resolver.ts) so the app
+ * and the admin panel share ONE priority implementation:
+ *   active schedule → manual mode → seasonal auto → language default.
+ *
+ * The app passes its own (per-user, offset-corrected) `currentSeason` so season
+ * detection stays exactly as before; the resolver only unifies the priority +
+ * schedule/targeting logic. A `null` season means "no active season" (the app
+ * decided so) — the resolver will NOT recompute a tabular one in that case.
  */
 export function resolveActiveIcon(
   config: AppIconsConfig | null,
   currentSeason: SeasonType | null,
   language: Language
 ): SeasonalIconKey {
-  const mode: IconMode = config?.mode ?? 'auto';
-  const langDefault: SeasonalIconKey = language === 'ar' ? 'default_ar' : 'default_en';
-
-  if (mode === 'language_only') return langDefault;
-
-  if (mode === 'manual' && config?.manualIcon) {
-    return normalizeIconKey(config.manualIcon);
-  }
-
-  // Auto mode: use season if active and enabled.
-  if (mode === 'auto' && currentSeason && currentSeason !== 'none') {
-    const enabled = config?.enabledSeasons ?? DEFAULT_ENABLED_SEASONS;
-    if (enabled.includes(currentSeason as Exclude<SeasonType, 'none'>)) {
-      const map = { ...DEFAULT_SEASONAL_MAP, ...(config?.seasonalMap ?? {}) };
-      const mapped = normalizeIconKey(map[currentSeason as Exclude<SeasonType, 'none'>]);
-      if (mapped && mapped !== 'default_ar' && mapped !== 'default_en') {
-        return mapped;
-      }
-    }
-  }
-
-  return langDefault;
+  const season: SeasonName | null =
+    currentSeason && currentSeason !== 'none' ? (currentSeason as SeasonName) : null;
+  return computeIconState(config, {
+    now: new Date(),
+    platform: Platform.OS === 'ios' ? 'ios' : 'android',
+    appVersion: Constants.expoConfig?.version ?? null,
+    language,
+    currentSeason: season,
+  }).iconKey;
 }
 
 /** Choose the highest-priority active season when multiple overlap. */
 export function pickPrioritySeason(activeSeasons: SeasonType[]): SeasonType | null {
-  for (const candidate of SEASON_PRIORITY) {
-    if (activeSeasons.includes(candidate)) return candidate;
-  }
-  return null;
+  const filtered = activeSeasons.filter(
+    (s): s is SeasonName => s !== 'none'
+  );
+  return (pickPrioritySeasonResolver(filtered) as SeasonType | null) ?? null;
 }
 
 // ─── Core switch ────────────────────────────────────────

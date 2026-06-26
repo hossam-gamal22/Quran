@@ -4,7 +4,8 @@
 // so the in-app gallery matches what the user will see on their home screen.
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, Platform, StyleSheet, Image } from 'react-native';
+import { View, Text, Platform, StyleSheet } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -693,6 +694,23 @@ function resolvePreviewPrayerItem(sharedData: ReturnType<typeof useWidgetPreview
 }
 
 /**
+ * Widget-scoped display name: Friday Dhuhr shows the single word «الجمعة» /
+ * "Jumuah" — matching `widgetPrayerName` in SnapshotWidget (the home-screen
+ * overlay) and the baked iOS templates — instead of the app-wide
+ * «صلاة الجمعة» carried on the shared payload, which is wider than the prayer
+ * tiles allot and truncated («صلاة الجم...») on small cards.
+ */
+function widgetScopedPrayerName(
+  key: string | undefined,
+  raw: string | undefined,
+  ar: boolean,
+  nowMs: number = Date.now(),
+): string | undefined {
+  if (key === 'dhuhr' && new Date(nowMs).getDay() === 5) return ar ? 'الجمعة' : 'Jumuah';
+  return raw;
+}
+
+/**
  * Intentional "enable location" placeholder for every prayer widget preview.
  * Shown in the in-app gallery when no real location is available yet
  * (`prayer.needsLocation`), instead of the misleading Makkah/sample times.
@@ -745,7 +763,8 @@ export function PrayerSimplePreview({ size, language, forSnapshot }: { size: Pre
   // current language. Falls back to cached strings only as a last resort.
   const liveTimeStr = formatPrayerTimeForPreview(trueNextItem?.epochMs ?? sharedData?.prayer?.nextPrayerAtEpochMs, ar, sharedData?.prayer?.timezone);
   const time = noWrapPrayerTime(applyNumerals(liveTimeStr ?? trueNextItem?.time ?? sharedData?.prayer?.nextPrayerTime ?? '04:14', numerals, ar));
-  const name = ar ? (trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
+  const rawName = ar ? (trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
+  const name = widgetScopedPrayerName((trueNextItem as any)?.key, rawName, ar) ?? rawName;
   const countdown = compactRemainingFromEpoch(resolvePreviewEpoch(sharedData, true), (s) => applyNumerals(s, numerals, ar), ar);
   const timeFs = Platform.OS === 'android' && size === 'small' ? 38 : size === 'small' ? 42 : 56;
   return (
@@ -855,8 +874,8 @@ function prayerRowsFromShared(data: ReturnType<typeof useWidgetPreviewData>, ar:
     const liveTime = formatPrayerTimeForPreview(item.epochMs, ar, data?.prayer?.timezone) ?? item.time ?? '--:--';
     return {
       key: item.key,
-      keyAr: item.nameAr ?? item.name ?? '',
-      keyEn: item.name ?? item.nameAr ?? '',
+      keyAr: widgetScopedPrayerName(item.key, item.nameAr ?? item.name, true, now) ?? '',
+      keyEn: widgetScopedPrayerName(item.key, item.name ?? item.nameAr, false, now) ?? '',
       time: liveTime,
       icon: iconFor(item.name),
       isNext: !!item.isNext,
@@ -1023,8 +1042,19 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
   const nextPrayer = prayerRows.find((r) => r.isNext) ?? prayerRows[0] ?? PRAYER_ROWS[0];
   const trueNextEpoch = prayerState.nextEpochMs ?? resolvePreviewEpoch(sharedData, true, nowMs);
   const trueNextItem = resolvePreviewPrayerItem(sharedData, true, nowMs);
-  const heroNameAr = prayerState.nextRow?.nameAr ?? trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? nextPrayer.keyAr;
-  const heroNameEn = prayerState.nextRow?.name ?? trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName ?? nextPrayer.keyEn;
+  const heroKey = prayerState.nextRow?.key ?? (trueNextItem as any)?.key;
+  const heroNameAr = widgetScopedPrayerName(
+    heroKey,
+    prayerState.nextRow?.nameAr ?? trueNextItem?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr,
+    true,
+    nowMs,
+  ) ?? nextPrayer.keyAr;
+  const heroNameEn = widgetScopedPrayerName(
+    heroKey,
+    prayerState.nextRow?.name ?? trueNextItem?.name ?? sharedData?.prayer?.nextPrayerName,
+    false,
+    nowMs,
+  ) ?? nextPrayer.keyEn;
   const heroTime = formatPrayerTimeForPreview(trueNextEpoch, ar, sharedData?.prayer?.timezone)
     ?? prayerState.nextRow?.time
     ?? trueNextItem?.time
@@ -1455,8 +1485,10 @@ export function PrayerNextPrevPreview({ size, language, forSnapshot }: { size: P
   const isAndroid = Platform.OS === 'android';
   const trueNextPrev = resolvePreviewPrayerItem(sharedData, true);
   const truePrevPrev = resolvePreviewPrayerItem(sharedData, false);
-  const nextName = ar ? (trueNextPrev?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextPrev?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
-  const previousName = ar ? (truePrevPrev?.nameAr ?? sharedData?.prayer?.previousPrayerNameAr ?? 'العشاء') : (truePrevPrev?.name ?? sharedData?.prayer?.previousPrayerName ?? 'Isha');
+  const rawNextName = ar ? (trueNextPrev?.nameAr ?? sharedData?.prayer?.nextPrayerNameAr ?? 'الفجر') : (trueNextPrev?.name ?? sharedData?.prayer?.nextPrayerName ?? 'Fajr');
+  const rawPreviousName = ar ? (truePrevPrev?.nameAr ?? sharedData?.prayer?.previousPrayerNameAr ?? 'العشاء') : (truePrevPrev?.name ?? sharedData?.prayer?.previousPrayerName ?? 'Isha');
+  const nextName = widgetScopedPrayerName((trueNextPrev as any)?.key, rawNextName, ar) ?? rawNextName;
+  const previousName = widgetScopedPrayerName((truePrevPrev as any)?.key, rawPreviousName, ar) ?? rawPreviousName;
   const nextItem = {
     label: ar ? 'الصلاة القادمة' : 'Next Prayer',
     name: nextName,
@@ -1619,9 +1651,19 @@ function CuratedImagePreview({ widgetId, size, language }: { widgetId: CuratedWi
   const tint = p.ink;
   // padding 0 + cover → the design fills the tile edge-to-edge at 100% (the PNGs
   // are authored at the tile aspect ratio), matching the placed widget exactly.
+  // expo-image with the `tintColor` PROP (not style): RN core Image's
+  // style.tintColor on the new architecture rendered these previews blank on
+  // Android (empty azkar gallery cards) while the same assets tinted fine in
+  // the native home-screen path.
   return (
     <GlassTile size={size} padding={0} palette={p}>
-      <Image source={src} resizeMode="cover" style={{ width: '100%', height: '100%', tintColor: tint }} />
+      <ExpoImage
+        source={src}
+        contentFit="cover"
+        tintColor={tint}
+        style={{ width: '100%', height: '100%' }}
+        onError={__DEV__ ? (e) => console.warn(`[widget/gallery] curated image failed id=${widgetId}:`, e?.error) : undefined}
+      />
     </GlassTile>
   );
 }
@@ -1996,15 +2038,30 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
       year = h.year;
     }
   } catch {}
-  // Smaller base font on small widgets so "٢٣ ذو القعدة" fits with auto-shrink
-  // headroom; medium/large keep the original calligraphic scale.
-  const monthFs = size === 'small' ? 22 : 32;
   const dayLabel = applyNumerals(day, numerals, ar);
   const monthLabel = ar ? monthAr : (HIJRI_MONTHS_EN[monthIndex - 1] ?? monthAr);
-  const hijriRow = `${dayLabel}  ${monthLabel}`;
+  const hijriRow = `${dayLabel} ${monthLabel}`;
+  // Length-aware pre-shrink (same spirit as SnapshotWidget's fitCalligraphyFs):
+  // RN's adjustsFontSizeToFit floor (minimumFontScale 0.75) is NOT enough for
+  // the longest Hijri names — at 22px the small tile clipped «٢٦ ذي الحجة» to
+  // «٢٦ ذي» (reported bug). Pre-scale by character budget so the full
+  // "{day} {month}" always fits one centered line; the RN auto-shrink stays on
+  // as a final safety net for font-metric variance.
+  const hijriFit = (base: number, floor: number, budget: number) => {
+    const len = hijriRow.trim().length;
+    return len <= budget ? base : Math.max(floor, Math.round((base * budget) / len));
+  };
+  // Enlarged composition (owner request): ~20% bigger date line + year + faint
+  // watermark so the small tile reads comfortably. The length-aware pre-shrink
+  // keeps the longest month («٢٦ ذي الحجة») on one full line, and RN's
+  // adjustsFontSizeToFit (minimumFontScale 0.75) remains the final safety net.
+  // KEEP IN SYNC with the live offline fallback in SnapshotWidget.tsx
+  // (LiveDateWidget hijriDate branch) so home matches the gallery when the
+  // baked PNG is stale.
+  const monthFs = size === 'small' ? hijriFit(26, 15, 9) : hijriFit(38, 22, 13);
   const fillStrong = p.ink;
   const watermarkLabel = ar ? 'هجري' : 'Hijri';
-  const watermarkFs = size === 'small' ? 44 : 72;
+  const watermarkFs = size === 'small' ? 50 : 84;
   const watermarkFill = p.isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
   return (
     <GlassTile size={size} padding={0} palette={p}>
@@ -2057,9 +2114,9 @@ export function HijriPreview({ size, language }: { size: PreviewSize; language?:
           adjustsFontSizeToFit
           style={{
             fontFamily: 'Rubik-Medium',
-            fontSize: size === 'small' ? 11 : 13,
+            fontSize: size === 'small' ? 13 : 15,
             color: p.muted,
-            marginTop: 4,
+            marginTop: 6,
           }}
         >
           {`${applyNumerals(year, numerals, ar)} ${ar ? 'هجري' : 'AH'}`}

@@ -24,9 +24,11 @@ import {
 import { addBookmark, isBookmarked } from '@/lib/storage';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SearchResult {
   number: number;
@@ -78,8 +80,13 @@ const HISTORY_KEY = '@quran_search_history';
 export default function QuranSearchScreen() {
   const router = useRouter();
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { settings, isDarkMode, t } = useSettings();
   const isRTL = useIsRTL();
+  const listBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  });
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -594,7 +601,7 @@ export default function QuranSearchScreen() {
             keyExtractor={item => `${item.surah.number}_${item.numberInSurah}`}
             renderItem={renderResult}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            contentContainerStyle={{ paddingBottom: listBottomSpacing }}
             initialNumToRender={15}
             maxToRenderPerBatch={10}
             windowSize={5}

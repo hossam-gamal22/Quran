@@ -87,6 +87,13 @@ interface BanRow {
   bannedBy?: string;
 }
 
+interface ReportDetail {
+  userId: string;
+  reason: string;
+  note?: string;
+  createdAt: Timestamp | null;
+}
+
 type BanDuration = '1d' | '7d' | '30d' | 'permanent';
 
 interface UserProfile {
@@ -106,6 +113,16 @@ const SECTION_COLORS: Record<string, string> = {
   prophet: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
   companion: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
   seerah: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+};
+
+// Mirror of the app's report reasons (lib/story-interactions.ts ReportReason).
+const REPORT_REASON_LABELS: Record<string, string> = {
+  inappropriate: 'محتوى غير لائق',
+  sectarian: 'كلام طائفي أو فتنة',
+  misinformation: 'معلومات دينية غير صحيحة',
+  spam: 'سبام أو إعلان',
+  harassment: 'إساءة أو تنمّر',
+  other: 'سبب آخر',
 };
 
 const STORY_TITLES: Record<string, string> = (() => {
@@ -211,6 +228,9 @@ const CommentsModeration: React.FC = () => {
   const [likersLoading, setLikersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [banModalUserId, setBanModalUserId] = useState<string | null>(null);
+  const [reportsModalRow, setReportsModalRow] = useState<CommentRow | null>(null);
+  const [reports, setReports] = useState<ReportDetail[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
 
   // ---------- Data loaders ----------
 
@@ -415,6 +435,44 @@ const CommentsModeration: React.FC = () => {
   useEffect(() => {
     if (likersModalStoryId) loadLikers(likersModalStoryId);
   }, [likersModalStoryId, loadLikers]);
+
+  const loadReports = useCallback(async (row: CommentRow) => {
+    setReportsLoading(true);
+    setReports([]);
+    try {
+      const reportsCol =
+        row.kind === 'reply' && row.parentCommentId
+          ? collection(
+              db,
+              'storyInteractions', row.storyId,
+              'comments', row.parentCommentId,
+              'replies', row.commentId,
+              'reports',
+            )
+          : collection(db, 'storyInteractions', row.storyId, 'comments', row.commentId, 'reports');
+      const snap = await getDocs(query(reportsCol, limit(100)));
+      const rows: ReportDetail[] = [];
+      snap.forEach((d) => {
+        const data = d.data() as any;
+        rows.push({
+          userId: String(data.userId || d.id),
+          reason: String(data.reason || 'other'),
+          note: data.note ? String(data.note) : undefined,
+          createdAt: (data.createdAt as Timestamp | null) || null,
+        });
+      });
+      rows.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setReports(rows);
+    } catch (err) {
+      console.error('[CommentsModeration] loadReports error:', err);
+    } finally {
+      setReportsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (reportsModalRow) loadReports(reportsModalRow);
+  }, [reportsModalRow, loadReports]);
 
   // ---------- Actions ----------
 
@@ -630,6 +688,7 @@ const CommentsModeration: React.FC = () => {
           onHide={hideComment}
           onDelete={deleteComment}
           onBan={(userId) => setBanModalUserId(userId)}
+          onViewReports={(row) => setReportsModalRow(row)}
         />
       )}
       {tab === 'likes' && (
@@ -649,6 +708,19 @@ const CommentsModeration: React.FC = () => {
           userId={banModalUserId}
           onClose={() => setBanModalUserId(null)}
           onConfirm={banUser}
+        />
+      )}
+
+      {/* Reports modal */}
+      {reportsModalRow && (
+        <ReportsModal
+          row={reportsModalRow}
+          reports={reports}
+          loading={reportsLoading}
+          onClose={() => {
+            setReportsModalRow(null);
+            setReports([]);
+          }}
         />
       )}
 
@@ -695,7 +767,8 @@ const CommentsList: React.FC<{
   onHide: (row: CommentRow) => void;
   onDelete: (row: CommentRow) => void;
   onBan: (userId: string) => void;
-}> = ({ comments, loading, onHide, onDelete, onBan }) => {
+  onViewReports: (row: CommentRow) => void;
+}> = ({ comments, loading, onHide, onDelete, onBan, onViewReports }) => {
   if (loading && !comments.length) {
     return (
       <div className="text-center py-12 text-admin-muted">
@@ -766,6 +839,15 @@ const CommentsList: React.FC<{
                 user: {c.userId}
               </code>
               <div className="flex-1" />
+              {c.reportCount > 0 && (
+                <button
+                  onClick={() => onViewReports(c)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-300 rounded-lg text-xs border border-red-500/40 transition-colors"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  عرض البلاغات
+                </button>
+              )}
               <button
                 onClick={() => onHide(c)}
                 className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-xs border border-amber-500/40 transition-colors"
@@ -1106,5 +1188,73 @@ const BanModal: React.FC<{
     </div>
   );
 };
+
+const ReportsModal: React.FC<{
+  row: CommentRow;
+  reports: ReportDetail[];
+  loading: boolean;
+  onClose: () => void;
+}> = ({ row, reports, loading, onClose }) => (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div
+      className="bg-admin-surface rounded-2xl p-6 max-w-lg w-full border border-admin-border max-h-[85vh] flex flex-col"
+      onClick={(e) => e.stopPropagation()}
+      dir="rtl"
+    >
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Flag className="w-5 h-5 text-red-400" />
+          بلاغات {row.kind === 'reply' ? 'الردّ' : 'التعليق'}
+        </h2>
+        <button onClick={onClose} className="text-admin-muted hover:text-white" title="إغلاق">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="bg-admin-bg p-3 rounded-lg mb-3 flex-shrink-0 border border-admin-border">
+        <p className="text-sm text-white font-semibold">{row.displayName || 'بدون اسم'}</p>
+        <p className="text-xs text-admin-muted mt-1 whitespace-pre-wrap line-clamp-3">{row.text}</p>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-admin-muted">
+          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+          جاري التحميل...
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="text-center py-8 text-admin-muted">لا توجد تفاصيل بلاغات</div>
+      ) : (
+        <>
+          <p className="text-admin-muted text-xs mb-2 flex-shrink-0">
+            {reports.length.toLocaleString('ar-EG')} بلاغ — مرتب من الأحدث
+          </p>
+          <div className="space-y-2 overflow-y-auto flex-1 -mx-1 px-1">
+            {reports.map((r, idx) => (
+              <div
+                key={`${r.userId}-${idx}`}
+                className="bg-admin-bg rounded-lg px-3 py-2.5 border border-admin-border"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                  <span className="text-xs px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 border border-red-500/40">
+                    {REPORT_REASON_LABELS[r.reason] || r.reason}
+                  </span>
+                  <span className="text-xs text-admin-muted whitespace-nowrap">{formatDate(r.createdAt)}</span>
+                </div>
+                {r.note && (
+                  <p className="text-sm text-white/90 whitespace-pre-wrap leading-relaxed mt-1.5 bg-admin-surface rounded-md p-2 border border-admin-border">
+                    “{r.note}”
+                  </p>
+                )}
+                <code className="text-[11px] text-admin-muted font-mono block mt-1.5 truncate">
+                  من: {r.userId}
+                </code>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
 
 export default CommentsModeration;

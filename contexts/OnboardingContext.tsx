@@ -220,16 +220,25 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         console.warn('[onboarding] server check failed/timeout, using local state', serverErr);
       }
 
-      // تحميل التقدم المحفوظ
-      const savedProgress = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_PROGRESS);
-      if (savedProgress) {
-        setProgress(JSON.parse(savedProgress));
+      // تحميل التقدم المحفوظ — corrupted progress JSON must not abort the
+      // preferences load below (each store fails independently).
+      try {
+        const savedProgress = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_PROGRESS);
+        if (savedProgress) {
+          setProgress(JSON.parse(savedProgress));
+        }
+      } catch (e) {
+        console.warn('[onboarding] corrupted saved progress, using defaults:', e);
       }
 
       // تحميل التفضيلات المحفوظة
-      const savedPrefs = await AsyncStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
-      if (savedPrefs) {
-        setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(savedPrefs) });
+      try {
+        const savedPrefs = await AsyncStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
+        if (savedPrefs) {
+          setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(savedPrefs) });
+        }
+      } catch (e) {
+        console.warn('[onboarding] corrupted saved preferences, using defaults:', e);
       }
     } catch (error) {
       console.error('Error loading onboarding state:', error);

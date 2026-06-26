@@ -33,6 +33,9 @@ interface CuratedImageWidgetProps {
   /** Resolved theme key (already collapsed from 'auto'). */
   theme?: string;
   clickUri?: string;
+  /** Pre-resolved local file:// for the image (dev-mode resilience — see
+   *  decideAndroidWidget). When unset, the require() source is used. */
+  imageUri?: string;
   /** Launcher-reported bounds in dp (mirrors SnapshotWidget scaling). */
   widgetWidth?: number;
   widgetHeight?: number;
@@ -45,6 +48,7 @@ export function CuratedImageWidget({
   size,
   theme,
   clickUri,
+  imageUri,
   widgetWidth,
   widgetHeight,
   now,
@@ -58,7 +62,7 @@ export function CuratedImageWidget({
   const tileHeight = logicalHeight * renderScale;
   const tileRadius = TILE_RADIUS[size] * renderScale;
 
-  const src = curatedImageSource(widgetId, now ?? new Date());
+  const src = imageUri ?? curatedImageSource(widgetId, now ?? new Date());
 
   // The PNGs are authored at the tile's aspect ratio (1080×510 ≈ medium), so we
   // fill the tile edge-to-edge — the widget shows the design at 100%, no inset.
@@ -81,6 +85,8 @@ export function CuratedImageWidget({
         height: 'match_parent',
         alignItems: 'center',
         justifyContent: 'center',
+        // Transparent outer host: the centered tile keeps the gallery's exact
+        // aspect (1:1 parity with the in-app gallery card).
         backgroundColor: '#00000000',
       }}
       clickAction={clickUri ? 'OPEN_URI' : 'OPEN_APP'}

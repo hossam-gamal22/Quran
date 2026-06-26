@@ -26,6 +26,18 @@ import {
 } from './snapshot';
 import type { SharedWidgetData } from '@/lib/widget-data';
 
+// 16 — Hijri date widget composition enlarged (~20% bigger date line, year,
+//       watermark — owner request). The content hash doesn't see layout-only
+//       changes, so bump to force the gallery PNG + anchors to re-bake;
+//       otherwise existing installs would keep serving the smaller baked tile
+//       while the gallery already renders the enlarged one (preview≠home).
+// 15 — Per-state prayer templates are now version-gated (prayer-static/
+//       manifest.json carries this version; the headless resolver rejects
+//       mismatches) and prayer-table anchors must be COMPLETE (all 6
+//       prayerRowTime.*) to be used. Bump forces gallery PNGs + manifest
+//       anchors + per-state templates to regenerate as ONE generation, so
+//       stale-template layouts and old-schema anchors can never mix with
+//       new code (was: home table missing 5 row times / wrong spacing).
 // 14 — Verse preview starts from a larger fit-to-width font and tighter side
 //       inset so short/medium ayat fill the space between ornaments.
 // 13 — Verse QCF ornaments/brackets get wider side inset from the ayah text.
@@ -50,7 +62,11 @@ import type { SharedWidgetData } from '@/lib/widget-data';
 //      `SharedWidgetData.snapshotManifest[routeKey].anchors`). Bumping forces
 //      every cached PNG + manifest entry to regenerate so the new fields are
 //      populated even when the user's content signature hasn't changed.
-const SCHEMA_VERSION = 14;
+// NOTE: keep in sync with PRAYER_TEMPLATE_BAKE_VERSION in
+// lib/widget-android-asset-resolver.ts (leaf module — can't import from here
+// without a cycle). Both must bump together so gallery PNGs + manifest anchors
+// + per-state templates always regenerate as ONE generation.
+const SCHEMA_VERSION = 16;
 
 export type DisplaySettingsLike = {
   widgetTheme?: string;

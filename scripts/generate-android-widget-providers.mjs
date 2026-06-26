@@ -33,11 +33,12 @@ function rememberLockedPreview(id, size) {
 const SIZE_DIMS = {
   small: { width: 110, height: 110, targetCellWidth: 2, targetCellHeight: 2 },
   medium: { width: 250, height: 110, targetCellWidth: 3, targetCellHeight: 2 },
-  // The large prayer/table content is ~square (329×345 dp) and the widget body
-  // fits it with `contain` scaling at the 3-col width, so a 4-row cell left a
-  // big empty band below the card. 3×2 hugs the content (the card already
-  // renders at the 3-col width; this just drops the unused extra height).
-  large: { width: 250, height: 170, targetCellWidth: 3, targetCellHeight: 2 },
+  // The large prayer/table content is ~square (329×345 dp). 3×3 cells with
+  // minHeight 260dp is the verified-good sizing (contain-fit renders the card
+  // at nearly full width without a big empty band). NOTE: android/ is NOT
+  // git-tracked — this generator is the single source of truth for these
+  // values, so any sizing tweak must be made HERE, not in the emitted XML.
+  large: { width: 250, height: 260, targetCellWidth: 3, targetCellHeight: 3 },
 };
 
 const RETIRED_PICKER_PROVIDERS = [
@@ -56,6 +57,7 @@ const LOCK_PROVIDERS = [
     ...SIZE_DIMS.small,
     preview: rememberPreview('dayThuluth', 'small'),
     category: 'keyguard',
+    isDate: true,
   },
   {
     className: 'RoohLockMonthThuluth',
@@ -66,6 +68,7 @@ const LOCK_PROVIDERS = [
     ...SIZE_DIMS.medium,
     preview: rememberPreview('monthThuluth', 'medium'),
     category: 'keyguard',
+    isDate: true,
   },
   {
     className: 'RoohLockNextPrayer',
@@ -98,6 +101,7 @@ const LOCK_PROVIDERS = [
     ...SIZE_DIMS.small,
     preview: rememberPreview('hijriDate', 'small'),
     category: 'keyguard',
+    isDate: true,
   },
   {
     className: 'RoohLockNextPrayerCountdown',
@@ -190,6 +194,9 @@ const homeProviders = variants.map((v) => {
     preview: v.isPremium ? rememberLockedPreview(v.id, v.size) : rememberPreview(v.id, v.size),
     category: 'home_screen',
     isPrayer: v.id.startsWith('prayer'),
+    // Date-keyed widgets get DateAwareWidgetProvider so the local-midnight
+    // refresh alarm stays armed while any of them is placed.
+    isDate: /^(day|month|hijri)/.test(v.id),
   };
 });
 
@@ -236,8 +243,12 @@ const javaFiles = [];
 for (const provider of providers) {
   const className = provider.className;
   const javaPath = resolve(ANDROID_JAVA, `${className}.java`);
-  const baseClass = provider.isPrayer ? 'PrayerAwareWidgetProvider' : 'RNWidgetProvider';
-  const providerImport = provider.isPrayer ? '' : '\nimport com.reactnativeandroidwidget.RNWidgetProvider;\n';
+  const baseClass = provider.isPrayer
+    ? 'PrayerAwareWidgetProvider'
+    : provider.isDate
+      ? 'DateAwareWidgetProvider'
+      : 'RNWidgetProvider';
+  const providerImport = (provider.isPrayer || provider.isDate) ? '' : '\nimport com.reactnativeandroidwidget.RNWidgetProvider;\n';
   const content = `package com.rooh.almuslim.widget;
 ${providerImport}
 public class ${className} extends ${baseClass} {

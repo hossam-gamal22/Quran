@@ -41,6 +41,11 @@ import {
 import type { SharedWidgetData } from '@/lib/widget-data';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { loadPageFont } from '@/lib/qcf-font-loader';
+import {
+  PRAYER_TEMPLATE_BAKE_VERSION,
+  prayerTemplateMatrixIsCurrent,
+  stampPrayerTemplateMatrix,
+} from '@/lib/widget-android-asset-resolver';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Anchor manifest — per-slot collector
@@ -1292,6 +1297,14 @@ function jumuahBakeSpecs(defId: string): Array<{ token: string; next: PrayerStat
 }
 
 /**
+ * @deprecated DEAD CODE PATH — no longer called in production. The per-state
+ * templates this bakes are NOT served anymore: decideAndroidWidget always uses
+ * the gallery-blank PNG + full live overlays (the templates' baked sample
+ * times + gallery-anchor positioning drift produced the "missing row times"
+ * bug). Kept only for the dev bake tooling; remove together with
+ * buildBakeFixture/BAKE_TIMES and the prayer-static version-gate helpers in
+ * widget-android-asset-resolver.ts in a future cleanup PR.
+ *
  * Build the local Android prayer-state templates used after the foreground app
  * is closed. Each image is captured from the same React preview as the gallery,
  * with numeric values hidden by `DynamicTimeText`; the headless widget task
@@ -1339,6 +1352,10 @@ export async function ensureAndroidPrayerStaticTemplates(opts: {
   // always "صلاة الجمعة"; the headless selector picks between them by date.
   const signature = [
     ANDROID_PRAYER_TEMPLATE_SCHEMA,
+    // Generation stamp — bumping it (see lib/widgets/pump.ts SCHEMA_VERSION)
+    // invalidates every stored signature so pre-bump templates re-bake even
+    // though their PNG files still exist on disk.
+    PRAYER_TEMPLATE_BAKE_VERSION,
     WIDGET_REGISTRY_VERSION,
     opts.theme,
     opts.language,
@@ -1355,7 +1372,13 @@ export async function ensureAndroidPrayerStaticTemplates(opts: {
         const checks = await Promise.all(expected.map((name) => FileSystem.getInfoAsync(`${ANDROID_PRAYER_TEMPLATE_DIR}${name}.png`)));
         if (checks.every((info) => info.exists)) {
           const stored = await AsyncStorage.getItem(signatureKey);
-          if (stored === signature) return { generated: 0, skipped: true, errors: [] };
+          // Besides the stored signature, the on-disk version manifest must
+          // bless this matrix: the headless resolver refuses templates whose
+          // matrix isn't stamped current, so skipping the bake without a valid
+          // stamp would silently downgrade every render to the gallery PNG.
+          if (stored === signature && (await prayerTemplateMatrixIsCurrent(opts.theme, opts.language))) {
+            return { generated: 0, skipped: true, errors: [] };
+          }
         }
       } catch {}
     }
@@ -1398,6 +1421,13 @@ export async function ensureAndroidPrayerStaticTemplates(opts: {
       hostSetSlots!({} as any);
       if (errors.length === 0) {
         try { await AsyncStorage.setItem(signatureKey, signature); } catch {}
+        // Bless this (theme, language) matrix for the headless resolver — but
+        // ONLY for a full (non-targeted) run: a partial bake leaves other
+        // states/sizes possibly stale, and stamping would let the resolver
+        // serve old-generation PNGs under new-generation overlay anchors.
+        if (!opts.targets?.length) {
+          try { await stampPrayerTemplateMatrix(opts.theme, opts.language); } catch {}
+        }
       }
       if (__DEV__) console.log(`[widget/android] prayer static templates generated=${generated} errors=${errors.length}`);
       return { generated, skipped: false, errors };
@@ -1578,7 +1608,7 @@ export async function bakePrayerStaticPNGs(
   // Write a manifest JSON next to the PNGs.
   const manifestPath = `${outputDir}manifest.json`;
   const manifest = {
-    version: 1,
+    version: PRAYER_TEMPLATE_BAKE_VERSION,
     bakedAt: new Date().toISOString(),
     total: PRAYER_BAKE_TOTAL,
     written: entries.length,

@@ -308,11 +308,31 @@ export function subscribeToRewardsConfig(
   }
 }
 
+// Serializes score writes on this device. The pending-score helpers below do
+// AsyncStorage read-modify-write, and the month-rollover branch does a Firestore
+// read-then-write — two rapid activities (e.g. tasbih + azkar in the same
+// second) interleaving those steps would drop one update's points.
+let _scoreWriteChain: Promise<void> = Promise.resolve();
+
 /**
  * Update monthly engagement score for a user.
  * Saves locally first (offline-safe), then syncs to Firestore.
+ * Calls are queued so concurrent updates can't clobber each other's
+ * pending-score state (cross-device races still need a server-side fix).
  */
-export const updateMonthlyScore = async (
+export const updateMonthlyScore = (
+  userId: string,
+  activityType: ActivityType,
+  multiplier: number = 1
+): Promise<void> => {
+  const run = () => updateMonthlyScoreInternal(userId, activityType, multiplier);
+  const task = _scoreWriteChain.then(run, run);
+  // Internal never rejects (it catches everything), but keep the chain safe anyway.
+  _scoreWriteChain = task.catch(() => {});
+  return task;
+};
+
+const updateMonthlyScoreInternal = async (
   userId: string,
   activityType: ActivityType,
   multiplier: number = 1
@@ -810,6 +830,10 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
   month: string;
   activities?: Record<string, number>;
   mergeBonus?: { activities: Record<string, number>; score: number; mergedFrom?: string };
+  // Server-side display name from the user doc. Lets callers fall back to it
+  // when the local AsyncStorage copy is missing (e.g. after a reinstall the
+  // device-based userId survives but local storage doesn't).
+  displayName?: string;
 } | null> => {
   try {
     const config = await fetchRewardsConfig();
@@ -841,7 +865,8 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
       ? calculatedScore
       : Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
 
-    return { score, month: currentMonth, activities, mergeBonus };
+    const docDisplayName = typeof data?.displayName === 'string' ? data.displayName : undefined;
+    return { score, month: currentMonth, activities, mergeBonus, displayName: docDisplayName };
   } catch {
     // Fallback to local-only if Firestore fails
     try {

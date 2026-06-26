@@ -568,8 +568,11 @@ export function getDefaultSeasonsMetadata(): SeasonsMetadata {
         nameAr: 'شهر محرم',
         nameEn: 'Muharram',
         description: 'أول شهور السنة الهجرية ومن الأشهر الحرم.',
+        // "أول شهور السنة الهجرية" is a new-year message — keep it to the first
+        // 10 days only (hijri_new_year owns 1–3, ashura owns 9–10) instead of
+        // the whole month, mirroring lib/seasonal-content.ts.
         startDate: { month: 1, day: 1 },
-        endDate: { month: 1, day: 30 },
+        endDate: { month: 1, day: 10 },
         color: '#607D8B',
         icon: 'calendar-month',
         greetings: [seasonSubtitleAr('muharram', 'أول شهور السنة الهجرية')],

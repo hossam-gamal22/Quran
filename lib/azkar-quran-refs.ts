@@ -50,7 +50,9 @@ export const AZKAR_QURAN_REFS: Record<number, QuranRef[]> = {
   47: [{ surah: 2, startAyah: 285, endAyah: 286 }],
 
   // Evening: Al-Baqarah 285-286 (آخر آيتين من سورة البقرة)
-  200: [{ surah: 2, startAyah: 285, endAyah: 286 }],
+  // id 291 (renumbered from 200 to resolve a duplicate-id collision with the
+  // after-eating dua in category 70 — keep this in sync with azkar.json).
+  291: [{ surah: 2, startAyah: 285, endAyah: 286 }],
 
   // Sleep: Al-Imran reference only (Sajdah + Mulk)
   56: [

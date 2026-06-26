@@ -28,6 +28,27 @@ service cloud.firestore {
       ]);
     }
 
+    // Server-side defense-in-depth: prevent the monthly score from being
+    // overwritten with a smaller value within the same month. The app uses
+    // firestoreIncrement(...) for same-month bumps and Math.max(local, cloud)
+    // for recalcs, so legitimate writes never need to decrease.
+    function monthlyEngagementHasScore(data) {
+      return data.keys().hasAny(['monthlyEngagement'])
+        && data.monthlyEngagement is map
+        && data.monthlyEngagement.keys().hasAny(['score'])
+        && data.monthlyEngagement.score is number;
+    }
+
+    // Sanity ceiling on the client-written monthly score. Points are client-
+    // computed (no auth, no server validation yet), so this can't stop subtle
+    // inflation — but it caps the blast radius of a spoofed write far above any
+    // legitimately reachable monthly total. Full recalc writes (Math.max sync
+    // after reinstall / weights change) stay well under this.
+    function monthlyScoreWithinCap() {
+      return !monthlyEngagementHasScore(request.resource.data)
+        || request.resource.data.monthlyEngagement.score <= 100000;
+    }
+
     function safeUserCreate() {
       // TEMPORARY (2026-06-06): `signedIn()` dropped because the published app
       // is not establishing a Firebase Auth session at write time, so every
@@ -45,18 +66,8 @@ service cloud.firestore {
         && (
           !request.resource.data.keys().hasAny(['isPremium'])
           || request.resource.data.isPremium == false
-        );
-    }
-
-    // Server-side defense-in-depth: prevent the monthly score from being
-    // overwritten with a smaller value within the same month. The app uses
-    // firestoreIncrement(...) for same-month bumps and Math.max(local, cloud)
-    // for recalcs, so legitimate writes never need to decrease.
-    function monthlyEngagementHasScore(data) {
-      return data.keys().hasAny(['monthlyEngagement'])
-        && data.monthlyEngagement is map
-        && data.monthlyEngagement.keys().hasAny(['score'])
-        && data.monthlyEngagement.score is number;
+        )
+        && monthlyScoreWithinCap();
     }
 
     function sameMonthlyEngagementMonth() {
@@ -84,7 +95,8 @@ service cloud.firestore {
       // Re-add `signedIn()` once the auth fix ships in the app build.
       return boundedDoc(100)
         && noUserPrivilegeEscalation()
-        && noMonthlyScoreDecrease();
+        && noMonthlyScoreDecrease()
+        && monthlyScoreWithinCap();
     }
 
     // User self-delete: allow if the doc's stored authUid matches the
@@ -159,9 +171,13 @@ service cloud.firestore {
     }
 
     function safeCommentCreate() {
-      return signedIn()
-        && request.resource.data.keys().hasOnly([
-          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount'
+      // TEMPORARY (2026-06-10): `signedIn()` dropped because the published app
+      // is not establishing a Firebase Auth (anonymous) session at write time,
+      // so every comment/reply write was denied and showed "تعذّر الإرسال".
+      // Field + size guards stay in force; bans are checked client-side.
+      // Re-add `signedIn()` once Anonymous Auth is enabled/working in the build.
+      return request.resource.data.keys().hasOnly([
+          'userId', 'displayName', 'text', 'createdAt', 'hidden', 'reportCount', 'replyCount'
         ])
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 500
@@ -183,6 +199,13 @@ service cloud.firestore {
     match /appConfig/{docId} {
       allow read: if docId != 'adminAuth';
       allow write: if docId != 'adminAuth' && adminWrite();
+    }
+
+    // Append-only audit trail for app-icon changes (admin-only).
+    match /appIconAuditLog/{docId} {
+      allow read: if isAdmin();
+      allow create: if adminWrite();
+      allow update, delete: if false;
     }
 
     match /config/{docId} {
@@ -445,14 +468,32 @@ service cloud.firestore {
 
     match /storyInteractions/{storyId} {
       allow read: if true;
-      allow create, update: if signedIn() && request.resource.data.size() <= 12;
+      // TEMPORARY (2026-06-10): `signedIn()` dropped — the like/comment count
+      // doc is bumped on the same write path as comments, which currently runs
+      // without a guaranteed auth session. Size guard stays. Re-add signedIn()
+      // once Anonymous Auth works in the build.
+      allow create, update: if request.resource.data.size() <= 12;
       allow delete: if adminWrite();
+    }
+
+    // Shared shape guard for like docs (story + comment likes): the doc id is
+    // the liker's device userId and the payload must echo it. Identity is NOT
+    // verifiable until Anonymous Auth works — this only stops malformed writes.
+    function safeLikeCreate(pathUserId) {
+      return request.resource.data.keys().hasOnly(['userId', 'displayName', 'createdAt'])
+        && request.resource.data.userId is string
+        && request.resource.data.userId == pathUserId;
     }
 
     match /storyInteractions/{storyId}/likes/{userId} {
       allow read: if true;
-      allow create: if signedIn() && request.resource.data.size() <= 5;
-      allow delete: if signedIn() || adminWrite();
+      // TEMPORARY (2026-06-10): `signedIn()` dropped — likes run on the same
+      // auth-less path as comments while Anonymous Auth is down. Shape guard
+      // stays. Re-add signedIn() once Anonymous Auth works in the build.
+      allow create: if safeLikeCreate(userId);
+      // Delete must stay open: "unlike" deletes the like doc and ownership is
+      // unverifiable without auth. Tighten with signedIn() once auth works.
+      allow delete: if true;
       allow update: if false;
     }
 
@@ -462,12 +503,27 @@ service cloud.firestore {
       // Admin moderates; users can delete their own (client checks ownership
       // via stored userId before deleting — Firestore can't verify because
       // the doc's userId is the device-generated id, not the Firebase Auth uid).
-      allow delete: if signedIn() || adminWrite();
-      // Updates: admin moderation OR client incrementing `reportCount` only.
+      // TEMPORARY (2026-06-10): `signedIn()` dropped so own-comment delete works
+      // while Anonymous Auth is down. Server-side ownership was never enforceable
+      // here anyway (device id ≠ auth uid). Re-add signedIn() once auth works.
+      allow delete: if true;
+      // Updates: admin moderation OR client incrementing `reportCount` /
+      // `replyCount` / `likeCount` only. TEMPORARY (2026-06-10): `signedIn()`
+      // dropped so the count bumps on the (auth-less) reply/like paths succeed;
+      // the strict affectedKeys guard still prevents tampering with any other field.
       allow update: if adminWrite() || (
-        signedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'replyCount'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'replyCount', 'likeCount'])
       );
+    }
+
+    match /storyInteractions/{storyId}/comments/{commentId}/likes/{userId} {
+      allow read: if true;
+      // TEMPORARY (2026-06-10): `signedIn()` dropped — comment likes run on the
+      // same auth-less path as comments. Shape guard stays. Re-add once auth works.
+      allow create: if safeLikeCreate(userId);
+      // Open delete is required for "unlike" while auth is down (see story likes).
+      allow delete: if true;
+      allow update: if false;
     }
 
     match /{path=**}/comments/{commentId} {
@@ -476,18 +532,22 @@ service cloud.firestore {
 
     match /storyInteractions/{storyId}/comments/{commentId}/reports/{userId} {
       allow read: if isAdmin();
-      allow create: if signedIn() && request.resource.data.size() <= 5;
-      allow delete: if signedIn() || adminWrite();
+      // TEMPORARY (2026-06-10): `signedIn()` dropped so reporting works while
+      // Anonymous Auth is down. Size guard stays. Re-add once auth works.
+      allow create: if request.resource.data.size() <= 5;
+      // The app never deletes reports — only moderation should.
+      allow delete: if adminWrite();
       allow update: if false;
     }
 
     match /storyInteractions/{storyId}/comments/{commentId}/replies/{replyId} {
       allow read: if true;
       allow create: if safeCommentCreate();
-      allow delete: if signedIn() || adminWrite();
+      // TEMPORARY (2026-06-10): `signedIn()` dropped on delete — parity with
+      // comment delete while Anonymous Auth is down. Re-add once auth works.
+      allow delete: if true;
       allow update: if adminWrite() || (
-        signedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount'])
       );
     }
 
@@ -497,14 +557,70 @@ service cloud.firestore {
 
     match /storyInteractions/{storyId}/comments/{commentId}/replies/{replyId}/reports/{userId} {
       allow read: if isAdmin();
-      allow create: if signedIn() && request.resource.data.size() <= 5;
-      allow delete: if signedIn() || adminWrite();
+      // TEMPORARY (2026-06-10): `signedIn()` dropped — parity with comment
+      // reports while Anonymous Auth is down. Re-add once auth works.
+      allow create: if request.resource.data.size() <= 5;
+      // The app never deletes reports — only moderation should.
+      allow delete: if adminWrite();
       allow update: if false;
     }
 
     match /userBans/{userId} {
       allow read: if signedIn();
       allow write: if adminWrite();
+    }
+
+    // Client crash breadcrumbs (the app has no Sentry/Crashlytics). The app
+    // uploads at most one doc per launch — only after a previous uncaught crash.
+    // No signedIn() because anonymous auth is currently unreliable (see the
+    // TEMPORARY notes above); a strict shape + size guard caps the blast radius.
+    // Read/update/delete stay admin-only.
+    match /crashLogs/{docId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if request.resource.data.size() <= 12
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 2000
+        && request.resource.data.stack is string
+        && request.resource.data.stack.size() <= 3000
+        // breadcrumbs is optional (older app builds omit it); when present it
+        // must be a bounded string so it can't be used to bloat the doc.
+        && (!('breadcrumbs' in request.resource.data)
+            || (request.resource.data.breadcrumbs is string
+                && request.resource.data.breadcrumbs.size() <= 2000));
+    }
+
+    // "Someone replied to your comment" inbox. Recipient is matched by device
+    // userId (queried client-side with where('toUserId','==', myId)). Reads are
+    // public during the Anonymous Auth outage; payload is already-public comment
+    // text. Updates may only flip `read`. TEMPORARY (2026-06-10) — tighten once
+    // auth works (scope reads/writes to the authed uid).
+    match /commentNotifications/{notifId} {
+      allow read: if true;
+      // Strict shape: exactly the fields the app writes, bounded sizes, and
+      // notifications are always born unread. Spam/spoofed-sender prevention is
+      // blocked on auth; this stops malformed/oversized docs.
+      allow create: if request.resource.data.keys().hasOnly([
+          'type', 'toUserId', 'fromName', 'storyId', 'storyTitle',
+          'commentId', 'replyText', 'createdAt', 'read', 'expiresAt'
+        ])
+        && request.resource.data.type in ['reply', 'like']
+        && request.resource.data.toUserId is string
+        && request.resource.data.toUserId.size() > 0
+        && request.resource.data.toUserId.size() <= 80
+        && request.resource.data.fromName is string
+        && request.resource.data.fromName.size() <= 80
+        && request.resource.data.storyTitle is string
+        && request.resource.data.storyTitle.size() <= 120
+        && request.resource.data.replyText is string
+        && request.resource.data.replyText.size() <= 200
+        && request.resource.data.read == false;
+      // Read-flip only, and only towards read=true (no un-reading others'
+      // notifications while reads are public during the auth outage).
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read == true;
+      // Cleanup is handled by the Firestore TTL policy on `expiresAt` — the
+      // client never deletes, so nobody should.
+      allow delete: if adminWrite();
     }
 
     match /{document=**} {

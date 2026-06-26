@@ -49,6 +49,21 @@ export function WidgetFallbackNotice({
   const clickActionData = clickAction === 'OPEN_URI' && clickUri ? { uri: clickUri } : undefined;
   const preview = WIDGET_FALLBACK_PREVIEWS[`${widgetId}_${size}`];
 
+  // Contain-fit the tile inside the allocated launcher cell and keep the outer
+  // host TRANSPARENT — launcher rows are often taller than columns, and filling
+  // the whole cell with the card bg made 2×2 widgets look like tall portrait
+  // cards (reported: «زيادات فوق وتحت»). The visible card is always the tile at
+  // its exact gallery aspect, centered.
+  const dims = SIZE_DIMS[size] ?? SIZE_DIMS.medium;
+  const targetWidth = Number.isFinite(widgetWidth) && (widgetWidth ?? 0) > 0 ? widgetWidth! : dims.width;
+  const targetHeight = Number.isFinite(widgetHeight) && (widgetHeight ?? 0) > 0 ? widgetHeight! : dims.height;
+  const scale = Math.min(targetWidth / dims.width, targetHeight / dims.height);
+  const tileWidth = dims.width * scale;
+  const tileHeight = dims.height * scale;
+  const offsetX = (targetWidth - tileWidth) / 2;
+  const offsetY = (targetHeight - tileHeight) / 2;
+  const tileRadius = (size === 'small' ? 28 : 32) * scale;
+
   // No bundled preview for this widget id/size — show the branded card with the
   // same "open the app" hint.
   if (!preview) {
@@ -57,46 +72,49 @@ export function WidgetFallbackNotice({
         style={{
           width: 'match_parent',
           height: 'match_parent',
-          flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: p.bg,
-          borderRadius: 0,
-          padding: 12,
+          justifyContent: 'center',
+          backgroundColor: '#00000000',
         }}
         clickAction={clickAction}
         clickActionData={clickActionData}
       >
-        <ImageWidget image={APP_ICON} imageWidth={28} imageHeight={28} radius={6} />
-        <TextWidget
-          text="روح المسلم"
-          style={{ fontSize: 13, color: p.text, fontFamily: FONT.widget, marginTop: 8, textAlign: 'center' }}
-        />
-        <TextWidget
-          text={notice}
-          style={{ fontSize: 10, color: p.muted, fontFamily: FONT.rubikMedium, marginTop: 4, textAlign: 'center' }}
-          maxLines={2}
-          truncate="END"
-        />
+        <FlexWidget
+          style={{
+            width: tileWidth,
+            height: tileHeight,
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: p.bg,
+            borderRadius: tileRadius,
+            padding: 12,
+          }}
+        >
+          <ImageWidget image={APP_ICON} imageWidth={28} imageHeight={28} radius={6} />
+          <TextWidget
+            text="روح المسلم"
+            style={{ fontSize: 13, color: p.text, fontFamily: FONT.widget, marginTop: 8, textAlign: 'center' }}
+          />
+          <TextWidget
+            text={notice}
+            style={{ fontSize: 10, color: p.muted, fontFamily: FONT.rubikMedium, marginTop: 4, textAlign: 'center' }}
+            maxLines={2}
+            truncate="END"
+          />
+        </FlexWidget>
       </FlexWidget>
     );
   }
-
-  const dims = SIZE_DIMS[size] ?? SIZE_DIMS.medium;
-  const targetWidth = Number.isFinite(widgetWidth) && (widgetWidth ?? 0) > 0 ? widgetWidth! : dims.width;
-  const targetHeight = Number.isFinite(widgetHeight) && (widgetHeight ?? 0) > 0 ? widgetHeight! : dims.height;
-  const scale = Math.min(targetWidth / dims.width, targetHeight / dims.height);
-  const imageWidth = dims.width * scale;
-  const imageHeight = dims.height * scale;
-  const offsetX = (targetWidth - imageWidth) / 2;
-  const offsetY = (targetHeight - imageHeight) / 2;
 
   return (
     <OverlapWidget
       style={{
         width: 'match_parent',
         height: 'match_parent',
-        backgroundColor: p.bg,
+        // Transparent host — the bundled preview PNG (captured full tile,
+        // rounded corners + bg baked in) IS the visible card.
+        backgroundColor: '#00000000',
         borderRadius: 0,
         overflow: 'hidden',
       }}
@@ -105,12 +123,13 @@ export function WidgetFallbackNotice({
     >
       <ImageWidget
         image={preview}
-        style={{ width: imageWidth, height: imageHeight, marginLeft: offsetX, marginTop: offsetY }}
-        imageWidth={imageWidth}
-        imageHeight={imageHeight}
+        style={{ width: tileWidth, height: tileHeight, marginLeft: offsetX, marginTop: offsetY }}
+        imageWidth={tileWidth}
+        imageHeight={tileHeight}
         radius={0}
       />
-      {/* Bottom-anchored "open the app" banner overlaid on the preview. */}
+      {/* "Open the app" banner pinned to the TILE's bottom edge (not the
+          cell's) so it always overlays the visible card. */}
       <FlexWidget
         style={{
           width: 'match_parent',
@@ -129,7 +148,7 @@ export function WidgetFallbackNotice({
             borderRadius: 10,
             paddingHorizontal: 10,
             paddingVertical: 4,
-            marginBottom: 6,
+            marginBottom: offsetY + 6,
           }}
         >
           <TextWidget

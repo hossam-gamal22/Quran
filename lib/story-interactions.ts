@@ -26,7 +26,9 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { db } from './firebase-config';
+import { ensureFirebaseUser } from '@/config/firebase';
 import { getUserId, getDisplayName } from './firebase-user';
+import { createReplyNotification, createCommentNotification } from './comment-notifications';
 import { validateCommentText, MAX_COMMENT_LENGTH } from './profanity-filter';
 import type { StorySection } from './story-id';
 
@@ -46,6 +48,13 @@ export interface StoryComment {
   hidden: boolean;
   reportCount: number;
   replyCount: number;
+  likeCount: number;
+}
+
+export interface CommentLiker {
+  userId: string;
+  displayName: string;
+  createdAt: Timestamp | null;
 }
 
 export interface StoryReply {
@@ -67,11 +76,11 @@ export interface UserBan {
 
 export type CommentWriteResult =
   | { ok: true; commentId: string }
-  | { ok: false; reason: 'no_display_name' | 'banned' | 'invalid_text' | 'profanity' | 'too_long' | 'too_short' | 'empty' | 'network' };
+  | { ok: false; reason: 'no_display_name' | 'banned' | 'invalid_text' | 'profanity' | 'too_long' | 'too_short' | 'empty' | 'auth' | 'network' };
 
 export type ReplyWriteResult =
   | { ok: true; replyId: string }
-  | { ok: false; reason: 'no_display_name' | 'banned' | 'invalid_text' | 'profanity' | 'too_long' | 'too_short' | 'empty' | 'network' };
+  | { ok: false; reason: 'no_display_name' | 'banned' | 'invalid_text' | 'profanity' | 'too_long' | 'too_short' | 'empty' | 'auth' | 'network' };
 
 // ==================== Refs ====================
 
@@ -80,6 +89,10 @@ const likesCol = (storyId: string) => collection(db, 'storyInteractions', storyI
 const likeDoc = (storyId: string, userId: string) => doc(db, 'storyInteractions', storyId, 'likes', userId);
 const commentsCol = (storyId: string) => collection(db, 'storyInteractions', storyId, 'comments');
 const commentDoc = (storyId: string, commentId: string) => doc(db, 'storyInteractions', storyId, 'comments', commentId);
+const commentLikesCol = (storyId: string, commentId: string) =>
+  collection(db, 'storyInteractions', storyId, 'comments', commentId, 'likes');
+const commentLikeDoc = (storyId: string, commentId: string, userId: string) =>
+  doc(db, 'storyInteractions', storyId, 'comments', commentId, 'likes', userId);
 const reportDoc = (storyId: string, commentId: string, userId: string) =>
   doc(db, 'storyInteractions', storyId, 'comments', commentId, 'reports', userId);
 const repliesCol = (storyId: string, commentId: string) =>
@@ -158,15 +171,22 @@ export const toggleLike = async (
 
   if (alreadyLiked) {
     await deleteDoc(ref);
-    await setDoc(
-      interactionDoc(storyId),
-      {
-        section,
-        likeCount: increment(-1),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
+    try {
+      await setDoc(
+        interactionDoc(storyId),
+        {
+          section,
+          likeCount: increment(-1),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      // Keep like doc and counter in lockstep — restore the like on count failure.
+      console.warn('[story-interactions] story likeCount decrement failed, restoring like:', err);
+      await setDoc(ref, { userId, createdAt: serverTimestamp() }).catch(() => {});
+      throw err;
+    }
     return { liked: false };
   }
 
@@ -174,15 +194,22 @@ export const toggleLike = async (
     userId,
     createdAt: serverTimestamp(),
   });
-  await setDoc(
-    interactionDoc(storyId),
-    {
-      section,
-      likeCount: increment(1),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+  try {
+    await setDoc(
+      interactionDoc(storyId),
+      {
+        section,
+        likeCount: increment(1),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    // Keep like doc and counter in lockstep — roll the like back on count failure.
+    console.warn('[story-interactions] story likeCount increment failed, rolling back like:', err);
+    await deleteDoc(ref).catch(() => {});
+    throw err;
+  }
   return { liked: true };
 };
 
@@ -230,6 +257,7 @@ const parseComment = (snap: QueryDocumentSnapshot<DocumentData>): StoryComment =
     hidden: Boolean(data.hidden),
     reportCount: Number(data.reportCount || 0),
     replyCount: Number(data.replyCount || 0),
+    likeCount: Number(data.likeCount || 0),
   };
 };
 
@@ -326,6 +354,13 @@ export const addComment = async (
     return { ok: false, reason: validation.reason || 'invalid_text' };
   }
 
+  // Best-effort auth attach: kick off anonymous sign-in so a Firebase Auth
+  // session is linked when it's available, but DON'T block the write on it.
+  // Anonymous auth is currently unreliable in the published build, and the
+  // create rules don't require signedIn() (see firestore.rules), so the write
+  // must still succeed without a session — never surface a fake auth error.
+  ensureFirebaseUser().catch(() => {});
+
   try {
     const userId = await getUserId();
     const trimmed = rawText.trim().slice(0, MAX_COMMENT_LENGTH);
@@ -383,6 +418,99 @@ export const deleteOwnComment = async (
   }
 };
 
+// ==================== Comment likes ====================
+
+export const hasUserLikedComment = async (storyId: string, commentId: string): Promise<boolean> => {
+  try {
+    const userId = await getUserId();
+    const snap = await getDoc(commentLikeDoc(storyId, commentId, userId));
+    return snap.exists();
+  } catch {
+    return false;
+  }
+};
+
+/** Everyone who liked a comment, newest first. Names are stored on the like doc. */
+export const fetchCommentLikers = async (
+  storyId: string,
+  commentId: string,
+): Promise<CommentLiker[]> => {
+  try {
+    const snap = await getDocs(query(commentLikesCol(storyId, commentId), fsLimit(100)));
+    return snap.docs
+      .map((d) => {
+        const data = d.data();
+        return {
+          userId: String(data.userId || d.id),
+          displayName: String(data.displayName || ''),
+          createdAt: (data.createdAt as Timestamp | null) || null,
+        };
+      })
+      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  } catch (err) {
+    console.warn('[story-interactions] fetchCommentLikers failed:', err);
+    return [];
+  }
+};
+
+/**
+ * Toggle the current user's like on a comment. Denormalizes `likeCount` on the
+ * comment doc and, on a fresh like, notifies the comment author (not self).
+ */
+export const toggleCommentLike = async (
+  storyId: string,
+  commentId: string,
+  meta?: { authorUserId?: string; storyTitle?: string; commentText?: string },
+): Promise<{ liked: boolean }> => {
+  ensureFirebaseUser().catch(() => {});
+  const userId = await getUserId();
+  const ref = commentLikeDoc(storyId, commentId, userId);
+  const snap = await getDoc(ref);
+
+  if (snap.exists()) {
+    await deleteDoc(ref);
+    try {
+      await updateDoc(commentDoc(storyId, commentId), { likeCount: increment(-1) });
+    } catch (err) {
+      // Restore the like doc so the counter and the like doc can't drift; the
+      // caller reverts its optimistic state off the thrown error.
+      console.warn('[story-interactions] likeCount decrement failed, restoring like:', err);
+      await setDoc(ref, { ...snap.data(), createdAt: serverTimestamp() }).catch(() => {});
+      throw err;
+    }
+    return { liked: false };
+  }
+
+  const displayName = (await getDisplayName())?.trim() || '';
+  await setDoc(ref, { userId, displayName, createdAt: serverTimestamp() });
+  try {
+    await updateDoc(commentDoc(storyId, commentId), { likeCount: increment(1) });
+  } catch (err) {
+    // Without the count bump the like would exist but never be reflected in the
+    // UI count — roll the like doc back so doc and counter can't drift apart,
+    // and surface the failure so the caller reverts its optimistic state.
+    console.warn('[story-interactions] likeCount increment failed, rolling back like:', err);
+    await deleteDoc(ref).catch(() => {});
+    throw err;
+  }
+
+  if (meta?.authorUserId && meta.authorUserId !== userId) {
+    createCommentNotification({
+      type: 'like',
+      toUserId: meta.authorUserId,
+      fromName: displayName,
+      storyId,
+      storyTitle: meta.storyTitle || '',
+      commentId,
+      text: meta.commentText || '',
+    }).catch((err) => {
+      console.warn('[story-interactions] like notification failed:', err);
+    });
+  }
+
+  return { liked: true };
+};
+
 // ==================== Reports ====================
 
 export type ReportReason =
@@ -397,6 +525,7 @@ export const reportComment = async (
   storyId: string,
   commentId: string,
   reason: ReportReason,
+  note?: string,
 ): Promise<{ ok: boolean; alreadyReported?: boolean }> => {
   try {
     const userId = await getUserId();
@@ -404,10 +533,12 @@ export const reportComment = async (
     const existing = await getDoc(ref);
     if (existing.exists()) return { ok: true, alreadyReported: true };
 
+    const trimmedNote = (note || '').trim().slice(0, 500);
     await setDoc(ref, {
       userId,
       reason,
       createdAt: serverTimestamp(),
+      ...(trimmedNote ? { note: trimmedNote } : {}),
     });
     // Denormalize: bump reportCount on the comment doc so admin queue can
     // sort cheaply without scanning subcollections.
@@ -448,6 +579,7 @@ export const addReply = async (
   storyId: string,
   commentId: string,
   rawText: string,
+  storyTitle?: string,
 ): Promise<ReplyWriteResult> => {
   const displayName = (await getDisplayName())?.trim();
   if (!displayName) return { ok: false, reason: 'no_display_name' };
@@ -459,6 +591,9 @@ export const addReply = async (
   if (!validation.valid) {
     return { ok: false, reason: validation.reason || 'invalid_text' };
   }
+
+  // Best-effort auth attach — don't block the reply write on it (see addComment).
+  ensureFirebaseUser().catch(() => {});
 
   try {
     const userId = await getUserId();
@@ -476,6 +611,24 @@ export const addReply = async (
     await updateDoc(commentDoc(storyId, commentId), {
       replyCount: increment(1),
     });
+    // Notify the parent comment's author (in-app, on their next open) — but
+    // never notify yourself for replying to your own comment.
+    try {
+      const parentSnap = await getDoc(commentDoc(storyId, commentId));
+      const parentUserId = parentSnap.exists() ? String(parentSnap.data().userId || '') : '';
+      if (parentUserId && parentUserId !== userId) {
+        await createReplyNotification({
+          toUserId: parentUserId,
+          fromName: displayName,
+          storyId,
+          storyTitle: storyTitle || '',
+          commentId,
+          replyText: trimmed,
+        });
+      }
+    } catch {
+      // notification is best-effort; never fail the reply on it
+    }
     return { ok: true, replyId: created.id };
   } catch (err) {
     console.warn('[story-interactions] addReply failed:', err);
@@ -509,6 +662,7 @@ export const reportReply = async (
   commentId: string,
   replyId: string,
   reason: ReportReason,
+  note?: string,
 ): Promise<{ ok: boolean; alreadyReported?: boolean }> => {
   try {
     const userId = await getUserId();
@@ -516,10 +670,12 @@ export const reportReply = async (
     const existing = await getDoc(ref);
     if (existing.exists()) return { ok: true, alreadyReported: true };
 
+    const trimmedNote = (note || '').trim().slice(0, 500);
     await setDoc(ref, {
       userId,
       reason,
       createdAt: serverTimestamp(),
+      ...(trimmedNote ? { note: trimmedNote } : {}),
     });
     await updateDoc(replyDoc(storyId, commentId, replyId), {
       reportCount: increment(1),

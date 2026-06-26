@@ -97,15 +97,37 @@ class AdhanPlaybackService : Service() {
     val soundKey = normalizeSoundKey(intent?.getStringExtra(EXTRA_SOUND_TYPE))
     val prayerName = intent?.getStringExtra(EXTRA_PRAYER_NAME).orEmpty()
 
-    // Idempotency guard: if a second ACTION_PLAY arrives while we're already
-    // playing the same sound (e.g. AlarmManager fired and the patched
-    // expo-notifications "androidFullAdhan" path fired ~milliseconds apart),
-    // skip the second start so we don't restart the MediaPlayer mid-adhan.
-    val currentlyPlaying = try { player?.isPlaying == true } catch (_: Exception) { false }
-    if (currentlyPlaying) {
-      Log.i(TAG, "Already playing adhan — ignoring duplicate ACTION_PLAY for " + soundKey)
+    // Idempotency guard against DOUBLE-AUDIO. Two ACTION_PLAY can arrive a few
+    // seconds apart for the SAME prayer: the AlarmManager full-adhan alarm, the
+    // patched expo-notifications "androidFullAdhan" path, and a late FCM fallback
+    // can all fire. \`player?.isPlaying\` is false during MediaPlayer.prepareAsync()
+    // so it alone is not enough — we use two layers:
+    //   1. player != null  → THIS instance is already preparing/playing → ignore.
+    //   2. a process-wide elapsed-time stamp → a *fresh* instance landing within
+    //      DUPLICATE_PLAY_WINDOW_MS of the last start is a duplicate trigger.
+    val nowElapsed = android.os.SystemClock.elapsedRealtime()
+    if (player != null) {
+      val playing = try { player?.isPlaying == true } catch (_: Exception) { false }
+      Log.i(TAG, "Already handling adhan (" + soundKey + ") playing=" + playing + " — ignoring duplicate ACTION_PLAY")
       return START_NOT_STICKY
     }
+    if (lastPlayStartElapsedMs > 0L && (nowElapsed - lastPlayStartElapsedMs) < DUPLICATE_PLAY_WINDOW_MS) {
+      Log.i(TAG, "Duplicate ACTION_PLAY within " + DUPLICATE_PLAY_WINDOW_MS + "ms — suppressing second adhan for " + soundKey)
+      // This fresh instance may have been launched via startForegroundService, so
+      // we MUST satisfy the startForeground() contract before stopping or the OS
+      // throws RemoteServiceException.
+      try {
+        val n = buildForegroundNotification(prayerName)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+          startForeground(NOTIFICATION_ID, n)
+        }
+      } catch (_: Exception) {}
+      stopSelfSafely()
+      return START_NOT_STICKY
+    }
+    lastPlayStartElapsedMs = nowElapsed
 
     currentPrayerName = prayerName
     val notification = buildForegroundNotification(prayerName)
@@ -478,6 +500,14 @@ class AdhanPlaybackService : Service() {
     const val EXTRA_SOUND_TYPE = "soundType"
     const val EXTRA_PRAYER_NAME = "prayerName"
 
+    // Process-wide last-start stamp (elapsedRealtime) used to suppress a duplicate
+    // adhan trigger that lands on a FRESH service instance shortly after a start.
+    @Volatile
+    private var lastPlayStartElapsedMs: Long = 0L
+    // Two adhans for different prayers are always far more than this apart, so any
+    // ACTION_PLAY within this window of the last start is a duplicate of it.
+    private const val DUPLICATE_PLAY_WINDOW_MS = 60_000L
+
     private const val TAG = "AdhanPlaybackService"
     private const val PLAYBACK_CHANNEL_ID = "adhan_full_playback_v2"
     private const val NOTIFICATION_ID = 7110
@@ -651,25 +681,41 @@ class FullAdhanModule(reactContext: ReactApplicationContext) :
         flags
       )
 
-      // Use setExactAndAllowWhileIdle so Doze mode does not delay the alarm.
-      // Falls back gracefully on Android < 23.
+      // Prefer setAlarmClock() — Android treats it as a real user alarm, which
+      // bypasses Doze, Battery Saver, App Standby, and OEM background restrictions
+      // (MIUI, EMUI, ColorOS, OneUI). It needs NO SCHEDULE_EXACT_ALARM grant, so it
+      // is reliable even when canScheduleExactAlarms() falsely returns false.
+      //
+      // This MUST mirror the expo-notifications scheduling path
+      // (plugins/with-alarm-clock-scheduling.js). Previously this native alarm used
+      // setExactAndAllowWhileIdle while the visual notification used setAlarmClock —
+      // so on Doze/OEM devices the full-adhan service fired up to ~15-30 min AFTER
+      // the on-time visual notification, which the user saw as a delayed/duplicate
+      // adhan. Using the same API makes both fire at the same instant.
       try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-          if (alarmManager.canScheduleExactAlarms()) {
+        val launchIntent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+        val showIntent = PendingIntent.getActivity(
+          ctx,
+          REQUEST_CODE_BASE + (requestCode % MAX_REQUEST_CODES),
+          launchIntent ?: Intent(),
+          flags
+        )
+        val clockInfo = AlarmManager.AlarmClockInfo(triggerAt, showIntent)
+        alarmManager.setAlarmClock(clockInfo, pendingIntent)
+        Log.i(TAG, "scheduleFullAdhan via setAlarmClock at=" + triggerAt + " rc=" + requestCode + " sound=" + soundKey)
+        promise.resolve(true)
+      } catch (se: Exception) {
+        Log.w(TAG, "setAlarmClock failed — falling back to exact/inexact", se)
+        try {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
           } else {
-            Log.w(TAG, "Cannot schedule exact alarms — using setAndAllowWhileIdle (may be delayed up to 15 min)")
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
           }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-          alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-        } else {
-          alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        } catch (e2: Exception) {
+          Log.w(TAG, "exact alarm fallback failed — using inexact setAndAllowWhileIdle", e2)
+          alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         }
-        promise.resolve(true)
-      } catch (se: SecurityException) {
-        Log.w(TAG, "SecurityException scheduling exact alarm — falling back to inexact", se)
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         promise.resolve(true)
       }
     } catch (e: Exception) {

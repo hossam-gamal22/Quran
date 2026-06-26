@@ -83,12 +83,28 @@ function getTargetAyahBg(themeIndex: number): string {
   return `rgba(${r}, ${g}, ${b}, 0.65)`;
 }
 
+// Single source of truth for which QCF page-font variant (dark/light) a page
+// will actually render with. MUST match MushafPage's local computation so that
+// any preload (auto-scroll start gate, ±neighbor preload, look-ahead) loads the
+// EXACT family name that gets painted — otherwise the rendered family stays cold
+// and falls back to another registered QCF page font (PUA glyph collision).
+function computeDarkFontVariant(forceLightText: boolean | undefined, themeIndex: number): boolean {
+  if (forceLightText !== undefined) return forceLightText;
+  const hex = (QURAN_THEMES[themeIndex]?.background || '#FFF8F0').replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+  return luminance < 128; // dark bg → need light (white-base) font
+}
+
 import NetInfo from '@react-native-community/netinfo';
 import { setLastRead, addBookmark, removeBookmark, getBookmarks } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
 import { isDownloaded, downloadSurah, deleteDownload } from '@/lib/audio-download-manager';
 import { audioPlayer, notifyOfflineAudio } from '@/lib/audio-player';
 import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
+import { getAppModalSurface, getAppModalBorder, APP_MODAL_GREEN } from '@/components/ui/AppModal';
 import { playPageSound, EFFECT_SOUNDS } from '@/lib/sound-manager';
 import { shareImage } from '@/lib/share-service';
 import {
@@ -107,6 +123,7 @@ import {
 import {
   loadPageFont,
   ensurePagesLoaded,
+  preloadCriticalPages,
   getPageFontFamily,
   isPageFontLoaded,
   ensureSharePageFontReady,
@@ -312,15 +329,7 @@ const MushafPage = React.memo(function MushafPage({
   // not the system dark mode flag — users can pick a light/cream theme even
   // while the app is in dark mode, and vice versa. `forceLightText` (set by
   // bg images) wins; otherwise inspect the theme's own background luminance.
-  const needsDarkFont = (() => {
-    if (forceLightText !== undefined) return forceLightText;
-    const hex = (QURAN_THEMES[themeIndex]?.background || '#FFF8F0').replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
-    return luminance < 128; // dark bg → need light (white-base) font
-  })();
+  const needsDarkFont = computeDarkFontVariant(forceLightText, themeIndex);
   const shouldForcePlainArabic = !!forcePlainArabicForCapture && Platform.OS === 'android';
   const [fontLoaded, setFontLoaded] = useState(
     isTajweedMode ? isColorPageFontLoaded(page) : isPageFontLoaded(page, needsDarkFont),
@@ -512,8 +521,20 @@ const MushafPage = React.memo(function MushafPage({
           if (isTajweedMode && !usePlainArabicMode) {
             const colorFontSource = getColorFontSource(page, needsDarkFont);
             if (colorFontSource) {
+              // Skia's <Text> primitive is a NON-bidi, left-to-right glyph
+              // painter — unlike React Native's native <Text> (CoreText/Android
+              // text engine) it does not reorder runs by Unicode bidi. The QCF
+              // word glyphs are stored in logical (reading) order and are strong
+              // RTL (Arabic Presentation Forms-A, bidi class AL), so painting
+              // them in string order flips the entire line (words and ayah
+              // markers appear reversed). Convert logical → visual RTL order by
+              // reversing the WORD sequence before handing it to Skia. Each QCF
+              // word is a single self-contained presentation-form glyph with no
+              // cross-word joining, so reversing at word granularity reproduces
+              // the exact layout the native <Text> (tarteel) path renders.
               const lineText = ayahGroups
-                .map(g => g.parts.map(p => p.glyph).join(''))
+                .flatMap(g => g.parts.map(p => p.glyph))
+                .reverse()
                 .join('');
               const firstGroup = ayahGroups[0];
               return (
@@ -980,6 +1001,8 @@ export default function SurahScreen() {
   const verseShareRef = useRef<IslamicShareCardHandle>(null);
   const autoShareTriggeredRef = useRef(false);
   const autoScrollAdvancingPageRef = useRef<number | null>(null);
+  // Monotonic token to cancel an in-flight auto-scroll font preload (pause/re-press).
+  const autoScrollPrepareRef = useRef(0);
   const continuousScrollOffsetRef = useRef(0);
   const continuousViewportHeightRef = useRef(0);
   const continuousPageHeightsRef = useRef<Map<number, number>>(new Map());
@@ -1037,6 +1060,9 @@ export default function SurahScreen() {
   const [autoScrollActive, setAutoScrollActive] = useState(false);
   const [showAutoScrollControls, setShowAutoScrollControls] = useState(false);
   const [autoScrollMinimized, setAutoScrollMinimized] = useState(false);
+  // True while we preload the QCF fonts for the starting window of pages BEFORE
+  // auto-scroll begins — guarantees the first continuous render is never cold.
+  const [autoScrollPreparing, setAutoScrollPreparing] = useState(false);
   const [autoScrollStartPage, setAutoScrollStartPage] = useState(currentPage);
   const [autoScrollDraftSpeed, setAutoScrollDraftSpeed] = useState(0.5);
   const [audioPressPending, setAudioPressPending] = useState(false);
@@ -1091,6 +1117,10 @@ export default function SurahScreen() {
         return (r * 299 + g * 587 + b * 114) / 1000 >= 128;
       })();
   const forceLightText = hasBgImage ? hasDarkBackgroundImage : undefined;
+  // Exact QCF page-font variant the pages will render with. Use THIS (not the raw
+  // `forceLightText`, which is `undefined` when no bg image) for every preload so
+  // the family we warm matches the family MushafPage paints.
+  const pageFontVariant = computeDarkFontVariant(forceLightText, themeIndex);
   const rawTextColor = getQuranTextColor('', themeIndex);
   const isRawColorDark = (() => {
     const hex = (rawTextColor || '#000000').replace('#', '');
@@ -1126,10 +1156,19 @@ export default function SurahScreen() {
   );
   const autoScrollSeconds = Math.round(autoScrollDurationMs / 1000);
   const autoScrollDurationLabel = formatAutoScrollDuration(autoScrollSeconds, isArabicLang);
+  // Match the app's standard AppModal surface exactly (white in light, deep green
+  // #0f1a14 in dark) so the auto-scroll modal looks like every other modal.
+  const AUTO_SCROLL_SURFACE = getAppModalSurface(isDarkMode);
+  const AUTO_SCROLL_BORDER = getAppModalBorder(isDarkMode);
+  const autoScrollFg = isDarkMode ? '#fff' : '#1a1a2e';
+  const autoScrollSubFg = isDarkMode ? '#bbb' : '#666';
+  const autoScrollIconBtnBg = isDarkMode ? 'rgba(13,142,98,0.18)' : 'rgba(13,142,98,0.10)';
+  const autoScrollIconBtnFg = isDarkMode ? '#4ADE80' : APP_MODAL_GREEN;
   const autoScrollCopy = {
     title: isArabicLang ? 'التصفح التلقائي' : 'Auto Scroll',
     play: isArabicLang ? 'تشغيل التصفح التلقائي' : 'Start Auto Scroll',
     pause: isArabicLang ? 'إيقاف مؤقت' : 'Pause',
+    preparing: isArabicLang ? 'جاري التحضير…' : 'Preparing…',
     minimized: isArabicLang ? 'مصغر' : 'Minimized',
     resume: isArabicLang ? 'متابعة' : 'Resume',
     speed: isArabicLang ? 'مدة الصفحة' : 'Page duration',
@@ -1424,8 +1463,8 @@ export default function SurahScreen() {
   }, []);
 
   useEffect(() => {
-    ensurePagesLoaded(currentPage, 3, forceLightText);
-  }, [currentPage, forceLightText]);
+    ensurePagesLoaded(currentPage, 3, pageFontVariant);
+  }, [currentPage, pageFontVariant]);
 
   // Warm the per-ayah audio cache for this page's first ayah in the background.
   // The cache layer coalesces and skips already-cached files, so this is cheap
@@ -1798,20 +1837,53 @@ export default function SurahScreen() {
 
   const toggleAutoScroll = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.selectionAsync();
+
+    // Pause: stop immediately and cancel any in-flight preload.
+    if (autoScrollActive) {
+      autoScrollPrepareRef.current++;
+      setAutoScrollActive(false);
+      return;
+    }
+    // Re-press while preparing → cancel the prepare (acts as toggle-off).
+    if (autoScrollPreparing) {
+      autoScrollPrepareRef.current++;
+      setAutoScrollPreparing(false);
+      return;
+    }
+
+    const firstOpen = !showAutoScrollControls;
     setShowAutoScrollControls(true);
     setAutoScrollMinimized(false);
-    if (!autoScrollActive && !showAutoScrollControls) {
+    if (firstOpen) {
       setAutoScrollStartPage(currentPage);
       continuousScrollOffsetRef.current = 0;
       requestAnimationFrame(() => {
         continuousScrollRef.current?.scrollToOffset({ offset: 0, animated: false });
       });
     }
-    setAutoScrollActive(prev => {
-      if (prev) return false;
-      return currentPage < TOTAL_PAGES;
+    if (currentPage >= TOTAL_PAGES) return; // nothing left to scroll
+
+    // ── Start gate ──
+    // Never let the scroll timer expose a page whose QCF font is still cold:
+    // doing so makes RN fall back to another registered QCF page font (all page
+    // fonts share PUA codepoints), producing the broken first render. Preload the
+    // forward window in the EXACT variant the pages will paint, then activate.
+    const forward: number[] = [];
+    for (let p = currentPage; p <= Math.min(TOTAL_PAGES, currentPage + 3); p++) forward.push(p);
+    const allReady = forward.every(p => isPageFontLoaded(p, pageFontVariant));
+    if (allReady) {
+      setAutoScrollActive(true);
+      return;
+    }
+    const token = ++autoScrollPrepareRef.current;
+    setAutoScrollPreparing(true);
+    preloadCriticalPages(forward, pageFontVariant, 2500).finally(() => {
+      // Ignore if a pause/re-press happened while we were preloading.
+      if (autoScrollPrepareRef.current !== token) return;
+      setAutoScrollPreparing(false);
+      setAutoScrollActive(true);
     });
-  }, [autoScrollActive, currentPage, showAutoScrollControls]);
+  }, [autoScrollActive, autoScrollPreparing, currentPage, showAutoScrollControls, pageFontVariant]);
 
   const updateAutoScrollSpeed = useCallback((speed: number) => {
     const normalized = Math.max(AUTO_SCROLL_MIN_SPEED, Math.min(AUTO_SCROLL_MAX_SPEED, speed));
@@ -1856,7 +1928,10 @@ export default function SurahScreen() {
   const updateContinuousPageFromOffset = useCallback((offsetY: number) => {
     const { page } = getContinuousPageMetrics(offsetY + 8);
     setCurrentPage(prev => (prev === page ? prev : page));
-  }, [getContinuousPageMetrics]);
+    // Look-ahead: warm the upcoming pages' fonts in the EXACT render variant so
+    // they are registered before they scroll into view (no cold-font fallback).
+    ensurePagesLoaded(page, 2, pageFontVariant);
+  }, [getContinuousPageMetrics, pageFontVariant]);
 
   useEffect(() => {
     if (!autoScrollActive || !autoScrollContinuousMode) return;
@@ -1876,12 +1951,20 @@ export default function SurahScreen() {
       }
       const pixelsPerTick = Math.max(0.25, height / Math.max(1, autoScrollDurationMs / AUTO_SCROLL_TICK_MS));
       const nextOffset = offset + pixelsPerTick;
+      // Pin: never scroll into a page whose font is not yet registered. Hold the
+      // position (and kick its load) until ready, so the user never sees a page
+      // render with the wrong (fallback) QCF font.
+      const nextPage = getContinuousPageMetrics(nextOffset + 8).page;
+      if (!isPageFontLoaded(nextPage, pageFontVariant)) {
+        ensurePagesLoaded(nextPage, 1, pageFontVariant);
+        return;
+      }
       continuousScrollOffsetRef.current = nextOffset;
       continuousScrollRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
       updateContinuousPageFromOffset(nextOffset);
     }, AUTO_SCROLL_TICK_MS);
     return () => clearInterval(timer);
-  }, [autoScrollActive, autoScrollContinuousMode, autoScrollDurationMs, continuousPages, getContinuousPageMetrics, updateContinuousPageFromOffset]);
+  }, [autoScrollActive, autoScrollContinuousMode, autoScrollDurationMs, continuousPages, getContinuousPageMetrics, updateContinuousPageFromOffset, pageFontVariant]);
 
   // Auto-sync page to audio while playing — jump to verse page when playback moves
   useEffect(() => {
@@ -2249,7 +2332,7 @@ export default function SurahScreen() {
           {showAutoScrollControls && (
             <View pointerEvents="box-none" style={[s.autoScrollWrap, { bottom: Math.max(insets.bottom, 12) + 8 }]}>
               <BlurView
-                intensity={Platform.OS === 'ios' ? 34 : 18}
+                intensity={Platform.OS === 'ios' ? 30 : 20}
                 tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
                 style={s.autoScrollBlur}
               >
@@ -2261,7 +2344,9 @@ export default function SurahScreen() {
                       s.autoScrollMiniPanel,
                       {
                         flexDirection: isRTL ? 'row-reverse' : 'row',
-                        backgroundColor: isLightBg ? 'rgba(255,255,255,0.88)' : 'rgba(24,24,28,0.86)',
+                        backgroundColor: AUTO_SCROLL_SURFACE,
+                        borderWidth: 1,
+                        borderColor: AUTO_SCROLL_BORDER,
                       },
                     ]}
                   >
@@ -2270,26 +2355,30 @@ export default function SurahScreen() {
                       style={[s.autoScrollMiniPlayButton, { backgroundColor: autoScrollActive ? 'rgba(13,142,98,0.18)' : AUTO_SCROLL_ACCENT }]}
                       activeOpacity={0.85}
                     >
-                      <MaterialCommunityIcons
-                        name={autoScrollActive ? 'pause' : 'play'}
-                        size={16}
-                        color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'}
-                      />
+                      {autoScrollPreparing ? (
+                        <ActivityIndicator size="small" color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'} />
+                      ) : (
+                        <MaterialCommunityIcons
+                          name={autoScrollActive ? 'pause' : 'play'}
+                          size={16}
+                          color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'}
+                        />
+                      )}
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.autoScrollTitle, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                      <Text style={[s.autoScrollTitle, { color: autoScrollFg, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                         {autoScrollCopy.title}
                       </Text>
-                      <Text style={[s.autoScrollSubtitle, { color: isLightBg ? '#666' : '#bbb', textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
-                        {autoScrollCopy.minimized} · {autoScrollDurationLabel}
+                      <Text style={[s.autoScrollSubtitle, { color: autoScrollSubFg, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                        {autoScrollPreparing ? autoScrollCopy.preparing : `${autoScrollCopy.minimized} · ${autoScrollDurationLabel}`}
                       </Text>
                     </View>
-                    <MaterialCommunityIcons name="chevron-up" size={18} color={isLightBg ? '#555' : '#bbb'} />
+                    <MaterialCommunityIcons name="chevron-up" size={18} color={autoScrollSubFg} />
                   </TouchableOpacity>
                 ) : (
                   <View style={[
                     s.autoScrollPanel,
-                    { backgroundColor: isLightBg ? 'rgba(255,255,255,0.84)' : 'rgba(24,24,28,0.82)' },
+                    { backgroundColor: AUTO_SCROLL_SURFACE, borderWidth: 1, borderColor: AUTO_SCROLL_BORDER },
                   ]}>
                     <View style={[s.autoScrollTopRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <TouchableOpacity
@@ -2297,56 +2386,64 @@ export default function SurahScreen() {
                         style={[s.autoScrollPlayButton, { backgroundColor: autoScrollActive ? 'rgba(13,142,98,0.18)' : AUTO_SCROLL_ACCENT }]}
                         activeOpacity={0.85}
                       >
-                        <MaterialCommunityIcons
-                          name={autoScrollActive ? 'pause' : 'play'}
-                          size={18}
-                          color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'}
-                        />
+                        {autoScrollPreparing ? (
+                          <ActivityIndicator size="small" color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'} />
+                        ) : (
+                          <MaterialCommunityIcons
+                            name={autoScrollActive ? 'pause' : 'play'}
+                            size={18}
+                            color={autoScrollActive ? AUTO_SCROLL_ACCENT : '#fff'}
+                          />
+                        )}
                       </TouchableOpacity>
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.autoScrollTitle, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left' }]}>
+                        <Text style={[s.autoScrollTitle, { color: autoScrollFg, textAlign: isRTL ? 'right' : 'left' }]}>
                           {autoScrollCopy.title}
                         </Text>
-                        <Text style={[s.autoScrollSubtitle, { color: isLightBg ? '#666' : '#bbb', textAlign: isRTL ? 'right' : 'left' }]}>
-                          {autoScrollActive ? autoScrollCopy.pause : autoScrollCopy.play} · {autoScrollCopy.speed}: {autoScrollDurationLabel}
+                        <Text style={[s.autoScrollSubtitle, { color: autoScrollSubFg, textAlign: isRTL ? 'right' : 'left' }]}>
+                          {autoScrollPreparing
+                            ? autoScrollCopy.preparing
+                            : `${autoScrollActive ? autoScrollCopy.pause : autoScrollCopy.play} · ${autoScrollCopy.speed}: ${autoScrollDurationLabel}`}
                         </Text>
                       </View>
                       <TouchableOpacity
                         hitSlop={8}
                         onPress={() => setAutoScrollMinimized(true)}
-                        style={[s.autoScrollCloseButton, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.10)' }]}
+                        style={[s.autoScrollCloseButton, { backgroundColor: autoScrollIconBtnBg }]}
                       >
-                        <MaterialCommunityIcons name="chevron-down" size={16} color={isLightBg ? '#333' : '#fff'} />
+                        <MaterialCommunityIcons name="chevron-down" size={16} color={autoScrollIconBtnFg} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         hitSlop={8}
                         onPress={() => {
+                          autoScrollPrepareRef.current++; // cancel any in-flight preload
                           setAutoScrollActive(false);
+                          setAutoScrollPreparing(false);
                           setShowAutoScrollControls(false);
                           setAutoScrollMinimized(false);
                         }}
-                        style={[s.autoScrollCloseButton, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.10)' }]}
+                        style={[s.autoScrollCloseButton, { backgroundColor: autoScrollIconBtnBg }]}
                       >
-                        <MaterialCommunityIcons name="close" size={14} color={isLightBg ? '#333' : '#fff'} />
+                        <MaterialCommunityIcons name="close" size={14} color={autoScrollIconBtnFg} />
                       </TouchableOpacity>
                     </View>
 
                     <View style={[s.autoScrollCurrentRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <Text style={[s.autoScrollDurationLabel, { color: isLightBg ? '#666' : '#aaa', textAlign: isRTL ? 'right' : 'left' }]}>
+                      <Text style={[s.autoScrollDurationLabel, { color: autoScrollSubFg, textAlign: isRTL ? 'right' : 'left' }]}>
                         {autoScrollCopy.speed}
                       </Text>
                       <View style={[s.autoScrollCurrentPill, { backgroundColor: 'rgba(13,142,98,0.12)' }]}>
-                        <Text style={[s.autoScrollCurrentText, { color: AUTO_SCROLL_ACCENT }]}>
+                        <Text style={[s.autoScrollCurrentText, { color: autoScrollIconBtnFg }]}>
                           {autoScrollDurationLabel}
                         </Text>
                       </View>
                     </View>
 
                     <View style={s.autoScrollSliderLabels}>
-                      <Text style={[s.autoScrollSliderLabel, { color: isLightBg ? '#666' : '#aaa', textAlign: 'left' }]}>
+                      <Text style={[s.autoScrollSliderLabel, { color: autoScrollSubFg, textAlign: 'left' }]}>
                         {autoScrollCopy.slower}
                       </Text>
-                      <Text style={[s.autoScrollSliderLabel, { color: isLightBg ? '#666' : '#aaa', textAlign: 'right' }]}>
+                      <Text style={[s.autoScrollSliderLabel, { color: autoScrollSubFg, textAlign: 'right' }]}>
                         {autoScrollCopy.faster}
                       </Text>
                     </View>
@@ -2360,7 +2457,7 @@ export default function SurahScreen() {
                       onValueChange={setAutoScrollDraftSpeed}
                       onSlidingComplete={updateAutoScrollSpeed}
                       minimumTrackTintColor={AUTO_SCROLL_ACCENT}
-                      maximumTrackTintColor={isLightBg ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)'}
+                      maximumTrackTintColor={isDarkMode ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)'}
                       thumbTintColor={AUTO_SCROLL_ACCENT}
                     />
                   </View>

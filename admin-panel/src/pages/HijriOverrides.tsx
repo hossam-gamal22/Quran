@@ -374,27 +374,53 @@ const HijriOverrides: React.FC = () => {
 
   const getCountryMode = (code: string): CountrySourceMode => sourceModes[code] === 'api' ? 'api' : 'admin';
 
-  // Persist a single country's mode (merge so the others are untouched).
-  const setCountryMode = async (code: string, mode: CountrySourceMode) => {
-    setSavingMode(code);
+  const sourceModeErrorMessage = (err: unknown) => {
+    const code = typeof err === 'object' && err && 'code' in err ? String((err as any).code) : '';
+    if (code.includes('permission-denied')) {
+      return 'تعذّر حفظ مصدر التاريخ: صلاحيات Firestore المنشورة لا تسمح بالكتابة. انشر firestore.rules ثم حاول مجدداً.';
+    }
+    return 'تعذّر حفظ مصدر التاريخ. حاول مجدداً.';
+  };
+
+  const persistCountryModes = async (codes: string[], mode: CountrySourceMode, savingKey: string) => {
+    const normalizedCodes = Array.from(new Set(codes.map(code => code.toUpperCase()).filter(Boolean)));
+    if (normalizedCodes.length === 0) return;
+    setSavingMode(savingKey);
     try {
+      const countries = normalizedCodes.reduce<Record<string, CountrySourceMode>>((acc, code) => {
+        acc[code] = mode;
+        return acc;
+      }, {});
       await setDoc(
         doc(db, SOURCE_MODE_COLLECTION, SOURCE_MODE_DOC),
-        { countries: { [code]: mode }, updatedAt: Timestamp.now(), updatedBy: 'admin' },
+        { countries, updatedAt: Timestamp.now(), updatedBy: 'admin' },
         { merge: true },
       );
       setToast({
         type: 'success',
-        message: mode === 'api'
-          ? `${getCountryName(code)}: التاريخ الآن من الـ API تلقائياً`
-          : `${getCountryName(code)}: التاريخ الآن من لوحة التحكم`,
+        message: normalizedCodes.length === 1
+          ? (mode === 'api'
+              ? `${getCountryName(normalizedCodes[0])}: التاريخ الآن من الـ API تلقائياً`
+              : `${getCountryName(normalizedCodes[0])}: التاريخ الآن من لوحة التحكم`)
+          : (mode === 'api'
+              ? `تم تحويل ${normalizedCodes.length} دولة للـ API تلقائياً`
+              : `تم إرجاع ${normalizedCodes.length} دولة للوحة التحكم`),
       });
     } catch (err) {
       console.error('Error saving source mode:', err);
-      setToast({ type: 'error', message: 'تعذّر حفظ مصدر التاريخ. حاول مجدداً.' });
+      setToast({ type: 'error', message: sourceModeErrorMessage(err) });
     } finally {
       setSavingMode(null);
     }
+  };
+
+  // Persist a single country's mode (merge so the others are untouched).
+  const setCountryMode = async (code: string, mode: CountrySourceMode) => {
+    await persistCountryModes([code], mode, code);
+  };
+
+  const setAllCountryModes = async (mode: CountrySourceMode) => {
+    await persistCountryModes(COUNTRIES.map(country => country.code), mode, `all-${mode}`);
   };
 
   // ============================================
@@ -1076,6 +1102,24 @@ const HijriOverrides: React.FC = () => {
               تطبيق على كل الدول
             </button>
             <button
+              onClick={() => setAllCountryModes('api')}
+              disabled={savingMode === 'all-api'}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-60 text-sky-300 border border-sky-500/30 rounded-lg transition-colors"
+              title="اجعل كل الدول تقرأ التاريخ من AlAdhan API"
+            >
+              {savingMode === 'all-api' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+              تحويل الكل للـ API
+            </button>
+            <button
+              onClick={() => setAllCountryModes('admin')}
+              disabled={savingMode === 'all-admin'}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-60 text-emerald-300 border border-emerald-500/30 rounded-lg transition-colors"
+              title="اجعل كل الدول تقرأ تعديل لوحة التحكم"
+            >
+              {savingMode === 'all-admin' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />}
+              إرجاع الكل لليدوي
+            </button>
+            <button
               onClick={() => setDrafts({})}
               className="inline-flex items-center gap-2 px-3 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
             >
@@ -1127,6 +1171,7 @@ const HijriOverrides: React.FC = () => {
                 </th>
                 <th className="text-right px-4 py-3">الدولة</th>
                 <th className="text-center px-4 py-3">المعروض حالياً</th>
+                <th className="text-center px-4 py-3">تاريخ الـ API</th>
                 <th className="text-center px-4 py-3">اليوم</th>
                 <th className="text-center px-4 py-3">الشهر</th>
                 <th className="text-center px-4 py-3">السنة</th>
@@ -1146,6 +1191,18 @@ const HijriOverrides: React.FC = () => {
                   draft.source !== (current.override?.source || DEFAULT_SOURCE);
 
                 const isSelected = selectedCountries.has(country.code);
+                const mode = getCountryMode(country.code);
+                const apiVal = apiValueFor(country.code);
+                const differs = !!apiVal && (
+                  apiVal.day !== current.day ||
+                  apiVal.month !== current.month ||
+                  apiVal.year !== current.year
+                );
+                // What the APP will actually show for this country:
+                // 'api' mode -> the API value; otherwise the admin value.
+                const shown = mode === 'api' && apiVal
+                  ? { day: apiVal.day, month: apiVal.month, year: apiVal.year }
+                  : { day: current.day, month: current.month, year: current.year };
 
                 return (
                   <tr key={country.code} className={`border-b border-admin-border/50 transition-colors ${isSelected ? 'bg-accent/10' : 'hover:bg-admin-surface/30'}`}>
@@ -1163,79 +1220,77 @@ const HijriOverrides: React.FC = () => {
                       <div className="text-xs text-slate-500" dir="ltr">{country.code} · {country.en}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {(() => {
-                        const mode = getCountryMode(country.code);
-                        const apiVal = apiValueFor(country.code);
-                        const differs = !!apiVal && (apiVal.day !== current.day || apiVal.month !== current.month);
-                        // What the APP will actually show for this country:
-                        // 'api' mode → the API value; otherwise the admin value.
-                        const shown = mode === 'api' && apiVal
-                          ? { day: apiVal.day, month: apiVal.month, year: apiVal.year }
-                          : { day: current.day, month: current.month, year: current.year };
-                        return (
-                          <div className="flex flex-col items-center gap-1.5">
-                            <div className="font-bold text-white">
-                              {shown.day} {HIJRI_MONTHS[shown.month - 1]?.ar} {shown.year} هـ
+                      <div className="flex flex-col items-center gap-1.5">
+                        <div className="font-bold text-white">
+                          {shown.day} {HIJRI_MONTHS[shown.month - 1]?.ar} {shown.year} هـ
+                        </div>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${
+                          mode === 'api'
+                            ? 'bg-sky-500/15 text-sky-300'
+                            : current.source === 'admin'
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : 'bg-slate-700/70 text-slate-300'
+                        }`}>
+                          {mode === 'api' ? 'تلقائي (API)' : current.source === 'admin' ? 'من الأدمن' : 'حساب تلقائي'}
+                        </span>
+
+                        {/* Source toggle: API (auto) vs admin (manual) */}
+                        <div className="inline-flex rounded-lg border border-admin-border overflow-hidden mt-0.5">
+                          <button
+                            onClick={() => setCountryMode(country.code, 'api')}
+                            disabled={savingMode === country.code || mode === 'api'}
+                            title="اجعل التطبيق يقرأ التاريخ من الـ API تلقائياً"
+                            className={`flex items-center gap-1 px-2 py-1 text-[11px] transition-colors ${
+                              mode === 'api' ? 'bg-sky-600 text-white' : 'bg-admin-surface-light text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            <Cloud className="w-3 h-3" /> API
+                          </button>
+                          <button
+                            onClick={() => setCountryMode(country.code, 'admin')}
+                            disabled={savingMode === country.code || mode === 'admin'}
+                            title="اجعل التطبيق يقرأ تعديل لوحة التحكم"
+                            className={`flex items-center gap-1 px-2 py-1 text-[11px] transition-colors ${
+                              mode === 'admin' ? 'bg-accent text-white' : 'bg-admin-surface-light text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            <PenLine className="w-3 h-3" /> يدوي
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex flex-col items-center gap-1.5">
+                        {apiError ? (
+                          <span className="text-xs text-red-300">تعذّر جلب الـ API</span>
+                        ) : apiVal ? (
+                          <>
+                            <div className="font-bold text-sky-200">
+                              {apiVal.day} {HIJRI_MONTHS[apiVal.month - 1]?.ar} {apiVal.year} هـ
                             </div>
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${
-                              mode === 'api'
-                                ? 'bg-sky-500/15 text-sky-300'
-                                : current.source === 'admin'
-                                  ? 'bg-emerald-500/15 text-emerald-300'
-                                  : 'bg-slate-700/70 text-slate-300'
-                            }`}>
-                              {mode === 'api' ? 'تلقائي (API)' : current.source === 'admin' ? 'من الأدمن' : 'حساب تلقائي'}
+                            <span className={`text-[11px] ${differs && mode === 'admin' ? 'text-amber-300' : 'text-slate-400'}`}>
+                              {differs && mode === 'admin' ? 'مختلف عن اليدوي' : 'مطابق للمعروض'}
                             </span>
-
-                            {/* Source toggle: API (auto) vs admin (manual) */}
-                            <div className="inline-flex rounded-lg border border-admin-border overflow-hidden mt-0.5">
-                              <button
-                                onClick={() => setCountryMode(country.code, 'api')}
-                                disabled={savingMode === country.code || mode === 'api'}
-                                title="اجعل التطبيق يقرأ التاريخ من الـ API تلقائياً"
-                                className={`flex items-center gap-1 px-2 py-1 text-[11px] transition-colors ${
-                                  mode === 'api' ? 'bg-sky-600 text-white' : 'bg-admin-surface-light text-slate-300 hover:bg-slate-600'
-                                }`}
-                              >
-                                <Cloud className="w-3 h-3" /> API
-                              </button>
-                              <button
-                                onClick={() => setCountryMode(country.code, 'admin')}
-                                disabled={savingMode === country.code || mode === 'admin'}
-                                title="اجعل التطبيق يقرأ تعديل لوحة التحكم"
-                                className={`flex items-center gap-1 px-2 py-1 text-[11px] transition-colors ${
-                                  mode === 'admin' ? 'bg-accent text-white' : 'bg-admin-surface-light text-slate-300 hover:bg-slate-600'
-                                }`}
-                              >
-                                <PenLine className="w-3 h-3" /> يدوي
-                              </button>
-                            </div>
-
-                            {/* API value + mismatch warning (manual mode only) */}
-                            {apiError ? (
-                              <span className="text-[11px] text-slate-500">تعذّر جلب الـ API</span>
-                            ) : apiVal ? (
-                              <span className={`text-[11px] ${differs && mode === 'admin' ? 'text-amber-300' : 'text-slate-400'}`}>
-                                الـ API: {apiVal.day} {HIJRI_MONTHS[apiVal.month - 1]?.ar}
-                                {differs && mode === 'admin' ? ' ✕ مختلف' : ' ✓'}
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-slate-500">… الـ API</span>
-                            )}
-
-                            {differs && mode === 'admin' && (
+                            {mode === 'admin' && (
                               <button
                                 onClick={() => setCountryMode(country.code, 'api')}
                                 disabled={savingMode === country.code}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] transition-colors"
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] transition-colors ${
+                                  differs
+                                    ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30'
+                                    : 'bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border-sky-500/30'
+                                }`}
                                 title="حوّل هذه الدولة لتعتمد قيمة الـ API"
                               >
-                                <AlertTriangle className="w-3 h-3" /> اعتمد الـ API
+                                {differs ? <AlertTriangle className="w-3 h-3" /> : <Cloud className="w-3 h-3" />}
+                                اعتمد الـ API
                               </button>
                             )}
-                          </div>
-                        );
-                      })()}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-500">جاري جلب الـ API...</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">

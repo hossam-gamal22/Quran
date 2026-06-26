@@ -27,6 +27,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { formatPoints } from '@/lib/format-number';
 import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
@@ -58,14 +59,16 @@ type SelectedPointInfo = {
   icon: MaterialIconName;
 };
 
-const getScoreTextSize = (score: number, fs: (size: number) => number) => {
-  const digits = String(Math.max(0, Math.trunc(score))).length;
+// Sized by the *formatted* string length (incl. ".4K"/"M" suffix chars) so the
+// rendered text — not the numeric digit count — drives the font tier.
+const getScoreTextSize = (formattedScore: string, fs: (size: number) => number) => {
+  const chars = formattedScore.length;
   const baseSize =
-    digits <= 4 ? 42 :
-    digits === 5 ? 34 :
-    digits === 6 ? 30 :
-    digits === 7 ? 26 :
-    digits === 8 ? 23 :
+    chars <= 4 ? 42 :
+    chars === 5 ? 34 :
+    chars === 6 ? 30 :
+    chars === 7 ? 26 :
+    chars === 8 ? 23 :
     20;
   const fontSize = fs(baseSize);
 
@@ -167,7 +170,9 @@ export default function HonorBoard() {
           getUserMonthlyInfo(userId),
           getDisplayName(),
         ]);
-        setHasDisplayName(!!userName && userName.trim().length > 0);
+        // Count the server-side name too — after a reinstall the local copy
+        // is empty while the user is still named (and ranked) on the server.
+        setHasDisplayName(!!((syncedInfo?.displayName || userName || '').trim()));
 
         const effectiveInfo = syncedInfo || info;
         const monthly = effectiveInfo?.activities || {};
@@ -254,7 +259,8 @@ export default function HonorBoard() {
 
   const bgColor = settings.display.appBackground !== 'none' ? 'transparent' : colors.background;
   const displayedLeaderboard = leaderboard.slice(0, LEADERBOARD_PREVIEW_COUNT);
-  const scoreTextSize = getScoreTextSize(userScore, colors.fs);
+  const formattedScore = formatPoints(userScore);
+  const scoreTextSize = getScoreTextSize(formattedScore, colors.fs);
 
   if (loading) {
     return (
@@ -434,18 +440,21 @@ export default function HonorBoard() {
                 { color: isDarkMode ? '#f59e0b' : '#B57200' },
               ]}
             >
-              {userScore}
+              {formattedScore}
             </Text>
             <Text style={[styles.scoreLabel, { color: colors.muted }]}>{t('honor.points')}</Text>
           </View>
-          {userRank ? (
-            <View style={[styles.rankBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="podium" size={16} color={isDarkMode ? '#f59e0b' : '#B57200'} />
-              <Text style={[styles.rankText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
-                {isArabic ? `ترتيبك: #${userRank}` : `Your Rank: #${userRank}`}
-              </Text>
-            </View>
-          ) : userScore > 0 ? (
+          {userRank ? (() => {
+            const medal = userRank <= 3 ? MEDAL_STYLES(isDarkMode)[userRank - 1] : null;
+            return (
+              <View style={[styles.rankBadge, { backgroundColor: medal?.bg || (isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)'), flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <MaterialCommunityIcons name={medal?.icon || 'podium'} size={16} color={medal?.color || (isDarkMode ? '#f59e0b' : '#B57200')} />
+                <Text style={[styles.rankText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
+                  {isArabic ? `ترتيبك: #${userRank}` : `Your Rank: #${userRank}`}
+                </Text>
+              </View>
+            );
+          })() : userScore > 0 ? (
             <View style={[styles.rankBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="star-four-points" size={16} color={isDarkMode ? '#f59e0b' : '#B57200'} />
               <Text style={[styles.rankText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
@@ -692,7 +701,7 @@ export default function HonorBoard() {
                       {/* Score */}
                       <View style={[styles.activityPointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
                         <Text style={[styles.activityPointsText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
-                          {user.score}
+                          {formatPoints(user.score)}
                         </Text>
                       </View>
                     </View>
@@ -849,7 +858,7 @@ export default function HonorBoard() {
                     </View>
                     <View style={[styles.activityPointsBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(181,114,0,0.08)' }]}>
                       <Text style={[styles.activityPointsText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
-                        {user.score}
+                        {formatPoints(user.score)}
                       </Text>
                     </View>
                   </View>
@@ -1386,6 +1395,7 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
     lineHeight: 20,
     includeFontPadding: false,
+    fontVariant: ['tabular-nums'],
   },
   emptyWinnersCard: {
     padding: 24,

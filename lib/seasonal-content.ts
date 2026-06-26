@@ -299,8 +299,11 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
     nameAr: 'شهر محرم',
     nameEn: 'Muharram',
     description: 'أول شهور السنة الهجرية',
+    // "أول شهور السنة الهجرية" is a new-year message — keep it to the first
+    // 10 days only (hijri_new_year owns 1–3, ashura owns 9–10) instead of the
+    // whole month, so it doesn't linger as a stale banner all of Muharram.
     startDate: { month: 1, day: 1 },
-    endDate: { month: 1, day: 30 },
+    endDate: { month: 1, day: 10 },
     color: '#696969',
     icon: 'calendar-month',
   },

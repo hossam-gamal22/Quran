@@ -47,6 +47,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { markPermissionRequested } from '@/lib/permission-recovery';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -204,6 +205,10 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 const QiblaScreen = ({ embedded = false }: { embedded?: boolean }) => {
   const insets = useSafeAreaInsets();
   const adBottomInset = useAdBottomInset();
+  const scrollBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  }) + adBottomInset;
   const { settings, t, isDarkMode } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -592,7 +597,7 @@ const QiblaScreen = ({ embedded = false }: { embedded?: boolean }) => {
     ) : (
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 + adBottomInset }]}
+        contentContainerStyle={[styles.scrollContainer, { paddingBottom: scrollBottomSpacing }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >

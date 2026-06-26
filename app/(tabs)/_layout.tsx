@@ -13,6 +13,11 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import {
+  ANDROID_TAB_BAR_BUTTON_MIN_HEIGHT,
+  ANDROID_TAB_BAR_TOP_PADDING,
+  getAndroidTabBarBottomPadding,
+} from '@/lib/tab-screen-spacing';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 const FALLBACK_LABELS: Record<string, string> = {
@@ -113,7 +118,7 @@ function AndroidTabsLayout() {
           style={[
             androidStyles.tabList,
             {
-              paddingBottom: Math.max(insets.bottom, 8) + 8,
+              paddingBottom: getAndroidTabBarBottomPadding(insets.bottom),
               borderTopColor: isDarkMode
                 ? 'rgba(255,255,255,0.08)'
                 : 'rgba(0,0,0,0.10)',
@@ -209,7 +214,7 @@ const androidStyles = StyleSheet.create({
     right: 0,
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: ANDROID_TAB_BAR_TOP_PADDING,
     paddingHorizontal: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
@@ -224,7 +229,7 @@ const androidStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
-    minHeight: 48,
+    minHeight: ANDROID_TAB_BAR_BUTTON_MIN_HEIGHT,
     gap: 2,
   },
   tabIconWrap: {

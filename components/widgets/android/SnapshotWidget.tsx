@@ -35,7 +35,11 @@ import { deviceUses24Hour, formatClockHHMM } from '@/lib/widget-clock-format';
 
 // ─── Live date widget (no PNG — always reads new Date()) ─────────────────────
 
-const DATE_WIDGET_IDS = new Set(['daySimple', 'dayThuluth', 'dayDigital', 'monthSimple', 'monthThuluth']);
+// hijriDate is included: it renders the CURRENT Hijri date, so after local
+// midnight a yesterday-baked PNG is plain wrong. Like the other date widgets it
+// serves the baked gallery PNG only when baked TODAY and otherwise falls back
+// to the live native re-render below — fully offline (pure-math Hijri).
+const DATE_WIDGET_IDS = new Set(['daySimple', 'dayThuluth', 'dayDigital', 'monthSimple', 'monthThuluth', 'hijriDate']);
 
 const WEEKDAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 // Full English weekday names to match the gallery preview (WEEKDAYS_EN in
@@ -165,6 +169,8 @@ function LiveDateWidget({
   const tileRadius = s(radius);
   const frame = (child: React.ReactElement) => (
     <FlexWidget
+      // Transparent outer host: the centered tile keeps the gallery's exact
+      // aspect (1:1 parity), matching the baked-PNG path's contain-fit.
       style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000000' }}
       clickAction={clickAction}
       clickActionData={clickUri ? { uri: clickUri } : undefined}
@@ -184,16 +190,27 @@ function LiveDateWidget({
     fsLogical: number,
     justify: 'center' | 'flex-end' | 'flex-start',
     offsetLogical: number = 0,
-  ) => (
-    <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: justify }}>
-      <TextWidget
-        text={text}
-        style={{ fontFamily: font, fontSize: s(fsLogical), color: faintWatermark, textAlign: 'center', width: 'match_parent', marginTop: s(offsetLogical) }}
-        allowFontScaling={false}
-        maxLines={1}
-      />
-    </FlexWidget>
-  );
+  ) => {
+    // Calligraphy fonts (WidgetFont variants) draw their glyphs high in the
+    // RNAW line box — the same metric quirk the month/weekday labels offset
+    // with `paddingTop: fs * 0.55`. Without the nudge a CENTER-justified
+    // watermark digit rides up and clips at the tile's top edge (reported:
+    // «٢٦» cut off + composition top-heavy). flex-end placements keep their
+    // hand-tuned offsets — the low "shadow" look is intentional there.
+    const calligraphyNudge = justify === 'center' && (font === FONT.widget || font === FONT.widget2)
+      ? Math.round(fsLogical * 0.55)
+      : 0;
+    return (
+      <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: justify }}>
+        <TextWidget
+          text={text}
+          style={{ fontFamily: font, fontSize: s(fsLogical), color: faintWatermark, textAlign: 'center', width: 'match_parent', marginTop: s(offsetLogical), paddingTop: s(calligraphyNudge) }}
+          allowFontScaling={false}
+          maxLines={1}
+        />
+      </FlexWidget>
+    );
+  };
 
   if (widgetId === 'dayDigital') {
     // Mirrors DayDigitalPreview: HH:MM in Rubik-Bold, plus a date subtitle that
@@ -297,6 +314,48 @@ function LiveDateWidget({
     );
   }
 
+  if (widgetId === 'hijriDate') {
+    // Offline/stale-PNG fallback for the Hijri date widget. Mirrors the
+    // ENLARGED HijriPreview composition (previews/index.tsx): faint «هجري»
+    // watermark, big "{day} {month}" calligraphy line, year subtitle. Reached
+    // only when the baked gallery PNG is missing or wasn't baked today, so the
+    // date can never go stale across midnight while the app stays closed.
+    const dayLabel = applyNumerals(hijriDay, numerals, isAr);
+    const monthLabel = isAr
+      ? (HIJRI_MONTHS_AR[hijriMonthIdx] ?? '')
+      : (HIJRI_MONTHS_EN_CLEAN[hijriMonthIdx] ?? '');
+    const hijriRow = `${dayLabel} ${monthLabel}`;
+    const hijriFit = (base: number, floor: number, budget: number) => {
+      const len = hijriRow.trim().length;
+      return len <= budget ? base : Math.max(floor, Math.round((base * budget) / len));
+    };
+    const monthFs = size === 'small' ? hijriFit(26, 15, 9) : hijriFit(38, 22, 13);
+    const yearFs = size === 'small' ? 13 : 15;
+    const wmFs = size === 'small' ? 50 : 84;
+    const hijriFont = isAr ? widgetFont : FONT.rubikBold;
+    return frame(
+      <OverlapWidget
+        style={{ width: tileWidth, height: tileHeight, backgroundColor: p.bg, borderRadius: tileRadius }}
+      >
+        {watermarkLayer(isAr ? 'هجري' : 'Hijri', isAr ? widgetFont : FONT.rubikBold, wmFs, 'center')}
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingLeft: s(8), paddingRight: s(8) }}>
+          <TextWidget
+            text={hijriRow}
+            style={{ fontFamily: hijriFont, fontSize: s(monthFs), color: strongText, textAlign: 'center', paddingTop: isAr ? s(Math.round(monthFs * 0.55)) : 0 }}
+            allowFontScaling={false}
+            maxLines={1}
+          />
+          <TextWidget
+            text={`${applyNumerals(hijriYear, numerals, isAr)} ${isAr ? 'هجري' : 'AH'}`}
+            style={{ fontFamily: FONT.rubikMedium, fontSize: s(yearFs), color: p.muted, textAlign: 'center', marginTop: s(6) }}
+            allowFontScaling={false}
+            maxLines={1}
+          />
+        </FlexWidget>
+      </OverlapWidget>
+    );
+  }
+
   if (widgetId === 'monthThuluth') {
     // Mirrors MonthThuluthPreview: calligraphy month name over a faint watermark
     // digit whose baseline sits near (medium) the bottom edge.
@@ -312,7 +371,11 @@ function LiveDateWidget({
         style={{ width: tileWidth, height: tileHeight, backgroundColor: p.bg, borderRadius: tileRadius }}
       >
         {watermarkLayer(wmDay, watermarkFont, wmFs, size === 'small' ? 'center' : 'flex-end')}
-        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', paddingLeft: s(10), paddingRight: s(10), paddingTop: s(size === 'small' ? 14 : 18), paddingBottom: s(size === 'small' ? 6 : 8) }}>
+        {/* Small: SYMMETRIC vertical padding so the centered month name sits at
+            the true visual middle of the square tile (was 14/6, biasing the
+            calligraphy up and leaving a dead band at the bottom). Medium keeps
+            its tuned asymmetric padding (low watermark "shadow" composition). */}
+        <FlexWidget style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', paddingLeft: s(10), paddingRight: s(10), paddingTop: s(size === 'small' ? 10 : 18), paddingBottom: s(size === 'small' ? 10 : 8) }}>
           <TextWidget text={mName} style={{ fontFamily: isAr ? widgetFont : FONT.rubikBold, fontSize: s(mainFs), color: strongText, textAlign: 'center', paddingTop: isAr ? s(Math.round(mainFs * 0.55)) : 0 }} allowFontScaling={false} maxLines={1} />
         </FlexWidget>
       </OverlapWidget>
@@ -554,6 +617,16 @@ function prayerTemplateTextOverlays(
 const PRAYER_ANCHOR_WIDGET_IDS = new Set(['prayerSingle', 'prayerTable', 'prayerNextPrevious']);
 const PRAYER_ROW_KEY_ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
+// 8×8 uniform translucent PNGs (12% black / 18% white) used for the live
+// active-row highlight band. Inlined as data URIs so the headless renderer
+// never needs Metro (dev) or an asset lookup — ResourceUtils.getBitmap decodes
+// `data:` sources directly. Keep tones in sync with `activeBg` in
+// components/widgets/previews/index.tsx.
+const HIGHLIGHT_BAND_PNG_LIGHT =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFUlEQVR4nGNkYGCQZ8ADmPBJDh8FACjEAC8KP2lrAAAAAElFTkSuQmCC';
+const HIGHLIGHT_BAND_PNG_DARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8//+/HgMewIRPcvgoAABHGwM772dJmAAAAABJRU5ErkJggg==';
+
 // Widget-scoped prayer name: Friday Dhuhr → the single word «الجمعة» / "Jumuah"
 // (the prayer tab keeps the app-wide getPrayerNameAr «صلاة الجمعة» unchanged).
 function widgetPrayerName(key: string, isAr: boolean, date: Date): string {
@@ -657,6 +730,22 @@ function buildPrayerAnchorOverlays(
   overlayNames: boolean,
 ): { statics: AnchorStaticItem[]; countdowns: AnchorCountdownSpec[]; highlight?: AnchorHighlightSpec } | null {
   if (!PRAYER_ANCHOR_WIDGET_IDS.has(widgetId) || !anchors || anchors.length === 0) return null;
+  // Completeness guard: a prayer TABLE's row times exist ONLY as live overlays
+  // (DynamicTimeText blanks them in every bake — they change daily), so an
+  // anchor set missing any of the six prayerRowTime.* rects can never render a
+  // correct table (old-schema manifest persisted across an app update).
+  // Returning null here lets the caller fall through to
+  // prayerTemplateTextOverlays (per-state template placements) instead of a
+  // countdown-only result that silently suppresses that fallback — which was
+  // exactly the "5 row times missing on home" bug.
+  if (widgetId === 'prayerTable') {
+    const present = new Set(
+      anchors
+        .filter((a) => a.id.startsWith('prayerRowTime.'))
+        .map((a) => a.id.slice('prayerRowTime.'.length)),
+    );
+    if (!PRAYER_ROW_KEY_ORDER.every((k) => present.has(k))) return null;
+  }
   const tableState = resolvePrayerTableState(data.prayer, now.getTime());
   const rows = tableState.rows;
   const next = tableState.nextRow ?? rows[0];
@@ -689,13 +778,16 @@ function buildPrayerAnchorOverlays(
       color = row?.isNext ? textColor : mutedColor;
     } else if (overlayNames && a.id.startsWith('prayerRowName.')) {
       // Gallery-fallback only: every row name was blanked in this PNG, so redraw
-      // all six live from the SAME resolvePrayerTableState rows the gallery's
-      // prayerRowsFromShared uses — so the name text + active/muted color match
-      // the gallery exactly (including the Friday «صلاة الجمعة» row label).
+      // all six live. Use the WIDGET-scoped name (Friday Dhuhr → the single word
+      // «الجمعة», matching the gallery row label) — the payload's nameAr carries
+      // the app-wide «صلاة الجمعة», which is wider than the captured anchor rect
+      // and clipped to «صلاة» on the home screen.
       const key = a.id.slice('prayerRowName.'.length);
       const idx = PRAYER_ROW_KEY_ORDER.indexOf(key);
       const row = idx >= 0 ? rows[idx] : undefined;
-      text = (isAr ? row?.nameAr : row?.name) ?? '';
+      text = idx >= 0
+        ? widgetPrayerName(key, isAr, now)
+        : ((isAr ? row?.nameAr : row?.name) ?? '');
       color = row?.isNext ? textColor : mutedColor;
     } else if (a.id === 'prayerHeroTime' || a.id === 'prayerNextTime') {
       text = fmt(next?.time ?? data.prayer?.nextPrayerTime);
@@ -936,38 +1028,50 @@ export function SnapshotWidget({
   // widgets, instead of the Makkah/sample fallback baked into the PNG. Single
   // early return through the one render path (no second resolver/provider).
   if (PRAYER_ANCHOR_WIDGET_IDS.has(widgetId) && data.prayer?.needsLocation) {
-    const titleFs = size === 'small' ? 15 : 18;
-    const subFs = size === 'small' ? 11 : 13;
+    const titleFs = (size === 'small' ? 15 : 18) * renderScale;
+    const subFs = (size === 'small' ? 11 : 13) * renderScale;
+    // Contain-fit tile (transparent outside) so the card keeps the gallery
+    // aspect instead of stretching to fill a taller launcher cell.
     return (
       <FlexWidget
         style={{
           width: 'match_parent',
           height: 'match_parent',
-          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: p.bg,
-          borderRadius: TILE_RADIUS[size],
-          paddingLeft: 14,
-          paddingRight: 14,
+          backgroundColor: '#00000000',
         }}
         clickAction={clickAction}
         clickActionData={clickUri ? { uri: clickUri } : undefined}
       >
-        <TextWidget
-          text={isAr ? '📍 فعّل الموقع' : '📍 Enable location'}
-          style={{ fontFamily: FONT.rubikBold, fontSize: titleFs, color: p.ink, textAlign: 'center' }}
-          allowFontScaling={false}
-          maxLines={1}
-        />
-        {size !== 'small' ? (
+        <FlexWidget
+          style={{
+            width: renderedImageWidth,
+            height: renderedImageHeight,
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: p.bg,
+            borderRadius: TILE_RADIUS[size] * renderScale,
+            paddingLeft: 14,
+            paddingRight: 14,
+          }}
+        >
           <TextWidget
-            text={isAr ? 'لعرض مواقيت الصلاة' : 'to show prayer times'}
-            style={{ fontFamily: FONT.rubikMedium, fontSize: subFs, color: p.muted, textAlign: 'center', marginTop: 8 }}
+            text={isAr ? '📍 فعّل الموقع' : '📍 Enable location'}
+            style={{ fontFamily: FONT.rubikBold, fontSize: titleFs, color: p.ink, textAlign: 'center' }}
             allowFontScaling={false}
-            maxLines={2}
+            maxLines={1}
           />
-        ) : null}
+          {size !== 'small' ? (
+            <TextWidget
+              text={isAr ? 'لعرض مواقيت الصلاة' : 'to show prayer times'}
+              style={{ fontFamily: FONT.rubikMedium, fontSize: subFs, color: p.muted, textAlign: 'center', marginTop: 8 }}
+              allowFontScaling={false}
+              maxLines={2}
+            />
+          ) : null}
+        </FlexWidget>
       </FlexWidget>
     );
   }
@@ -1147,8 +1251,12 @@ export function SnapshotWidget({
         width: 'match_parent',
         height: 'match_parent',
         // Android launchers can allocate a cell ratio that differs from the
-        // iOS/gallery snapshot. Keep the outer host transparent and fit the
-        // captured tile inside it so the snapshot is never cropped.
+        // iOS/gallery snapshot. Keep the outer host TRANSPARENT and contain-fit
+        // the captured tile so the rendered card keeps the gallery's exact
+        // aspect/composition (1:1 parity — owner's requirement). Painting the
+        // theme bg across the whole cell was tried and reverted: it visually
+        // stretches the card vs the gallery tile. Cell-size accuracy is handled
+        // in the provider XML (e.g. prayerTable large = 3×3) instead.
         backgroundColor: '#00000000',
         borderRadius: 0,
         overflow: 'hidden',
@@ -1178,21 +1286,26 @@ export function SnapshotWidget({
       {prayerAnchorOverlays?.highlight ? (() => {
         const h = prayerAnchorOverlays.highlight!;
         // Drawn over the (highlight-blanked) gallery PNG, under the text overlays.
-        // Translucent tone matches the gallery's activeBg so the baked row label
-        // shows through; the live row time sits crisply on top. Alpha kept in
-        // sync with `activeBg` in previews/index.tsx (~12% light / ~18% dark) so
-        // the band reads clearly on the cream light theme.
-        const highlightColor = p.isLight ? '#1F000000' : '#2EFFFFFF';
+        // Rendered as a TRANSLUCENT BITMAP (data-URI PNG stretched to the row
+        // rect) — NOT a FlexWidget backgroundColor: live RNAW backgrounds drop
+        // 8-digit ARGB colours entirely (verified on-device: the band pixels
+        // stayed exactly the tile bg), the same quirk that blanked ARGB text.
+        // Bitmap alpha composites correctly, so the baked row icon (large table)
+        // shows through just like the gallery's translucent activeBg. Tone kept
+        // in sync with `activeBg` in previews/index.tsx (12% black light / 18%
+        // white dark).
         return (
-          <FlexWidget
+          <ImageWidget
             key="anchor-row-highlight"
+            image={(p.isLight ? HIGHLIGHT_BAND_PNG_LIGHT : HIGHLIGHT_BAND_PNG_DARK) as any}
+            imageWidth={h.width * renderScale}
+            imageHeight={h.height * renderScale}
+            radius={(size === 'large' ? 10 : 6) * renderScale}
             style={{
               width: h.width * renderScale,
               height: h.height * renderScale,
               marginLeft: imageOffsetX + h.x * renderScale,
               marginTop: imageOffsetY + h.y * renderScale,
-              backgroundColor: highlightColor,
-              borderRadius: (size === 'large' ? 10 : 6) * renderScale,
             }}
           />
         );

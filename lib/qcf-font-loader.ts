@@ -22,6 +22,24 @@ const loadedPages = new Map<number, boolean>(); // page -> darkMode used
 const loadedColorPages = new Set<number>();
 const loadingPromises = new Map<string, Promise<void>>();
 
+/**
+ * On Android, `Font.loadAsync` resolves a JS tick before the native typeface is
+ * fully registered for layout/shaping. Painting a QCF page font in that window
+ * makes the OS fall back to another already-registered QCF page font — and since
+ * every QCF page font reuses the same PUA codepoints, that renders the wrong
+ * glyphs (overlap, missing ayah markers). Yield two frames so awaited callers
+ * (auto-scroll start gate, look-ahead) only see the font as ready once it can
+ * actually shape text. No-op on iOS/web where registration is synchronous.
+ */
+function awaitNativeFontReady(): Promise<void> {
+  if (Platform.OS !== 'android' || typeof requestAnimationFrame !== 'function') {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
 async function resolveFontSource(fontSource: any): Promise<any> {
   try {
     const asset = Asset.fromModule(fontSource);
@@ -191,6 +209,9 @@ export async function loadPageFont(
             await new Promise(r => setTimeout(r, 300 * attempt));
           }
           await Font.loadAsync({ [familyName]: resolvedFontSource });
+          // Wait for the native typeface to register before reporting ready, so
+          // the first paint never falls back to a different QCF page font.
+          await awaitNativeFontReady();
           loadedPages.set(page, darkMode);
           return;
         } catch (e) {

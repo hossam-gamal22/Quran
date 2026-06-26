@@ -35,6 +35,7 @@ import { useAdBottomInset } from '@/lib/ads-context';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 
 import AzkarAPI, {
   AzkarCategory,
@@ -59,6 +60,10 @@ export default function AzkarScreen() {
   const { exclude } = useLocalSearchParams<{ exclude?: string }>();
   const insets = useSafeAreaInsets();
   const adBottomInset = useAdBottomInset();
+  const scrollBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  }) + adBottomInset;
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
   const colors = useColors();
@@ -546,7 +551,7 @@ export default function AzkarScreen() {
         {renderQuickLinks()}
 
         {/* المسافة السفلية */}
-        <View style={{ height: Math.max(insets.bottom + 84, 100) + adBottomInset }} />
+        <View style={{ height: scrollBottomSpacing }} />
       </ScrollView>
       <BannerAdComponent screen="azkar" inTabScreen />
     </BackgroundWrapper>

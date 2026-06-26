@@ -24,6 +24,7 @@ import * as Haptics from 'expo-haptics';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 interface SearchResult {
   number: number;
   text: string;
@@ -91,6 +92,10 @@ export default function TafsirSearchScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const listBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  });
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -459,7 +464,7 @@ export default function TafsirSearchScreen() {
                 </TouchableOpacity>
               )}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={{ paddingBottom: listBottomSpacing }}
             />
           </>
         ) : (
@@ -489,7 +494,7 @@ export default function TafsirSearchScreen() {
                   </View>
                 )
               }
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={{ paddingBottom: listBottomSpacing }}
             />
           </>
         )}
@@ -627,7 +632,7 @@ export default function TafsirSearchScreen() {
                 </View>
               </TouchableOpacity>
             )}
-            contentContainerStyle={{ paddingBottom: 40, paddingTop: 6 }}
+            contentContainerStyle={{ paddingBottom: listBottomSpacing, paddingTop: 6 }}
           />
         </ScreenContainer>
       </Modal>

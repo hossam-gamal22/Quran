@@ -21,6 +21,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
 import Slider from '@react-native-community/slider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -28,7 +29,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useAudioSeekPreview } from '@/hooks/use-audio-seek-preview';
 import { ScreenContainer } from '@/components/screen-container';
-import { UniversalHeader } from '@/components/ui';
+import { UniversalHeader, AudioResumePromptModal, formatResumeHint } from '@/components/ui';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { SourcesList } from '@/components/ui/SourcesList';
@@ -40,8 +41,15 @@ import { EmbeddedVideo } from '@/components/ui/EmbeddedVideo';
 import { useSeerahContent } from '@/lib/content-api';
 import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
 import { formatAudioTime } from '@/lib/audio-time';
+import {
+  getSavedPlaybackProgress,
+  clearPlaybackProgress,
+  shouldOfferResume,
+  type AudioResumeEntry,
+} from '@/lib/audio-resume-store';
 import { isFavorited, toggleFavorite } from '@/lib/favorites-manager';
 import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
+import { StoryNotificationsBell } from '@/components/social/StoryNotificationsBell';
 import { seerahSectionId } from '@/lib/story-id';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -342,31 +350,57 @@ interface SectionCardProps {
   colors: ReturnType<typeof useColors>;
 }
 
-function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors }: SectionCardProps) {
-  const isRTL = useIsRTL();
-  const s = useScaledStyles(_s, colors.fs);
-  const slug = sectionSlug(section.titleEn);
-  const favoriteId = `seerah_${slug}`;
+// Page-level bookmark for the whole Seerah (not per section). Lives in the
+// header next to the notifications bell.
+const SEERAH_PAGE_FAVORITE_ID = 'seerah_full';
+
+function SeerahPageBookmark() {
+  const colors = useColors();
   const [isFav, setIsFav] = useState(false);
 
   useEffect(() => {
-    isFavorited(favoriteId, 'seerah').then(setIsFav);
-  }, [favoriteId]);
+    isFavorited(SEERAH_PAGE_FAVORITE_ID, 'seerah').then(setIsFav);
+  }, []);
 
-  const handleToggleFav = useCallback(async (e: any) => {
-    e?.stopPropagation?.();
+  const toggle = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const nowSaved = await toggleFavorite({
-      id: favoriteId,
+      id: SEERAH_PAGE_FAVORITE_ID,
       type: 'seerah',
-      title: getLanguage() === 'ar' ? section.title : section.titleEn,
-      subtitle: getLanguage() === 'ar' ? section.titleEn : section.title,
-      arabic: section.paragraphs[0] || section.title,
-      route: `/seerah?section=${slug}`,
-      meta: { chapter: index + 1 },
+      title: t('seerah.title'),
+      arabic: t('seerah.title'),
+      route: '/seerah',
     });
     setIsFav(nowSaved);
-  }, [favoriteId, slug, section, index]);
+  }, []);
+
+  return (
+    <Pressable
+      onPress={toggle}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={t('common.favorites')}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+      }}
+    >
+      <MaterialCommunityIcons
+        name={isFav ? 'bookmark' : 'bookmark-outline'}
+        size={22}
+        color={isFav ? colors.primary : colors.text}
+      />
+    </Pressable>
+  );
+}
+
+function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors }: SectionCardProps) {
+  const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
 
   return (
     <View style={s.sectionOuter}>
@@ -394,17 +428,6 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
             </TranslatedText>
           )}
         </View>
-        <Pressable
-          onPress={handleToggleFav}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={[s.sectionBadge, { backgroundColor: ACCENT_LIGHT }]}
-        >
-          <MaterialCommunityIcons
-            name={isFav ? 'heart' : 'heart-outline'}
-            size={20}
-            color={isFav ? '#ef4444' : colors.text}
-          />
-        </Pressable>
         <View style={[s.sectionBadge, { backgroundColor: ACCENT_LIGHT }]}>
           <MaterialCommunityIcons
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -528,6 +551,7 @@ function AudioStatusModal({
   const copy = getSeerahAudioCopy();
   const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
+  const insets = useSafeAreaInsets();
   const isLoading = mode === 'loading';
   const title = isLoading ? copy.loadingAudioTitle : mode === 'offline' ? copy.noInternetTitle : copy.audioErrorTitle;
   const body = isLoading ? copy.loadingAudioBody : mode === 'offline' ? copy.noInternetBody : copy.audioErrorBody;
@@ -537,8 +561,8 @@ function AudioStatusModal({
   const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={s.modalOverlay}>
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <View style={[s.modalOverlay, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <View
           style={[
             s.modalCard,
@@ -557,12 +581,15 @@ function AudioStatusModal({
           {isLoading ? (
             <Pressable
               onPress={onClose}
-              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, marginTop: 18, alignSelf: 'stretch' }]}
+              // Centered pill (flex:0 so it never stretches on the column's
+              // vertical axis; not full-width so it reads as clearly inside the
+              // card). flex:1 only belongs to the row-laid error actions below.
+              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, flex: 0, alignSelf: 'center', paddingHorizontal: 40, marginTop: 4 }]}
             >
               <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
             </Pressable>
           ) : (
-            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 18 }]}>
+            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Pressable onPress={onClose} style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight }]}>
                 <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
               </Pressable>
@@ -598,6 +625,13 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
   const [audioModalDismissed, setAudioModalDismissed] = useState(false);
   const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
+  const [savedResume, setSavedResume] = useState<AudioResumeEntry | null>(null);
+  const [resumePromptVisible, setResumePromptVisible] = useState(false);
+  const pendingResumeRef = useRef<AudioResumeEntry | null>(null);
+  // Position to begin playback from, applied only AFTER the resume prompt has
+  // fully dismissed — see handleResumePromptDismissed (prevents the iOS
+  // modal-handoff freeze).
+  const pendingPlaybackRef = useRef<number | null>(null);
   const trackId = 'seerah-full-audio';
   const isThisStoryAudio = globalAudioState.source === 'azkar' && globalAudioState.currentTrackId === trackId;
   const isPlaying = isThisStoryAudio && globalAudioState.isPlaying;
@@ -660,6 +694,20 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
       .catch(() => {});
   }, [audioUrl]);
 
+  // Load the durable resume position for the inline hint. Refreshed whenever
+  // this track stops being the live one (paused elsewhere, finished, replaced)
+  // so the hint always reflects what is actually stored.
+  useEffect(() => {
+    if (isThisStoryAudio) return;
+    let cancelled = false;
+    getSavedPlaybackProgress(trackId)
+      .then((entry) => {
+        if (!cancelled) setSavedResume(entry);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [audioUrl, isThisStoryAudio]);
+
   const handleTrackComplete = useCallback(() => {
     if (finishAdShownRef.current) return;
     if (prePlayAdDisplayedRef.current) return;
@@ -697,6 +745,54 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
     }
   }, [audioAttempted, currentPosition, duration, isPlaying]);
 
+  const startPlayback = useCallback(async (initialPositionMs: number) => {
+    try {
+      // Resolve/prepare the audio in the background while the ad is on
+      // screen, so playback can begin as soon as the ad closes.
+      const preparedPromise = resolveAudioForPlayback();
+      preparedPromise.catch(() => {}); // rethrown at the await below
+
+      if (!prePlayAdShownRef.current) {
+        prePlayAdShownRef.current = true;
+        const didShowPrePlayAd = await showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
+      }
+
+      const prepared = await preparedPromise;
+      await playAzkarQueue(
+        [{
+          id: trackId,
+          title: displayTitle,
+          subtitle: copy.subtitle,
+          url: prepared.uri,
+          forceExpoAv: true,
+          resumeKey: trackId,
+          initialPositionMs,
+        }],
+        0,
+        '/seerah',
+        { onTrackComplete: handleTrackComplete },
+      );
+    } catch (audioError) {
+      setAudioModalDismissed(false);
+      setAudioResolveState('error');
+      setAudioStartError(true);
+      console.log('Seerah audio playback failed', audioError);
+    }
+  }, [
+    copy.subtitle,
+    displayTitle,
+    handleTrackComplete,
+    playAzkarQueue,
+    resolveAudioForPlayback,
+  ]);
+
   const handlePress = useCallback(async () => {
     setAudioAttempted(true);
     setAudioModalDismissed(false);
@@ -722,52 +818,62 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
       return;
     }
 
-    try {
-      if (!prePlayAdShownRef.current && !hasStartedCurrentAudio) {
-        prePlayAdShownRef.current = true;
-        const didShowPrePlayAd = await showInterstitial({
-          allowInSacredContext: false,
-          ignoreSmartFrequencyCaps: true,
-          ignoreSmartSessionDelay: true,
-          ignoreGlobalCooldown: true,
-          timeoutMs: 5000,
-        }).catch(() => {});
-        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
-      }
-
-      const prepared = await resolveAudioForPlayback();
-      await playAzkarQueue(
-        [{
-          id: trackId,
-          title: displayTitle,
-          subtitle: copy.subtitle,
-          url: prepared.uri,
-          forceExpoAv: true,
-        }],
-        0,
-        '/seerah',
-        { onTrackComplete: handleTrackComplete },
-      );
-    } catch (audioError) {
-      setAudioModalDismissed(false);
-      setAudioResolveState('error');
-      setAudioStartError(true);
-      console.log('Seerah audio playback failed', audioError);
+    // Fresh start of this content: check the durable resume position first.
+    // Read from storage (not component state) so the decision is never stale.
+    const saved = await getSavedPlaybackProgress(trackId).catch(() => null);
+    if (shouldOfferResume(saved)) {
+      pendingResumeRef.current = saved;
+      setSavedResume(saved);
+      setResumePromptVisible(true);
+      return;
     }
+
+    // Too early to matter or practically finished — restart silently.
+    if (saved) {
+      clearPlaybackProgress(trackId).catch(() => {});
+      setSavedResume(null);
+    }
+    await startPlayback(0);
   }, [
     audioUrl,
-    copy.subtitle,
     currentPosition,
-    displayTitle,
     duration,
     globalAudioState.isLoading,
-    handleTrackComplete,
     isPlaying,
     isThisStoryAudio,
-    playAzkarQueue,
-    resolveAudioForPlayback,
+    startPlayback,
     toggleGlobalAudio,
   ]);
+
+  // Resume/restart only *record the intent* and close the prompt. Playback —
+  // which presents the loading/status modal — is started from the prompt's
+  // onDismiss, so the two native modals never transition in the same commit.
+  const handleResumeChoice = useCallback(() => {
+    const saved = pendingResumeRef.current;
+    pendingResumeRef.current = null;
+    pendingPlaybackRef.current = saved ? saved.positionMs : 0;
+    setResumePromptVisible(false);
+  }, []);
+
+  const handleRestartChoice = useCallback(() => {
+    pendingResumeRef.current = null;
+    setSavedResume(null);
+    clearPlaybackProgress(trackId).catch(() => {});
+    pendingPlaybackRef.current = 0;
+    setResumePromptVisible(false);
+  }, []);
+
+  const dismissResumePrompt = useCallback(() => {
+    pendingResumeRef.current = null;
+    pendingPlaybackRef.current = null;
+    setResumePromptVisible(false);
+  }, []);
+
+  const handleResumePromptDismissed = useCallback(() => {
+    const startAt = pendingPlaybackRef.current;
+    pendingPlaybackRef.current = null;
+    if (startAt != null) startPlayback(startAt);
+  }, [startPlayback]);
 
   const handleDownloadAudio = useCallback(async () => {
     if (!audioUrl || audioDownloadState === 'downloading') return;
@@ -874,8 +980,8 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
             value={sliderPosition}
             disabled={!canSeekAudio}
             minimumTrackTintColor={ACCENT}
-            maximumTrackTintColor="rgba(6,79,47,0.18)"
-            thumbTintColor={canSeekAudio ? ACCENT : 'rgba(255,255,255,0.45)'}
+            maximumTrackTintColor={isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(6,79,47,0.20)'}
+            thumbTintColor={canSeekAudio ? ACCENT : (isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(6,79,47,0.45)')}
             onSlidingStart={handleSeekStart}
             onValueChange={handleSeekChange}
             onSlidingComplete={handleSeekComplete}
@@ -915,6 +1021,12 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
             })}
           </View>
 
+          {!isThisStoryAudio && shouldOfferResume(savedResume) && (
+            <Text style={[s.audioResumeHint, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {formatResumeHint(savedResume.positionMs)}
+            </Text>
+          )}
+
           {!!audioDownloadError && (
             <Text style={[s.audioDownloadErrorText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {audioDownloadError}
@@ -923,8 +1035,16 @@ function SeerahAudioCard({ audioUrl, colors, isDarkMode }: SeerahAudioCardProps)
 
         </View>
       </View>
+      <AudioResumePromptModal
+        visible={resumePromptVisible}
+        savedPositionMs={pendingResumeRef.current?.positionMs ?? savedResume?.positionMs ?? 0}
+        onResume={handleResumeChoice}
+        onRestart={handleRestartChoice}
+        onClose={dismissResumePrompt}
+        onDismiss={handleResumePromptDismissed}
+      />
       <AudioStatusModal
-        visible={showAudioModal}
+        visible={showAudioModal && !resumePromptVisible}
         mode={audioModalMode}
         colors={colors}
         onRetry={handlePress}
@@ -998,6 +1118,12 @@ export default function SeerahScreen() {
       {/* Header */}
       <UniversalHeader
         backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
+        rightExtra={
+          <>
+            <SeerahPageBookmark />
+            <StoryNotificationsBell style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }} />
+          </>
+        }
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('seerah.title')}</Text>
@@ -1389,6 +1515,13 @@ const _s = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 10,
+  },
+  audioResumeHint: {
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    textAlign: 'center',
   },
   audioPlayButton: {
     width: 54,

@@ -38,7 +38,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const APP_INFO = {
   email: 'hossamgamal290@gmail.com',
-  website: 'https://roohmuslim.com',
+  website: 'https://hossamgamal.web.app/',
 };
 
 const FEATURES = [
@@ -47,6 +47,9 @@ const FEATURES = [
   { icon: 'mosque', titleKey: 'aboutApp.prayerTimesFeature', descKey: 'aboutApp.prayerTimesFeatureDesc' },
   { icon: 'calendar-check', titleKey: 'aboutApp.worshipTrackerFeature', descKey: 'aboutApp.worshipTrackerFeatureDesc' },
   { icon: 'bookmark-multiple', titleKey: 'aboutApp.khatmaSystem', descKey: 'aboutApp.khatmaSystemDesc' },
+  { icon: 'star-crescent', titleKey: 'aboutApp.seerahFeature', descKey: 'aboutApp.seerahFeatureDesc' },
+  { icon: 'account-group', titleKey: 'aboutApp.companionsFeature', descKey: 'aboutApp.companionsFeatureDesc' },
+  { icon: 'book-open-page-variant', titleKey: 'aboutApp.religiousStoriesFeature', descKey: 'aboutApp.religiousStoriesFeatureDesc' },
   { icon: 'widgets', titleKey: 'aboutApp.widgetFeature', descKey: 'aboutApp.widgetFeatureDesc' },
 ];
 
@@ -205,15 +208,6 @@ export default function AboutScreen() {
                 {t('common.version')} {Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.2.1'}
               </Text>
             </View>
-          </View>
-        </Animated.View>
-
-        {/* Description */}
-        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <View style={[styles.descCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.descText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {t('aboutApp.description')}
-            </Text>
           </View>
         </Animated.View>
 

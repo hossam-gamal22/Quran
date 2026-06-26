@@ -53,6 +53,18 @@ interface ThemeCacheSnapshot {
 
 let _cachedThemeSnapshot: ThemeCacheSnapshot | null = null;
 
+// Serializes the read-merge-write settings updaters. Each updater reads the
+// persisted settings (or a closure snapshot), merges its partial on top, and
+// writes the whole object back — two of those interleaving drop each other's
+// keys. The freshest-read inside each updater handles staleness; this queue
+// ensures the read→write window of one updater can't overlap another's.
+let _settingsUpdateChain: Promise<unknown> = Promise.resolve();
+function enqueueSettingsUpdate<T>(fn: () => Promise<T>): Promise<T> {
+  const task = _settingsUpdateChain.then(fn, fn);
+  _settingsUpdateChain = task.catch(() => {});
+  return task;
+}
+
 /** Eagerly started at module scope — resolves before SettingsProvider mounts
  *  because _layout.tsx gates on languageReady which also reads AsyncStorage. */
 export const themeCachePromise: Promise<ThemeCacheSnapshot | null> = AsyncStorage.getItem(THEME_CACHE_KEY)
@@ -1154,21 +1166,25 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   }, [settings]);
 
-  const updateTheme = useCallback(async (theme: ThemeMode) => {
+  const updateTheme = useCallback((theme: ThemeMode) => enqueueSettingsUpdate(async () => {
     const newSettings = { ...settings, theme };
     await saveSettings(newSettings);
-  }, [settings]);
+  }), [settings]);
 
-  const updateThemeAndDisplay = useCallback(async (theme: ThemeMode, display: Partial<DisplaySettings>) => {
+  const updateThemeAndDisplay = useCallback((theme: ThemeMode, display: Partial<DisplaySettings>) => enqueueSettingsUpdate(async () => {
     const newSettings = {
       ...settings,
       theme,
       display: { ...settings.display, ...display },
     };
     await saveSettings(newSettings);
-  }, [settings]);
+  }), [settings]);
 
   const updateNotifications = useCallback(async (notifications: Partial<NotificationSettings>) => {
+    // Only the read-merge-write section holds the settings queue; the
+    // (potentially slow) reschedule below runs outside it and is serialized
+    // by the notifications-manager's own mutex.
+    const newSettings = await enqueueSettingsUpdate(async () => {
     console.log('[FullAdhan] user toggled:', notifications.useFullAdhan);
     // Read the freshest persisted state from disk so concurrent writers
     // (e.g. non-premium adhan reset effect firing in parallel with a
@@ -1189,17 +1205,17 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     } catch (e) {
       console.warn('[updateNotifications] freshest-read failed, falling back to closure state:', e);
     }
-    const newSettings = {
+    const merged = {
       ...baseSettings,
       notifications: { ...baseSettings.notifications, ...notifications },
     };
     console.log('[FullAdhan] saved settings:', {
       incoming: notifications,
-      useFullAdhan: newSettings.notifications.useFullAdhan === true,
-      fullAdhanSoundType: newSettings.notifications.fullAdhanSoundType,
-      adhanSoundType: newSettings.notifications.adhanSoundType,
+      useFullAdhan: merged.notifications.useFullAdhan === true,
+      fullAdhanSoundType: merged.notifications.fullAdhanSoundType,
+      adhanSoundType: merged.notifications.adhanSoundType,
     });
-    await saveSettings(newSettings);
+    await saveSettings(merged);
 
     // If sound-related keys changed, reset Android channels so the new sound takes effect
     const soundKeys = [
@@ -1209,7 +1225,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     ] as const;
     const soundChanged = soundKeys.some(k => k in notifications);
     if (soundChanged) {
-      const n2 = newSettings.notifications;
+      const n2 = merged.notifications;
       // 'default' adhan → treat as 'makkah' so channels always get a real adhan sound
       const adhan = (n2.adhanSoundType && n2.adhanSoundType !== 'default') ? n2.adhanSoundType : 'makkah';
       const fajr = adhan; // Fajr uses same adhan by default
@@ -1224,6 +1240,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       // The scheduleNotificationsFromSettings() call below will reschedule notifications
       // with the correct channelId for the new sound.
     }
+    return merged;
+    });
 
     // Schedule or cancel notifications based on updated settings
     const n = newSettings.notifications;
@@ -1330,7 +1348,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, initialSchedulingDone]);
 
-  const updateDisplay = useCallback(async (display: Partial<DisplaySettings>) => {
+  const updateDisplay = useCallback((display: Partial<DisplaySettings>) => enqueueSettingsUpdate(async () => {
     logWidgetTheme('passed to updateDisplay:', display);
     const touchedWidgetPrefs = WIDGET_DISPLAY_KEYS.some((key) => key in display);
     let widgetPrefsForSave: WidgetDisplayPrefs = {};
@@ -1358,9 +1376,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       },
     };
     await saveSettings(newSettings);
-  }, [settings]);
+  }), [settings]);
 
-  const updatePrayer = useCallback(async (prayer: Partial<PrayerSettings>) => {
+  const updatePrayer = useCallback((prayer: Partial<PrayerSettings>) => enqueueSettingsUpdate(async () => {
     // Read freshest persisted state from disk before merging, same pattern as
     // updateNotifications. This prevents a stale closure from overwriting keys
     // like `useFullAdhan` that were changed concurrently (e.g. user enabled full
@@ -1432,7 +1450,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         } catch {}
       }
     }
-  }, [settings]);
+  }), [settings]);
 
   // ========================================
   // دوال عامة

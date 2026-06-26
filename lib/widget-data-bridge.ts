@@ -676,6 +676,29 @@ function normalizeAndroidPrayerStaticState(value?: string): AndroidPrayerStaticS
     : null;
 }
 
+function readUmmAlQuraParts(date: Date): { day: number; month: number; year: number } | null {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+    });
+    const parts = formatter.formatToParts(date);
+    const value = (type: Intl.DateTimeFormatPartTypes) => {
+      const part = parts.find((p) => p.type === type)?.value;
+      const parsed = part ? parseInt(part, 10) : NaN;
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const day = value('day');
+    const month = value('month');
+    const year = value('year');
+    if (day === null || month === null || year === null) return null;
+    return { day, month, year };
+  } catch {
+    return null;
+  }
+}
+
 
 /**
  * Aggregate all widget data and write to shared storage, then refresh all Android widgets.
@@ -923,11 +946,16 @@ export async function updateWidgetData(
       const today = new Date();
       const resolved = await getHijriDate(today);
       if (resolved && typeof resolved.day === 'number') {
-        const fmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric' });
-        for (let n = -3; n <= 3; n++) {
-          const shifted = new Date(today.getTime() + n * 86400000);
-          const appleDay = parseInt(fmt.format(shifted), 10);
-          if (Number.isFinite(appleDay) && appleDay === resolved.day) {
+        for (let n = -5; n <= 5; n++) {
+          const shifted = new Date(today);
+          shifted.setDate(shifted.getDate() + n);
+          const apple = readUmmAlQuraParts(shifted);
+          if (
+            apple
+            && apple.day === resolved.day
+            && apple.month === resolved.month
+            && apple.year === resolved.year
+          ) {
             hijriOffset = n;
             break;
           }
@@ -1101,32 +1129,14 @@ export async function updateWidgetData(
               ...generatedManifest,
             }
           : mergeSnapshotManifest(previousSharedData, generatedManifest);
-        if (Platform.OS === 'android') {
-          const { ensureAndroidPrayerStaticTemplates } = require('./widgets/snapshot');
-          // Generate ALL six prayer-state templates for EVERY prayer widget/size
-          // of the ACTIVE theme — UNCONDITIONALLY (no `targets`, so it doesn't
-          // depend on placed-widget detection). The previous version gated this
-          // on `placedRouteKeys`, which is empty when `getWidgetInfo` returns
-          // nothing (fresh manifest / flaky detection); the templates then never
-          // generated and the widget served the stale gallery PNG all day — the
-          // reported "الفجر/الظهر with the wrong time + wrong highlight". Omitting
-          // `targets` makes ensureAndroidPrayerStaticTemplates bake the full
-          // "all prayer kinds × sizes × 6 states" matrix for this theme. It is
-          // signature-gated, so repeat calls are a cheap no-op once generated.
-          const templates = await ensureAndroidPrayerStaticTemplates?.({
-            theme: activeTheme,
-            language: widgetLanguage,
-            force: !!options.clearSnapshotCache,
-          });
-          if (templates?.errors?.length) {
-            throw new Error(`android_prayer_template_generation_failed:${templates.errors.join('|')}`);
-          }
-          if (__DEV__) {
-            console.log(
-              `[widget/android] all-state prayer templates ready (active theme=${activeTheme}) generated=${templates?.generated ?? 0} skipped=${templates?.skipped ?? false}`,
-            );
-          }
-        }
+        // NOTE: the per-state prayer template bake (ensureAndroidPrayerStaticTemplates)
+        // was removed here. Those ~420 PNGs are no longer served by
+        // decideAndroidWidget — prayer widgets always render the gallery-blank
+        // PNG + full live overlays (names/times/highlight/countdown) from
+        // data.prayer, which the headless task keeps fresh offline. Baking them
+        // burned CPU/battery on every app open for assets nobody reads, and the
+        // gallery-anchor/template-layout drift they caused was the "missing row
+        // times" bug.
         if (__DEV__) {
           Object.values(generatedManifest).forEach((entry) => {
             console.log(`[widget/app] generated snapshot key=${entry.key} path=${entry.path ?? 'n/a'} hash=${entry.hash ?? 'n/a'}`);
@@ -1256,21 +1266,9 @@ export async function updateWidgetData(
             if (__DEV__) {
               console.log(`[widget/refresh] backgroundPrewarmMs=${Date.now() - prewarmT0} entries=${result?.entries?.length ?? 0}`);
             }
-            if (Platform.OS === 'android') {
-              // Bake the full prayer matrix (all kinds × sizes × 6 states) for the
-              // ACTIVE theme + current language only. Signature-gated → cheap
-              // no-op once generated. The foreground pass already did this when a
-              // prayer widget is placed; this covers the gallery-complete case.
-              const { ensureAndroidPrayerStaticTemplates } = require('./widgets/snapshot');
-              const templates = await ensureAndroidPrayerStaticTemplates?.({
-                theme: prewarmTheme,
-                language: prewarmLang,
-                force: false,
-              });
-              if (__DEV__) {
-                console.log(`[widget/android] backgroundPrayerTemplates generated=${templates?.generated ?? 0} skipped=${templates?.skipped ?? false}`);
-              }
-            }
+            // NOTE: per-state prayer template bake removed (see the foreground
+            // pump note above) — prayer widgets always serve the gallery PNG +
+            // live overlays now.
             // Single-state disk hygiene: delete every snapshot/template that is
             // not the active theme + current language, then refresh on-screen
             // widgets against the pruned manifest.

@@ -1784,6 +1784,14 @@ export interface TranslationKeys {
   };
   subscription: {
     alreadySubscribed: string;
+    winnerGrantTitle: string;
+    winnerGrantRank: string;
+    winnerGrantDesc: string;
+    winnerGrantDaysLeft: string;
+    winnerGrantMotivation: string;
+    adminGrantTitle: string;
+    adminGrantDesc: string;
+    viewHonorBoard: string;
     bestValue: string;
     currentPlan: string;
     legalText: string;
@@ -2202,6 +2210,12 @@ export interface TranslationKeys {
     widgetFeatureDesc: string;
     worshipTrackerFeature: string;
     worshipTrackerFeatureDesc: string;
+    seerahFeature: string;
+    seerahFeatureDesc: string;
+    companionsFeature: string;
+    companionsFeatureDesc: string;
+    religiousStoriesFeature: string;
+    religiousStoriesFeatureDesc: string;
   };
   seerah: {
     chapters: string;
@@ -2786,6 +2800,7 @@ export interface TranslationKeys {
     like: string;
     unlike: string;
     comments: string;
+    comment: string;
     send: string;
     moreActions: string;
     actions: string;
@@ -2803,6 +2818,9 @@ export interface TranslationKeys {
     reportHarassment: string;
     reportOther: string;
     reportedThanks: string;
+    reportConfirmTitle: string;
+    reportNotePlaceholder: string;
+    reportSend: string;
     noComments: string;
     beFirst: string;
     writeCommentAs: string;
@@ -2814,7 +2832,17 @@ export interface TranslationKeys {
     errorProfanity: string;
     errorTooLong: string;
     errorEmpty: string;
+    errorAuth: string;
     errorNetwork: string;
+    replyNotifTitle: string;
+    replyNotifOne: string;
+    replyNotifMany: string;
+    notifTitle: string;
+    notifEmpty: string;
+    notifMarkAllRead: string;
+    likeNotifOne: string;
+    likedByTitle: string;
+    likesEmpty: string;
   };
 }
 // ==================== العربية ====================
@@ -4581,6 +4609,14 @@ const ar: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'مشترك بالفعل',
+    winnerGrantTitle: 'مكافأة لوحة الشرف 🏆',
+    winnerGrantRank: 'حصلت على المركز {rank} في مسابقة الشهر الماضي',
+    winnerGrantDesc: 'النسخة المميزة هدية لك لتميزك في لوحة الشرف الشهر الماضي',
+    winnerGrantDaysLeft: 'متبقي {days} يوم على انتهاء المكافأة',
+    winnerGrantMotivation: 'واصل نشاطك هذا الشهر لتحافظ على مركزك وتستمر معك النسخة المميزة!',
+    adminGrantTitle: 'منحة من الإدارة 🌟',
+    adminGrantDesc: 'تم منحك النسخة المميزة هدية من إدارة التطبيق',
+    viewHonorBoard: 'تابع ترتيبك في لوحة الشرف',
     bestValue: 'أفضل قيمة',
     currentPlan: 'الخطة الحالية',
     legalText: 'النص القانوني',
@@ -4979,6 +5015,12 @@ const ar: TranslationKeys = {
     widgetFeatureDesc: 'ودجات للشاشة الرئيسية للوصول السريع',
     worshipTrackerFeature: 'متابعة العبادات',
     worshipTrackerFeatureDesc: 'تتبع صلواتك وأذكارك وعباداتك اليومية',
+    seerahFeature: 'السيرة النبوية',
+    seerahFeatureDesc: 'سيرة النبي ﷺ من المولد إلى الوفاة',
+    companionsFeature: 'قصص الصحابة',
+    companionsFeatureDesc: 'سير أصحاب رسول الله ﷺ ومواقفهم',
+    religiousStoriesFeature: 'القصص الدينية',
+    religiousStoriesFeatureDesc: 'قصص الأنبياء والقصص الإسلامية الهادفة',
   },
   seerah: {
     chapters: 'فصول',
@@ -5545,6 +5587,7 @@ const ar: TranslationKeys = {
     like: 'إعجاب',
     unlike: 'إلغاء الإعجاب',
     comments: 'التعليقات',
+    comment: 'تعليق',
     send: 'إرسال',
     moreActions: 'المزيد',
     actions: 'الإجراءات',
@@ -5562,6 +5605,9 @@ const ar: TranslationKeys = {
     reportHarassment: 'إساءة أو تنمّر',
     reportOther: 'سبب آخر',
     reportedThanks: 'تم استلام إبلاغك. شكراً لمساعدتك.',
+    reportConfirmTitle: 'تم الإبلاغ',
+    reportNotePlaceholder: 'اكتب تفاصيل البلاغ ليطّلع عليها المشرفون (اختياري)…',
+    reportSend: 'إرسال البلاغ',
     noComments: 'لا توجد تعليقات بعد',
     beFirst: 'كن أول من يشارك تأمّلاً',
     writeCommentAs: 'اكتب تعليقاً باسم {name}…',
@@ -5573,7 +5619,17 @@ const ar: TranslationKeys = {
     errorProfanity: 'يرجى مراجعة التعليق — يحتوي على ألفاظ غير مناسبة',
     errorTooLong: 'التعليق طويل جداً',
     errorEmpty: 'لا يمكن إرسال تعليق فارغ',
+    errorAuth: 'تعذّر تجهيز الحساب، حاول مرة أخرى بعد لحظات',
     errorNetwork: 'تعذّر الإرسال — تحقق من الاتصال وحاول مرة أخرى',
+    replyNotifTitle: 'ردود جديدة 💬',
+    replyNotifOne: 'ردّ {name} على تعليقك',
+    replyNotifMany: 'لديك {count} ردود جديدة على تعليقاتك',
+    notifTitle: 'الإشعارات',
+    notifEmpty: 'لا توجد إشعارات بعد',
+    notifMarkAllRead: 'تحديد الكل كمقروء',
+    likeNotifOne: 'أعجب {name} بتعليقك',
+    likedByTitle: 'أعجبوا بهذا التعليق',
+    likesEmpty: 'لا توجد إعجابات بعد',
   },
 };
 // ==================== English ====================
@@ -7340,6 +7396,14 @@ const en: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Already Subscribed',
+    winnerGrantTitle: 'Honor Board Reward 🏆',
+    winnerGrantRank: 'You ranked #{rank} in last month\'s competition',
+    winnerGrantDesc: 'Premium is your free reward for excelling on the honor board last month',
+    winnerGrantDaysLeft: '{days} days left on your reward',
+    winnerGrantMotivation: 'Stay active this month to keep your rank and keep premium!',
+    adminGrantTitle: 'Gift from the Team 🌟',
+    adminGrantDesc: 'You were granted premium as a gift from the app team',
+    viewHonorBoard: 'Track your rank on the honor board',
     bestValue: 'Best Value',
     currentPlan: 'Current Plan',
     legalText: 'Legal Text',
@@ -7738,6 +7802,12 @@ const en: TranslationKeys = {
     widgetFeatureDesc: 'Home screen widgets for quick access',
     worshipTrackerFeature: 'Worship Tracker',
     worshipTrackerFeatureDesc: 'Track your daily prayers, adhkar, and worship',
+    seerahFeature: 'Prophetic Biography',
+    seerahFeatureDesc: 'The life of the Prophet ﷺ from birth to passing',
+    companionsFeature: 'Companions Stories',
+    companionsFeatureDesc: 'Lives and stances of the Prophet’s companions',
+    religiousStoriesFeature: 'Religious Stories',
+    religiousStoriesFeatureDesc: 'Stories of the prophets and meaningful Islamic tales',
   },
   seerah: {
     chapters: 'Chapters',
@@ -8304,6 +8374,7 @@ const en: TranslationKeys = {
     like: 'Like',
     unlike: 'Unlike',
     comments: 'Comments',
+    comment: 'Comment',
     send: 'Send',
     moreActions: 'More',
     actions: 'Actions',
@@ -8321,6 +8392,9 @@ const en: TranslationKeys = {
     reportHarassment: 'Harassment or bullying',
     reportOther: 'Other reason',
     reportedThanks: 'Your report has been received. Thank you.',
+    reportConfirmTitle: 'Reported',
+    reportNotePlaceholder: 'Describe the issue for the moderators (optional)…',
+    reportSend: 'Send report',
     noComments: 'No comments yet',
     beFirst: 'Be the first to share a reflection',
     writeCommentAs: 'Write a comment as {name}…',
@@ -8332,7 +8406,17 @@ const en: TranslationKeys = {
     errorProfanity: 'Please revise — your comment contains inappropriate language',
     errorTooLong: 'Comment is too long',
     errorEmpty: 'Cannot send an empty comment',
+    errorAuth: 'Could not prepare your account — try again in a moment',
     errorNetwork: 'Could not send — check your connection and try again',
+    replyNotifTitle: 'New replies 💬',
+    replyNotifOne: '{name} replied to your comment',
+    replyNotifMany: 'You have {count} new replies to your comments',
+    notifTitle: 'Notifications',
+    notifEmpty: 'No notifications yet',
+    notifMarkAllRead: 'Mark all as read',
+    likeNotifOne: '{name} liked your comment',
+    likedByTitle: 'Liked this comment',
+    likesEmpty: 'No likes yet',
   },
 };
 //==================== Français ====================
@@ -10096,6 +10180,14 @@ const fr: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Déjà abonné',
+    winnerGrantTitle: 'Récompense du tableau d\'honneur 🏆',
+    winnerGrantRank: 'Vous avez obtenu la {rank}e place au concours du mois dernier',
+    winnerGrantDesc: 'Premium est votre récompense gratuite pour votre excellence au tableau d\'honneur le mois dernier',
+    winnerGrantDaysLeft: '{days} jours restants sur votre récompense',
+    winnerGrantMotivation: 'Restez actif ce mois-ci pour garder votre rang et conserver Premium !',
+    adminGrantTitle: 'Cadeau de l\'équipe 🌟',
+    adminGrantDesc: 'Premium vous a été offert par l\'équipe de l\'application',
+    viewHonorBoard: 'Suivez votre rang au tableau d\'honneur',
     bestValue: 'Meilleure offre',
     currentPlan: 'Plan actuel',
     legalText: 'Texte juridique',
@@ -10494,6 +10586,12 @@ const fr: TranslationKeys = {
     widgetFeatureDesc: 'Widgets pour un accès rapide depuis l\'écran d\'accueil',
     worshipTrackerFeature: 'Suivi d\'Adoration',
     worshipTrackerFeatureDesc: 'Suivez vos prières, adhkar et adorations quotidiennes',
+    seerahFeature: 'Biographie du Prophète',
+    seerahFeatureDesc: 'La vie du Prophète ﷺ, de la naissance à la mort',
+    companionsFeature: 'Récits des Compagnons',
+    companionsFeatureDesc: 'Vies et positions des compagnons du Prophète',
+    religiousStoriesFeature: 'Récits religieux',
+    religiousStoriesFeatureDesc: 'Récits des prophètes et histoires islamiques édifiantes',
   },
   seerah: {
     chapters: 'Chapitres',
@@ -12819,6 +12917,14 @@ const de: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Bereits abonniert',
+    winnerGrantTitle: 'Ehrentafel-Belohnung 🏆',
+    winnerGrantRank: 'Sie haben Platz {rank} im Wettbewerb des letzten Monats erreicht',
+    winnerGrantDesc: 'Premium ist Ihre kostenlose Belohnung für Ihre Leistung auf der Ehrentafel im letzten Monat',
+    winnerGrantDaysLeft: 'Noch {days} Tage Belohnung übrig',
+    winnerGrantMotivation: 'Bleiben Sie diesen Monat aktiv, um Ihren Rang und Premium zu behalten!',
+    adminGrantTitle: 'Geschenk vom Team 🌟',
+    adminGrantDesc: 'Premium wurde Ihnen als Geschenk vom App-Team gewährt',
+    viewHonorBoard: 'Verfolgen Sie Ihren Rang auf der Ehrentafel',
     bestValue: 'Bestes Angebot',
     currentPlan: 'Aktueller Plan',
     legalText: 'Rechtstext',
@@ -13217,6 +13323,12 @@ const de: TranslationKeys = {
     widgetFeatureDesc: 'Startbildschirm-Widgets für schnellen Zugriff',
     worshipTrackerFeature: 'Gebetsverfolgung',
     worshipTrackerFeatureDesc: 'Verfolgen Sie Ihre täglichen Gebete, Adhkar und Ibadah',
+    seerahFeature: 'Prophetenbiografie',
+    seerahFeatureDesc: 'Das Leben des Propheten ﷺ von der Geburt bis zum Tod',
+    companionsFeature: 'Geschichten der Gefährten',
+    companionsFeatureDesc: 'Leben und Haltungen der Gefährten des Propheten',
+    religiousStoriesFeature: 'Religiöse Geschichten',
+    religiousStoriesFeatureDesc: 'Geschichten der Propheten und lehrreiche islamische Erzählungen',
   },
   seerah: {
     chapters: 'Kapitel',
@@ -15542,6 +15654,14 @@ const tr: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Zaten Abone',
+    winnerGrantTitle: 'Onur Panosu Ödülü 🏆',
+    winnerGrantRank: 'Geçen ayın yarışmasında {rank}. sırada yer aldınız',
+    winnerGrantDesc: 'Premium, geçen ay onur panosundaki başarınız için ücretsiz ödülünüzdür',
+    winnerGrantDaysLeft: 'Ödülünüzün bitmesine {days} gün kaldı',
+    winnerGrantMotivation: 'Sıralamanızı ve Premium\'u korumak için bu ay aktif kalın!',
+    adminGrantTitle: 'Ekipten Hediye 🌟',
+    adminGrantDesc: 'Premium, uygulama ekibinden hediye olarak verildi',
+    viewHonorBoard: 'Onur panosundaki sıralamanızı takip edin',
     bestValue: 'En İyi Teklif',
     currentPlan: 'Mevcut Plan',
     legalText: 'Yasal Metin',
@@ -15940,6 +16060,12 @@ const tr: TranslationKeys = {
     widgetFeatureDesc: 'Hızlı erişim için ana ekran widget\'ları',
     worshipTrackerFeature: 'İbadet Takipçisi',
     worshipTrackerFeatureDesc: 'Günlük namazlarınızı, zikirlerinizi ve ibadetlerinizi takip edin',
+    seerahFeature: 'Peygamber Siyeri',
+    seerahFeatureDesc: 'Hz. Peygamber ﷺ’in doğumundan vefatına hayatı',
+    companionsFeature: 'Sahabe Hikayeleri',
+    companionsFeatureDesc: 'Peygamberin sahabelerinin hayatları ve duruşları',
+    religiousStoriesFeature: 'Dini Hikayeler',
+    religiousStoriesFeatureDesc: 'Peygamber kıssaları ve ibretli İslami hikayeler',
   },
   seerah: {
     chapters: 'Bölümler',
@@ -18265,6 +18391,14 @@ const es: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Ya suscrito',
+    winnerGrantTitle: 'Recompensa del cuadro de honor 🏆',
+    winnerGrantRank: 'Obtuviste el puesto {rank} en el concurso del mes pasado',
+    winnerGrantDesc: 'Premium es tu recompensa gratuita por destacar en el cuadro de honor el mes pasado',
+    winnerGrantDaysLeft: 'Quedan {days} días de tu recompensa',
+    winnerGrantMotivation: '¡Mantente activo este mes para conservar tu puesto y seguir con Premium!',
+    adminGrantTitle: 'Regalo del equipo 🌟',
+    adminGrantDesc: 'Se te otorgó Premium como regalo del equipo de la aplicación',
+    viewHonorBoard: 'Sigue tu posición en el cuadro de honor',
     bestValue: 'Mejor oferta',
     currentPlan: 'Plan actual',
     legalText: 'Texto legal',
@@ -18663,6 +18797,12 @@ const es: TranslationKeys = {
     widgetFeatureDesc: 'Widgets de pantalla de inicio para acceso rápido',
     worshipTrackerFeature: 'Seguimiento de Adoración',
     worshipTrackerFeatureDesc: 'Rastrea tus oraciones, adhkar y adoración diaria',
+    seerahFeature: 'Biografía del Profeta',
+    seerahFeatureDesc: 'La vida del Profeta ﷺ desde el nacimiento hasta la muerte',
+    companionsFeature: 'Historias de los Compañeros',
+    companionsFeatureDesc: 'Vidas y posturas de los compañeros del Profeta',
+    religiousStoriesFeature: 'Historias religiosas',
+    religiousStoriesFeatureDesc: 'Historias de los profetas y relatos islámicos edificantes',
   },
   seerah: {
     chapters: 'Capítulos',
@@ -20987,6 +21127,14 @@ const ur: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'پہلے سے سبسکرائب',
+    winnerGrantTitle: 'اعزازی بورڈ کا انعام 🏆',
+    winnerGrantRank: 'پچھلے مہینے کے مقابلے میں آپ نے {rank} نمبر حاصل کیا',
+    winnerGrantDesc: 'پریمیم پچھلے مہینے اعزازی بورڈ پر آپ کی شاندار کارکردگی کا مفت انعام ہے',
+    winnerGrantDaysLeft: 'آپ کے انعام کے {days} دن باقی ہیں',
+    winnerGrantMotivation: 'اپنا مقام اور پریمیم برقرار رکھنے کے لیے اس مہینے سرگرم رہیں!',
+    adminGrantTitle: 'ٹیم کی طرف سے تحفہ 🌟',
+    adminGrantDesc: 'آپ کو ایپ ٹیم کی طرف سے پریمیم تحفے میں دیا گیا ہے',
+    viewHonorBoard: 'اعزازی بورڈ پر اپنا مقام دیکھیں',
     bestValue: 'بہترین آفر',
     currentPlan: 'موجودہ پلان',
     legalText: 'قانونی متن',
@@ -21385,6 +21533,12 @@ const ur: TranslationKeys = {
     widgetFeatureDesc: 'فوری رسائی کے لیے ہوم اسکرین وجیٹس',
     worshipTrackerFeature: 'عبادت ٹریکر',
     worshipTrackerFeatureDesc: 'اپنی روزانہ نمازیں، اذکار اور عبادات کا ریکارڈ رکھیں',
+    seerahFeature: 'سیرت النبی',
+    seerahFeatureDesc: 'نبی ﷺ کی پیدائش سے وفات تک کی زندگی',
+    companionsFeature: 'صحابہ کے واقعات',
+    companionsFeatureDesc: 'رسول اللہ ﷺ کے صحابہ کی زندگیاں اور مواقف',
+    religiousStoriesFeature: 'دینی کہانیاں',
+    religiousStoriesFeatureDesc: 'انبیاء کے قصے اور سبق آموز اسلامی کہانیاں',
   },
   seerah: {
     chapters: 'ابواب',
@@ -23710,6 +23864,14 @@ const id: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Sudah Berlangganan',
+    winnerGrantTitle: 'Hadiah Papan Kehormatan 🏆',
+    winnerGrantRank: 'Anda meraih peringkat {rank} dalam kompetisi bulan lalu',
+    winnerGrantDesc: 'Premium adalah hadiah gratis atas prestasi Anda di papan kehormatan bulan lalu',
+    winnerGrantDaysLeft: 'Sisa {days} hari untuk hadiah Anda',
+    winnerGrantMotivation: 'Tetap aktif bulan ini untuk mempertahankan peringkat dan Premium Anda!',
+    adminGrantTitle: 'Hadiah dari Tim 🌟',
+    adminGrantDesc: 'Anda diberikan Premium sebagai hadiah dari tim aplikasi',
+    viewHonorBoard: 'Pantau peringkat Anda di papan kehormatan',
     bestValue: 'Nilai Terbaik',
     currentPlan: 'Paket Saat Ini',
     legalText: 'Teks Hukum',
@@ -24108,6 +24270,12 @@ const id: TranslationKeys = {
     widgetFeatureDesc: 'Widget layar utama untuk akses cepat',
     worshipTrackerFeature: 'Pelacak Ibadah',
     worshipTrackerFeatureDesc: 'Lacak sholat, dzikir, dan ibadah harian Anda',
+    seerahFeature: 'Sirah Nabi',
+    seerahFeatureDesc: 'Kehidupan Nabi ﷺ dari kelahiran hingga wafat',
+    companionsFeature: 'Kisah Para Sahabat',
+    companionsFeatureDesc: 'Kehidupan dan sikap para sahabat Nabi',
+    religiousStoriesFeature: 'Kisah Religius',
+    religiousStoriesFeatureDesc: 'Kisah para nabi dan cerita Islami yang bermakna',
   },
   seerah: {
     chapters: 'Bab',
@@ -26433,6 +26601,14 @@ const ms: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Sudah Melanggan',
+    winnerGrantTitle: 'Ganjaran Papan Kehormat 🏆',
+    winnerGrantRank: 'Anda mencapai kedudukan {rank} dalam pertandingan bulan lepas',
+    winnerGrantDesc: 'Premium ialah ganjaran percuma atas kecemerlangan anda di papan kehormat bulan lepas',
+    winnerGrantDaysLeft: 'Tinggal {days} hari untuk ganjaran anda',
+    winnerGrantMotivation: 'Kekal aktif bulan ini untuk mengekalkan kedudukan dan Premium anda!',
+    adminGrantTitle: 'Hadiah daripada Pasukan 🌟',
+    adminGrantDesc: 'Anda diberikan Premium sebagai hadiah daripada pasukan aplikasi',
+    viewHonorBoard: 'Jejak kedudukan anda di papan kehormat',
     bestValue: 'Nilai Terbaik',
     currentPlan: 'Pelan Semasa',
     legalText: 'Teks Undang-undang',
@@ -26831,6 +27007,12 @@ const ms: TranslationKeys = {
     widgetFeatureDesc: 'Widget skrin utama untuk akses pantas',
     worshipTrackerFeature: 'Penjejak Ibadah',
     worshipTrackerFeatureDesc: 'Jejak solat, zikir, dan ibadah harian anda',
+    seerahFeature: 'Sirah Nabi',
+    seerahFeatureDesc: 'Kehidupan Nabi ﷺ dari kelahiran hingga kewafatan',
+    companionsFeature: 'Kisah Para Sahabat',
+    companionsFeatureDesc: 'Kehidupan dan pendirian para sahabat Nabi',
+    religiousStoriesFeature: 'Kisah Keagamaan',
+    religiousStoriesFeatureDesc: 'Kisah para nabi dan cerita Islam yang bermakna',
   },
   seerah: {
     chapters: 'Bab',
@@ -29156,6 +29338,14 @@ const hi: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'पहले से सदस्य',
+    winnerGrantTitle: 'सम्मान बोर्ड पुरस्कार 🏆',
+    winnerGrantRank: 'पिछले महीने की प्रतियोगिता में आपने {rank} स्थान प्राप्त किया',
+    winnerGrantDesc: 'प्रीमियम पिछले महीने सम्मान बोर्ड पर आपकी उत्कृष्टता का मुफ्त पुरस्कार है',
+    winnerGrantDaysLeft: 'आपके पुरस्कार के {days} दिन शेष हैं',
+    winnerGrantMotivation: 'अपना स्थान और प्रीमियम बनाए रखने के लिए इस महीने सक्रिय रहें!',
+    adminGrantTitle: 'टीम की ओर से उपहार 🌟',
+    adminGrantDesc: 'आपको ऐप टीम की ओर से प्रीमियम उपहार में दिया गया है',
+    viewHonorBoard: 'सम्मान बोर्ड पर अपना स्थान देखें',
     bestValue: 'सर्वोत्तम ऑफ़र',
     currentPlan: 'वर्तमान प्लान',
     legalText: 'कानूनी पाठ',
@@ -29554,6 +29744,12 @@ const hi: TranslationKeys = {
     widgetFeatureDesc: 'होम स्क्रीन विजेट्स',
     worshipTrackerFeature: 'इबादत ट्रैकर',
     worshipTrackerFeatureDesc: 'दैनिक इबादत ट्रैकिंग',
+    seerahFeature: 'नबी की जीवनी',
+    seerahFeatureDesc: 'नबी ﷺ का जन्म से लेकर निधन तक का जीवन',
+    companionsFeature: 'सहाबा की कहानियाँ',
+    companionsFeatureDesc: 'नबी के साथियों के जीवन और उनके दृष्टिकोण',
+    religiousStoriesFeature: 'धार्मिक कहानियाँ',
+    religiousStoriesFeatureDesc: 'पैगंबरों की कहानियाँ और सार्थक इस्लामी कथाएँ',
   },
   seerah: {
     chapters: 'अध्याय',
@@ -31879,6 +32075,14 @@ const bn: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'ইতিমধ্যে সাবস্ক্রাইব',
+    winnerGrantTitle: 'সম্মান বোর্ড পুরস্কার 🏆',
+    winnerGrantRank: 'গত মাসের প্রতিযোগিতায় আপনি {rank} স্থান অর্জন করেছেন',
+    winnerGrantDesc: 'গত মাসে সম্মান বোর্ডে আপনার সাফল্যের জন্য প্রিমিয়াম আপনার বিনামূল্যে পুরস্কার',
+    winnerGrantDaysLeft: 'আপনার পুরস্কারের আর {days} দিন বাকি',
+    winnerGrantMotivation: 'আপনার স্থান ও প্রিমিয়াম ধরে রাখতে এই মাসে সক্রিয় থাকুন!',
+    adminGrantTitle: 'টিমের পক্ষ থেকে উপহার 🌟',
+    adminGrantDesc: 'অ্যাপ টিমের পক্ষ থেকে আপনাকে প্রিমিয়াম উপহার দেওয়া হয়েছে',
+    viewHonorBoard: 'সম্মান বোর্ডে আপনার অবস্থান দেখুন',
     bestValue: 'সেরা অফার',
     currentPlan: 'বর্তমান প্ল্যান',
     legalText: 'আইনি পাঠ্য',
@@ -32277,6 +32481,12 @@ const bn: TranslationKeys = {
     widgetFeatureDesc: 'দ্রুত অ্যাক্সেসের জন্য হোম স্ক্রীন উইজেট',
     worshipTrackerFeature: 'ইবাদত ট্র্যাকার',
     worshipTrackerFeatureDesc: 'আপনার দৈনিক নামাজ, আযকার এবং ইবাদত ট্র্যাক করুন',
+    seerahFeature: 'নবীজির জীবনী',
+    seerahFeatureDesc: 'নবী ﷺ-এর জন্ম থেকে মৃত্যু পর্যন্ত জীবন',
+    companionsFeature: 'সাহাবিদের গল্প',
+    companionsFeatureDesc: 'নবীর সাহাবিদের জীবন ও অবস্থান',
+    religiousStoriesFeature: 'ধর্মীয় গল্প',
+    religiousStoriesFeatureDesc: 'নবীদের কাহিনি ও অর্থবহ ইসলামি গল্প',
   },
   seerah: {
     chapters: 'অধ্যায়',
@@ -34602,6 +34812,14 @@ const ru: TranslationKeys = {
   },
   subscription: {
     alreadySubscribed: 'Уже подписан',
+    winnerGrantTitle: 'Награда доски почёта 🏆',
+    winnerGrantRank: 'Вы заняли {rank} место в конкурсе прошлого месяца',
+    winnerGrantDesc: 'Премиум — ваша бесплатная награда за успехи на доске почёта в прошлом месяце',
+    winnerGrantDaysLeft: 'Осталось {days} дней награды',
+    winnerGrantMotivation: 'Оставайтесь активны в этом месяце, чтобы сохранить место и Премиум!',
+    adminGrantTitle: 'Подарок от команды 🌟',
+    adminGrantDesc: 'Премиум предоставлен вам в подарок от команды приложения',
+    viewHonorBoard: 'Следите за своим местом на доске почёта',
     bestValue: 'Лучшее предложение',
     currentPlan: 'Текущий план',
     legalText: 'Юридический текст',
@@ -35000,6 +35218,12 @@ const ru: TranslationKeys = {
     widgetFeatureDesc: 'Виджеты на главном экране для быстрого доступа',
     worshipTrackerFeature: 'Трекер ибадата',
     worshipTrackerFeatureDesc: 'Отслеживайте свои ежедневные молитвы, азкар и ибадат',
+    seerahFeature: 'Жизнеописание Пророка',
+    seerahFeatureDesc: 'Жизнь Пророка ﷺ от рождения до кончины',
+    companionsFeature: 'Истории сподвижников',
+    companionsFeatureDesc: 'Жизнь и поступки сподвижников Пророка',
+    religiousStoriesFeature: 'Религиозные истории',
+    religiousStoriesFeatureDesc: 'Истории пророков и поучительные исламские рассказы',
   },
   seerah: {
     chapters: 'Главы',

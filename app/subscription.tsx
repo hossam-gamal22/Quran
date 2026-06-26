@@ -1,7 +1,7 @@
 // app/subscription.tsx
 // صفحة الاشتراك والباقات - روح المسلم
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,8 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { getPlanLabel, type SubscriptionPlan } from '@/lib/subscription-manager';
 import { useTranslation } from '@/contexts/SettingsContext';
+import { fetchRewardsConfig } from '@/lib/rewards-manager';
+import { getUserId } from '@/lib/firebase-user';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
@@ -55,6 +57,9 @@ export default function SubscriptionScreen() {
   const { t } = useTranslation();
   const {
     isPremium,
+    premiumSource,
+    premiumGrantedBy,
+    expiresAt,
     currentPlan,
     products,
     config,
@@ -71,6 +76,43 @@ export default function SubscriptionScreen() {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>('yearly');
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [winnerRank, setWinnerRank] = useState<number | null>(null);
+
+  // Honor-board winner grants only ('admin' = manual gift, no rank to look up).
+  // Resolve the user's winning rank from the rewards config (currentWinners
+  // are sorted by score, falling back to history).
+  const isWinnerGrantedBy =
+    premiumGrantedBy === 'auto_reward_system' || premiumGrantedBy === 'reward_system';
+
+  useEffect(() => {
+    if (premiumSource !== 'admin') return;
+    if (premiumGrantedBy != null && !isWinnerGrantedBy) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const [userId, rewardsConfig] = await Promise.all([
+          getUserId(),
+          fetchRewardsConfig(),
+        ]);
+        if (!mounted || !userId) return;
+        const idx = rewardsConfig.currentWinners.findIndex(w => w.userId === userId);
+        if (idx >= 0) {
+          setWinnerRank(idx + 1);
+          return;
+        }
+        for (const entry of rewardsConfig.history) {
+          const i = entry.winners.findIndex(w => w.userId === userId);
+          if (i >= 0) {
+            setWinnerRank(i + 1);
+            return;
+          }
+        }
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [premiumSource, premiumGrantedBy, isWinnerGrantedBy]);
 
   // Check seasonal offer active
   const seasonalOffer = config.seasonalOffer;
@@ -125,6 +167,76 @@ export default function SubscriptionScreen() {
             <Text style={[styles.premiumDesc, { color: colors.textLight }]}>
               {t('subscription.unavailableDesc') || 'جميع الميزات متاحة مجاناً. استمتع بالتطبيق!'}
             </Text>
+          </View>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  // Admin-granted premium (honor board winner or manual gift) — explain why
+  // they're premium and motivate winners to stay active to keep it.
+  if (isPremium && premiumSource === 'admin') {
+    // grantedBy is authoritative when present; rank lookup is the fallback
+    // for the brief window before the Firestore refresh fills grantedBy.
+    const isWinner = isWinnerGrantedBy || (premiumGrantedBy == null && winnerRank != null);
+    const daysLeft = expiresAt
+      ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+      : null;
+    const rankMedal = winnerRank === 1 ? '🥇' : winnerRank === 2 ? '🥈' : winnerRank === 3 ? '🥉' : '';
+
+    return (
+      <ScreenContainer>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.premiumContainer}>
+          <UniversalHeader titleColor={colors.text} />
+
+          <View style={styles.premiumContent}>
+            <MaterialCommunityIcons
+              name={isWinner ? 'trophy' : 'gift'}
+              size={80}
+              color={isDarkMode ? '#FFD700' : '#B8860B'}
+            />
+            <Text style={[styles.premiumTitle, { color: colors.text }]}>
+              {isWinner ? t('subscription.winnerGrantTitle') : t('subscription.adminGrantTitle')}
+            </Text>
+            {isWinner && winnerRank ? (
+              <Text style={[styles.premiumSubtitle, { color: colors.text, textAlign: 'center' }]}>
+                {rankMedal} {t('subscription.winnerGrantRank', { rank: winnerRank })}
+              </Text>
+            ) : null}
+            <Text style={[styles.premiumDesc, { color: colors.textLight, textAlign: 'center', paddingHorizontal: 30 }]}>
+              {isWinner ? t('subscription.winnerGrantDesc') : t('subscription.adminGrantDesc')}
+            </Text>
+            {daysLeft != null && (
+              <View style={[styles.grantDaysBadge, { backgroundColor: isDarkMode ? 'rgba(255,215,0,0.12)' : 'rgba(184,134,11,0.10)' }]}>
+                <Text style={[styles.grantDaysText, { color: isDarkMode ? '#FFD700' : '#B8860B' }]}>
+                  {t('subscription.winnerGrantDaysLeft', { days: daysLeft })}
+                </Text>
+              </View>
+            )}
+            {isWinner && (
+              <>
+                <Text style={[styles.premiumDesc, { color: colors.text, textAlign: 'center', paddingHorizontal: 30 }]}>
+                  {t('subscription.winnerGrantMotivation')}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.honorBoardBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/honor-board');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="podium-gold" size={20} color="#fff" />
+                  <Text style={styles.honorBoardBtnText}>{t('subscription.viewHonorBoard')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {!isWinner && (
+              <Text style={[styles.premiumDesc, { color: colors.textLight }]}>
+                {t('subscription.thankYou')}
+              </Text>
+            )}
           </View>
         </View>
       </ScreenContainer>
@@ -509,6 +621,36 @@ const _styles = StyleSheet.create({
   premiumDesc: {
     fontSize: 14,
     fontFamily: fontRegular(),
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
+  grantDaysBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  grantDaysText: {
+    fontSize: 14,
+    fontFamily: fontBold(),
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
+  honorBoardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: SUBSCRIBE_GREEN,
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  honorBoardBtnText: {
+    fontSize: 15,
+    fontFamily: fontBold(),
+    color: '#fff',
     lineHeight: 24,
     includeFontPadding: false,
   },

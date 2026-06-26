@@ -61,19 +61,45 @@ struct WidgetConstants {
     static let sharedDataFile = "widget_data.json"
 }
 
+/// Minimal probe for comparing payload freshness across the two stores.
+/// `prayer.lastUpdated` is an ISO-8601 string written on every payload build,
+/// so lexicographic comparison orders payloads chronologically.
+private struct SharedDataFreshnessProbe: Codable {
+    struct PrayerProbe: Codable { var lastUpdated: String? }
+    var prayer: PrayerProbe?
+}
+
+private func sharedPayloadTimestamp(_ data: Data) -> String {
+    (try? JSONDecoder().decode(SharedDataFreshnessProbe.self, from: data))?.prayer?.lastUpdated ?? ""
+}
+
 func loadSharedRawData() -> Data? {
+    var defaultsData: Data? = nil
     if let userDefaults = UserDefaults(suiteName: WidgetConstants.appGroupId),
        let jsonString = userDefaults.string(forKey: "widget_shared_data"),
        let data = jsonString.data(using: .utf8) {
-        return data
+        defaultsData = data
     }
 
-    guard let containerURL = FileManager.default.containerURL(
+    var fileData: Data? = nil
+    if let containerURL = FileManager.default.containerURL(
         forSecurityApplicationGroupIdentifier: WidgetConstants.appGroupId
-    ) else { return nil }
+    ) {
+        let fileURL = containerURL.appendingPathComponent(WidgetConstants.sharedDataFile)
+        fileData = try? Data(contentsOf: fileURL)
+    }
 
-    let fileURL = containerURL.appendingPathComponent(WidgetConstants.sharedDataFile)
-    return try? Data(contentsOf: fileURL)
+    // The app writes UserDefaults first, then the fallback file. If the
+    // UserDefaults write failed (observed on some devices), the file holds the
+    // fresher payload — prefer whichever timestamps newer instead of letting a
+    // stale UserDefaults copy permanently shadow the fallback file.
+    switch (defaultsData, fileData) {
+    case (let d?, nil): return d
+    case (nil, let f?): return f
+    case (nil, nil): return nil
+    case (let d?, let f?):
+        return sharedPayloadTimestamp(f) > sharedPayloadTimestamp(d) ? f : d
+    }
 }
 
 func loadSharedData<T: Codable>(_ type: T.Type) -> T? {

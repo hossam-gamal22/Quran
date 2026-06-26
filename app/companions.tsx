@@ -22,6 +22,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
 import Slider from '@react-native-community/slider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -42,9 +43,17 @@ import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { useCompanionsContent } from '@/lib/content-api';
 import { prepareStoryAudio, isStoryAudioCached, downloadStoryAudio } from '@/lib/story-audio-cache';
+import {
+  getSavedPlaybackProgress,
+  clearPlaybackProgress,
+  shouldOfferResume,
+  type AudioResumeEntry,
+} from '@/lib/audio-resume-store';
+import { AudioResumePromptModal, formatResumeHint } from '@/components/ui/AudioResumePromptModal';
 import { formatAudioTime } from '@/lib/audio-time';
 import { expandCompanionStory } from '@/data/full-story-texts';
 import { StoryInteractionBar } from '@/components/social/StoryInteractionBar';
+import { StoryNotificationsBell } from '@/components/social/StoryNotificationsBell';
 import { companionStoryId } from '@/lib/story-id';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -1285,6 +1294,7 @@ function AudioStatusModal({
   const copy = getListenCopy();
   const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
+  const insets = useSafeAreaInsets();
   const isLoading = mode === 'loading';
   const title = isLoading ? copy.loadingAudioTitle : mode === 'offline' ? copy.noInternetTitle : copy.audioErrorTitle;
   const body = isLoading ? copy.loadingAudioBody : mode === 'offline' ? copy.noInternetBody : copy.audioErrorBody;
@@ -1294,8 +1304,8 @@ function AudioStatusModal({
   const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={s.modalOverlay}>
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <View style={[s.modalOverlay, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <View
           style={[
             s.modalCard,
@@ -1314,12 +1324,15 @@ function AudioStatusModal({
           {isLoading ? (
             <Pressable
               onPress={onClose}
-              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, marginTop: 18, alignSelf: 'stretch' }]}
+              // Centered pill (flex:0 so it never stretches on the column's
+              // vertical axis; not full-width so it reads as clearly inside the
+              // card). flex:1 only belongs to the row-laid error actions below.
+              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, flex: 0, alignSelf: 'center', paddingHorizontal: 40, marginTop: 4 }]}
             >
               <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
             </Pressable>
           ) : (
-            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 18 }]}>
+            <View style={[s.modalActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Pressable onPress={onClose} style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight }]}>
                 <Text style={[s.modalButtonText, { color: colors.text }]}>{copy.close}</Text>
               </Pressable>
@@ -1419,6 +1432,13 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
   const [audioModalDismissed, setAudioModalDismissed] = useState(false);
   const [audioDownloadState, setAudioDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
+  const [savedResume, setSavedResume] = useState<AudioResumeEntry | null>(null);
+  const [resumePromptVisible, setResumePromptVisible] = useState(false);
+  const pendingResumeRef = useRef<AudioResumeEntry | null>(null);
+  // Position to begin playback from, applied only AFTER the resume prompt has
+  // fully dismissed — see handleResumePromptDismissed (prevents the iOS
+  // modal-handoff freeze).
+  const pendingPlaybackRef = useRef<number | null>(null);
   const hasAudio = !!companion.audioUrl?.trim();
   const trackId = useMemo(() => `companion-story-${companion.id}`, [companion.id]);
   const isThisStoryAudio = globalAudioState.source === 'azkar' && globalAudioState.currentTrackId === trackId;
@@ -1482,6 +1502,19 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
     }
   }, [companion.id, companion.audioUrl]);
 
+  // Per-companion durable resume position for the inline hint. Refreshed when
+  // this story stops being the live track so the hint reflects what is stored.
+  useEffect(() => {
+    if (isThisStoryAudio) return;
+    let cancelled = false;
+    getSavedPlaybackProgress(trackId)
+      .then((entry) => {
+        if (!cancelled) setSavedResume(entry);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [trackId, isThisStoryAudio]);
+
   const handleTrackComplete = useCallback(() => {
     if (finishAdShownRef.current) return;
     if (prePlayAdDisplayedRef.current) return;
@@ -1519,6 +1552,55 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
     }
   }, [audioAttempted, currentPosition, duration, isPlaying]);
 
+  const startPlayback = useCallback(async (initialPositionMs: number) => {
+    try {
+      // Resolve/prepare the audio in the background while the ad is on
+      // screen, so playback can begin as soon as the ad closes.
+      const preparedPromise = resolveAudioForPlayback();
+      preparedPromise.catch(() => {}); // rethrown at the await below
+
+      if (!prePlayAdShownRef.current) {
+        prePlayAdShownRef.current = true;
+        const didShowPrePlayAd = await showInterstitial({
+          allowInSacredContext: false,
+          ignoreSmartFrequencyCaps: true,
+          ignoreSmartSessionDelay: true,
+          ignoreGlobalCooldown: true,
+          timeoutMs: 5000,
+        }).catch(() => {});
+        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
+      }
+
+      const prepared = await preparedPromise;
+      await playAzkarQueue(
+        [{
+          id: trackId,
+          title: audioTitle,
+          subtitle: copy.audioSource,
+          url: prepared.uri,
+          forceExpoAv: true,
+          resumeKey: trackId,
+          initialPositionMs,
+        }],
+        0,
+        '/companions',
+        { onTrackComplete: handleTrackComplete },
+      );
+    } catch (audioError) {
+      setAudioModalDismissed(false);
+      setAudioResolveState('error');
+      setAudioStartError(true);
+      console.log('Companion story audio playback failed', audioError);
+    }
+  }, [
+    audioTitle,
+    copy.audioSource,
+    handleTrackComplete,
+    playAzkarQueue,
+    resolveAudioForPlayback,
+    trackId,
+  ]);
+
   const handlePlayPress = useCallback(async () => {
     setAudioAttempted(true);
     setAudioModalDismissed(false);
@@ -1544,54 +1626,64 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
       return;
     }
 
-    try {
-      if (!prePlayAdShownRef.current && !hasStartedCurrentAudio) {
-        prePlayAdShownRef.current = true;
-        const didShowPrePlayAd = await showInterstitial({
-          allowInSacredContext: false,
-          ignoreSmartFrequencyCaps: true,
-          ignoreSmartSessionDelay: true,
-          ignoreGlobalCooldown: true,
-          timeoutMs: 5000,
-        }).catch(() => {});
-        prePlayAdDisplayedRef.current = didShowPrePlayAd === true;
-      }
-
-      const prepared = await resolveAudioForPlayback();
-      await playAzkarQueue(
-        [{
-          id: trackId,
-          title: audioTitle,
-          subtitle: copy.audioSource,
-          url: prepared.uri,
-          forceExpoAv: true,
-        }],
-        0,
-        '/companions',
-        { onTrackComplete: handleTrackComplete },
-      );
-    } catch (audioError) {
-      setAudioModalDismissed(false);
-      setAudioResolveState('error');
-      setAudioStartError(true);
-      console.log('Companion story audio playback failed', audioError);
+    // Fresh start of this story: check the durable resume position first.
+    // Read from storage (not component state) so the decision is never stale.
+    const saved = await getSavedPlaybackProgress(trackId).catch(() => null);
+    if (shouldOfferResume(saved)) {
+      pendingResumeRef.current = saved;
+      setSavedResume(saved);
+      setResumePromptVisible(true);
+      return;
     }
+
+    // Too early to matter or practically finished — restart silently.
+    if (saved) {
+      clearPlaybackProgress(trackId).catch(() => {});
+      setSavedResume(null);
+    }
+    await startPlayback(0);
   }, [
-    audioTitle,
     companion.audioUrl,
     companion.id,
-    copy.audioSource,
     currentPosition,
     duration,
     globalAudioState.isLoading,
-    handleTrackComplete,
     isPlaying,
     isThisStoryAudio,
-    playAzkarQueue,
-    resolveAudioForPlayback,
+    startPlayback,
     toggleGlobalAudio,
     trackId,
   ]);
+
+  // Resume/restart only *record the intent* and close the prompt. Playback —
+  // which presents the loading/status modal — is started from the prompt's
+  // onDismiss, so the two native modals never transition in the same commit.
+  const handleResumeChoice = useCallback(() => {
+    const saved = pendingResumeRef.current;
+    pendingResumeRef.current = null;
+    pendingPlaybackRef.current = saved ? saved.positionMs : 0;
+    setResumePromptVisible(false);
+  }, []);
+
+  const handleRestartChoice = useCallback(() => {
+    pendingResumeRef.current = null;
+    setSavedResume(null);
+    clearPlaybackProgress(trackId).catch(() => {});
+    pendingPlaybackRef.current = 0;
+    setResumePromptVisible(false);
+  }, [trackId]);
+
+  const dismissResumePrompt = useCallback(() => {
+    pendingResumeRef.current = null;
+    pendingPlaybackRef.current = null;
+    setResumePromptVisible(false);
+  }, []);
+
+  const handleResumePromptDismissed = useCallback(() => {
+    const startAt = pendingPlaybackRef.current;
+    pendingPlaybackRef.current = null;
+    if (startAt != null) startPlayback(startAt);
+  }, [startPlayback]);
 
   const handleDownloadAudio = useCallback(async () => {
     if (!companion.audioUrl || audioDownloadState === 'downloading') return;
@@ -1655,9 +1747,9 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
         onBack={onBack}
         backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
         rightActions={onToggleFav ? [{
-          icon: isFav ? 'heart' : 'heart-outline',
+          icon: isFav ? 'bookmark' : 'bookmark-outline',
           onPress: onToggleFav,
-          color: isFav ? '#ef4444' : colors.text,
+          color: isFav ? colors.primary : colors.text,
           size: 22,
           style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
         }] : []}
@@ -1730,8 +1822,8 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
               value={sliderPosition}
               disabled={!canSeekAudio}
               minimumTrackTintColor={ACCENT}
-              maximumTrackTintColor="rgba(6,79,47,0.18)"
-              thumbTintColor={canSeekAudio ? ACCENT : 'rgba(255,255,255,0.45)'}
+              maximumTrackTintColor={colors.isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(6,79,47,0.20)'}
+              thumbTintColor={canSeekAudio ? ACCENT : (colors.isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(6,79,47,0.45)')}
               onSlidingStart={handleSeekStart}
               onValueChange={handleSeekChange}
               onSlidingComplete={handleSeekComplete}
@@ -1770,6 +1862,12 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
                 );
               })}
             </View>
+
+            {hasAudio && !isThisStoryAudio && shouldOfferResume(savedResume) && (
+              <Text style={[s.audioResumeHint, { color: colors.textLight, writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {formatResumeHint(savedResume.positionMs)}
+              </Text>
+            )}
 
             {!hasAudio && (
               <Text style={[s.audioNotice, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
@@ -1878,8 +1976,16 @@ function StoryListening({ companion, onBack, onToggleFav, isFav = false, isDarkM
         <SourcesList sources={getCompanionSources((companion as { id?: string }).id)} />
       </ScrollView>
 
+      <AudioResumePromptModal
+        visible={resumePromptVisible}
+        savedPositionMs={pendingResumeRef.current?.positionMs ?? savedResume?.positionMs ?? 0}
+        onResume={handleResumeChoice}
+        onRestart={handleRestartChoice}
+        onClose={dismissResumePrompt}
+        onDismiss={handleResumePromptDismissed}
+      />
       <AudioStatusModal
-        visible={showAudioModal}
+        visible={showAudioModal && !resumePromptVisible}
         mode={audioModalMode}
         colors={colors}
         onRetry={handlePlayPress}
@@ -1917,11 +2023,12 @@ export default function CompanionsScreen() {
 
   const filteredCompanions = useMemo(() => {
     const query = normalizeSearchText(searchQuery);
-    return allCompanions.filter((companion) => {
-      if (companion.category !== activeCategory) return false;
-      if (!query) return true;
-      return companionSearchText(companion).includes(query);
-    });
+    // When searching, span ALL categories so the user can find any companion
+    // without first switching to the right tab. With no query, show the active tab.
+    if (query) {
+      return allCompanions.filter((companion) => companionSearchText(companion).includes(query));
+    }
+    return allCompanions.filter((companion) => companion.category === activeCategory);
   }, [activeCategory, allCompanions, searchQuery]);
   const searchPlaceholder = getLanguage() === 'ar' ? 'ابحث باسم الصحابي...' : 'Search companions...';
   const noSearchResults = getLanguage() === 'ar' ? 'لا توجد نتائج مطابقة.' : 'No matching companions.';
@@ -1993,6 +2100,7 @@ export default function CompanionsScreen() {
       {/* Header */}
       <UniversalHeader
         backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
+        rightExtra={<StoryNotificationsBell style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }} />}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('companions.title')}</Text>
@@ -2542,6 +2650,13 @@ const _s = StyleSheet.create({
     fontFamily: fontSemiBold(),
     fontSize: 12,
     lineHeight: 18,
+  },
+  audioResumeHint: {
+    fontFamily: fontSemiBold(),
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    textAlign: 'center',
   },
   audioNotice: {
     fontFamily: fontRegular(),

@@ -15,6 +15,7 @@ const SYSTEM_EVENT_ACTIONS = [
 ];
 const PERSISTENT_WIDGET_SOURCES = [
   'NativeWidgetTextOverlay.kt',
+  'DateAwareWidgetProvider.java',
   'PrayerAwareWidgetProvider.java',
   'PrayerWidgetRefreshModule.kt',
   'PrayerWidgetRefreshReceiver.kt',

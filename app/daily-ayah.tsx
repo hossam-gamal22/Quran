@@ -25,7 +25,7 @@ import { Asset } from 'expo-asset';
 import { useRouter, Stack } from 'expo-router';
 import { fetchTafsir, getDefaultTranslationForLanguage } from '@/lib/quran-api';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
-import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
+import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 import { resolveDailyVerse, resolveDailyVerseSync, withFullArabic } from '@/lib/seasonal-ayah';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
@@ -232,8 +232,6 @@ export default function DailyAyahVideoScreen() {
   const [tafsirText, setTafsirText] = useState<string | null>(null);
   const [tafsirLoading, setTafsirLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
-  const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
   // Verse of the day — resolved through the shared picker so the screen always
   // matches widgets/notifications. Seed synchronously to avoid a fragment flash.
   const [resolvedAyah, setResolvedAyah] = useState<typeof DAILY_AYAHS[0]>(() => resolveDailyVerseSync());
@@ -241,6 +239,18 @@ export default function DailyAyahVideoScreen() {
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
 
   const currentAyah = randomAyah || resolvedAyah;
+
+  // Seed the QCF glyphs SYNCHRONOUSLY when the verse's page font is already warm
+  // (prewarmDailyAyah loads it during idle), so the very first paint is the final
+  // Mushaf glyphs — no Uthmani→QCF restyle and no verse flash on entry.
+  const seedQcf = (() => {
+    const d = getVerseQcfData(currentAyah.surah, currentAyah.ayah);
+    return d && isPageFontLoaded(d.page, isDarkMode)
+      ? { glyphs: d.glyphs, family: getPageFontFamily(d.page, isDarkMode) }
+      : null;
+  });
+  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(() => seedQcf()?.glyphs ?? null);
+  const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(() => seedQcf()?.family ?? null);
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
@@ -263,7 +273,16 @@ export default function DailyAyahVideoScreen() {
   useEffect(() => {
     let cancelled = false;
     resolveDailyVerse()
-      .then(({ ayah }) => { if (!cancelled) setResolvedAyah(ayah); })
+      .then(({ ayah }) => {
+        if (cancelled) return;
+        // Only update when the authoritative verse actually differs from the
+        // synchronous seed. After the seed/async sources were unified this is
+        // almost always a no-op, so the user never sees a verse swap; the guard
+        // also avoids a needless QCF font reload + re-render.
+        setResolvedAyah(prev =>
+          prev.surah === ayah.surah && prev.ayah === ayah.ayah ? prev : ayah,
+        );
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -310,6 +329,19 @@ export default function DailyAyahVideoScreen() {
       setQcfFontFamily(null);
       return;
     }
+    // Font already registered (e.g. prewarmed, or unchanged from the seed):
+    // paint the correct QCF glyphs immediately — no fallback flash.
+    if (isPageFontLoaded(data.page, isDarkMode)) {
+      setQcfGlyphs(data.glyphs);
+      setQcfFontFamily(getPageFontFamily(data.page, isDarkMode));
+      return;
+    }
+    // Font not ready yet (e.g. the user shuffled to a new verse): drop the old
+    // page's glyphs first so we never render the PREVIOUS verse's glyphs under
+    // the NEW reference (QCF page fonts share PUA codepoints → wrong glyphs).
+    // The card falls back to the full Uthmani text, then upgrades to QCF.
+    setQcfGlyphs(null);
+    setQcfFontFamily(null);
     loadPageFont(data.page, isDarkMode).then(() => {
       if (cancelled) return;
       setQcfGlyphs(data.glyphs);

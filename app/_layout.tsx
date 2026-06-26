@@ -45,7 +45,7 @@ import { SubscriptionProvider, useSubscription } from '@/contexts/SubscriptionCo
 // Firebase Integration
 import { registerUser, updateLastActive, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore } from '@/lib/firebase-user';
 import { db } from '@/lib/firebase-config';
-import { doc as firestoreDoc, updateDoc as firestoreUpdateDoc, increment as firestoreIncrement } from 'firebase/firestore';
+import { doc as firestoreDoc, updateDoc as firestoreUpdateDoc, increment as firestoreIncrement, collection as firestoreCollection, addDoc as firestoreAddDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 import {
   initializeGlobalStats,
   trackAppOpen,
@@ -64,6 +64,8 @@ import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 import { scheduleMidnightRefresh } from '@/lib/widget-data-bridge';
 import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
+import { consumeLastCrash } from '@/lib/global-error-handler';
+import { addBreadcrumb } from '@/lib/diagnostics-breadcrumbs';
 import { ensureFirebaseUser } from '@/config/firebase';
 import { initTranslationOverrides } from '@/lib/auto-translate';
 import { subscribeToSoundSettings, refreshSoundSettings } from '@/lib/sound-manager';
@@ -328,6 +330,20 @@ const initWithTimeout = async (fn: () => Promise<void>, name: string, timeout = 
   }
 };
 
+// Run a SYNCHRONOUS startup side-effect that must never abort the rest of the
+// effect. A throw here (e.g. a subscribe() that synchronously fails because a
+// dependency isn't ready) would otherwise propagate out of RootLayout's own
+// useEffect — which the in-tree <ErrorBoundary> cannot catch — and escalate to
+// a fatal. We contain it and return a fallback so startup keeps going.
+function safeSync<T>(fn: () => T, name: string, fallback: T): T {
+  try {
+    return fn();
+  } catch (error) {
+    console.warn(`⚠️ ${name} threw during startup (contained):`, error);
+    return fallback;
+  }
+}
+
 const hideSplash = async () => {
   try {
     // Check if SplashScreen native module is available
@@ -369,6 +385,9 @@ const NavigationTracker = () => {
   useEffect(() => {
     if (pathname && pathname !== prevPathRef.current) {
       prevPathRef.current = pathname;
+      // Diagnostics: record every route change so a crash report shows the
+      // exact screen the user was on (and the path that led there).
+      addBreadcrumb('nav', pathname);
       // Don't count onboarding screens as page views for ad triggers
       if (!pathname.startsWith('/onboarding')) {
         onPageView();
@@ -660,7 +679,7 @@ async function restoreFullCloudBackupIfFreshInstall() {
 let lastIconResumeSyncMs = 0;
 const ICON_RESUME_SYNC_THROTTLE_MS = 30 * 60 * 1000;
 
-export default function RootLayout() {
+function RootLayoutInner() {
   const pathname = usePathname();
   const router = useRouter();
   const [appReady, setAppReady] = useState(false);
@@ -687,6 +706,59 @@ export default function RootLayout() {
       }
     }, 4000);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Surface the previous launch's uncaught crash (if any) so the real root
+  // cause of an intermittent startup crash is finally observable. The global
+  // handler in lib/global-error-handler.ts persisted it; we read+clear it here.
+  // Logged to the console (visible in logcat / Xcode) and ready to forward to a
+  // crash backend later. Non-blocking and fully self-contained.
+  useEffect(() => {
+    consumeLastCrash()
+      .then((crash) => {
+        if (!crash) return;
+        console.warn(
+          `🩺 [PrevCrash] ${crash.isFatal ? 'FATAL ' : ''}${crash.source} @ ${crash.iso}: ${crash.message}`,
+        );
+        if (crash.breadcrumbs) console.warn('🩺 [PrevCrash] trail:', crash.breadcrumbs);
+        if (__DEV__ && crash.stack) console.warn('🩺 [PrevCrash] stack:', crash.stack);
+
+        // Remote crash visibility (the app has no Sentry/Crashlytics). Upload
+        // the breadcrumb to Firestore `crashLogs` so intermittent crashes on
+        // REAL user devices become diagnosable from the admin side. Completely
+        // fire-and-forget: offline, a denied rule, or any failure just no-ops —
+        // it must never itself disturb startup.
+        (async () => {
+          try {
+            let appVersion = '';
+            try {
+              appVersion = String(require('expo-constants').default?.expoConfig?.version ?? '');
+            } catch {}
+            let userId = '';
+            try { userId = (await getUserId()) ?? ''; } catch {}
+            await firestoreAddDoc(firestoreCollection(db, 'crashLogs'), {
+              message: String(crash.message ?? '').slice(0, 2000),
+              stack: String(crash.stack ?? '').slice(0, 3000),
+              // Run-up trail (route/audio/memory/appstate) — the context that
+              // makes an otherwise-anonymous intermittent crash diagnosable.
+              breadcrumbs: String(crash.breadcrumbs ?? '').slice(0, 2000),
+              isFatal: !!crash.isFatal,
+              source: String(crash.source ?? 'unknown'),
+              platform: String(crash.platform ?? Platform.OS),
+              crashedAt: crash.ts ?? Date.now(),
+              reportedAt: Date.now(),
+              appVersion,
+              userId,
+              // Firestore TTL policy on `expiresAt` auto-deletes the doc ~30 days
+              // later, so crash logs self-clean without a cron/Cloud Function.
+              expiresAt: FirestoreTimestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            });
+          } catch {
+            // Swallow — remote logging is best-effort only.
+          }
+        })();
+      })
+      .catch(() => {});
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -902,6 +974,14 @@ export default function RootLayout() {
       const trackPlayerInitPromise = Platform.OS !== 'web' && trackPlayerAvailable
         ? initWithTimeout(
             async () => {
+              // Idempotency guard: calling setupPlayer() twice throws
+              // "player already initialized" (and on some New-Arch builds can
+              // wedge the native player). A re-entrant effect / fast refresh /
+              // post-error reload could otherwise hit it twice. Run setup once.
+              if ((globalThis as any).__roohTrackPlayerSetupDone) {
+                markTrackPlayerReady();
+                return;
+              }
               try {
                 const TrackPlayer = require('react-native-track-player').default;
                 const {
@@ -910,6 +990,7 @@ export default function RootLayout() {
                   IOSCategory,
                   AndroidAudioContentType,
                 } = require('react-native-track-player');
+                (globalThis as any).__roohTrackPlayerSetupDone = true;
                 await TrackPlayer.setupPlayer({
                   autoUpdateMetadata: true,
                   // Force the Playback audio category so playback ignores the
@@ -1167,7 +1248,11 @@ export default function RootLayout() {
     );
 
     // Schedule midnight refresh for daily verse/dhikr widget content
-    const cleanupMidnight = scheduleMidnightRefresh();
+    const cleanupMidnight = safeSync(
+      () => scheduleMidnightRefresh(),
+      'scheduleMidnightRefresh',
+      () => {},
+    );
 
     // Warm up the "Verse of the Day" screen (resolve verse + load its QCF page
     // font + decode the background) once the app is idle, so the first open is
@@ -1253,6 +1338,10 @@ export default function RootLayout() {
     }, 30_000);
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      // Diagnostics: trail foreground/background transitions. A crash whose
+      // breadcrumb ends on "appstate:active" points at resume-path work;
+      // ending on "appstate:background" points at a background-task / OOM kill.
+      addBreadcrumb('appstate', nextAppState);
       if (nextAppState === 'active') {
         updateLastActive().catch((e) => console.warn('⚠️ [AppResume] updateLastActive:', e?.message));
         getUserId()
@@ -1330,21 +1419,41 @@ export default function RootLayout() {
     // Subscribe to admin sound settings changes from Firestore so notifications,
     // adhan, and effect sounds always reflect the latest admin assignments
     // without waiting for the 24h cache TTL.
-    const unsubscribeSoundSettings = subscribeToSoundSettings();
+    // NOTE: these subscribe() calls open Firestore listeners synchronously; a
+    // throw here would propagate out of RootLayout's own effect (uncatchable by
+    // the in-tree ErrorBoundary) and become a fatal. Contain each one.
+    const noopUnsub = () => {};
+    const unsubscribeSoundSettings = safeSync(
+      () => subscribeToSoundSettings(),
+      'subscribeToSoundSettings',
+      noopUnsub,
+    );
 
     // Subscribe to live admin edits of the azkar collection (text, audio,
     // benefit, translations). Updates the in-memory override and notifies
     // any listening screens to re-render.
-    const unsubscribeAzkar = subscribeToAzkarFromFirestore();
+    const unsubscribeAzkar = safeSync(
+      () => subscribeToAzkarFromFirestore(),
+      'subscribeToAzkarFromFirestore',
+      noopUnsub,
+    );
 
     // Subscribe to live admin edits of custom adhkar categories.
-    const unsubscribeCustomCategories = subscribeToCustomCategoriesFromFirestore();
+    const unsubscribeCustomCategories = safeSync(
+      () => subscribeToCustomCategoriesFromFirestore(),
+      'subscribeToCustomCategoriesFromFirestore',
+      noopUnsub,
+    );
 
     // Subscribe to live admin edits of Quran themes so the reader sees color
     // changes without waiting for cache expiry or app reinstall.
-    const unsubscribeQuranThemes = subscribeToQuranThemes((themes) => {
-      setQuranThemes(themes);
-    });
+    const unsubscribeQuranThemes = safeSync(
+      () => subscribeToQuranThemes((themes) => {
+        setQuranThemes(themes);
+      }),
+      'subscribeToQuranThemes',
+      noopUnsub,
+    );
 
     const activityInterval = setInterval(() => {
       updateLastActive().catch(() => {});
@@ -1472,6 +1581,30 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [router]);
 
+  // ── Memory-pressure diagnostics ──
+  // The app renders Skia surfaces (Tajweed Mushaf), 604 QCF page fonts, and
+  // large background images — a profile where a low-RAM Android/iOS device can
+  // hit memory pressure and the OS silently kills the process ("the app closed
+  // by itself"). That kill is NATIVE and never produces a JS stack, so the only
+  // way to attribute it is to record the warning that precedes it. iOS fires
+  // 'memoryWarning' from didReceiveMemoryWarning; some RN/Android builds emit it
+  // on TRIM_MEMORY. We drop a breadcrumb so a subsequent crash report shows the
+  // pressure run-up, and best-effort trim JS-held caches to lower the odds.
+  useEffect(() => {
+    const sub = AppState.addEventListener('memoryWarning', () => {
+      addBreadcrumb('memory', 'warning');
+      console.warn('🧠 [Memory] System memory warning received');
+      // Best-effort: drop the decoded-image cache if expo-image is present.
+      try {
+        const ExpoImage = require('expo-image');
+        ExpoImage?.Image?.clearMemoryCache?.();
+      } catch {
+        // expo-image not installed / not the cache owner — ignore.
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     const receivedSub = ExpoNotifications.addNotificationReceivedListener((notification) => {
       applyHijriOverridePushPayload(notification.request.content.data).catch(() => {});
@@ -1529,6 +1662,7 @@ export default function RootLayout() {
         const data = response.notification.request.content.data;
         const notifId = response.notification.request.identifier;
 
+        addBreadcrumb('deeplink', `notif-coldstart:${String(data?.type ?? 'unknown')}`);
         if (__DEV__) console.log('🔔 Cold-start notification tap:', notifId, JSON.stringify(data));
         await applyHijriOverridePushPayload(data).catch(() => false);
 
@@ -1544,9 +1678,15 @@ export default function RootLayout() {
           }).catch(() => {});
         }
 
-        // Small delay to ensure the navigation container is fully mounted
+        // Small delay to ensure the navigation container is fully mounted.
+        // This callback runs AFTER the surrounding try/catch has exited, so a
+        // throw here would be uncaught — guard it explicitly.
         setTimeout(() => {
-          handleNotificationNavigation(data, router, notifId);
+          try {
+            handleNotificationNavigation(data, router, notifId);
+          } catch (navErr) {
+            console.warn('Cold-start notification navigation failed:', navErr);
+          }
         }, 600);
       } catch (e) {
         console.warn('Failed to handle cold-start notification:', e);
@@ -1728,6 +1868,20 @@ export default function RootLayout() {
         </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </ErrorBoundary>
+  );
+}
+
+// Outer boundary: RootLayoutInner renders its OWN <ErrorBoundary> around the
+// provider tree, but that inner boundary is a child of RootLayoutInner and so
+// cannot catch errors thrown by RootLayoutInner itself — its render, its hooks,
+// or its many startup useEffects. This outer wrapper closes that gap: a throw
+// in RootLayoutInner's own render/effects now shows the recovery UI instead of
+// tearing down to a blank screen or escalating to a fatal.
+export default function RootLayout() {
+  return (
+    <ErrorBoundary>
+      <RootLayoutInner />
     </ErrorBoundary>
   );
 }

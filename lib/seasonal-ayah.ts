@@ -166,16 +166,62 @@ export interface ResolvedDailyVerse {
   isOverride: boolean;
 }
 
+// ─── In-memory authoritative cache ───────────────────────────────────────────
+// `resolveDailyVerse()` is the single source of truth, but it is async (Firestore
+// override + AsyncStorage verse-pool). Once it has resolved for today we keep the
+// result here so the synchronous first-paint seed (`resolveDailyVerseSync`) can
+// return the IDENTICAL verse — eliminating the first-render verse swap. The cache
+// is warmed early in the session by `prewarmDailyAyah()` and `updateWidgetData()`,
+// both of which already call `resolveDailyVerse()`.
+function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+}
+let resolvedCache: { key: string; result: ResolvedDailyVerse } | null = null;
+
+/** Today's already-resolved verse if the async resolver has run this session. */
+export function getCachedResolvedDailyVerse(date: Date = new Date()): ResolvedDailyVerse | null {
+  return resolvedCache && resolvedCache.key === dateKey(date) ? resolvedCache.result : null;
+}
+
+/** Verse-pool entry for `date`, resolved synchronously (mirrors resolveDailyVerse step 3). */
+function resolveVersePoolSync(date: Date): DailyAyah | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getVersePoolEntrySync } = require('@/lib/verse-pool');
+    const entry = getVersePoolEntrySync(date);
+    if (entry) {
+      const base: DailyAyah = {
+        arabic: entry.arabic,
+        ref: `${entry.surahName} ${entry.ayahNumber}`,
+        trans: entry.translation || '',
+        surah: entry.surahNumber,
+        ayah: entry.ayahNumber,
+      };
+      return withFullArabic(base);
+    }
+  } catch {}
+  return null;
+}
+
 /**
- * Synchronous best-guess for the verse of the day — used for the first paint
- * so the screen never flashes a short fragment or an empty card. Mirrors the
- * non-async tail of {@link resolveDailyVerse} (seasonal → rolling pool).
+ * Synchronous best-guess for the verse of the day — used for the first paint so
+ * the screen never flashes a fragment, an empty card, or (the real bug) a verse
+ * that the async resolver then swaps out. Selection order mirrors
+ * {@link resolveDailyVerse} as closely as a sync call allows:
+ *   0. Authoritative cache (today's async result — includes admin override)
+ *   1. Seasonal verse
+ *   2. Rotating verse pool (deterministic, fixed-seed — matches async step 3)
+ *   3. Rolling `DAILY_AYAHS` fallback
  */
 export function resolveDailyVerseSync(date: Date = new Date()): DailyAyah {
+  const cached = getCachedResolvedDailyVerse(date);
+  if (cached) return cached.ayah;
   try {
     const seasonal = getSeasonalAyahForDate(date);
     if (seasonal) return withFullArabic(seasonal);
   } catch {}
+  const pooled = resolveVersePoolSync(date);
+  if (pooled) return pooled;
   return withFullArabic(getFallbackDailyAyahForDate(date));
 }
 
@@ -189,6 +235,14 @@ export function resolveDailyVerseSync(date: Date = new Date()): DailyAyah {
  * The result always carries the complete Uthmani text.
  */
 export async function resolveDailyVerse(date: Date = new Date()): Promise<ResolvedDailyVerse> {
+  const result = await resolveDailyVerseUncached(date);
+  // Warm the synchronous cache so the in-app screen's first paint matches this
+  // authoritative result instead of guessing (and then visibly swapping).
+  resolvedCache = { key: dateKey(date), result };
+  return result;
+}
+
+async function resolveDailyVerseUncached(date: Date): Promise<ResolvedDailyVerse> {
   // 1. Admin override (required lazily to avoid a load-time Firebase cycle)
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires

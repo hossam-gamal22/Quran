@@ -26,7 +26,7 @@ import { fontBold, fontMedium, fontRegular, fontSemiBold, quranFontFamily } from
 import { getGharibWordOfTheDay } from '@/data/gharib-quran';
 import { fetchGharibWords, getGharibWordsSync } from '@/lib/gharib-api';
 import { localizeNumber } from '@/lib/format-number';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -37,7 +37,7 @@ import { ModalColors } from '@/constants/theme';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllSurahs, type QuranV4Surah } from '@/lib/qcf-page-data';
-import { getLocalizedFullDate, getLocalizedHijriDate, subscribeToHijriOffsetChanges } from '@/lib/hijri-date';
+import { getLocalizedFullDate, getLocalizedHijriDate, getLocalizedDateNames, subscribeToHijriOffsetChanges } from '@/lib/hijri-date';
 import { getCategoryById, type AzkarCategoryType, resolveCategoryId } from '@/lib/azkar-api';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -52,8 +52,8 @@ import DailyHighlights from '@/components/ui/DailyHighlights';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { useAdBottomInset } from '@/lib/ads-context';
+import { getTabScreenBottomSpacing } from '@/lib/tab-screen-spacing';
 import { ColoredButton } from '@/components/ui/colored-button';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -681,13 +681,18 @@ export default function HomeScreen() {
   const router = useRouter();
   const { isDarkMode, settings, t } = useSettings();
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const adBottomInset = useAdBottomInset();
+  const scrollBottomSpacing = getTabScreenBottomSpacing({
+    platform: Platform.OS,
+    bottomSafeAreaInset: insets.bottom,
+  }) + adBottomInset;
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const quickAccessScrollRef = useRef<ScrollView>(null);
   const { currentSeason, dailyData, adminBanner: adminSeasonalBanner, refreshSeasonalData } = useSeasonal();
   const features = useFeatures();
-  const { isPremium, showUpgradeBanner, isSubscriptionEnabled } = useSubscription();
+  const { isPremium, showUpgradeBanner, isSubscriptionEnabled, isLoading: subscriptionLoading } = useSubscription();
 
   // Date display
   const [homeDateNow, setHomeDateNow] = useState(() => new Date());
@@ -695,13 +700,34 @@ export default function HomeScreen() {
   const refreshHomeHijriDate = useCallback(() => {
     const now = new Date();
     setHomeDateNow(now);
+    // Instant value: synchronous tabular calc (already offset-corrected).
     setHomeHijriDate(getLocalizedHijriDate(now));
+    // Authoritative reconcile: resolve TODAY through the very same 4-layer
+    // service that powers the seasonal banner (admin override → AlAdhan →
+    // news → tabular). Guarantees the date line matches the banner + widgets.
+    import('@/services/hijriCalendarService')
+      .then(({ getHijriDate }) => getHijriDate(now))
+      .then((r: any) => {
+        if (!r || typeof r.day !== 'number') return;
+        if (__DEV__) console.log('[hijri-fix] home authoritative resolve →', r.day, r.month, r.year, 'src=', r.source);
+        const names = getLocalizedDateNames();
+        setHomeHijriDate((prev) => ({
+          ...prev,
+          day: r.day,
+          month: r.month,
+          year: r.year,
+          monthName: names.hijriMonths[r.month - 1] || r.monthNameAr || prev.monthName,
+          monthNameAr: r.monthNameAr || prev.monthNameAr,
+        }));
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => subscribeToHijriOffsetChanges(refreshHomeHijriDate), [refreshHomeHijriDate]);
+  // Re-resolve when the day or the app language changes.
   useEffect(() => {
-    setHomeHijriDate(getLocalizedHijriDate(homeDateNow));
-  }, [homeDateNow, settings.language]);
+    refreshHomeHijriDate();
+  }, [settings.language, refreshHomeHijriDate]);
 
   useEffect(() => {
     let midnightTimer: ReturnType<typeof setTimeout> | null = null;
@@ -750,8 +776,10 @@ export default function HomeScreen() {
         const userScore = info?.score || 0;
         // Mirror honor-board eligibility: a user without a display name is
         // excluded from the visible leaderboard, so showing them a rank
-        // here is misleading. Wait until they set a name.
-        const hasName = !!(displayName || '').trim();
+        // here is misleading. Wait until they set a name. The server-side
+        // name from the user doc counts too — after a reinstall the local
+        // copy is empty while the user is still ranked on the board.
+        const hasName = !!((displayName || info?.displayName || '').trim());
         if (hasName && userScore > 0) {
           // `getUserMonthlyRank` returns the true rank — cache findIndex
           // for top-50 users (0 extra reads) or a `count()` aggregation
@@ -950,17 +978,20 @@ export default function HomeScreen() {
   const [cachedPrayerTimes, setCachedPrayerTimes] = useState<PrayerTimes | null>(null);
   const [prayerTimezone, setPrayerTimezone] = useState<string | undefined>(undefined);
   const [nextPrayerCountdown, setNextPrayerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
-  // Banner countdown state (always-on, independent of modal)
-  const [bannerCountdown, setBannerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
-  const [bannerNextPrayer, setBannerNextPrayer] = useState<{ name: PrayerName; time: string } | null>(null);
-  // Hydration grace period: don't show the premium-upgrade fallback banner during
-  // first paint, so async banners (welcome / prayer countdown / seasonal) get a
-  // chance to populate first instead of flashing the premium banner.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setHydrated(true), 800);
-    return () => clearTimeout(id);
-  }, []);
+  // Banner countdown (always-on, independent of modal). Derived SYNCHRONOUSLY
+  // from cachedPrayerTimes via useMemo (see below) — NOT setState-in-effect —
+  // so the prayer-countdown card renders in the same commit that prayer times
+  // become available, with no intermediate null frame for a fallback banner to
+  // sneak into.
+  const [countdownTick, setCountdownTick] = useState(0);
+  // Readiness gate for the premium-upgrade fallback banner. We must not commit
+  // to the premium banner until we KNOW no higher-priority banner will claim
+  // the slot. `prayerDataResolved` flips once the prayer-times load attempt
+  // finishes (success OR failure), so we know whether a prayer countdown card
+  // will appear. Combined with subscription readiness, this replaces the old
+  // fixed 800ms timer that raced prayer-time hydration and caused the premium
+  // banner to flash before being replaced by the prayer countdown.
+  const [prayerDataResolved, setPrayerDataResolved] = useState(false);
 
   // Load cached prayer times — try cache first, fallback to fetch
   useEffect(() => {
@@ -1050,6 +1081,11 @@ export default function HomeScreen() {
         if (!cachedPrayerTimes) {
           showOfflineModal();
         }
+      } finally {
+        // Prayer-times resolution is complete (loaded OR confirmed unavailable).
+        // Only now do we know whether a prayer countdown will claim the banner
+        // slot — which gates the premium fallback banner without a timer.
+        setPrayerDataResolved(true);
       }
     };
     loadPrayerTimes();
@@ -1067,19 +1103,25 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [showNextPrayerModal, cachedPrayerTimes, prayerTimezone]);
 
-  // Always-on banner countdown (updates every second for WelcomeBanner)
+  // Always-on banner countdown: tick once per second to re-evaluate the derived
+  // values below. We only drive a counter here — the actual next-prayer/remaining
+  // values are computed synchronously in useMemo so they exist in the SAME render
+  // that cachedPrayerTimes becomes available (no setState lag, no null frame).
   useEffect(() => {
     if (!cachedPrayerTimes) return;
-    const update = () => {
-      const next = getNextPrayer(cachedPrayerTimes, { timezone: prayerTimezone });
-      setBannerNextPrayer(next);
-      const remaining = getTimeRemaining(cachedPrayerTimes, { timezone: prayerTimezone });
-      setBannerCountdown(remaining);
-    };
-    update();
-    const interval = setInterval(update, 1000);
+    const interval = setInterval(() => setCountdownTick(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, [cachedPrayerTimes, prayerTimezone]);
+
+  const bannerNextPrayer = useMemo<{ name: PrayerName; time: string } | null>(
+    () => (cachedPrayerTimes ? getNextPrayer(cachedPrayerTimes, { timezone: prayerTimezone }) : null),
+    // countdownTick intentionally re-derives every second
+    [cachedPrayerTimes, prayerTimezone, countdownTick]
+  );
+  const bannerCountdown = useMemo<{ hours: number; minutes: number; seconds: number } | null>(
+    () => (cachedPrayerTimes ? getTimeRemaining(cachedPrayerTimes, { timezone: prayerTimezone }) : null),
+    [cachedPrayerTimes, prayerTimezone, countdownTick]
+  );
 
   // Debug: Log when modal opens
   useEffect(() => {
@@ -1801,7 +1843,7 @@ export default function HomeScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + adBottomInset }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomSpacing }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -2058,7 +2100,17 @@ export default function HomeScreen() {
               onPress={() => router.push('/honor-board')}
               style={[styles.rankBadgeHome, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(245,158,11,0.1)' : 'rgba(181,114,0,0.08)' }]}
             >
-              <MaterialCommunityIcons name={userRank ? 'podium' : 'trophy-outline'} size={14} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+              {/* Top-3 medal scheme mirrors MEDAL_STYLES in honor-board.tsx */}
+              <MaterialCommunityIcons
+                name={userRank === 1 ? 'trophy' : userRank === 2 || userRank === 3 ? 'medal' : userRank ? 'podium' : 'trophy-outline'}
+                size={14}
+                color={
+                  userRank === 1 ? (isDarkMode ? '#FFD700' : '#B8860B')
+                    : userRank === 2 ? '#C0C0C0'
+                    : userRank === 3 ? '#CD7F32'
+                    : isDarkMode ? '#f59e0b' : '#B57200'
+                }
+              />
               <Text style={[styles.rankBadgeHomeText, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
                 {userRank
                   ? (settings.language === 'ar' ? `ترتيبك: #${userRank}` : `Your Rank: #${userRank}`)
@@ -2106,9 +2158,16 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {/* Premium Upgrade Banner — fallback only when no other banner is active.
-            Wait for hydration so async banners get a chance to render first. */}
-        {hydrated && isSubscriptionEnabled && !isPremium && showUpgradeBanner && !(isBannerActive(welcomeBanner) || adminSeasonalBanner || autoSeasonalBanner || (showPrayerCountdown && bannerCountdown) || new Date().getDay() === 5) && (
+        {/* Premium Upgrade Banner — fallback ONLY when no higher-priority banner
+            will claim the slot. Gated on real readiness (no timer):
+            - subscription state must be resolved (!subscriptionLoading) so the
+              premium decision uses the user's true status, not the default
+              "enabled/non-premium" config that exists on first render.
+            - prayer-times load must have finished (prayerDataResolved) so we
+              know whether the prayer-countdown card will appear.
+            Higher-priority slot is gated on `cachedPrayerTimes` (the source of
+            the prayer card), not the derived countdown, to avoid any window. */}
+        {!subscriptionLoading && prayerDataResolved && isSubscriptionEnabled && !isPremium && showUpgradeBanner && !(isBannerActive(welcomeBanner) || adminSeasonalBanner || autoSeasonalBanner || (showPrayerCountdown && cachedPrayerTimes) || new Date().getDay() === 5) && (
           <Animated.View entering={FadeInDown.delay(60).duration(400)}>
             <TouchableOpacity
               activeOpacity={0.85}
@@ -2377,10 +2436,6 @@ export default function HomeScreen() {
               </View>
             </CollapsibleSection>
           </Animated.View>
-          {/* Inline MREC ad after every 3rd section (and not after the last) */}
-          {(sectionIndex + 1) % 3 === 0 && sectionIndex < orderedSections.length - 1 && (
-            <InlineMrecAd screen="home" darkMode={isDarkMode} />
-          )}
           </React.Fragment>
         ))}
 

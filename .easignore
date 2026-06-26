@@ -52,7 +52,16 @@ yarn-error.log*
 credentials/
 .git/
 *.tgz
-/tmp/
+# Exclude all of tmp/ EXCEPT the widget-previews build input, which
+# generate-android-widget-preview-images.mjs reads during prebuild
+# (anchors.json + baked snapshot PNGs). Excluding it makes prebuild
+# fail with "No pulled anchors for prayerSingle_small".
+/tmp/*
+# No trailing slash: EAS copies the working dir via fs.cp with a directory
+# filter, so the directory itself must be re-included or cp never descends
+# into it (the trailing-slash form skips the whole subtree).
+!/tmp/widget-previews
+!/tmp/widget-previews/**
 # Local native build caches
 android/app/build/
 android/.cxx/
