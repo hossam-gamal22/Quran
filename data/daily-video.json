@@ -1,55 +1,4 @@
 {
-  "2026-07-18": {
-    "ayahText": "وَقَٰتِلُوهُمْ حَتَّىٰ لَا تَكُونَ فِتْنَةٌۭ وَيَكُونَ ٱلدِّينُ لِلَّهِ ۖ فَإِنِ ٱنتَهَوْا۟ فَلَا عُدْوَٰنَ إِلَّا عَلَى ٱلظَّٰلِمِينَ",
-    "surahName": "سُورَةُ البَقَرَةِ",
-    "surahEnglish": "Al-Baqara",
-    "surahNumber": 2,
-    "ayahNumber": 193,
-    "globalAyahNumber": 200,
-    "generatedAt": "2026-07-18T00:32:19.824Z",
-    "videos": [
-      {
-        "reciterId": "ar.alafasy",
-        "reciterLabel": "مشاري العفاسي",
-        "reciterLabelEn": "Mishary Alafasy",
-        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-alafasy.mp4",
-        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-alafasy-premium.mp4",
-        "duration": 16.88
-      },
-      {
-        "reciterId": "ar.abdulsamad",
-        "reciterLabel": "عبدالباسط عبدالصمد",
-        "reciterLabelEn": "Abdul Basit",
-        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-abdulsamad.mp4",
-        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-abdulsamad-premium.mp4",
-        "duration": 28.18
-      },
-      {
-        "reciterId": "ar.abdurrahmaansudais",
-        "reciterLabel": "عبدالرحمن السديس",
-        "reciterLabelEn": "Abdurrahman As-Sudais",
-        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-abdurrahmaansudais.mp4",
-        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-abdurrahmaansudais-premium.mp4",
-        "duration": 16.22
-      },
-      {
-        "reciterId": "ar.mahermuaiqly",
-        "reciterLabel": "ماهر المعيقلي",
-        "reciterLabelEn": "Maher Al Muaiqly",
-        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-mahermuaiqly.mp4",
-        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-mahermuaiqly-premium.mp4",
-        "duration": 11.6
-      },
-      {
-        "reciterId": "ar.saoodshuraym",
-        "reciterLabel": "سعود الشريم",
-        "reciterLabelEn": "Saud Ash-Shuraym",
-        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-saoodshuraym.mp4",
-        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-18-saoodshuraym-premium.mp4",
-        "duration": 11.6
-      }
-    ]
-  },
   "2026-07-19": {
     "ayahText": "ٱلشَّهْرُ ٱلْحَرَامُ بِٱلشَّهْرِ ٱلْحَرَامِ وَٱلْحُرُمَٰتُ قِصَاصٌۭ ۚ فَمَنِ ٱعْتَدَىٰ عَلَيْكُمْ فَٱعْتَدُوا۟ عَلَيْهِ بِمِثْلِ مَا ٱعْتَدَىٰ عَلَيْكُمْ ۚ وَٱتَّقُوا۟ ٱللَّهَ وَٱعْلَمُوٓا۟ أَنَّ ٱللَّهَ مَعَ ٱلْمُتَّقِينَ",
     "surahName": "سُورَةُ البَقَرَةِ",
@@ -404,6 +353,57 @@
         "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-25-saoodshuraym.mp4",
         "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-25-saoodshuraym-premium.mp4",
         "duration": 16.93
+      }
+    ]
+  },
+  "2026-07-26": {
+    "ayahText": "وَمِنْهُم مَّن يَقُولُ رَبَّنَآ ءَاتِنَا فِى ٱلدُّنْيَا حَسَنَةًۭ وَفِى ٱلْءَاخِرَةِ حَسَنَةًۭ وَقِنَا عَذَابَ ٱلنَّارِ",
+    "surahName": "سُورَةُ البَقَرَةِ",
+    "surahEnglish": "Al-Baqara",
+    "surahNumber": 2,
+    "ayahNumber": 201,
+    "globalAyahNumber": 208,
+    "generatedAt": "2026-07-26T00:37:41.856Z",
+    "videos": [
+      {
+        "reciterId": "ar.alafasy",
+        "reciterLabel": "مشاري العفاسي",
+        "reciterLabelEn": "Mishary Alafasy",
+        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-alafasy.mp4",
+        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-alafasy-premium.mp4",
+        "duration": 16.14
+      },
+      {
+        "reciterId": "ar.abdulsamad",
+        "reciterLabel": "عبدالباسط عبدالصمد",
+        "reciterLabelEn": "Abdul Basit",
+        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-abdulsamad.mp4",
+        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-abdulsamad-premium.mp4",
+        "duration": 26.4
+      },
+      {
+        "reciterId": "ar.abdurrahmaansudais",
+        "reciterLabel": "عبدالرحمن السديس",
+        "reciterLabelEn": "Abdurrahman As-Sudais",
+        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-abdurrahmaansudais.mp4",
+        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-abdurrahmaansudais-premium.mp4",
+        "duration": 13.51
+      },
+      {
+        "reciterId": "ar.mahermuaiqly",
+        "reciterLabel": "ماهر المعيقلي",
+        "reciterLabelEn": "Maher Al Muaiqly",
+        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-mahermuaiqly.mp4",
+        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-mahermuaiqly-premium.mp4",
+        "duration": 18.73
+      },
+      {
+        "reciterId": "ar.saoodshuraym",
+        "reciterLabel": "سعود الشريم",
+        "reciterLabelEn": "Saud Ash-Shuraym",
+        "url": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-saoodshuraym.mp4",
+        "premiumUrl": "https://github.com/hossam-gamal22/Quran/releases/download/daily-videos/video-2026-07-26-saoodshuraym-premium.mp4",
+        "duration": 10.63
       }
     ]
   }
