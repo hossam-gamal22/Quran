@@ -449,7 +449,7 @@ export default function QuranSearchScreen() {
 
   return (
     <QuranBackgroundWrapper backgroundKey={settings.display.quranBackground} style={{ flex: 1 }}>
-    <ScreenContainer containerClassName="bg-transparent" edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
         <View style={s.header}>

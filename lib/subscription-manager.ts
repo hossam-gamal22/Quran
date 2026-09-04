@@ -4,7 +4,8 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from './firebase-config';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { shouldRefetchContent, markContentFetched } from './content-manifest';
 import { t } from '@/lib/i18n';
 import type { SeasonalOffer } from '@/types/premium';
 
@@ -117,28 +118,27 @@ export const fetchSubscriptionConfig = async (): Promise<SubscriptionConfig> => 
 };
 
 /**
- * Real-time listener for subscription config changes from admin panel.
- * Returns an unsubscribe function.
+ * Manifest-gated one-shot read of subscription config (replaces a live
+ * single-doc listener). Returns a no-op unsubscribe.
  */
 export function subscribeToSubscriptionConfig(
   onUpdate: (config: SubscriptionConfig) => void
 ): () => void {
-  try {
-    const docRef = doc(db, 'config', 'subscription-settings');
-    return onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const config = { ...DEFAULT_SUBSCRIPTION_CONFIG, ...data };
-        AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config)).catch(() => {});
-        onUpdate(config);
-      }
-    }, (error) => {
-      console.log('⚠️ Subscription config listener error:', error);
-    });
-  } catch (e) {
-    console.log('⚠️ Failed to subscribe to subscription config:', e);
-    return () => {};
-  }
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('subscriptionConfig'))) return;
+      const docSnap = await getDoc(doc(db, 'config', 'subscription-settings'));
+      await markContentFetched('subscriptionConfig');
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+      const config = { ...DEFAULT_SUBSCRIPTION_CONFIG, ...data };
+      AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config)).catch(() => {});
+      onUpdate(config);
+    } catch (e) {
+      console.log('⚠️ Subscription config fetch error:', e);
+    }
+  })();
+  return () => {};
 }
 
 // ==================== State Management ====================

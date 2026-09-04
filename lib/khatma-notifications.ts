@@ -5,6 +5,7 @@ import { Khatma } from './khatma-storage';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
 import { getReminderChannelId } from '../services/notifications/channels';
+import { markPermissionRequested } from './permission-recovery';
 
 // Sound file mapping (must match app.json expo-notifications sounds)
 const SOUND_FILES: Record<string, string> = {
@@ -57,6 +58,9 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
+      if (Platform.OS === 'android') {
+        await markPermissionRequested('notifications');
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }

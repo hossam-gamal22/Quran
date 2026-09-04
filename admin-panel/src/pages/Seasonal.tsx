@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { collection, doc, getDocs, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { db } from '../firebase';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
@@ -179,6 +180,7 @@ const Seasonal: React.FC = () => {
           updatedAt: new Date().toISOString(),
         });
       }
+      await bumpContentVersion('seasonalContent');
     } catch (error) {
       console.error('Error saving seasonal content:', error);
     }
@@ -217,7 +219,9 @@ const Seasonal: React.FC = () => {
   const handleDeleteContent = (id: string) => {
     setContents(prev => prev.filter(c => c.id !== id));
     setDeleteConfirmId(null);
-    deleteDoc(doc(db, 'seasonalContent', id)).catch(console.error);
+    deleteDoc(doc(db, 'seasonalContent', id))
+      .then(() => bumpContentVersion('seasonalContent'))
+      .catch(console.error);
   };
 
   const handleToggleActive = (id: string) => {
@@ -240,7 +244,9 @@ const Seasonal: React.FC = () => {
       setContents(prev => [...prev, entry]);
     }
     
-    setDoc(doc(db, 'seasonalContent', id), entry).catch(console.error);
+    setDoc(doc(db, 'seasonalContent', id), entry)
+      .then(() => bumpContentVersion('seasonalContent'))
+      .catch(console.error);
     setShowModal(false);
     setEditingContent(null);
   };

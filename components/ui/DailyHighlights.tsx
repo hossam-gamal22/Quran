@@ -33,6 +33,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getCachedPrayerTimes, getNextPrayer, getPrayerTranslationKey } from '@/lib/prayer-times';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { ModalColors } from '@/constants/theme';
 const STORY_CACHE_KEY = 'story_of_day_cache';
 const HIGHLIGHTS_ORDER_KEY = '@highlights_order';
 const STORY_THUMBNAIL_KEY = '@story_thumbnail_cache';
@@ -512,21 +513,42 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
 
       {/* Full-width reorder button */}
       {showReorderButton && (
-        <BlurView
-         
-          intensity={80}
-          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-          style={styles.fullReorderBlur}
-        >
-          <TouchableOpacity
-            style={[styles.fullReorderBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-            onPress={openReorderModal}
-            activeOpacity={0.8}
+        Platform.OS === 'android' ? (
+          <View
+            style={[
+              styles.fullReorderBlur,
+              {
+                backgroundColor: isDarkMode ? 'rgba(15,25,30,0.55)' : 'rgba(255,255,255,0.75)',
+                borderWidth: 0,
+              },
+            ]}
           >
-            <MaterialCommunityIcons name="swap-vertical" size={18} color={themeColors.text} />
-            <Text style={[styles.fullReorderBtnText, { color: themeColors.text }]}>{t('home.reorderSections')}</Text>
-          </TouchableOpacity>
-        </BlurView>
+            <TouchableOpacity
+              style={[styles.fullReorderBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+              onPress={openReorderModal}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="swap-vertical" size={18} color={themeColors.text} />
+              <Text style={[styles.fullReorderBtnText, { color: themeColors.text }]}>{t('home.reorderSections')}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <BlurView
+
+            intensity={80}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+            style={styles.fullReorderBlur}
+          >
+            <TouchableOpacity
+              style={[styles.fullReorderBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+              onPress={openReorderModal}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="swap-vertical" size={18} color={themeColors.text} />
+              <Text style={[styles.fullReorderBtnText, { color: themeColors.text }]}>{t('home.reorderSections')}</Text>
+            </TouchableOpacity>
+          </BlurView>
+        )
       )}
 
       {/* Reorder Modal */}
@@ -537,21 +559,17 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
         onRequestClose={() => setShowReorderModal(false)}
       >
         <View style={styles.reorderOverlay}>
-          <BlurView
-           
-            intensity={Platform.OS === 'ios' ? 40 : 25}
-            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-            style={styles.reorderBlur}
+          <View
+            style={[
+              styles.reorderBlur,
+              {
+                backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight,
+              },
+            ]}
           >
             <View style={[
               styles.reorderContent,
-              {
-                backgroundColor: isDarkMode
-                  ? 'rgba(30,30,32,0.55)'
-                  : 'rgba(255,255,255,0.7)',
-                borderWidth: 0.5,
-                borderColor: 'rgba(255,255,255,0.2)',
-              },
+              { backgroundColor: 'transparent', borderWidth: 0 },
             ]}>
               <Text style={[
                 styles.reorderTitle,
@@ -604,13 +622,9 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
 
               <View style={[styles.reorderButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
-                  style={[styles.reorderBtn2, styles.reorderResetBtn]}
+                  style={[styles.reorderBtn2, styles.reorderResetBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
                   onPress={resetHighlightOrder}
                 >
-                  {Platform.OS === 'ios' && (
-                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-                  )}
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                   <Text style={[
                     styles.reorderBtnText,
                     { color: isDarkMode ? '#A3A3A3' : '#525252' },
@@ -626,7 +640,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                 </TouchableOpacity>
               </View>
             </View>
-          </BlurView>
+          </View>
         </View>
       </Modal>
     </View>

@@ -6,6 +6,9 @@ import { isRTL, getLanguage } from '@/lib/i18n';
 /** Returns localized app name based on current language */
 const getLocalizedName = () => isRTL() ? 'رُوح المسلم' : 'Rooh Al-Muslim';
 
+export const APP_STORE_URL = 'https://apps.apple.com/app/id6761651911';
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.rooh.almuslim';
+
 export const APP_CONFIG = {
   // اسم التطبيق
   name: 'رُوح المسلم',
@@ -22,14 +25,14 @@ export const APP_CONFIG = {
   contact: {
     email: 'hossamgamal290@gmail.com',
     website: '',
-    playStore: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-    appStore: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
+    playStore: PLAY_STORE_URL,
+    appStore: APP_STORE_URL,
   },
   
   // روابط التحميل
   downloadLinks: {
-    android: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-    ios: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
+    android: PLAY_STORE_URL,
+    ios: APP_STORE_URL,
   },
   
   // التوقيع للمشاركة (language-aware)

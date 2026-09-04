@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { Platform } from "react-native";
 import { useSettings, FontSize } from "@/contexts/SettingsContext";
-import { Colors, DarkColors } from "@/constants/theme";
+import { Colors, DarkColors, ModalColors } from "@/constants/theme";
 import { getContrastPalette, getContrastTextColor, blendWithDimOverlay, getLuminance } from "@/lib/contrast-helper";
 import { APP_BACKGROUNDS } from "@/lib/backgrounds";
 import { useThemeConfig } from "@/contexts/ThemeConfigContext";
@@ -128,20 +128,20 @@ export function useColors() {
     ? (bgTextColor === 'white' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)')
     : colors.textLight;
 
-  // When a background is active, use glass card colors for better integration
-  // For dark bg (white text): use dark glass overlay so white text is readable on any part of the bg image
-  // For light bg (black text): use subtle transparent overlay
-  // On Android, elevation renders hard shadow outlines on semi-transparent backgrounds,
-  // so we make cards fully transparent on Android to avoid ugly visible boxes.
+  // When a background is active, use a semi-opaque card overlay so cards stay visibly
+  // separated from the background image (otherwise neighbouring cards "bleed" together
+  // and the grid looks like floating text). Use a slightly heavier alpha on Android
+  // because there's no BlurView underneath to add depth.
   const cardSolid = hasBgOverride
-    ? (bgTextColor === 'white' ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.65)')
+    ? (bgTextColor === 'white'
+        ? (Platform.OS === 'android' ? 'rgba(15,25,30,0.55)' : 'rgba(0,0,0,0.30)')
+        : (Platform.OS === 'android' ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.65)'))
     : colors.card;
-  const card = (hasBgOverride && Platform.OS === 'android') ? 'transparent' : cardSolid;
-  // Elevation value: 0 on Android when card is transparent (avoids shadow artifacts)
-  const cardElevation = (hasBgOverride && Platform.OS === 'android') ? 0 : undefined;
+  const card = cardSolid;
+  const cardElevation = undefined;
   const modalSurface = hasBgOverride
-    ? (bgTextColor === 'white' ? '#0f1a14' : '#FFFFFF')
-    : (isDarkMode ? '#0f1a14' : '#FFFFFF');
+    ? (bgTextColor === 'white' ? ModalColors.cardDark : ModalColors.cardLight)
+    : (isDarkMode ? ModalColors.cardDark : ModalColors.cardLight);
 
   // Icon color override: adapt for bg-override mode
   const icon = hasBgOverride

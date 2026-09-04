@@ -75,6 +75,7 @@ export default function TranslateButton({
         completed++;
         setProgress(Math.round((completed / total) * 100));
       },
+      targetLangs,
     );
 
     // Flatten to Record<string, string>

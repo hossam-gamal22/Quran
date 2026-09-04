@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { convertToPng } from '../utils/imageUpload';
 import { Styled } from '../components/Styled';
@@ -154,6 +155,7 @@ const QuranThemesManager: React.FC = () => {
         themes: ordered,
         updatedAt: new Date().toISOString(),
       });
+      await bumpContentVersion('quranThemes');
       setSaveMsg('✅ تم الحفظ');
       setThemes(ordered);
     } catch (e) {

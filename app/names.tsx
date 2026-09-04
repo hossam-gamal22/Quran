@@ -21,7 +21,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, DarkColors, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, DarkColors, Spacing, BorderRadius, Shadows, ModalColors } from '../constants/theme';
 import { APP_CONFIG } from '../constants/app';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -897,6 +897,11 @@ export default function AllahNamesScreen() {
   const styles = useScaledStyles(_styles, colors.fs);
   const { t, language } = useTranslation();
   const currentLang = settings.language || 'ar';
+  // Share modal colours (force dark green card per design request)
+  const SHARE_MODAL_BG = '#091f1d';
+  const SHARE_MODAL_TEXT = '#FFFFFF';
+  const SHARE_MODAL_SUBTEXT = '#A8A8AD';
+  const SHARE_MODAL_ICON = '#FFFFFF';
   
   // الحالة
   const [selectedName, setSelectedName] = useState<AllahName | null>(null);
@@ -1153,11 +1158,7 @@ export default function AllahNamesScreen() {
         onRequestClose={() => setShowModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.detailsModal, { overflow: 'hidden' }]}>
-            {Platform.OS === 'ios' && (
-              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-            )}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,20,20,0.75)' : 'rgba(255,255,255,0.85)' }]} />
+          <View style={[styles.detailsModal, { overflow: 'hidden', backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight }]}>
             {/* الرأس */}
             <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
               <TouchableOpacity onPress={() => setShowModal(false)}>
@@ -1271,15 +1272,11 @@ export default function AllahNamesScreen() {
           activeOpacity={1}
           onPress={() => setShowShareModal(false)}
         >
-          <View style={[styles.shareModalContent, { overflow: 'hidden' }]}>
-            {Platform.OS === 'ios' && (
-              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-            )}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,20,20,0.75)' : 'rgba(255,255,255,0.85)' }]} />
+          <View style={[styles.shareModalContent, { overflow: 'hidden', backgroundColor: SHARE_MODAL_BG }]}>
             <View style={[styles.shareModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[styles.shareModalTitle, { color: colors.text }]}>{t('names.shareHeader')}</Text>
+              <Text style={[styles.shareModalTitle, { color: SHARE_MODAL_TEXT }]}>{t('names.shareHeader')}</Text>
               <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color={colors.icon} />
+                <Ionicons name="close" size={24} color={SHARE_MODAL_ICON} />
               </TouchableOpacity>
             </View>
             
@@ -1287,7 +1284,7 @@ export default function AllahNamesScreen() {
               <>
                 <View style={styles.sharePreview}>
                   <Text style={[styles.sharePreviewName, { color: colors.primaryText }]}>{selectedName.name}</Text>
-                  <Text style={[styles.sharePreviewMeaning, { color: colors.textLight }]}>{getNameMeaning(selectedName, currentLang)}</Text>
+                  <Text style={[styles.sharePreviewMeaning, { color: SHARE_MODAL_SUBTEXT }]}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
                 <View style={[styles.shareOptions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1298,7 +1295,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="share-social" size={24} color={Colors.primary} />
                     </View>
-                    <Text style={[styles.shareOptionText, { color: colors.text }]}>{t('common.share')}</Text>
+                    <Text style={[styles.shareOptionText, { color: SHARE_MODAL_TEXT }]}>{t('common.share')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1308,7 +1305,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="copy" size={24} color={Colors.secondary} />
                     </View>
-                    <Text style={[styles.shareOptionText, { color: colors.text }]}>{t('common.copy')}</Text>
+                    <Text style={[styles.shareOptionText, { color: SHARE_MODAL_TEXT }]}>{t('common.copy')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1330,7 +1327,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                     </View>
-                    <Text style={[styles.shareOptionText, { color: colors.text }]}>{t('names.whatsapp')}</Text>
+                    <Text style={[styles.shareOptionText, { color: SHARE_MODAL_TEXT }]}>{t('names.whatsapp')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1347,7 +1344,7 @@ export default function AllahNamesScreen() {
                         color={Colors.error}
                       />
                     </View>
-                    <Text style={[styles.shareOptionText, { color: colors.text }]}>
+                    <Text style={[styles.shareOptionText, { color: SHARE_MODAL_TEXT }]}> 
                       {favorites.includes(selectedName.id) ? t('common.removeFromFavorites') : t('common.addToFavorites')}
                     </Text>
                   </TouchableOpacity>

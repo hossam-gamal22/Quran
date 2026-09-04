@@ -2,13 +2,40 @@
 // نظام المكافآت الشهرية — إدارة النقاط والفائزين
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where, getCountFromServer } from 'firebase/firestore';
 import { db } from './firebase-config';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
 import { getMonthlyActivityStats, getTodayDate } from '@/lib/worship-storage';
 
 const CACHE_KEY = '@rewards_config_cache';
 const PENDING_SCORES_KEY = '@pending_monthly_scores';
+const LAST_SYNC_FINGERPRINT_KEY = '@rewards_last_sync_fingerprint';
+const LAST_SYNC_AT_KEY = '@rewards_last_sync_at';
+const MIN_SYNC_INTERVAL_MS = 60 * 1000;
+
+type SyncOptions = { force?: boolean };
+
+const computeFingerprint = (
+  month: string,
+  score: number,
+  activities: Record<string, number>,
+): string => {
+  const keys = Object.keys(activities).sort();
+  const parts = keys.map(k => `${k}:${Math.trunc(activities[k] || 0)}`);
+  return `${month}|${Math.trunc(score)}|${parts.join(',')}`;
+};
+
+const isThrottled = async (force: boolean): Promise<boolean> => {
+  if (force) return false;
+  try {
+    const raw = await AsyncStorage.getItem(LAST_SYNC_AT_KEY);
+    if (!raw) return false;
+    const last = Number(raw) || 0;
+    return Date.now() - last < MIN_SYNC_INTERVAL_MS;
+  } catch {
+    return false;
+  }
+};
 
 export const DEFAULT_WEIGHTS: ScoreWeights = {
   app_open: 1,
@@ -446,12 +473,36 @@ const getPendingScores = async (month: string): Promise<{ totalPoints: number; a
  */
 export const syncMonthlyEngagementFromLocalWorship = async (
   userId: string,
+  options: SyncOptions = {},
 ): Promise<MonthlyEngagementSyncResult | null> => {
   try {
+    const force = options.force === true;
+    if (await isThrottled(force)) return null;
+
     const config = await fetchRewardsConfig();
     if (!config.enabled) return null;
 
     const currentMonth = getCurrentMonth();
+
+    // Cheap pre-check: if local activities haven't changed since last
+    // sync AND we synced recently, skip the Firestore read entirely.
+    // This is the single biggest cost saving at scale.
+    const worshipStats = await getMonthlyActivityStats();
+    const pending = await getPendingScores(currentMonth);
+    const weights = config.scoreWeights || DEFAULT_WEIGHTS;
+    const localActivities = mergeMonthlyActivities({}, pending.activities || {}, worshipStats, undefined);
+    const localScore = calculateMonthlyScore(localActivities, weights);
+    const localFingerprint = computeFingerprint(currentMonth, localScore, localActivities);
+    if (!force) {
+      try {
+        const lastFingerprint = await AsyncStorage.getItem(LAST_SYNC_FINGERPRINT_KEY);
+        if (lastFingerprint === localFingerprint) {
+          await AsyncStorage.setItem(LAST_SYNC_AT_KEY, String(Date.now()));
+          return null;
+        }
+      } catch {}
+    }
+
     const userRef = doc(db, 'users', userId);
     const userSnap = await getDoc(userRef);
     const docExists = userSnap.exists();
@@ -460,8 +511,6 @@ export const syncMonthlyEngagementFromLocalWorship = async (
     const existingActivities = engagement.month === currentMonth
       ? { ...(engagement.activities || {}) }
       : {};
-    const pending = await getPendingScores(currentMonth);
-    const worshipStats = await getMonthlyActivityStats();
 
     const mergeBonus = data?.mergeBonus || undefined;
     const activities = mergeMonthlyActivities(
@@ -471,8 +520,27 @@ export const syncMonthlyEngagementFromLocalWorship = async (
       mergeBonus,
     );
 
-    const calculatedScore = calculateMonthlyScore(activities, config.scoreWeights || DEFAULT_WEIGHTS);
+    const calculatedScore = calculateMonthlyScore(activities, weights);
     const score = Math.max(calculatedScore, getCloudScoreFloor(engagement, currentMonth));
+
+    const monthIsCurrent = engagement.month === currentMonth;
+    const scoreUnchanged = monthIsCurrent && Number(engagement.score) === score;
+    const willArchivePrevMonth =
+      docExists && engagement.month && engagement.month !== currentMonth && engagement.score > 0;
+
+    if (scoreUnchanged && !willArchivePrevMonth) {
+      await AsyncStorage.setItem(LAST_SYNC_FINGERPRINT_KEY, computeFingerprint(currentMonth, score, activities));
+      await AsyncStorage.setItem(LAST_SYNC_AT_KEY, String(Date.now()));
+      await AsyncStorage.removeItem(PENDING_SCORES_KEY);
+      return {
+        score,
+        month: currentMonth,
+        activities,
+        mergeBonus,
+        displayName: getVisibleDisplayName(data || {}),
+        visibleOnLeaderboard: data ? isEligibleForLeaderboard(data) : false,
+      };
+    }
 
     const engagementUpdate: Record<string, any> = {
       monthlyEngagement: {
@@ -481,10 +549,19 @@ export const syncMonthlyEngagementFromLocalWorship = async (
         activities,
       },
     };
-    if (docExists && engagement.month && engagement.month !== currentMonth && engagement.score > 0) {
+    if (willArchivePrevMonth) {
       engagementUpdate[`engagementHistory.${engagement.month}`] = {
         score: engagement.score,
         activities: engagement.activities || {},
+      };
+      // Denormalised pointer so the winner-selection Cloud Function can
+      // still find this user's previous-month score after their
+      // engagement record has rolled over to the new month.
+      engagementUpdate.lastFinalizedMonth = {
+        month: engagement.month,
+        score: engagement.score,
+        activities: engagement.activities || {},
+        displayName: getVisibleDisplayName(data || {}),
       };
     }
 
@@ -494,6 +571,8 @@ export const syncMonthlyEngagementFromLocalWorship = async (
       await setDoc(userRef, engagementUpdate, { merge: true });
     }
 
+    await AsyncStorage.setItem(LAST_SYNC_FINGERPRINT_KEY, computeFingerprint(currentMonth, score, activities));
+    await AsyncStorage.setItem(LAST_SYNC_AT_KEY, String(Date.now()));
     await AsyncStorage.removeItem(PENDING_SCORES_KEY);
     return {
       score,
@@ -504,7 +583,7 @@ export const syncMonthlyEngagementFromLocalWorship = async (
       visibleOnLeaderboard: data ? isEligibleForLeaderboard(data) : false,
     };
   } catch (error) {
-    console.log('📴 Monthly engagement sync failed:', error);
+    if (__DEV__) console.log('📴 Monthly engagement sync failed:', error);
     return null;
   }
 };
@@ -515,6 +594,116 @@ export const syncMonthlyEngagementFromLocalWorship = async (
  */
 export const syncPendingScores = async (userId: string): Promise<void> => {
   await syncMonthlyEngagementFromLocalWorship(userId);
+};
+
+/**
+ * Returns how often the foreground app should push the user's monthly
+ * score to the server, based on how close we are to the month boundary.
+ *
+ * - Last hour of month: every 60 seconds (last-minute activity matters)
+ * - Last 24 hours of month: every 5 minutes
+ * - Otherwise: null (no aggressive foreground sync; the 15-min
+ *   background task is enough)
+ */
+export const getEndOfMonthSyncIntervalMs = (now: Date = new Date()): number | null => {
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  const msUntilEnd = endOfMonth.getTime() - now.getTime();
+  if (msUntilEnd <= 0) return null;
+  if (msUntilEnd <= 60 * 60 * 1000) return 60 * 1000;
+  if (msUntilEnd <= 24 * 60 * 60 * 1000) return 5 * 60 * 1000;
+  return null;
+};
+
+const getPrevMonthKey = (): { month: string; year: number; monthNumber: number } => {
+  const now = new Date();
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return {
+    year: prev.getFullYear(),
+    monthNumber: prev.getMonth() + 1,
+    month: `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-v2`,
+  };
+};
+
+/**
+ * If we're in the early days of a new month, push any stranded
+ * previous-month activity from the device to the server so the
+ * scheduled winner-selection Cloud Function can see it.
+ *
+ * Safe to call at any time. Skips if the user already has the latest
+ * previous-month score on the server (no Firestore write performed).
+ */
+export const syncPreviousMonthIfPending = async (userId: string): Promise<void> => {
+  try {
+    const config = await fetchRewardsConfig();
+    if (!config.enabled) return;
+
+    const now = new Date();
+    if (now.getDate() > 3) return;
+
+    const prev = getPrevMonthKey();
+    const weights = config.scoreWeights || DEFAULT_WEIGHTS;
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    const data = userSnap.data();
+    const docExists = userSnap.exists();
+
+    const worshipStats = await getMonthlyActivityStats(prev.year, prev.monthNumber);
+    const localWorship = getLocalWorshipActivities(worshipStats);
+    if (Object.values(localWorship).every(v => v <= 0)) return;
+
+    const engagement: MonthlyEngagement = data?.monthlyEngagement || { month: '', score: 0 };
+    const historyKey = `engagementHistory.${prev.month}`;
+    const archived = data?.engagementHistory?.[prev.month];
+
+    const existingActivities: Record<string, number> =
+      engagement.month === prev.month
+        ? { ...(engagement.activities || {}) }
+        : { ...((archived?.activities as Record<string, number>) || {}) };
+
+    const mergedActivities: Record<string, number> = { ...existingActivities };
+    for (const key of WORSHIP_ACTIVITY_KEYS) {
+      mergedActivities[key] = Math.max(
+        toActivityCount(existingActivities[key]),
+        toActivityCount(localWorship[key]),
+      );
+    }
+
+    const calculatedScore = calculateMonthlyScore(mergedActivities, weights);
+    const existingScore = Math.max(
+      Number(archived?.score) || 0,
+      engagement.month === prev.month ? (Number(engagement.score) || 0) : 0,
+    );
+
+    if (calculatedScore <= existingScore) return;
+
+    const update: Record<string, any> = {
+      [historyKey]: {
+        score: calculatedScore,
+        activities: mergedActivities,
+      },
+      lastFinalizedMonth: {
+        month: prev.month,
+        score: calculatedScore,
+        activities: mergedActivities,
+        displayName: getVisibleDisplayName(data || {}),
+      },
+    };
+    if (engagement.month === prev.month) {
+      update.monthlyEngagement = {
+        month: prev.month,
+        score: calculatedScore,
+        activities: mergedActivities,
+      };
+    }
+
+    if (docExists) {
+      await updateDoc(userRef, update);
+    } else {
+      await setDoc(userRef, update, { merge: true });
+    }
+  } catch (error) {
+    if (__DEV__) console.log('📴 Previous month sync failed:', error);
+  }
 };
 
 /**
@@ -614,11 +803,27 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
 };
 
 /**
- * Get the monthly leaderboard — top users by score for the current month
+ * Get the monthly leaderboard — top users by score for the current month.
+ *
+ * Reads the shared `cache/leaderboard-current` document maintained by the
+ * `cacheLeaderboardSnapshot` Cloud Function. This costs 1 read per
+ * client visit instead of 50, which is the single biggest cost driver
+ * at scale. Falls back to the live query if the cache is missing or
+ * stale (e.g., first-month rollover before the schedule has fired).
  */
 export const getMonthlyLeaderboard = async (topN: number = 20): Promise<LeaderboardEntry[]> => {
+  const currentMonth = getCurrentMonth();
   try {
-    const currentMonth = getCurrentMonth();
+    const cacheSnap = await getDoc(doc(db, 'cache', 'leaderboard-current'));
+    if (cacheSnap.exists()) {
+      const data = cacheSnap.data() as { month?: string; entries?: LeaderboardEntry[] } | undefined;
+      if (data?.month === currentMonth && Array.isArray(data.entries) && data.entries.length > 0) {
+        return orderLeaderboard(data.entries, topN);
+      }
+    }
+  } catch {}
+
+  try {
     const usersRef = collection(db, 'users');
     const q = query(
       usersRef,
@@ -645,6 +850,71 @@ export const getMonthlyLeaderboard = async (topN: number = 20): Promise<Leaderbo
     return orderLeaderboard(leaderboard, topN);
   } catch {
     return [];
+  }
+};
+
+/**
+ * Resolve the exact monthly rank for a user — including users below the
+ * cached top 50, where `findIndex` on the cache alone returns -1.
+ *
+ * Strategy:
+ *  - Read `cache/leaderboard-current` (1 read; same doc `getMonthlyLeaderboard`
+ *    uses, often already warmed by the caller).
+ *  - If the user is in the cached entries, return `index + 1`.
+ *  - Else, if their score is positive, run a `count()` aggregation for
+ *    `month == currentMonth AND score > userScore`. Aggregate count is
+ *    billed as 1 read per ≤1000 matched docs, so a single read per session
+ *    even at scale.
+ *  - Returns `null` for score-0 / no-engagement users (no rank to show).
+ *
+ * The result reflects rank among *all* users with a positive score
+ * (matching the admin panel ordering), not only among named users —
+ * which is what users actually want to see ("how many people scored more
+ * than me?"). The visible leaderboard list remains named-only.
+ */
+export const getUserMonthlyRank = async (
+  userId: string,
+  userScore: number,
+): Promise<number | null> => {
+  if (!userId || !Number.isFinite(userScore) || userScore <= 0) return null;
+  const currentMonth = getCurrentMonth();
+  try {
+    const cacheSnap = await getDoc(doc(db, 'cache', 'leaderboard-current'));
+    if (cacheSnap.exists()) {
+      const data = cacheSnap.data() as {
+        month?: string;
+        entries?: LeaderboardEntry[];
+        lowestCachedScore?: number | null;
+      } | undefined;
+      if (data?.month === currentMonth && Array.isArray(data.entries)) {
+        const idx = data.entries.findIndex(u => u.userId === userId);
+        if (idx >= 0) return idx + 1;
+        // Fast path: when the cache covers everyone with a positive
+        // score (i.e. there are fewer eligible users than the cache
+        // cap), a user not in the cache has score 0 and we already
+        // returned null above. Skip the count read in that case.
+        const lowest = data.lowestCachedScore;
+        if (typeof lowest === 'number' && userScore >= lowest && data.entries.length < 50) {
+          // Edge case: user has a score >= lowestCachedScore but was
+          // filtered out (e.g. no displayName). Their position among
+          // all positive-score users is just before the cache tail.
+          return data.entries.length;
+        }
+      }
+    }
+
+    // Exact rank for users below the cached top — one count aggregation.
+    const usersRef = collection(db, 'users');
+    const q = query(
+      usersRef,
+      where('monthlyEngagement.month', '==', currentMonth),
+      where('monthlyEngagement.score', '>', userScore),
+    );
+    const countSnap = await getCountFromServer(q);
+    const higherCount = countSnap.data().count || 0;
+    return higherCount + 1;
+  } catch {
+    return null;
   }
 };
 

@@ -45,6 +45,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useAdBottomInset } from '@/lib/ads-context';
+import { markPermissionRequested } from '@/lib/permission-recovery';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -322,6 +323,9 @@ const QiblaScreen = () => {
         }
 
         // ── Phase 1: Request location permission ──
+        if (Platform.OS === 'android') {
+          await markPermissionRequested('location');
+        }
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           // If we already have a bearing from cache, don't show error
@@ -1033,7 +1037,8 @@ const _styles = StyleSheet.create({
     gap: 8,
   },
   thumbnailsContainer: {
-    borderWidth: 1,
+    // Remove visible border so the thumbnail strip blends with the background
+    borderWidth: 0,
     borderRadius: 14,
     marginHorizontal: 4,
     paddingVertical: 6,

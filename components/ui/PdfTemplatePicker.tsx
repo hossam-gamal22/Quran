@@ -30,6 +30,7 @@ import {
 } from '@/lib/pdf-export';
 import { APP_BACKGROUNDS } from '@/lib/backgrounds';
 import { useColors } from '@/hooks/use-colors';
+import { ModalColors } from '@/constants/theme';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
 import { localizeNumber } from '@/lib/format-number';
@@ -287,9 +288,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
           style={[
             styles.sheet,
             {
-              backgroundColor: isDarkMode
-                ? 'rgba(30,30,32,0.97)'
-                : 'rgba(255,255,255,0.98)',
+              backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight,
             },
           ]}
           onPress={(e) => e.stopPropagation()}

@@ -62,6 +62,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { PermissionBanner } from '@/components/notifications/PermissionBanner';
+import { markPermissionRequested } from '@/lib/permission-recovery';
 import { useAdBottomInset } from '@/lib/ads-context';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSacredContext } from '@/hooks/use-sacred-context';
@@ -97,6 +98,7 @@ import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
 import EidPrayerCard from '@/components/ui/prayer/EidPrayerCard';
+import { SmartAlarmCard } from '@/components/smart-alarm/SmartAlarmCard';
 import RectangleWidgetView from '@/components/ui/prayer/RectangleWidgetView';
 import AnalogClockView from '@/components/ui/prayer/AnalogClockView';
 import DigitalTypographyView from '@/components/ui/prayer/DigitalTypographyView';
@@ -452,6 +454,9 @@ export default function PrayerScreen() {
       let status = existing.status;
       if (status !== 'granted') {
         if (stored) return stored;
+        if (Platform.OS === 'android') {
+          await markPermissionRequested('location');
+        }
         ({ status } = await Location.requestForegroundPermissionsAsync());
       }
       if (status !== 'granted') {
@@ -1200,6 +1205,11 @@ export default function PrayerScreen() {
             </Animated.View>
           ) : (
             <>
+              {/* Smart Fajr Alarm — prominent card above the clock */}
+              <Animated.View entering={FadeInDown.duration(400)}>
+                <SmartAlarmCard />
+              </Animated.View>
+
               {/* Clock style selector with thumbnails — always visible */}
               <View style={styles.clockStyleSelectorWrap}>
                 <View style={[styles.clockThumbnailsContainer, Platform.OS === 'android' && styles.clockThumbnailsContainerAndroidFlat, { borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}>

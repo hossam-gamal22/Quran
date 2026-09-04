@@ -183,6 +183,11 @@ service cloud.firestore {
       allow write: if adminWrite();
     }
 
+    match /cache/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /tempPages/{pageId} {
       allow read: if true;
       allow write: if adminWrite();
@@ -195,6 +200,12 @@ service cloud.firestore {
     }
 
     match /activity/{docId} {
+      allow read: if isAdmin();
+      allow create, update: if signedIn() && boundedDoc(40);
+      allow delete: if adminWrite();
+    }
+
+    match /activityDaily/{docId} {
       allow read: if isAdmin();
       allow create, update: if signedIn() && boundedDoc(40);
       allow delete: if adminWrite();

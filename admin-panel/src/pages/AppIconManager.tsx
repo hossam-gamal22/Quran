@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { getArabicSeasonalBannerCopy } from '@app-lib/seasonal-banner-copy';
 import defaultArIcon from '../../../assets/images/icons/icon.png';
 import defaultEnIcon from '../../../assets/images/icons/icon_en.png';
@@ -431,6 +432,7 @@ export default function AppIconManager() {
         updatedAt: new Date().toISOString(),
       };
       await setDoc(doc(db, FIRESTORE_DOC), updated);
+      await bumpContentVersion('appIcons');
       setConfig(updated);
       setSaveMessage({ type: 'success', text: 'تم الحفظ بنجاح' });
       setTimeout(() => setSaveMessage(null), 3000);

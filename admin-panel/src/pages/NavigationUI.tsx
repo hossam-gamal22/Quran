@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Save, RefreshCw, Navigation2, Plus, Trash2 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { db } from '../firebase';
 
 type IconMode = 'material' | 'ionicons' | 'sf' | 'png';
@@ -280,6 +281,7 @@ const NavigationUI: React.FC = () => {
         },
         { merge: true }
       );
+      await bumpContentVersion('appSettings');
       setSaved(true);
     } finally {
       setSaving(false);

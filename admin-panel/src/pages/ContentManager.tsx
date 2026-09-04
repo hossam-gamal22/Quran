@@ -521,6 +521,34 @@ const TABS: { key: ContentTab; label: string; icon: React.ElementType }[] = [
 const getFullDefaultCompanionsContent = () =>
   expandCompanionsContent(getDefaultCompanionsContent()) as unknown as CompanionsContent;
 
+// Adds any companion present in the bundled defaults but missing from
+// Firestore (matched by id). Preserves Firestore order; new entries are
+// appended in the order they appear in the defaults list. Existing edits
+// in Firestore are untouched.
+function syncCompanionsWithDefaults(
+  current: CompanionsContent
+): { content: CompanionsContent; changed: boolean; summary: string } {
+  const defaults = getFullDefaultCompanionsContent();
+  const existingIds = new Set((current.companions || []).map((c) => c.id).filter(Boolean));
+
+  const newlyAdded: CMSCompanion[] = [];
+  for (const def of defaults.companions || []) {
+    if (def.id && !existingIds.has(def.id)) {
+      newlyAdded.push(def as CMSCompanion);
+    }
+  }
+
+  if (newlyAdded.length === 0) {
+    return { content: current, changed: false, summary: '' };
+  }
+
+  return {
+    content: { ...current, companions: [...(current.companions || []), ...newlyAdded] },
+    changed: true,
+    summary: `أُضيف ${newlyAdded.length} صحابي مفقود من قائمة التطبيق`,
+  };
+}
+
 const withDefaultSeasonalPageContent = (
   page: SeasonalPageKey,
   data: SeasonalPageContent | null
@@ -2459,24 +2487,36 @@ export default function ContentManager() {
           companionsData.companions || [],
           (c) => c.nameAr
         );
-        if (removedCompanionIds.length > 0) {
-          // Persist the cleanup back to Firestore so duplicates are gone for
-          // real — not just hidden in the UI.
-          const cleaned = { ...companionsData, companions: dedupedCompanions };
-          setCompanions(cleaned);
+        const afterDedup = { ...companionsData, companions: dedupedCompanions };
+        const synced = syncCompanionsWithDefaults(afterDedup);
+        const needsSave = removedCompanionIds.length > 0 || synced.changed;
+        setCompanions(synced.content);
+        if (needsSave) {
+          // Persist cleanup + missing-defaults sync back to Firestore so the
+          // admin sees the full catalog on next load.
+          const summaryParts: string[] = [];
+          if (removedCompanionIds.length > 0) summaryParts.push(`حُذفت ${removedCompanionIds.length} نسخة مكررة`);
+          if (synced.changed) summaryParts.push(synced.summary);
           setDoc(doc(db, 'appContent', 'companionsContent'), sanitizeForFirestore({
-            ...cleaned,
+            ...synced.content,
             updatedAt: new Date().toISOString(),
           })).then(() => {
-            setStatus({ type: 'success', message: `تم حذف ${removedCompanionIds.length} نسخة مكررة من قصص الصحابة` });
+            setStatus({ type: 'success', message: `تم تحديث قصص الصحابة (${summaryParts.join(' · ')})` });
           }).catch((err) => {
-            console.warn('Companion dedup save failed', err);
+            console.warn('Companion sync save failed', err);
           });
-        } else {
-          setCompanions(companionsData);
         }
       } else {
-        setCompanions(getFullDefaultCompanionsContent());
+        // No Firestore doc yet — seed it with the full bundled list so the
+        // admin sees all 47 companions on first run.
+        const seeded = getFullDefaultCompanionsContent();
+        setCompanions(seeded);
+        setDoc(doc(db, 'appContent', 'companionsContent'), sanitizeForFirestore({
+          ...seeded,
+          updatedAt: new Date().toISOString(),
+        })).catch((err) => {
+          console.warn('Companion initial seed failed', err);
+        });
       }
       if (religiousStoriesDoc.exists()) {
         const storiesData = religiousStoriesDoc.data() as ReligiousStoriesContent;

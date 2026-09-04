@@ -89,10 +89,13 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
 
           {/* Logo side - on the left in RTL */}
           <View style={[styles.logoSection]}>
-            <Image
-              source={iconSource || require('@/assets/images/icons/icon.png')}
-              style={styles.logo}
-            />
+            <View style={styles.logoWrap}>
+              <Image
+                source={iconSource || require('@/assets/images/icons/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
             <Text style={[styles.appName, { color: greenColor }]}>{t('common.appName')}</Text>
           </View>
         </View>
@@ -130,9 +133,15 @@ const _styles = StyleSheet.create({
   logoSection: {
     alignItems: 'center',
     gap: 8,
+    // Reserve a fixed slot for the logo so Android's flex layout doesn't
+    // collapse it when the countdown row gets long (e.g. 04:22:11 + letterSpacing).
+    width: 64,
+    flexShrink: 0,
   },
   countdownSection: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   countdownText: {
     fontSize: 42,
@@ -145,10 +154,16 @@ const _styles = StyleSheet.create({
     fontFamily: fontSemiBold(),
     marginTop: 4,
   },
-  logo: {
+  logoWrap: {
     width: 48,
     height: 48,
     borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
+  logo: {
+    width: 48,
+    height: 48,
   },
   appName: {
     fontSize: 11,

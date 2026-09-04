@@ -70,7 +70,9 @@ import type { PreviewSize } from '@/components/widgets/previews/shared';
 // v19: iOS target uses a compiled registry fallback and active snapshot writes
 // are awaited before WidgetKit reloads, so Edit Widget / in-app setting changes
 // cannot fall back to the default Day Simple tile.
-export const WIDGET_REGISTRY_VERSION = 25; // per-widget prayer countdown overlay anchors
+// v26: Android prayer-table snapshots bake static prayer times/names into the
+// PNG; only the fast-changing countdown stays as a native overlay.
+export const WIDGET_REGISTRY_VERSION = 26; // Android prayer table baked text parity
 
 export type WidgetCategory = 'date' | 'prayer' | 'quran' | 'azkar' | 'hijri';
 export type WidgetPlatform = 'ios' | 'android';
@@ -200,7 +202,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
     id: 'dayThuluth',
     category: 'date',
-    titleAr: 'اليوم - ثلث',
+    titleAr: 'اليوم ثلث',
     titleEn: 'Day Thuluth',
     sizes: ['small', 'medium'],
     platforms: ['ios', 'android'],
@@ -214,7 +216,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
     id: 'dayDigital',
     category: 'date',
-    titleAr: 'اليوم - رقمي',
+    titleAr: 'اليوم رقمي',
     titleEn: 'Day Digital',
     sizes: ['small'],
     platforms: ['ios', 'android'],
@@ -244,7 +246,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
     id: 'monthThuluth',
     category: 'date',
-    titleAr: 'الشهر - ثلث',
+    titleAr: 'الشهر ثلث',
     titleEn: 'Month Thuluth',
     sizes: ['medium'],
     platforms: ['ios', 'android'],
@@ -505,14 +507,9 @@ export const LEGACY_ANDROID_WIDGET_MAP: Record<string, { id: string; size: Previ
   RoohPrayerTableMedium: { id: 'prayerTable', size: 'medium' },
   RoohPrayerTableLarge: { id: 'prayerTable', size: 'large' },
   RoohPrayerNextPreviousMedium: { id: 'prayerNextPrevious', size: 'medium' },
-  RoohVerseOfDaySmall: { id: 'verseOfDay', size: 'small' },
   RoohVerseOfDayMedium: { id: 'verseOfDay', size: 'medium' },
-  RoohVerseOfDayLarge: { id: 'verseOfDay', size: 'large' },
-  RoohAzkarMorningSmall: { id: 'azkarMorning', size: 'small' },
   RoohAzkarMorningMedium: { id: 'azkarMorning', size: 'medium' },
-  RoohAzkarEveningSmall: { id: 'azkarEvening', size: 'small' },
   RoohAzkarEveningMedium: { id: 'azkarEvening', size: 'medium' },
-  RoohDailyDhikrSmall: { id: 'dailyDhikr', size: 'small' },
   RoohDailyDhikrMedium: { id: 'dailyDhikr', size: 'medium' },
   RoohHijriDateSmall: { id: 'hijriDate', size: 'small' },
   RoohHijriDateMedium: { id: 'hijriDate', size: 'medium' },

@@ -342,6 +342,7 @@ async function renderSnapshotWidget(
   widgetName: string,
   data: SharedWidgetData,
   renderWidget: (jsx: React.ReactElement) => void,
+  widgetBounds?: { width?: number; height?: number },
 ): Promise<void> {
   const target = resolveTarget(widgetName);
   if (!target) return;
@@ -393,6 +394,8 @@ async function renderSnapshotWidget(
       snapshotKey={snapshotKey}
       snapshotPath={path}
       fallbackReason={fallbackReason}
+      widgetWidth={widgetBounds?.width}
+      widgetHeight={widgetBounds?.height}
       clickAction="OPEN_URI"
       clickUri={widgetDeepLink(target.id)}
     />,
@@ -454,7 +457,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // Prayer widgets: recompute prayer times locally via adhan so the widget
       // stays accurate for weeks without the main app being opened.
       const fresh = await refreshPrayerWidgetData(widgetName, data);
-      await renderSnapshotWidget(widgetName, fresh, renderWidget);
+      await renderSnapshotWidget(widgetName, fresh, renderWidget, widgetInfo);
       return;
     }
 
@@ -496,7 +499,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       // Prayer widgets: recompute prayer times locally via adhan so the widget
       // stays accurate for weeks without the main app being opened.
       const fresh = await refreshPrayerWidgetData(widgetName, data);
-      await renderSnapshotWidget(widgetName, fresh, renderWidget);
+      await renderSnapshotWidget(widgetName, fresh, renderWidget, widgetInfo);
       return;
     }
 

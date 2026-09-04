@@ -99,3 +99,8 @@ credentials.json
 credentials/
 *-firebase-adminsdk-*.json
 *-service-account-*.json
+
+# Firebase service account keys — never commit (grant admin access)
+serviceAccountKey.json
+**/serviceAccountKey.json
+functions/serviceAccountKey.json

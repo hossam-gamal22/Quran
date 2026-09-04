@@ -2,7 +2,7 @@
 // Generate Android launcher widget-picker thumbnails from the real widget
 // snapshots produced by the in-app snapshot pump.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
@@ -10,7 +10,10 @@ import { PNG } from 'pngjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const REG_PATH = resolve(ROOT, 'widgets/ios/Resources/widget-registry.json');
-const OUT_DIR = resolve(ROOT, 'android/app/src/main/res/drawable');
+// Launcher thumbnails are bitmap snapshots of the in-app gallery tiles. Keep
+// them in drawable-nodpi so Android Launcher does not density-scale them before
+// fitting them into its widget picker cells.
+const OUT_DIR = resolve(ROOT, 'android/app/src/main/res/drawable-nodpi');
 const DEFAULT_IN_DIR = resolve(ROOT, 'tmp/widget-previews');
 const IN_DIR = process.argv[2] ? resolve(ROOT, process.argv[2]) : DEFAULT_IN_DIR;
 const THEME = process.argv[3] ?? 'light';
@@ -160,6 +163,18 @@ function loadSnapshot(id, size, premium, outPath) {
 
 mkdirSync(OUT_DIR, { recursive: true });
 const registry = JSON.parse(readFileSync(REG_PATH, 'utf8'));
+const expectedFiles = new Set();
+for (const def of registry) {
+  if (!Array.isArray(def.platforms) || !def.platforms.includes('android')) continue;
+  for (const size of def.sizes ?? []) {
+    if (SIZE_DIMS[size]) expectedFiles.add(previewDrawableName(def.id, size));
+  }
+}
+for (const file of readdirSync(OUT_DIR)) {
+  if (/^widget_preview_.*\.png$/.test(file) && !expectedFiles.has(file)) {
+    unlinkSync(resolve(OUT_DIR, file));
+  }
+}
 let count = 0;
 for (const def of registry) {
   if (!Array.isArray(def.platforms) || !def.platforms.includes('android')) continue;

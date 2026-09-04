@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { db } from '../firebase';
 import { sendPremiumGrantNotification } from '../services/pushNotifications';
 
@@ -238,6 +239,7 @@ export default function Subscriptions() {
     setMessage('');
     try {
       await setDoc(doc(db, 'config', 'subscription-settings'), config);
+      await bumpContentVersion('subscriptionConfig');
       setMessage('✅ تم حفظ الإعدادات بنجاح');
     } catch (error) {
       setMessage('❌ حدث خطأ أثناء الحفظ');

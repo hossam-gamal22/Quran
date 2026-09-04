@@ -32,7 +32,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
-import { Spacing } from '@/constants/theme';
+import { Spacing, ModalColors } from '@/constants/theme';
 import { db, auth } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -40,6 +40,7 @@ import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import * as Updates from 'expo-updates';
 import { getStoreUrls, fetchAppConfig } from '@/lib/app-config-api';
+import { APP_STORE_URL, PLAY_STORE_URL } from '@/constants/app';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import { getDisplayName, setDisplayName, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore, isDisplayNameTaken } from '@/lib/firebase-user';
 import { saveDisplayName } from '@/lib/rewards-manager';
@@ -206,9 +207,9 @@ export default function SettingsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const storeUrls = await getStoreUrls();
     const url = Platform.select({
-      ios: storeUrls.ios || 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
-      android: storeUrls.android || 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-      default: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
+      ios: storeUrls.ios || APP_STORE_URL,
+      android: storeUrls.android || PLAY_STORE_URL,
+      default: APP_STORE_URL,
     });
     if (url) Linking.openURL(url);
   };
@@ -709,7 +710,7 @@ export default function SettingsScreen() {
           />
           <View style={[
             styles.suggestCard,
-            { backgroundColor: isDarkMode ? '#1a2a22' : '#ffffff' }
+            { backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight }
           ]}>
             <Text style={[
               styles.suggestTitle,

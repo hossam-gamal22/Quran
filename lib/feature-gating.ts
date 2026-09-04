@@ -2,7 +2,8 @@
 // نظام بوابة الميزات — يحدد أي ميزة للبريميوم فقط
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { shouldRefetchContent, markContentFetched } from './content-manifest';
 import { db } from '@/config/firebase';
 import type { FeatureGatingConfig, PremiumFeatureKey } from '@/types/premium';
 
@@ -83,26 +84,27 @@ export function isFeaturePremium(
 }
 
 /**
- * Real-time listener for feature gating config changes (like ads-config pattern).
- * Updates memoryCache + AsyncStorage on every change.
+ * Manifest-gated one-shot read of feature gating config (replaces a live
+ * single-doc listener). The admin bumps the 'featureGating' manifest key on
+ * save; the 24h safety TTL is the backstop. Returns a no-op unsubscribe.
  */
 export function subscribeToFeatureGating(
   onChange: (config: FeatureGatingConfig) => void
 ): () => void {
-  try {
-    return onSnapshot(doc(db, 'config', 'feature-gating'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as FeatureGatingConfig;
-        const merged = { ...DEFAULT_FEATURE_GATING, ...data };
-        memoryCache = merged;
-        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(() => {});
-        onChange(merged);
-      }
-    }, (err) => {
-      console.log('⚠️ Feature gating listener error:', err);
-    });
-  } catch (e) {
-    console.log('⚠️ Failed to subscribe to feature gating:', e);
-    return () => {};
-  }
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('featureGating'))) return;
+      const snap = await getDoc(doc(db, 'config', 'feature-gating'));
+      await markContentFetched('featureGating');
+      if (!snap.exists()) return;
+      const data = snap.data() as FeatureGatingConfig;
+      const merged = { ...DEFAULT_FEATURE_GATING, ...data };
+      memoryCache = merged;
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(() => {});
+      onChange(merged);
+    } catch (e) {
+      console.log('⚠️ Feature gating fetch error:', e);
+    }
+  })();
+  return () => {};
 }

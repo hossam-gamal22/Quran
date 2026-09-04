@@ -46,7 +46,13 @@ const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
 // recreation since Android caches channel sounds immutably.
 // v27: Removed the `reminder_general_reminder` channel after deleting the
 // general_reminder.mp3 asset — the system default sound replaces it.
-const CURRENT_CHANNELS_VERSION = '27';
+// v28: Added 5 dedicated alarm ringtone channels for the smart Fajr alarm
+// (alarm_classic / alarm_digital / alarm_buzzer / alarm_radar / alarm_chime).
+// v29: Promoted smart-alarm ringtones to dedicated `smartalarm_*` channels
+// with bypassDnd=true + alarm-style vibration so the Fajr/Suhoor alarm rings
+// through Do-Not-Disturb. The reminder_alarm_* channels from v28 are no longer
+// used by the smart alarm (kept for backwards compat / no harm).
+const CURRENT_CHANNELS_VERSION = '29';
 
 export const ANDROID_FULL_ADHAN_CHANNEL_ID = 'adhan_full_visual';
 
@@ -86,7 +92,26 @@ export const NOTIFICATION_SOUND_FILES: Record<string, string> = {
   salawat:             'salawat.mp3',
   subhanallah:         'subhanallah.mp3',
   tasbih:              'tasbih.mp3',
+  // Smart-alarm ringtones (assets/sounds/alarm_*.mp3). Kept here so
+  // resolveNotificationSound() + app.json bundling find them. Dedicated
+  // alarm channels (below) are used at fire time for bypassDnd behaviour.
+  alarm_classic:       'alarm_classic.mp3',
+  alarm_digital:       'alarm_digital.mp3',
+  alarm_buzzer:        'alarm_buzzer.mp3',
+  alarm_radar:         'alarm_radar.mp3',
+  alarm_chime:         'alarm_chime.mp3',
 };
+
+// ─── Smart-alarm ringtone keys (subset of NOTIFICATION_SOUND_FILES) ──────────
+// These get their OWN channels with bypassDnd + alarm-style vibration so the
+// Fajr/Suhoor smart alarm pierces Do-Not-Disturb and rings like a real alarm.
+export const ALARM_SOUND_KEYS = [
+  'alarm_classic',
+  'alarm_digital',
+  'alarm_buzzer',
+  'alarm_radar',
+  'alarm_chime',
+] as const;
 
 /**
  * Resolve a sound key to the platform-correct filename.
@@ -113,6 +138,17 @@ export function getAdhanChannelId(soundKey?: string): string {
   const key = soundKey.replace(/\.mp3$/, '');
   if (ADHAN_SOUND_FILES[key]) return `adhan_${key}`;
   return 'adhan_makkah'; // fallback
+}
+
+/**
+ * Get the Android channel ID for a smart-alarm ringtone.
+ * Returns 'smartalarm_<key>' — these channels have bypassDnd=true and an
+ * alarm-style vibration pattern. Falls back to the classic alarm channel.
+ */
+export function getAlarmChannelId(soundKey?: string): string {
+  const key = (soundKey || 'alarm_classic').replace(/\.mp3$/, '');
+  if ((ALARM_SOUND_KEYS as readonly string[]).includes(key)) return `smartalarm_${key}`;
+  return 'smartalarm_alarm_classic'; // fallback
 }
 
 /**
@@ -213,6 +249,29 @@ export async function initializeAllNotificationChannels(): Promise<void> {
         enableVibrate: true,
         lightColor: '#1B5E20',
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+    } catch (e) {
+      console.warn(`[Channels] Failed to create ${channelId}:`, e);
+    }
+  }
+
+  // --- SMART-ALARM CHANNELS (one per alarm ringtone, with bypassDnd) ---
+  // Used by the Fajr/Suhoor smart alarm. Alarm-style: MAX importance,
+  // bypassDnd so it rings through Do-Not-Disturb, longer vibration pulses.
+  for (const key of ALARM_SOUND_KEYS) {
+    const channelId = `smartalarm_${key}`;
+    const soundFile = resolveSoundFile(NOTIFICATION_SOUND_FILES[key]);
+    try {
+      await Notifications.setNotificationChannelAsync(channelId, {
+        name: `${uiText({ ar: 'منبه', en: 'Alarm' })} - ${key}`,
+        groupId: 'reminders',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: soundFile,
+        vibrationPattern: [0, 600, 300, 600, 300, 600],
+        enableVibrate: true,
+        lightColor: '#0d8e62',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: true,
       });
     } catch (e) {
       console.warn(`[Channels] Failed to create ${channelId}:`, e);

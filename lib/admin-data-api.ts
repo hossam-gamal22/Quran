@@ -3,9 +3,11 @@
 // جلب البيانات المدارة من الأدمن مع fallback محلي
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, collection, getDocs, onSnapshot, query, orderBy, type Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, orderBy, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { shouldRefetchContent, markContentFetched } from './content-manifest';
 import { fetchWithTimeout } from './fetch-with-timeout';
+import { reconcileAppTasbihPresets } from './tasbih-presets';
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes, so admin edits reach users quickly
 
@@ -99,7 +101,7 @@ function stripPresetPlaceholders(preset: TasbihPreset): TasbihPreset {
 }
 
 function normalizeTasbihPresets(presets: TasbihPreset[]): TasbihPreset[] {
-  return presets
+  const normalized = presets
     .map((preset, index) => {
       const data = preset as unknown as Record<string, unknown>;
       const order = typeof data.order === 'number' && Number.isFinite(data.order) ? data.order : index;
@@ -112,6 +114,8 @@ function normalizeTasbihPresets(presets: TasbihPreset[]): TasbihPreset[] {
       } as TasbihPreset & { order: number };
     })
     .sort((a, b) => (a.order - b.order) || (a.id - b.id));
+
+  return reconcileAppTasbihPresets(normalized as any) as TasbihPreset[];
 }
 
 export async function fetchTasbihPresets(localDefaults: TasbihPreset[]): Promise<TasbihPreset[]> {
@@ -134,13 +138,24 @@ export async function fetchTasbihPresets(localDefaults: TasbihPreset[]): Promise
   return normalizeTasbihPresets(presets);
 }
 
+/**
+ * Manifest-gated one-shot refresh of tasbih presets at startup (replaces a
+ * permanent collection onSnapshot). Skips the Firestore read entirely when
+ * the admin hasn't bumped the `tasbihPresets` version since the last fetch.
+ * Returns a no-op unsubscribe so existing call sites keep working unchanged.
+ */
 export function subscribeToTasbihPresets(
   localDefaults: TasbihPreset[],
   onUpdate: (presets: TasbihPreset[]) => void,
 ): Unsubscribe {
-  return onSnapshot(
-    collection(db, 'tasbihPresets'),
-    (snap) => {
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('tasbihPresets'))) {
+        // Manifest unchanged — caller's other code path (or cache) already has data.
+        return;
+      }
+      const snap = await getDocs(collection(db, 'tasbihPresets'));
+      await markContentFetched('tasbihPresets');
       const presets = snap.empty
         ? localDefaults
         : snap.docs.map(d => {
@@ -150,19 +165,18 @@ export function subscribeToTasbihPresets(
             id: data.id ?? d.id,
           } as unknown as TasbihPreset;
         });
-
       const normalized = normalizeTasbihPresets(presets);
       onUpdate(normalized);
       AsyncStorage.setItem('@admin_tasbih_presets', JSON.stringify({
         data: normalized,
         timestamp: Date.now(),
       })).catch(() => {});
-    },
-    (err) => {
+    } catch (err) {
       console.log('⚠️ Firestore tasbih subscription failed, using fallback:', err);
       onUpdate(normalizeTasbihPresets(localDefaults));
-    },
-  );
+    }
+  })();
+  return () => {};
 }
 
 // ==================== Islamic Events ====================
@@ -197,20 +211,25 @@ export async function fetchIslamicEvents(localDefaults: IslamicEvent[]): Promise
   );
 }
 
+/**
+ * Manifest-gated one-shot refresh of islamic events (replaces a permanent
+ * collection onSnapshot). Returns a no-op unsubscribe.
+ */
 export function subscribeToIslamicEvents(
   localDefaults: IslamicEvent[],
   onUpdate: (events: IslamicEvent[]) => void,
   onError?: (error: unknown) => void,
 ): Unsubscribe {
-  const eventsQuery = query(
-    collection(db, 'islamicEvents'),
-    orderBy('hijriMonth', 'asc'),
-    orderBy('hijriDay', 'asc'),
-  );
-
-  return onSnapshot(
-    eventsQuery,
-    async snap => {
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('islamicEvents'))) return;
+      const eventsQuery = query(
+        collection(db, 'islamicEvents'),
+        orderBy('hijriMonth', 'asc'),
+        orderBy('hijriDay', 'asc'),
+      );
+      const snap = await getDocs(eventsQuery);
+      await markContentFetched('islamicEvents');
       const events = snap.empty
         ? localDefaults
         : snap.docs.map(d => ({ id: d.id, ...d.data() } as IslamicEvent));
@@ -219,12 +238,12 @@ export function subscribeToIslamicEvents(
         await AsyncStorage.setItem('@admin_islamic_events', JSON.stringify({ data: sortedEvents, timestamp: Date.now() }));
       } catch {}
       onUpdate(sortedEvents);
-    },
-    error => {
+    } catch (error) {
       console.log('⚠️ Islamic events subscription failed:', error);
       onError?.(error);
-    },
-  );
+    }
+  })();
+  return () => {};
 }
 
 // ==================== Quran Themes ====================
@@ -257,13 +276,19 @@ export async function fetchQuranThemes(localDefaults: QuranThemeOverride[]): Pro
   );
 }
 
+/**
+ * Manifest-gated one-shot refresh of quran themes (replaces a permanent
+ * single-doc onSnapshot). Returns a no-op unsubscribe.
+ */
 export function subscribeToQuranThemes(
   onUpdate: (themes: QuranThemeOverride[]) => void,
   onError?: (error: unknown) => void
 ): Unsubscribe {
-  return onSnapshot(
-    doc(db, 'appConfig', 'quranThemes'),
-    async snap => {
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('quranThemes'))) return;
+      const snap = await getDoc(doc(db, 'appConfig', 'quranThemes'));
+      await markContentFetched('quranThemes');
       if (!snap.exists()) return;
       const data = snap.data();
       if (!Array.isArray(data.themes) || data.themes.length === 0) return;
@@ -272,12 +297,12 @@ export function subscribeToQuranThemes(
         await AsyncStorage.setItem('@admin_quran_themes', JSON.stringify({ data: themes, timestamp: Date.now() }));
       } catch {}
       onUpdate(themes);
-    },
-    error => {
+    } catch (error) {
       console.log('⚠️ Quran themes subscription failed:', error);
       onError?.(error);
     }
-  );
+  })();
+  return () => {};
 }
 
 // ==================== Google Calendar Events ====================

@@ -790,7 +790,7 @@ export default function FavoritesScreen() {
     },
     modalCard: {
       width: '100%',
-      backgroundColor: colors.card,
+      backgroundColor: colors.modalSurface,
       borderRadius: 24,
       padding: 20,
       maxHeight: '90%',

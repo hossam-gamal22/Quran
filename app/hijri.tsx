@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Modal,
   Dimensions,
   Share,
   Platform,
@@ -14,7 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, ModalColors } from '../constants/theme';
 import { APP_CONFIG } from '../constants/app';
 import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBidh, getAyyamAlBidhEvent, setCachedHijriOffset } from '../lib/hijri-date';
 import type { IslamicEventDetails } from '../lib/hijri-date';
@@ -35,6 +34,7 @@ import { TranslatedText } from '@/components/ui/TranslatedText';
 import { getLanguage } from '@/lib/i18n';
 import { useHijriDate } from '@/hooks/useHijriDate';
 import { getDayNames } from '@/constants/dayNames';
+import AppModal from '@/components/ui/AppModal';
 
 const getEventName = (ev: IslamicEventDetails) => {
   const lang = getLanguage();
@@ -692,61 +692,60 @@ export default function HijriScreen() {
       <BannerAdComponent screen="hijri" />
 
       {/* ============================================ */}
-      {/* نافذة إعدادات تعديل التاريخ الهجري */}
+      {/* نافذة إعدادات تعديل التاريخ الهجري (AppModal for consistent backdrop & close) */}
       {/* ============================================ */}
-      <Modal
+      <AppModal
         visible={showOffsetModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowOffsetModal(false)}
+        onClose={() => setShowOffsetModal(false)}
+        title={t('hijri.adjustTitle')}
+        position="center"
+        closeButton
       >
-        <View style={[styles.modalOverlay, { justifyContent: 'center' }]}>
-          <View style={[styles.offsetModalContent, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.97)' }]}>
-            <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[styles.modalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('hijri.adjustTitle')}</Text>
-              <TouchableOpacity onPress={() => setShowOffsetModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.offsetDescription, { color: colors.textLight }]}>
-              {t('hijri.adjustDesc')}
-            </Text>
-
-            <View style={styles.offsetOptions}>
-              {[-2, -1, 0, 1, 2].map((offset) => (
-                <TouchableOpacity
-                  key={offset}
-                  style={[
-                    styles.offsetOption,
-                    { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
-                    hijriOffset === offset && { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
-                  ]}
-                  onPress={() => saveOffset(offset)}
-                >
-                  {Platform.OS === 'ios' && hijriOffset !== offset && (
-                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-                  )}
-                  {hijriOffset !== offset && (
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                  )}
-                  <Text style={[
-                    styles.offsetOptionText,
-                    { color: colors.text },
-                    hijriOffset === offset && { color: '#FFFFFF', fontWeight: '700' },
-                  ]}>
-                    {offset === 0 ? t('hijri.noAdjustment') : offset > 0 ? `+${offset} ${t('seasonal.day')}` : `${offset} ${t('seasonal.day')}`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.offsetNote, { color: colors.textLight }]}>
-              {t('hijri.adjustDesc')}: {hijriOffset === 0 ? t('hijri.noAdjustment') : hijriOffset > 0 ? `+${hijriOffset} ${t('seasonal.day')}` : `${hijriOffset} ${t('seasonal.day')}`}
-            </Text>
-          </View>
+        <Text
+          style={[styles.offsetDescription, { color: colors.textLight }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit={true}
+          minimumFontScale={0.75}
+        >
+          {t('hijri.adjustDesc')}
+        </Text>
+        <View style={styles.offsetOptions}>
+          {[-2, -1, 0, 1, 2].map((offset) => (
+            <TouchableOpacity
+              key={offset}
+              style={[
+                styles.offsetOption,
+                { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
+                hijriOffset === offset && { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
+              ]}
+              onPress={() => saveOffset(offset)}
+            >
+              {Platform.OS === 'ios' && hijriOffset !== offset && (
+                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              {hijriOffset !== offset && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+              )}
+              <Text style={[
+                styles.offsetOptionText,
+                { color: colors.text },
+                hijriOffset === offset && { color: '#FFFFFF', fontWeight: '700' },
+              ]}>
+                {offset === 0 ? t('hijri.noAdjustment') : offset > 0 ? `+${offset} ${t('seasonal.day')}` : `${offset} ${t('seasonal.day')}`}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </Modal>
+
+        <View style={{ alignItems: 'center' }}>
+          <Text style={[styles.offsetNote, { color: colors.textLight, marginBottom: 4, textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' }]}> 
+            {t('hijri.adjustDesc')}:
+          </Text>
+          <Text style={[styles.offsetNote, { color: colors.textLight, textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' }]}> 
+            {hijriOffset === 0 ? t('hijri.noAdjustment') : (hijriOffset > 0 ? `+${hijriOffset} ${t('seasonal.day')}` : `${hijriOffset} ${t('seasonal.day')}`)}
+          </Text>
+        </View>
+      </AppModal>
     </BackgroundWrapper>
   );
 }

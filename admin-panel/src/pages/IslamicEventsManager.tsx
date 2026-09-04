@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit as fsLimit } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage, type NotificationTranslations } from '../services/pushNotifications';
 
 interface IslamicEvent {
@@ -164,6 +165,7 @@ const IslamicEventsManager: React.FC = () => {
         notifyTimeHour: typeof event.notifyTimeHour === 'number' ? event.notifyTimeHour : 19,
         actionUrl: event.actionUrl || '/hijri',
       });
+      await bumpContentVersion('islamicEvents');
       setSaveMsg('✅ تم الحفظ');
       setIsModalOpen(false);
       setEditingEvent(null);
@@ -176,6 +178,7 @@ const IslamicEventsManager: React.FC = () => {
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'islamicEvents', id));
+      await bumpContentVersion('islamicEvents');
       setDeleteConfirmId(null);
       loadEvents();
     } catch { /* empty */ }
@@ -184,6 +187,7 @@ const IslamicEventsManager: React.FC = () => {
   const handleToggleAuto = async (event: IslamicEvent) => {
     try {
       await setDoc(doc(db, 'islamicEvents', event.id), { ...event, autoNotify: !event.autoNotify }, { merge: true });
+      await bumpContentVersion('islamicEvents');
       setSaveMsg(event.autoNotify ? '⏸️ تم إيقاف الإشعار التلقائي' : '🔔 تم تفعيل الإشعار التلقائي');
       loadEvents();
     } catch (e) {

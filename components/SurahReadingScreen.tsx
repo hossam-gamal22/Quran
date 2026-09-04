@@ -532,7 +532,6 @@ export default function SurahReadingScreen({
   return (
     <BackgroundWrapper style={{ flex: 1 }}>
       <ScreenContainer
-        containerClassName="bg-background"
         edges={['top', 'left', 'right']}
         screenKey={`surah-read-${surahNumber}`}
       >

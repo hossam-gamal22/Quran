@@ -28,9 +28,11 @@ import {
   PrayerKey 
 } from './notification-types';
 import { checkExactAlarmPermission } from '@/services/notifications/permissions';
+import { markPermissionRequested } from '@/lib/permission-recovery';
 import { getOfflinePrayerTimesRange } from '@/lib/prayer-week-cache';
 import type { PrayerTimes as PrayerTimesType } from '@/lib/prayer-times';
 import { getEffectivePrayerCalcSettings } from '@/lib/prayer-settings-source';
+import { isSmartFajrAlarmEnabled } from '@/lib/smart-alarm/storage';
 
 // Re-export للتوافق
 export { NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS } from './notification-types';
@@ -109,6 +111,10 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   if (existingStatus === 'granted') return true;
+
+  if (Platform.OS === 'android') {
+    await markPermissionRequested('notifications');
+  }
 
   const { status } = await Notifications.requestPermissionsAsync({
     ios: {
@@ -582,6 +588,14 @@ export async function schedulePrayerNotifications(
 
       for (const prayerKey of PRAYER_KEYS) {
         if (!notifSettings.prayers[prayerKey]) continue;
+
+        // Smart Fajr alarm is mutually exclusive with the regular Fajr notification.
+        // When user picks the smart alarm, suppress the regular one here so the user
+        // doesn't get two alarms going off at Fajr time.
+        if (prayerKey === 'fajr' && isSmartFajrAlarmEnabled()) {
+          console.log('[prayer-notif] SKIP fajr — smart alarm is enabled');
+          continue;
+        }
 
         const apiKey = PRAYER_KEY_TO_API[prayerKey];
         const timeStr = timings[apiKey];
