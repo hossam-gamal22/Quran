@@ -379,7 +379,7 @@ export default function DisplaySettingsScreen() {
                     <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                   )}
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                  <View style={styles.bgGrid}>
+                  <View style={[styles.bgGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     {/* Built-in color backgrounds — free */}
                     {mergedBuiltIn.filter(bg => !bg.is_premium).map((bg) => {
                       const isSelected = settings.display.appBackground === bg.id;
@@ -422,7 +422,7 @@ export default function DisplaySettingsScreen() {
                           </View>
                         )}
                       </View>
-                      <View style={styles.bgGrid}>
+                      <View style={[styles.bgGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         {mergedBuiltIn.filter(bg => bg.is_premium).map((bg) => {
                           const isSelected = settings.display.appBackground === bg.id;
                           return (
@@ -547,7 +547,7 @@ export default function DisplaySettingsScreen() {
                   </ScrollView>
                   
                   {/* Pexels photos — free (filtered by category) */}
-                  <View style={styles.bgGrid}>
+                  <View style={[styles.bgGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     {freePexels
                       .filter((photo) => selectedCategory === 'all' || photo.category === selectedCategory)
                       .map((photo) => {
@@ -592,7 +592,7 @@ export default function DisplaySettingsScreen() {
                           </View>
                         )}
                       </View>
-                      <View style={styles.bgGrid}>
+                      <View style={[styles.bgGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         {premiumPexels
                           .filter((photo) => selectedCategory === 'all' || photo.category === selectedCategory)
                           .map((photo) => {
@@ -770,6 +770,7 @@ const _styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GRID_GAP,
+    justifyContent: 'flex-start',
   },
   bgGridThumb: {
     borderRadius: 12,

@@ -1,0 +1,581 @@
+{
+  "categories": [
+    {
+      "id": "7c8fcd8a-eab1-4748-80cd-065829bad2d0",
+      "name": {
+        "ar": "موسوعة الفقه الإسلامي",
+        "en": "Encyclopedia of Islamic Jurisprudence"
+      },
+      "icon": "https://quoranmediastg.blob.core.windows.net/quraanradio/QuestionAndAnswerIcons/7c8fcd8a-eab1-4748-80cd-065829bad2d0/7c8fcd8a-eab1-4748-80cd-065829bad2d0-Test.svg",
+      "order": 0,
+      "isVisible": true,
+      "questions": [
+        {
+          "id": "b2253655-85d7-49c2-a5d0-0442645edd4f",
+          "question": {
+            "ar": "ما حكم قضاء صيام التطوع؟",
+            "en": "What is the ruling on making up a voluntary fast?"
+          },
+          "answer": {
+            "ar": "قال الدكتور صبري عبد الرؤوف، أستاذ الفقه المقارن بجامعة الأزهر الشريف إن الفقهاء اختلفوا في ضرورة قضاء صيام التطوع إذا أفطر الصائم لأي سبب، حيث ذهب فقهاء المالكية والحنفية إلى ضرورة قضاء صيام التطوع، معللين ذلك بأن الإنسان إذا تقرب إلى الله تعالى بقربة ما، الواجب عليه أن يصون هذه القربة ويحافظ عليها، واستندوا في ذلك إلى قوله تعالى: {وَلَا تُبْطِلُوا أَعْمَالَكُمْ}، وخصوا بذلك من شرع في صيام تطوع وأفطر بغير عذر، بينما ذهب فقهاء الشافعية والحنابلة إلى أن من أفطر في صيام التطوع فلا قضاء عليه؛ لأنه صيام غير واجب فلا يكون القضاء واجبًا\". \nوأشار عبد الرؤوف إلى أن الأمر في هذه المسألة متروك للصائم، وإن كان من الأفضل أن يتم الصائم صومه إذا شرع فيه، إلا في حالة وجود عذر. \nجاء ذلك خلال برنامج \"موسوعة الفقه الإسلامي\" الذي يذاع على موجات إذاعة القرآن الكريم، إعداد وتقديم الإذاعية الدكتورة هاجر سعد الدين.",
+            "en": "Scholars differed about making up a voluntary fast if a person breaks it. The Maliki and Hanafi schools require making it up, especially if it was broken without an excuse, because a person should preserve an act of worship once begun. The Shafi‘i and Hanbali schools hold that no makeup is required because the fast was not obligatory. The matter is therefore one of scholarly disagreement, though it is better to complete a voluntary fast after starting it unless there is a valid excuse."
+          },
+          "audioUrl": "10810256",
+          "order": 0,
+          "isVisible": true
+        },
+        {
+          "id": "b20ebedf-e5fd-4ec2-aa55-0535815154c8",
+          "question": {
+            "ar": "ما هي أسباب نقل الملكية في الفقه الإسلامي؟",
+            "en": "What are the causes by which ownership is transferred in Islamic jurisprudence?"
+          },
+          "answer": {
+            "ar": "أوضح الدكتور نجيب عوضين، أستاذ الشريعة الإسلامية بجامعة القاهرة، أن أسباب نقل الملكية قد تكون جبرية، مثل خلافة الإنسان لغيره (كالميراث)، أو اختيارية بإرادة الشخص.\n\nوأضاف أن الفقهاء ذكروا أسبابًا أخرى، منها:\n\nأسباب فعلية أو عملية: وهي التي ينشأ فيها الملك من سلوك فعلي إيجابي، مثل صيد البر والبحر. ولا يُشترط فيها كمال الأهلية.\n\nأسباب قولية (غير فعلية): وأساسها العقد، الذي يربط بين ألفاظ الإيجاب والقبول. فهي أقوال تصدر من الراغب في تملك شيء معين، ويرد عليها الطرف الثاني بالرفض أو القبول. ويُشترط فيها الإيجاب والقبول الصريح، والإرادة والرضا، وكمال الأهلية.\n\nأسباب تنشأ بدون قول أو فعل: مثل بيع المعاطاة، وهو أن تعطي شخصًا شيئًا فيُعطيك مقابله، دون الحاجة إلى لفظ البيع.\n\nيُذكر أن برنامج \"موسوعة الفقه الإسلامي\" يُذاع عبر أثير إذاعة القرآن الكريم، من إعداد وتقديم الإذاعية القديرة د. هاجر سعد الدين.",
+            "en": "Ownership may transfer compulsorily, such as through inheritance, or voluntarily by a person’s choice. Jurists also mention practical causes, such as hunting lawful land or sea game; verbal causes, chiefly contracts based on offer and acceptance, consent, and legal capacity; and transfers that occur without explicit wording, such as a customary hand-to-hand sale."
+          },
+          "audioUrl": "10650590",
+          "order": 1,
+          "isVisible": true
+        },
+        {
+          "id": "8368c5d1-25a5-497a-9930-068580e8b7ea",
+          "question": {
+            "ar": "ما هو حق الانتفاع؟ وما هي صلاحيات المنتفع به؟ وما هي مصادره في الشريعة الإسلامية؟",
+            "en": "What is usufruct, what rights does the beneficiary have, and what are its sources in Islamic law?"
+          },
+          "answer": {
+            "ar": "أوضح الدكتور نجيب عوضين، أستاذ الشريعة الإسلامية بجامعة القاهرة، أن حق الانتفاع هو حق عيني يُعطى لشخص يُسمى المنتفع صلاحيةَ استخدام واستغلال عقار أو أرض مملوكة لشخص آخر دون أن تُنقل له ملكية الشيء نفسه. هذا الحق مؤقت، ويسمح للمنتفع بالعيش في المنزل أو زراعة الأرض أو الاستفادة من أي منافع أخرى يدرّها العقار، بينما يظل المالك الأصلي مالكًا للأرض أو العقار.\n\nصلاحيات المنتفع:\n\nيمكن للمنتفع استخدام الشيء واستغلاله وجني ثماره، مثل زراعة الأرض أو تأجير عقار، لكن بشرط عدم الإضرار بالشيء أو تغيير جوهره. وقد تكون المنفعة بأجر أو بدون أجر.\n\nمصادر حق الانتفاع:\n\nمصدر حق الانتفاع متعدد ومتنوع، مثل الشرط الذي يتم بالاتفاق بين الطرفين، أو الإذن العام بأن يكون مصدر هذه الحقوق ملكًا عامًا وليست ملكية خاصة.\nبرنامج \"موسوعة الفقه الإسلامي\" يُذاع عبر أثير إذاعة القرآن الكريم، من إعداد وتقديم الإذاعية القديرة د. هاجر سعد الدين.",
+            "en": "Usufruct is a real right that allows a beneficiary to use or benefit from property owned by someone else without acquiring ownership of the property itself. The beneficiary may use it, lease it, or take its fruits so long as they do not harm or alter its substance. Its sources may include agreement between parties or a public permission connected to public, not private, property."
+          },
+          "audioUrl": "8102182",
+          "order": 2,
+          "isVisible": true
+        },
+        {
+          "id": "f4b93353-27bf-4972-ba5c-06e2c9a6f285",
+          "question": {
+            "ar": "ماهو صيام داوود؟",
+            "en": "What is the Fast of Dawud?"
+          },
+          "answer": {
+            "ar": "أكد الدكتور صبري عبد الرؤوف، أستاذ الفقه المقارن بجامعة الأزهر، أن الفقهاء اتفقوا على أن من أراد أن يصوم طوعًا فاستحبوا له أن يصوم يومًا ويفطر يومًا، وقد ورد أن رسول الله صلى الله عليه وسلم قال: \"أحب الصلاة إلى الله صلاة داود عليه السلام، وأحب الصيام صيام داود، وكان ينام نصف الليل ويقوم ثلثه وينام سدسه ويصوم يومًا ويفطر يومًا\".\nوأضاف أن ما شُرع من قبلنا ما دام الرسول صلى الله عليه وسلم قد أكده بقوله وفعله، فيكون الأمر مشروعًا لنا، لكنه مشروط بأن لا يترتب على ذلك ضرر للإنسان، وذلك لأن الشريعة الإسلامية قائمة على قاعدة عامة هي قاعدة \"لا ضرر ولا ضرار\".\nجاء ذلك خلال برنامج موسوعة الفقه الإسلامي المذاع على موجات إذاعة القرآن الكريم، إعداد وتقديم الإذاعية الدكتورة هاجر سعد الدين.",
+            "en": "The Fast of Dawud is to fast one day and not fast the next. It is recommended for someone who wants frequent voluntary fasting and is able to do so without harm. The Prophet ﷺ described it as the most beloved fasting to Allah, and Islamic law is governed by the principle that harm must be avoided."
+          },
+          "audioUrl": "10810261",
+          "order": 3,
+          "isVisible": true
+        },
+        {
+          "id": "9526c790-5b1d-4050-9f10-0f4d31a4db07",
+          "question": {
+            "ar": "ما هو مفهوم (الأجرة) وأنواعها؟",
+            "en": "What is the concept of wages or rent, and what are its types?"
+          },
+          "answer": {
+            "ar": "أوضح الدكتور نجيب عوضين، أستاذ الشريعة الإسلامية بجامعة القاهرة، أن الأجرة من أهم أركان عقد الإجارة.\nمفهوم الأجرة: هي العوض الذي يدفعه المستأجر أو رب العمل للمؤجر أو العامل، في مقابل المنفعة التي يحصل عليها.\nأنواع الأجرة:\n * أجرة نقدية: غالبًا ما تكون الأجرة من النقود، ويُشترط فيها أن تكون معلومة ومحددة.\n * أجرة عينية: لا يوجد ما يمنع أن تكون الأجرة عينًا من الأعيان، مثل اتفاق المؤجر مع المستأجر أن يعطيه حبوبًا أو آلة أو نحو ذلك، تعادل قيمة الأجرة النقدية.\n * أجرة منفعة: يجوز أن تكون الأجرة منفعة من المنافع المتبادلة بين الطرفين.\n\n برنامج (موسوعة الفقه الإسلامي) يُذاع عبر أثير إذاعة القرآن الكريم، من إعداد وتقديم الإذاعية القديرة الدكتورة هاجر سعد الدين.",
+            "en": "The wage or rent is the compensation paid by the tenant or employer to the lessor or worker in return for the benefit received. It may be cash, a specified item equivalent to the cash rent, or another exchanged benefit, provided it is known and clearly defined."
+          },
+          "audioUrl": "10650585",
+          "order": 4,
+          "isVisible": true
+        },
+        {
+          "id": "78eb2964-65dc-43fe-8ba5-719ac7d7584b",
+          "question": {
+            "ar": "ما هو عقد الإجارة وما هي أبرز خصائصه؟",
+            "en": "What is an ijarah contract, and what are its main characteristics?"
+          },
+          "answer": {
+            "ar": "الجواب: أوضح الدكتور نجيب عوضين، أستاذ الشريعة الإسلامية بجامعة القاهرة، أن عقد الإجارة هو عقد له طبيعته الخاصة، ومن أهم خصائصه:\nأنه من عقود المعاوضات: أي لا بد فيه من عوض مقابل الانتفاع بالعين، وهو ما يسمى بالأجرة.\nأنه عقد مُلزم للطرفين: يترتب عليه التزام على المؤجر بتسليم المنفعة أو ما شابه، والتزام على المستأجر بدفع الأجرة وغير ذلك من الالتزامات المتبادلة حسب كل نوع من أنواع الإجارة. ففي إجارة العمل مثلًا، يقدم العامل عمله في مقابل الأجر.\nأنه عقد عام: يشمل كافة صور الإجارة، كإجارة المسكن أو إجارة الأرض الفضاء أو الزراعية، إلخ.\nأنه من العقود الزمنية: أي أن الضابط الذي يُعتمد عليه في قياس المنفعة وتحديد كميتها هو الزمن والمدة المحددة.\nبرنامج (موسوعة الفقه الإسلامي) يُذاع عبر أثير إذاعة القرآن الكريم، وهو من إعداد وتقديم الإذاعية القديرة الدكتورة هاجر سعد الدين.",
+            "en": "Ijarah is a contract of exchange in which compensation is paid for a benefit. It binds both parties: the lessor must deliver the benefit, and the lessee must pay the rent or wage. It covers many forms, such as leasing a home, land, or labor, and it is time-based because the amount of benefit is measured by the agreed duration."
+          },
+          "audioUrl": "10524664",
+          "order": 5,
+          "isVisible": true
+        }
+      ]
+    },
+    {
+      "id": "cab28cbe-1700-483f-846f-08dc2c7ef253",
+      "name": {
+        "ar": "بريد الإسلام",
+        "en": "Islam Mailbox"
+      },
+      "icon": "",
+      "order": 1,
+      "isVisible": true,
+      "questions": [
+        {
+          "id": "24b2e253-e653-41c6-b5c9-02b15ff3da63",
+          "question": {
+            "ar": "حكم الترويح عن النفس في الإسلام؟",
+            "en": "What is the ruling on recreation and relaxation in Islam?"
+          },
+          "answer": {
+            "ar": "أكد الدكتور عبد المنعم سلطان، رئيس قسم الشريعة الإسلامية بكلية الحقوق جامعة المنوفية، أن الإسلام نظام متكامل يعمل على تحقيق التوازن بين متطلبات الإنسان الروحية والعقلية والبدنية. فالإسلام دين واقعي لم يفرض على الناس أن يكون كل كلامهم ذِكرًا، ولا أن يكون كل فراغهم في المسجد، وإنما اعترف بفطرتهم وغرائزهم التي خلقهم الله تعالى عليها، فقد خلقهم الله تعالى يفرحون ويضحكون ويلعبون. ولقد كانت حياة الرسول، صلى الله عليه وسلم، مثالًا رائعا للحياة الإنسانية المتكاملة، فهو في خلواته يصلي ويطيل الخشوع ويقوم حتى تتورم قدماه، وهو في الحق لا يبالي بأحد في جنب الله تعالى، لكنه مع الحياة والناس بشر يمشي في الأسواق ويأكل الطعام ويتزوج ويبتسم ويداعب ويمزح ولا يقول إلا حقًّا. فالترويح عن النفس من الأمور المشروعة، وقد وردت نصوص كثيرة في ذلك، ومنها قوله تعالى: ﴿وَابْتَغِ فِيمَا آتَاكَ اللَّهُ الدَّارَ الْآخِرَةَ ۖ وَلَا تَنسَ نَصِيبَكَ مِنَ الدُّنْيَا ۖ﴾، وكذلك قوله تعالى: ﴿قُلْ مَنْ حَرَّمَ زِينَةَ اللَّهِ الَّتِي أَخْرَجَ لِعِبَادِهِ وَالطَّيِّبَاتِ مِنَ الرِّزْقِ ۚ﴾، ومن خلال النصوص السابقة يتبين لنا مشروعية الترويح عن النفس، وأن الإسلام أعطى الإنسان غذاءه الروحي والبدني ووازن بينهما، فلم يلزم العبد الانقطاع الدائم للعبادة، ولم يترك الناس ليكونوا فريسة للشهوات والمادة.\n يُذاع برنامج (بريد الإسلام) يوميًا على موجات إذاعة القرآن الكريم، إعداد وتقديم الدكتور أحمد القاضي.",
+            "en": "Recreation is permissible in Islam when it remains within lawful limits. Islam balances spiritual, mental, and physical needs and recognizes human nature. The Prophet ﷺ lived a complete human life: he worshiped deeply, but also smiled, joked truthfully, married, ate, and dealt with people. Recreation should not lead to sin or neglect of obligations."
+          },
+          "audioUrl": "10695894",
+          "order": 0,
+          "isVisible": true
+        },
+        {
+          "id": "385953b7-f269-4cdf-aa2c-0529cf97a71c",
+          "question": {
+            "ar": "أريد الطلاق من زوجي على الإبراء، فما هي حقوقي التي يجوز لي المطالبة بها بعد هذا الطلاق؟",
+            "en": "I want a divorce from my husband by release of claims. What rights may I still claim after this divorce?"
+          },
+          "answer": {
+            "ar": "يجيب عن هذه الرسالة الأستاذ الدكتور عبد المنعم أحمد سلطان، أستاذ الشريعة الإسلامية بكلية الحقوق جامعة المنوفية، موضحاً أن الطلاق على الإبراء هو تنازل الزوجة عن حقوقها المالية المقررة بمقتضى عقد الزواج كليًا أو جزئيًا مقابل طلاقها، وهو جائز شرعًا للمرأة الرشيدة، وتنقسم الحقوق في هذه الحالة إلى قسمين:\nالأول: حقوق يشملها الإبراء ويجوز التنازل عنها، وهي الصداق (المهر) سواء كان معجلًا أو مؤجلًا، والنفقة الماضية التي ثبت استحقاقها للزوجة عن مدة سابقة على الطلاق.\nالثاني: حقوق لا يشملها الإبراء وتظل ثابتة للزوجة، ومنها النفقة المستقبلية؛ إذ ذهب جمهور الفقهاء إلى عدم صحة الإبراء منها لأنها تجب شيئًا فشيئًا بمرور الزمان، فلا يصح إسقاطها قبل وجوبها. وكذلك حق السكنى أثناء العدة؛ لأن الاعتداد في سكن الزوجية حق لله تعالى لا تملك المعتدة إسقاطه. \nأما حقوق الأولاد من نفقة وأجرة سكن، فهي حق محض للأطفال لا تملك الأم الحاضنة التنازل عنه بحال من الأحوال.\nوبناءً عليه، فإن للسائلة المطالبة بنفقتها المستقبلية وحقها في السكنى طوال مدة العدة، كما يظل حق أولادها في النفقة والسكن ثابتًا لا يسقطه إبراء الزوجة من حقوقها الخاصة.\nبرنامج \"بريد الإسلام\" يذاع عبر إذاعة القرآن الكريم، تقديم الإذاعي الدكتور  أحمد القاضي .",
+            "en": "Divorce by release of claims means the wife gives up some or all of her financial marital rights in return for divorce, and it is valid for a legally competent woman. The release may cover the prompt or deferred dowry and past maintenance already due. It does not remove future maintenance before it becomes due, housing during the waiting period, or the children’s rights to support and housing."
+          },
+          "audioUrl": "11485421",
+          "order": 1,
+          "isVisible": true
+        },
+        {
+          "id": "b6ea76f2-c778-41aa-b855-068f847fa1b1",
+          "question": {
+            "ar": "كيف يقضي المسبوق ما فاته  من الصلاة مع الإمام؟",
+            "en": "How should a latecomer make up the part of the prayer missed with the imam?"
+          },
+          "answer": {
+            "ar": "يجيب عن هذا السؤال أ.د. صبرى عبد الرؤوف أستاذ الفقه المقارن بجامعة الأزهر \n\nأشار د.صبري عبد الرؤوف في هذا الصدد إلى حديث أبي هريرة رضي الله عنه عن الرسول صلى الله عليه وسلم: «إنما جُعِلَ الإمام ليِؤُتَمَّ به، فلا تختلفوا عليه، فإذا كبر فكبروا، وإذا ركع فاركعوا، وإذا قال: سمع الله لمن حمده، فقولوا: ربنا ولك الحمد. وإذا سجد فاسجدوا، وإذا صلى جالسا فصلوا جلوسا أجمعون».وعلى هذا فإنه على المأموم أن يتم ما فاته من صلاته بمفرده بدون إمام.\n\nوأوضح أستاذ الفقه المقارن أن الثابت عن رسول صلى الله عليه وسلم عندما دخل مكة صلى قصرا وقال يا أهل مكة أتموا صلاتكم فإنا على سفر وأمرهم بإتمام الصلاة فرادى وعلينا أن نتبع الرسول صلى الله عليه وسلم.",
+            "en": "A latecomer follows the imam in whatever part of the prayer they catch, then completes the missed rak‘ahs alone after the imam finishes. This follows the principle that the imam is appointed to be followed, and the missed portion is made up individually."
+          },
+          "audioUrl": "9479639",
+          "order": 2,
+          "isVisible": true
+        },
+        {
+          "id": "e7d4c58c-ef94-4c80-a9cc-09e3cdcb0be5",
+          "question": {
+            "ar": "ماتت إمراة وتركت زوجاً واما ًواخا شقيقا ًواخا ًلأم وأباً وبنتًا فمن يرث ومن لايرث",
+            "en": "A woman died leaving a husband, mother, full brother, maternal brother, father, and daughter. Who inherits and who does not?"
+          },
+          "answer": {
+            "ar": "يُجيب عنه دكتور صبري عبد الرؤوف: تقسم التركة كالآتي: الزوج يستحق ربع التركة؛ لوجود الفرع الوارث وهو البنت، والأم تستحق السُدس لوجود الفرع الوارث ولوجود أكثر من أخ، والبنت تستحق النصف فرضا، وللأب السدس فرضا والباقي تعصيبا، أما الأخ الشقيق والأخ لأم فهما محجوبان.",
+            "en": "The estate is divided as follows: the husband receives one quarter because there is a surviving daughter; the mother receives one sixth because there is a descendant heir and more than one sibling; the daughter receives one half; and the father receives one sixth plus the remainder by residuary entitlement. The full brother and maternal brother are excluded."
+          },
+          "audioUrl": "9479644",
+          "order": 3,
+          "isVisible": true
+        },
+        {
+          "id": "fededaf4-5297-47dd-817b-0b4c4c554120",
+          "question": {
+            "ar": "لمن تكون  الشبكة والهدايا عند فسخ الخطبة ؟",
+            "en": "Who is entitled to the engagement jewelry and gifts if the engagement is broken off?"
+          },
+          "answer": {
+            "ar": "أجاب الأستاذ الدكتور فتحي عثمان الفقي أنه إذا كان قد اتفق على الشبكة مع المهر أو جرى عرف باعتبارها من المهر فإنها تكون من المهر وتأخذ حكمه، ولا تأخذ المخطوبة منها شيئا، بمعنى أن يستردها الخاطب بذاتها إن كانت قائمة أو مثلها أو قيمتها إن كانت قد هلكت. أما إذا لم تدخل في المهر أو لم يجر عرف بذلك فإنها تأخذ حكم الهدايا، والهدايا تأخذ حكم الهبة في فقه المذهب الحنفي الجاري عليه القضاء، والهبة شرعا عند الحنفية يجوز الرجوع فيها واستردادها إذا كانت قائمة بذاتها ووصفها، أما إذا هلكت أو استهلكت فلا تسترد لأن الهلاك أو الاستهلاك من موانع الرجوع.",
+            "en": "If the engagement jewelry was agreed to be part of the dowry, or custom treats it as part of the dowry, it must be returned to the suitor itself, or by equivalent value if it no longer exists. If it was not part of the dowry, it takes the ruling of gifts. Under the Hanafi position commonly applied in courts, gifts may be reclaimed if they still exist unchanged, but not if they have perished or been consumed."
+          },
+          "audioUrl": "9480000",
+          "order": 4,
+          "isVisible": true
+        },
+        {
+          "id": "444ab561-86d6-4dc4-9292-0e1f4b186c7c",
+          "question": {
+            "ar": "ما المقصود بالكلالة؟ وكيف تُقسم تركتها في ضوء الآيات القرآنية؟",
+            "en": "What is kalalah, and how is its estate divided in light of the Quranic verses?"
+          },
+          "answer": {
+            "ar": "يجيب عن هذه الرسالة الأستاذ الدكتور أحمد يوسف سليمان، أستاذ الشريعة الإسلامية بكلية دار العلوم جامعة القاهرة، موضحاً أن الكلالة -على الراجح من أقوال أهل العلم- هي الميت الذي ليس له فرع وارث (أبناء) ولا أصل وارث (أب)، وقد ورد ذكرها في القرآن الكريم في موضعين بسورة النساء:\n * الموضع الأول (الإخوة لأم): في قوله تعالى: ﴿وَإِن كَانَ رَجُلٌ يُورَثُ كَلَالَةً أَوِ امْرَأَةٌ وَلَهُ أَخٌ أَوْ أُخْتٌ فَلِكُلِّ وَاحِدٍ مِّنْهُمَا السُّدُسُ ۚ فَإِن كَانُوا أَكْثَرَ مِن ذَٰلِكَ فَهُمْ شُرَكَاءُ فِي الثُّلُثِ﴾. والمقصود هنا الإخوة من الأم؛ فإذا انفرد الواحد (ذكرًا أو أنثى) استحق السدس، وإن كانوا أكثر اشتركوا جميعًا في الثلث بالتساوي.\n * الموضع الثاني (الإخوة الأشقاء أو لأب): في خاتمة سورة النساء، قوله تعالى: ﴿يَسْتَفْتُونَكَ قُلِ اللَّهُ يُفْتِيكُمْ فِي الْكَلَالَةِ ۚ إِنِ امْرُؤٌ هَلَكَ لَيْسَ لَهُ وَلَدٌ وَلهُ أُخْتٌ فَلَهَا نِصْفُ مَا تَرَكَ ۚ وَهُوَ يَرِثُهَا إِن لَّمْ يَكُن لَّهَا وَلَدٌ...﴾. فإذا كان للمتوفى أخت شقيقة أو لأب فلها النصف، وإن كانتا اثنتين فلهما الثلثان، وإن كانوا إخوة رجالًا ونساءً فتقسم بينهم للذكر مثل حظ الأنثيين.\nالخلاصة: الكلالة تعني انقطاع عمود النسب (الأصول والفروع)، وقد فصل القرآن نصيب الإخوة حسب صلتهم بالميت؛ فآية أول السورة خصت الإخوة لأم، وآية الخاتمة خصت الإخوة الأشقاء ولأب، تبياناً من الله لئلا يضل الناس في تقسيم المواريث.\n برنامج بريد الإسلام، يُذاع عبر إذاعة القرآن الكريم، تقديم الإذاعي إبراهيم مجاهد.",
+            "en": "Kalalah most likely refers to a deceased person who leaves neither a descendant heir nor an ascendant father. The Quran mentions it in two inheritance contexts: maternal siblings share fixed portions, and full or paternal siblings inherit according to the rules in the final verse of Surat an-Nisa. The exact distribution depends on which heirs are present."
+          },
+          "audioUrl": "11485436",
+          "order": 5,
+          "isVisible": true
+        }
+      ]
+    },
+    {
+      "id": "61837daf-9334-40ad-8471-08dc2c7ef253",
+      "name": {
+        "ar": "دقيقة فقهية",
+        "en": "One-Minute Fiqh"
+      },
+      "icon": "",
+      "order": 2,
+      "isVisible": true,
+      "questions": [
+        {
+          "id": "66e9b282-b64e-4ce3-8ed2-00e1559baa84",
+          "question": {
+            "ar": "ما حكم بيع المستلزمات الطبية غير المرخصة في وقت الأزمات؟",
+            "en": "What is the ruling on selling unlicensed medical supplies during crises?"
+          },
+          "answer": {
+            "ar": "أولًا، قال النبي ﷺ: «مَن غشّنا فليس منّا».\n\nفكل من يبيع مستلزمات طبية، أو أي سلعة غير مرخّصة أو مغشوشة، فهو داخل في معنى الغش الذي نهى عنه النبي ﷺ. وهذا الفعل ليس من أخلاق المسلمين، لأنه يقوم على خداع الناس والإضرار بهم.\n\nوالغش حرام شرعًا، وتزداد حرمته إذا كان في وقت الأزمات أو عند احتياج الناس، لأن فيه استغلالًا لحاجتهم وتعريضًا لحياتهم أو صحتهم للخطر. ومن يفعل ذلك فقد ارتكب إثمًا عظيمًا، وقد يكون من الكبائر إذا ترتب عليه ضرر بالناس.\n\nكما أن المال الناتج عن بيع هذه السلع مال حرام، لا بركة فيه، ويخشى على صاحبه أن يدخل على نفسه وأهل بيته مالًا خبيثًا. وقد قال النبي ﷺ: «أيما جسد نبت من سُحت فالنار أولى به».\n\nلذلك فالواجب على كل مسلم أن يتقي الله في بيعه وشرائه، وأن يعلم أن الربح الحرام لا يدوم، وأن سلامة الناس وحقوقهم أمانة سيحاسب عليها أمام الله.",
+            "en": "First, the Prophet ﷺ said: “Whoever cheats us is not one of us.”\n\nSo anyone who sells medical supplies — or any goods — that are unlicensed or adulterated falls under the meaning of the cheating (ghish) that the Prophet ﷺ forbade. This conduct is not part of the morals of Muslims, because it is built on deceiving people and harming them.\n\nCheating is forbidden in Islam, and its prohibition becomes greater in times of crisis or when people are in need, because it exploits their need and endangers their lives or health. Whoever does this has committed a grave sin, which may be among the major sins if it results in harm to people.\n\nMoreover, the money earned from selling such goods is unlawful money with no blessing in it, and such a person risks bringing unlawful, impure wealth upon himself and his household. The Prophet ﷺ said: “Any flesh that grows from unlawful gain, the Fire is more deserving of it.”\n\nTherefore, every Muslim must fear Allah in his buying and selling, and know that unlawful profit does not last, and that the safety and rights of people are a trust for which he will be held accountable before Allah."
+          },
+          "audioUrl": "9619097",
+          "order": 0,
+          "isVisible": true
+        },
+        {
+          "id": "2f1f3499-8fab-4f20-a04a-01aa5b231279",
+          "question": {
+            "ar": "ما حكم صلاة تحية المسجد ومتى تُصلى؟",
+            "en": "What is the ruling on the mosque greeting prayer, and when is it performed?"
+          },
+          "answer": {
+            "ar": "أوضح الدكتور مجدي عاشور، المستشار العلمي السابق لمفتي الجمهورية، أن تحية المسجد هي الصلاة التي تُؤدَّى عند دخول المسجد، وتُصلَّى قبل أداء الفريضة أو قبل الأذان.\nوهي ركعتان سنة عن سنة النبي صلى الله عليه وسلم، تُصلَّى بتسليمتين كأي ركعتين. فمن فعلها أُثيب، ومن لم يفعلها فلا حرج عليه.\nجاء ذلك خلال برنامج (دقيقة فقهية) المُذاع يوميًا عبر أثير إذاعة القرآن الكريم، من إعداد وتقديم الدكتور حسن سليمان.",
+            "en": "The mosque greeting prayer is the prayer performed when entering a mosque. It is two rak‘ahs and is a Sunnah of the Prophet ﷺ. It may be prayed before the obligatory prayer or before the adhan when one enters. Whoever performs it is rewarded, and whoever leaves it is not sinful."
+          },
+          "audioUrl": "11171340",
+          "order": 1,
+          "isVisible": true
+        },
+        {
+          "id": "6ace1c47-6747-42fa-9a58-0902ab172798",
+          "question": {
+            "ar": "ما حكم وضع النقط في الأنف والأذن أثناء الصيام؟",
+            "en": "What is the ruling on using nose or ear drops while fasting?"
+          },
+          "answer": {
+            "ar": "أولًا: قطرة الأنف أثناء الصيام\n\nوضع النقط في الأنف قد يكون مفسدًا للصوم إذا وصل الدواء إلى داخل الجوف أو إلى ما يُعد منفذًا إليه. فإذا وصل الدواء إلى الخيشوم، وهو أعلى داخل الأنف، وكان له أثر يصل إلى الحلق أو الجوف، فالأحوط أن يُعد ذلك مفطرًا، ويلزم القضاء.\n\nأما إذا كانت القطرة في أول الأنف فقط، ولم تتجاوز موضعها، ولم يشعر الصائم بوصول شيء منها إلى الحلق أو الجوف، فالصوم صحيح ولا قضاء عليه.\n\nثانيًا: قطرة الأذن أثناء الصيام\n\nأما التقطير في الأذن، فقد ذهب جمهور الفقهاء إلى أنه يفسد الصوم إذا وصل أثر الدواء إلى الداخل، واعتبروا الأذن منفذًا قد يصل منه الدواء إلى الدماغ أو الجوف.\n\nبينما ذهب بعض أهل العلم، ومنهم بعض الشافعية، إلى أن قطرة الأذن لا تفطر، لأن الأذن ليست منفذًا معتادًا مباشرًا إلى الجوف، وما يصل منها إنما يكون عن طريق المسام، وهذا يشبه الكحل ونحوه.\n\nوالمرجع في تحقق وصول الدواء إلى الداخل من الناحية الطبية هو قول الأطباء، وعلى الإنسان أن يأخذ بما يناسب حالته. ومع ذلك، فإن الاحتياط أولى، فمن استطاع تأجيل استعمال القطرة إلى ما بعد الإفطار فهو أفضل خروجًا من الخلاف، إلا إذا كان محتاجًا إليها أو متضررًا من تركها.",
+            "en": "First: Nose drops while fasting\n\nPutting drops in the nose may break the fast if the medicine reaches the interior of the body (the jawf) or what is considered a passage to it. If the medicine reaches the upper nasal cavity (the khayshum) and has an effect that reaches the throat or the interior, the more cautious view is that this breaks the fast and the day must be made up.\n\nBut if the drops remain only at the front of the nose and do not go beyond their place, and the fasting person does not sense anything of it reaching the throat or interior, then the fast is valid and no makeup is required.\n\nSecond: Ear drops while fasting\n\nAs for putting drops in the ear, the majority of jurists held that it breaks the fast if the effect of the medicine reaches the interior, considering the ear a passage through which medicine may reach the brain or the interior.\n\nSome scholars, however — including some of the Shafi‘is — held that ear drops do not break the fast, because the ear is not a normal direct passage to the interior, and what reaches it does so through the pores, similar to kohl and the like.\n\nThe reference for whether the medicine actually reaches the interior, medically, is the statement of doctors, and a person should act according to what suits his condition. Nevertheless, caution is better: whoever is able to delay using the drops until after breaking the fast, that is preferable in order to avoid the disagreement — unless he is in need of them or is harmed by leaving them."
+          },
+          "audioUrl": "9619108",
+          "order": 2,
+          "isVisible": true
+        },
+        {
+          "id": "4cda44f7-a120-4f2e-b3a1-09ea26b631ab",
+          "question": {
+            "ar": "من لم يستطع الحج بنفسه هل يمكنه أن ينيب عنه؟",
+            "en": "Can someone who is unable to perform Hajj personally appoint another person to perform it on their behalf?"
+          },
+          "answer": {
+            "ar": "بسم الله الرحمن الرحيم، الحمد لله، والصلاة والسلام على سيدنا ومولانا رسول الله، وعلى آله وصحبه ومن والاه.\n\nإذا تحققت في الإنسان شروط وجوب الحج، لكنه عجز عن الذهاب بنفسه عجزًا مستمرًا، جاز له أن ينيب غيره ليحج عنه.\n\nوقد ورد عن عبد الله بن عباس رضي الله عنهما أن رسول الله ﷺ سمع رجلًا يقول: لبيك عن شُبْرُمة، فقال له النبي ﷺ: «ومن شبرمة؟» قال: أخ لي أو قريب لي. فقال له النبي ﷺ: «أحججت عن نفسك؟» قال: لا. قال: «حج عن نفسك، ثم حج عن شبرمة».\n\nويُؤخذ من هذا الحديث وغيره جواز الحج عن الغير، سواء كان ذلك تبرعًا أو مقابل نفقة وأجر، لكن بشرط أن يكون من يحج عن غيره قد حج عن نفسه أولًا.\n\nكما يشترط أن يكون الشخص الذي يُحج عنه عاجزًا عن أداء الحج بنفسه، كأن يكون ميتًا، أو مصابًا بعجز بدني شديد، أو مرض لا يُرجى شفاؤه، أو عاهة تمنعه من الحركة والسفر، أو أي مانع دائم يجعله غير قادر على الذهاب للحج بنفسه.\n\nأما من كان عجزه مؤقتًا ويُرجى زواله، فينتظر حتى يستطيع أداء الحج بنفسه.",
+            "en": "In the name of Allah, the Most Merciful, the Most Compassionate. Praise be to Allah, and prayers and peace be upon our master and guide, the Messenger of Allah, and upon his family and Companions and those who follow him.\n\nIf the conditions making Hajj obligatory are fulfilled in a person, but he is unable to go himself with a continuing inability, then he may appoint someone else to perform Hajj on his behalf.\n\nIt is reported from Abdullah ibn Abbas (may Allah be pleased with them both) that the Messenger of Allah ﷺ heard a man saying: “Labbayk (here I am) on behalf of Shubrumah.” The Prophet ﷺ said to him: “Who is Shubrumah?” He said: “A brother of mine,” or “a relative of mine.” The Prophet ﷺ said: “Have you performed Hajj for yourself?” He said: “No.” He said: “Perform Hajj for yourself, then perform Hajj on behalf of Shubrumah.”\n\nFrom this hadith and others, it is derived that performing Hajj on behalf of another is permissible, whether voluntarily or in return for expenses and a fee — but on the condition that the one performing Hajj on another’s behalf has already performed Hajj for himself first.\n\nIt is also a condition that the person on whose behalf Hajj is performed be unable to perform it himself — such as being deceased, or suffering a severe physical disability, or an illness with no hope of recovery, or an impairment that prevents him from moving and traveling, or any permanent obstacle that makes him unable to go to Hajj himself.\n\nAs for someone whose inability is temporary and expected to pass, he should wait until he is able to perform Hajj himself."
+          },
+          "audioUrl": "9619066",
+          "order": 3,
+          "isVisible": true
+        },
+        {
+          "id": "99922a06-a073-4aa9-9fbc-0af2b21377ea",
+          "question": {
+            "ar": "يوجد لدينا في قريتنا المقابر تحفها المساكن من كل اتجاه فهل يجوز هدم هذه المقابر ونقلها إلى مكان خارج القرية ويصبح مكان هذه المقابر مساكن؟",
+            "en": "In our village, graves are surrounded by homes on every side. May these graves be demolished and moved outside the village so the land becomes housing?"
+          },
+          "answer": {
+            "ar": "إذا كانت المقابر في القرية محاطة بالمساكن من كل اتجاه، فلا يجوز هدمها أو نقل ما فيها من الموتى إلى مكان آخر إلا لضرورة معتبرة، وبعد التأكد من أن أجساد المقبورين قد اندثرت، وبليت عظامهم، واستحالت إلى تراب.\n\nويشترط في ذلك أن يكون لمن يقوم بالنقل حق التصرف في الأرض، وأن يتم الأمر وفق القوانين واللوائح المنظمة لهذا الشأن، ودون اعتداء على حرمة الموتى أو مخالفة شرعية أو قانونية.\n\nويُستثنى من ذلك مقابر العلماء والأولياء والصالحين، فلا يجوز التعرض لها أو نقلها أو هدمها، لما لها من حرمة ومكانة، ولما قد يترتب على ذلك من مفاسد.\n\nوعليه، فالأصل هو احترام حرمة المقابر وعدم التعرض لها، ولا يُلجأ إلى نقلها أو إزالة ما فيها إلا عند الضرورة، وبالضوابط الشرعية والقانونية المعتبرة.",
+            "en": "If the graves in the village are surrounded by homes on every side, it is not permissible to demolish them or to move the dead within them to another place except for a recognized necessity, and after confirming that the bodies of those buried have decomposed, their bones have decayed, and they have turned to dust.\n\nIt is also a condition that whoever carries out the relocation has the legal right to dispose of the land, that the matter be done in accordance with the laws and regulations governing this, and without violating the sanctity of the dead or committing any religious or legal breach.\n\nExcepted from this are the graves of scholars, righteous saints (awliya’), and the pious; it is not permissible to disturb, move, or demolish them, due to their sanctity and standing, and because of the harms that may result from doing so.\n\nAccordingly, the basic rule is to respect the sanctity of graves and not disturb them, and one should not resort to relocating them or removing what is in them except in case of necessity, and according to the recognized religious and legal controls."
+          },
+          "audioUrl": "9619092",
+          "order": 4,
+          "isVisible": true
+        },
+        {
+          "id": "d8882328-a95d-412d-ba30-0f221552dc6f",
+          "question": {
+            "ar": "هل يجب على الزوج تحمل نفقة علاج زوجته؟",
+            "en": "Must a husband pay for his wife’s medical treatment?"
+          },
+          "answer": {
+            "ar": "أوضح الدكتور مجدي عاشور، المستشار العلمي السابق لمفتي الجمهورية، أن مصاريف علاج الزوجة واجبة على الزوج ؛ لأن مقصود العلاج هو حفظ صحة الزوجة، ولذلك فإن الدواء يُعدّ صنو (أخو) الغذاء، ومن ثمّ يأخذ حكمه في الوجوب الشرعي على الزوج.\n\nيُذاع برنامج (دقيقة فقهية) يومياً عبر أثير إذاعة القرآن الكريم، من إعداد وتقديم الدكتور حسن سليمان.",
+            "en": "Medical treatment expenses for a wife are due from the husband, because treatment preserves her health and medicine is closely related to food. It therefore follows the same obligation of maintenance."
+          },
+          "audioUrl": "11060895",
+          "order": 5,
+          "isVisible": true
+        }
+      ]
+    },
+    {
+      "id": "12bd2def-39aa-4772-8936-08dc2c8f9689",
+      "name": {
+        "ar": "مع الصائمين",
+        "en": "With Those Who Fast"
+      },
+      "icon": "",
+      "order": 3,
+      "isVisible": true,
+      "questions": [
+        {
+          "id": "beb5c872-8e86-4957-9408-022132be6ab6",
+          "question": {
+            "ar": "هل يجب أن تكون فدية الصيام وجبة تكفي للإفطار والسحور؟ وهل يجوز إخراجها للأخوة؟",
+            "en": "Must the expiation for missed fasting be a meal enough for iftar and suhur, and may it be given to siblings?"
+          },
+          "answer": {
+            "ar": "أجاب عن السؤال الدكتور محمد نجيب عوضين، أستاذ الشريعة الإسلامية بكلية الحقوق جامعة القاهرة، حيث أكد أن فدية الصيام يجب أن تكون وجبة تكفي من يحصل عليها للإفطار ويتبقى منها للسحور. وأشار عوضين إلى أن المبالغ التي تحددها دار الإفتاء كحد أدنى للفدية تكون بناءً على دراسة لأسعار السوق، كما أنها غير مُلزمة، ويمكن للقادر أن يخرج ما يشاء. وحول إمكانية إخراج الفدية للأخوة، أكد عوضين أن الفدية لها نفس مصارف الزكاة؛ حيث تُخرج للفقراء والمساكين. وعلى هذا، فإن كان هؤلاء الإخوة ليسوا من الفقراء، فلا يجوز إخراج الفدية لهم، ويجب البحث عمن يستحقون.\n\nتُذاع الفترة الإذاعية المفتوحة \"مع الصائمين\" يوميًا في رمضان على موجات إذاعة القرآن الكريم، قدمها الإذاعي الدكتور أحمد القاضي.",
+            "en": "The expiation for missed fasting should be a meal sufficient for the recipient’s iftar with enough remaining for suhur. Officially announced amounts are minimum estimates based on market prices and are not binding; one who can give more may do so. It may be given only to those eligible, such as the poor and needy. If one’s siblings are not poor, it should be given to someone who is entitled to it."
+          },
+          "audioUrl": "10963068",
+          "order": 0,
+          "isVisible": true
+        },
+        {
+          "id": "806099ae-f72d-464f-9daf-03650f7d22f4",
+          "question": {
+            "ar": "ما هو الحال المرتحل؟",
+            "en": "What is meant by al-hal al-murtahil?"
+          },
+          "answer": {
+            "ar": "عرَّف الدكتور مجدي عاشور، المستشار العلمي السابق لمفتي الجمهورية، الحال المرتحل بأنه هو الذي يختم القرآن، وعندما يصل إلى سورة الناس يعود لقراءة سورة الفاتحة ثم خمس آيات – مثلاً – من سورة البقرة، لأن هذا يعد تَيَمُّنًا بإعادة ختمه مرة أخرى، فيصل الشخص إلى سورة الناس ثم يرتحل إلى أول القرآن الكريم مرة ثانية، وهكذا.\nجاء ذلك خلال الفترة الإذاعية المفتوحة مع الصائمين التي تُذاع يوميًا في رمضان على موجات إذاعة القرآن الكريم، قدمها الإذاعي بهاء عبادة.",
+            "en": "Al-hal al-murtahil is the person who completes the Quran and then begins again, reading Surat al-Fatihah and some verses from Surat al-Baqarah after reaching Surat an-Nas, as a hopeful sign of continuing the recitation and beginning another completion."
+          },
+          "audioUrl": "10859084",
+          "order": 1,
+          "isVisible": true
+        },
+        {
+          "id": "bdd87525-fd4e-434e-bbcc-04aaa6750d96",
+          "question": {
+            "ar": "ما حكم وضوء المريض الذي قام الأطباء بتركيب قسطرة بولية له؟",
+            "en": "How does a patient with a urinary catheter perform wudu?"
+          },
+          "answer": {
+            "ar": "أجاب فضيلة الشيخ عويضة عثمان، أمين الفتوى بدار الإفتاء المصرية، بأن السائل في هذه الحالة صاحب عذر، ويصح وضوؤه ما لم يخرج من هذه القسطرة ما يفسد الوضوء.\nوعليه أن يتوضأ لكل صلاة، وصلاته ووضوؤه صحيحان.\nتُذاع الفترة الإذاعية المفتوحة \"مع الصائمين\" يوميًا في رمضان على موجات إذاعة القرآن الكريم، قدمها الإذاعي فؤاد حسان.",
+            "en": "A patient with a urinary catheter is treated as a person with a continuing excuse. Their wudu is valid unless something exits through the catheter that invalidates wudu. They should perform wudu for each prayer, and their wudu and prayer are valid."
+          },
+          "audioUrl": "10963052",
+          "order": 2,
+          "isVisible": true
+        },
+        {
+          "id": "8e8d0cb4-36c9-4714-9def-07bb025cca3b",
+          "question": {
+            "ar": "هل يجوز تغسيل الزوجة لزوجها والعكس؟",
+            "en": "Is it permissible for a wife to wash her deceased husband, and vice versa?"
+          },
+          "answer": {
+            "ar": "ورد سؤال للفترة الإذاعية المفتوحة مع الصائمين حول جواز قيام الزوجة بتغسيل زوجها المتوفى أو العكس.\nأجاب عن السؤال الدكتور مجدي عاشور، المستشار العلمي السابق لمفتي الجمهورية، مؤكداً أن الأولى أن يغسل كل جنس جنسه، الرجل يغسل الرجل، والست تغسل الست. ولكن يجوز للزوجة أن تقوم بتغسيل زوجها، استناداً إلى ما قالته السيدة عائشة، رضي الله عنها: \"لو استقبلتُ من أمري ما استدبرتُ ما غسَّلَ رسولَ اللهِ صلى الله عليه وسلم غيري\". لكن قد لا تتمالك الزوجة نفسها عند تغسيل الزوج، وهذا سوف يؤخر عملية الغسل والدفن، إنما لو كانت رابطة الجأش تحافظ على تماسكها، فيجوز لها أن تقوم بالغسل.\nتُذاع الفترة الإذاعية المفتوحة مع الصائمين يوميًا في رمضان على موجات إذاعة القرآن الكريم، قدمها الإذاعي بهاء عبادة.",
+            "en": "The preferred practice is that men wash deceased men and women wash deceased women. However, a wife may wash her deceased husband, based on the report from Aishah, may Allah be pleased with her. If emotional distress would delay washing and burial, another suitable person should do it."
+          },
+          "audioUrl": "10859089",
+          "order": 3,
+          "isVisible": true
+        },
+        {
+          "id": "b8a3bc80-1047-4562-bc9e-07db5b968c59",
+          "question": {
+            "ar": "هل يجوز نقل رفاة المتوفي من مقبرة إلى أخرى أو من بلد إلى أخرى؟",
+            "en": "Is it permissible to move a deceased person’s remains from one grave or country to another?"
+          },
+          "answer": {
+            "ar": "المسلم مأمور بالصبر على قضاء الله تعالى وقدره، واحتساب الأجر عند المصيبة. قال الله تعالى:\n\n﴿وَلَنَبْلُوَنَّكُمْ بِشَيْءٍ مِّنَ الْخَوْفِ وَالْجُوعِ وَنَقْصٍ مِّنَ الْأَمْوَالِ وَالْأَنفُسِ وَالثَّمَرَاتِ ۗ وَبَشِّرِ الصَّابِرِينَ ۝ الَّذِينَ إِذَا أَصَابَتْهُم مُّصِيبَةٌ قَالُوا إِنَّا لِلَّهِ وَإِنَّا إِلَيْهِ رَاجِعُونَ ۝ أُولَـٰئِكَ عَلَيْهِمْ صَلَوَاتٌ مِّن رَّبِّهِمْ وَرَحْمَةٌ ۖ وَأُولَـٰئِكَ هُمُ الْمُهْتَدُونَ﴾.\n\nوهذا الثواب العظيم يكون لمن صبر عند الصدمة الأولى، وسلّم لأمر الله، واحتسب مصيبته، واسترجع بقوله: إنا لله وإنا إليه راجعون، فينال صلوات من ربه ورحمة وهداية.\n\nوالأصل في الدفن أن يُدفن الميت في المكان الذي مات فيه، كما وقع في شهداء غزوة أحد، حيث دُفنوا في موضع استشهادهم. وقد رُوي عن هشام بن عامر الأنصاري رضي الله عنه أن الأنصار جاءوا إلى رسول الله ﷺ يوم أحد فقالوا: أصابنا قرح وجهد، فقال: «احفروا وأوسعوا، واجعلوا الرجلين والثلاثة في القبر».\n\nومع ذلك، فقد أجاز بعض الفقهاء نبش القبر ونقل الميت إذا وُجدت حاجة معتبرة أو مصلحة راجحة، مع مراعاة حرمة الميت وعدم امتهانه.\n\nومن أدلة ذلك ما رُوي عن جابر بن عبد الله رضي الله عنهما أنه قال: دُفن مع أبي رجل، فلم تطب نفسي حتى أخرجته، فجعلته في قبر على حدة. ويُستفاد من هذا الأثر جواز نبش القبر ونقل الميت لأمر يتعلق بمصلحة الحي أو طيب نفسه، ما دام لا يترتب على ذلك ضرر أو امتهان للميت.\n\nكما نُقل عن الإمام أحمد أنه لم ير بأسًا في نقل الموتى من مواضع غير مناسبة، وذكر أن معاذًا رضي الله عنه نبش قبر امرأته. وجاء في موطأ الإمام مالك أن سعد بن أبي وقاص وسعيد بن زيد رضي الله عنهما ماتا بالعقيق، فحُملا إلى المدينة ودُفنا بها، وفي ذلك دلالة على جواز نقل الميت من الموضع الذي مات فيه إلى موضع آخر ليدفن فيه، عند الحاجة أو المصلحة.\n\nوعليه، ففي واقعة السؤال، إذا مات الابن في الحج، ودُفن بعيدًا عن أهله، ولم يعلم والده إلا بعد مدة، وتأثر بذلك تأثرًا شديدًا، فلا حرج من اتخاذ الإجراءات اللازمة لنقل الجثمان إلى بلد أهله أو قريته، بشرط مراعاة الضوابط الشرعية والطبية والصحية والقانونية، وأن يتم ذلك بما يحفظ حرمة الميت، ودون انتهاك أو امتهان لجسده.\n\nويكون ذلك جائزًا خاصة إذا كان في نقله تطييب لخاطر والده وأهله، وتحقيق مصلحة معتبرة لا تخالف قواعد الشريعة.\n\nوالله تعالى أعلى وأعلم.",
+            "en": "A Muslim is commanded to be patient with the decree and destiny of Allah Almighty, and to seek reward when afflicted. Allah Almighty says:\n\n“And We will surely test you with something of fear and hunger and a loss of wealth and lives and fruits, but give good tidings to the patient — who, when disaster strikes them, say, ‘Indeed we belong to Allah, and indeed to Him we will return.’ Those are the ones upon whom are blessings from their Lord and mercy, and it is those who are the rightly guided.”\n\nThis great reward is for the one who is patient at the first shock, submits to the command of Allah, seeks reward for his affliction, and says: ‘Indeed we belong to Allah, and indeed to Him we will return,’ so he attains blessings from his Lord, mercy, and guidance.\n\nThe basic principle in burial is that the deceased is buried in the place where he died, as happened with the martyrs of the Battle of Uhud, who were buried at the site of their martyrdom. It is reported from Hisham ibn Amir al-Ansari (may Allah be pleased with him) that the Ansar came to the Messenger of Allah ﷺ on the day of Uhud and said: “We have suffered wounds and hardship,” so he said: “Dig, make the graves wide, and place two and three (men) in one grave.”\n\nNevertheless, some jurists permitted exhuming a grave and moving the deceased if there is a recognized need or a preponderant interest (maslahah), while observing the sanctity of the deceased and not degrading him.\n\nAmong the evidence for this is what is reported from Jabir ibn Abdullah (may Allah be pleased with them both), who said: “A man was buried with my father, but my soul was not at ease until I took him out and placed him in a separate grave.” It is derived from this report that it is permissible to exhume a grave and move the deceased for a matter relating to the interest of the living or their peace of mind, as long as no harm or degradation of the deceased results.\n\nIt was also narrated from Imam Ahmad that he saw no harm in moving the dead from unsuitable places, and he mentioned that Mu‘adh (may Allah be pleased with him) exhumed his wife’s grave. It is stated in the Muwatta of Imam Malik that Sa‘d ibn Abi Waqqas and Sa‘id ibn Zayd (may Allah be pleased with them both) died at al-‘Aqiq and were carried to Madinah and buried there — which indicates the permissibility of moving the deceased from the place where he died to another place to be buried in, when there is a need or interest.\n\nAccordingly, in the case in question: if the son died during Hajj and was buried far from his family, and his father did not learn of it until after a period and was deeply affected by it, then there is no harm in taking the necessary steps to transport the body to the country or village of his family — on the condition of observing the religious, medical, health, and legal controls, and that it be done in a way that preserves the sanctity of the deceased, without violating or degrading his body.\n\nThis is permissible especially if moving him brings comfort to his father and family and achieves a recognized interest that does not contradict the rules of the Shari‘ah.\n\nAnd Allah Almighty knows best."
+          },
+          "audioUrl": "9479672",
+          "order": 4,
+          "isVisible": true
+        },
+        {
+          "id": "829c7350-7c1d-4f56-96b9-09081965148d",
+          "question": {
+            "ar": "حلف بالطلاق على عدم فعل شيء معين ثم فعله. فهل يقع الطلاق في هذه الحالة؟",
+            "en": "If someone swears by divorce not to do something and then does it, does divorce occur?"
+          },
+          "answer": {
+            "ar": "أجاب الدكتور مجدي عاشور، المستشار العلمي السابق لمفتي الجمهورية، حيث أكد أن في هذه الحالة الطلاق لا يقع، لكن عليه كفارة الحنث باليمين، وهي: إطعام عشرة مساكين، وإن لم يستطع فصيام ثلاثة أيام متتابعة أو غير متتابعة.",
+            "en": "In this case divorce does not occur, but the person must offer expiation for breaking an oath: feeding ten poor people, or, if unable, fasting three days, whether consecutive or separate."
+          },
+          "audioUrl": "11238519",
+          "order": 5,
+          "isVisible": true
+        }
+      ]
+    },
+    {
+      "id": "a20aaf61-5ea8-4b79-97e2-3ab3239d3aa0",
+      "name": {
+        "ar": "بين السائل والفقيه",
+        "en": "Between the Questioner and the Jurist"
+      },
+      "icon": "https://infrastructurergdiag744.blob.core.windows.net/quraanradio/QuestionAndAnswerIcons/a20aaf61-5ea8-4b79-97e2-3ab3239d3aa0/a20aaf61-5ea8-4b79-97e2-3ab3239d3aa0-%D8%A7%D9%84%D8%B9%D9%84%D9%8A%D9%85.svg",
+      "order": 4,
+      "isVisible": true,
+      "questions": [
+        {
+          "id": "6946ac3b-c1d2-4571-82ab-0251ca4da749",
+          "question": {
+            "ar": "ما حكم الرجوع في البيع لوجود سعر أعلى؟",
+            "en": "What is the ruling on withdrawing from a sale because a higher price was offered?"
+          },
+          "answer": {
+            "ar": "أجاب الدكتور عبد المنعم سلطان، أستاذ الشريعة الإسلامية بكلية الحقوق جامعة المنوفية، قائلًا: إذا حدث اتفاق بين البائع والمشتري فيجب على الطرفين الالتزام بهذا الاتفاق، ولا يجوز للبائع أن يتراجع عنه لوجود سعر أعلى، وذلك ما جاء في قوله تعالى: \"يَا أَيُّهَا الَّذِينَ آمَنُوا أَوْفُوا بِالْعُقُودِ\"\n تذاع الفقرة الإذاعية بين السائل والفقيه على موجات إذاعة القرآن الكريم، قدمها الإذاعي الدكتور أحمد القاضي.",
+            "en": "If buyer and seller have concluded an agreement, both parties must honor it. The seller may not withdraw merely because a higher price later appears, in accordance with the command to fulfill contracts."
+          },
+          "audioUrl": "11257639",
+          "order": 0,
+          "isVisible": true
+        },
+        {
+          "id": "97a04fee-39a3-42d4-8be7-0258532f4915",
+          "question": {
+            "ar": "أيهما أولى صلاة الفوائت أم السنن ؟",
+            "en": "Which should take priority: missed obligatory prayers or voluntary prayers?"
+          },
+          "answer": {
+            "ar": "أجاب عن السؤال الوارد للفترة الإذاعية المفتوحة \"بين السائل والفقيه\"  الدكتور محمد نجيب عوضين،  أستاذ الشريعة الإسلامية بكلية الحقوق جامعة القاهرة ، حيث أكد أن الأولى والأهم صلاة الفوائت لأنها فروض يسأل عنها الإنسان ، بينما لا يسأل عن صلاة السنن،  و الأفضل أن يقوم الإنسان بالجمع بين صلاة الفوائت والسنن إن استطاع ، وإن لم يستطع فيمكنه بعد الانتهاء من الفوائت على أغلب ظنه أن يبدأ في صلاة السنن .\nتذاع الفترة الإذاعية المفتوحة \" بين السائل و الفقيه\"  يومي الثلاثاء والجمعة من كل أسبوع على موجه إذاعة القرآن الكريم قدمها الإذاعي دكتور كمال نصر الدين",
+            "en": "Missed obligatory prayers have priority because they are obligations for which a person is accountable, while voluntary prayers are not obligatory. It is best to combine making up missed prayers with voluntary prayers if possible. If not, one should focus on making up the missed obligations, then resume voluntary prayers after reasonably completing them."
+          },
+          "audioUrl": "10616305",
+          "order": 1,
+          "isVisible": true
+        },
+        {
+          "id": "b56b65a6-6378-4181-80d6-0389ae2161cf",
+          "question": {
+            "ar": "متى يكون الأبناء والزوجة أعداءً للإنسان؟",
+            "en": "When can one’s children and spouse become enemies to a person?"
+          },
+          "answer": {
+            "ar": "أوضح الشيخ عويضة عثمان، أمين الفتوى بدار الإفتاء المصرية، أن الأبناء والزوجة يكونون أعداءً للإنسان عندما يمنعونه من طاعة الله، أو يدفعونه إلى الكسب الحرام. واستدل على ذلك بالآية القرآنية الكريمة: \"إِنَّ مِنْ أَزْوَاجِكُمْ وَأَوْلَادِكُمْ عَدُوًّا لَّكُمْ فَاحْذَرُوهُمْ ۚ\". وذكر أن هذه الآية نزلت في عوف بن مالك الأشجعي الذي أراد الخروج للغزو، فمنعه أولاده وزوجته، فكانوا بذلك أعداءً له لأنهم منعوه من الخروج في سبيل الله.\nجاء ذلك خلال الفترة الإذاعية المفتوحة (بين السائل و الفقيه) والتي تذاع يومي الثلاثاء والجمعة من كل أسبوع على موجات إذاعة القرآن الكريم قدمها الإذاعي دكتور أحمد القاضي.",
+            "en": "Children and spouses may become enemies to a person when they prevent them from obeying Allah or push them toward unlawful earnings. This is connected to the Quranic warning that some spouses and children may be enemies, so believers should be cautious."
+          },
+          "audioUrl": "10650618",
+          "order": 2,
+          "isVisible": true
+        },
+        {
+          "id": "885e4ccc-f960-4ff6-beb2-071cf4c61f24",
+          "question": {
+            "ar": "هل يجب إخراج الزكاة عن سبائك الذهب؟",
+            "en": "Is zakat due on gold bullion?"
+          },
+          "answer": {
+            "ar": "أجاب الدكتور عبد المنعم سلطان، أستاذ الشريعة الإسلامية بكلية الحقوق جامعة المنوفية، قائلًا: إن الذهب ما دام أنه ليس للزينة يجب إخراج الزكاة عليه. وعلى هذا، يجب إخراج الزكاة على سبائك الذهب إذا بلغت النصاب وحال عليها الحول.\n\n تذاع الفقرة الإذاعية بين السائل والفقيه على موجات إذاعة القرآن الكريم، قدمها الإذاعي الدكتور أحمد القاضي.",
+            "en": "Gold that is not used for personal adornment is subject to zakat. Therefore, zakat is due on gold bullion if it reaches the nisab and a lunar year has passed over it."
+          },
+          "audioUrl": "11257637",
+          "order": 3,
+          "isVisible": true
+        },
+        {
+          "id": "5168f8f7-99be-4310-87a6-07c4f7411b6b",
+          "question": {
+            "ar": "هل يجوز أن أدعو على شخص صدمني بسيارته وتسبب لي في إصابات ؟",
+            "en": "May I supplicate against someone who hit me with his car and injured me?"
+          },
+          "answer": {
+            "ar": "أجاب عن السؤال الوارد للفترة الإذاعية المفتوحة (بين السائل و الفقيه) الدكتور مجدي عاشور ، المستشار العلمي السابق لمفتي الجمهورية ، حيث أكد أنه يجوز الدعاء على الظالم، مشيرا إلى أن هذا الأمر فيه درجات أفضلها تفويض الأمر لله كما جاء في قوله تعالى \" فَمَنْ عَفَا وَأَصْلَحَ فَأَجْرُهُ عَلَى اللَّهِ ۚ \".\nوأضاف أن الدعاء على الظالم جائز لكنه يجعل المظلوم قد حصل على حقه في الدنيا ، لافتا إلى أن المظلوم لن ينتفع بشيء إذا أصيب ظالمه بأذى خاصة إن كان له أسرة و أبناء ، و اختتم حديثه قائلا:\" الأفضل تفويض الأمر لله بقول: حسبي الله ونعم الوكيل\".\n\nتذاع الفترة الإذاعية المفتوحة ( بين السائل و الفقيه) يومي الثلاثاء والجمعة من كل أسبوع على موجات إذاعة القرآن الكريم قدمها الإذاعي فؤاد حسان.",
+            "en": "It is permissible to supplicate against an oppressor, but there are levels. The better course is to entrust the matter to Allah and seek reward through pardon and reform. Supplicating against the wrongdoer may mean the oppressed person has taken their right in this world, while saying \"Allah is sufficient for me, and He is the best disposer of affairs\" is better."
+          },
+          "audioUrl": "10616344",
+          "order": 4,
+          "isVisible": true
+        },
+        {
+          "id": "444929f7-de34-495a-be66-09bfef8df7bc",
+          "question": {
+            "ar": "الحكم الفقهي في نسيان قصار السور والتشهد الأوسط في الصلاة ؟",
+            "en": "What is the fiqh ruling if one forgets short surahs or the middle tashahhud in prayer?"
+          },
+          "answer": {
+            "ar": "أكد الدكتور مجدي عاشور ، المستشار العلمي السابق لمفتي الجمهورية ، أن قراءة سورة قصيرة و قراءة التشهد الأوسط كلاهما سنة وليسا فرضا، مشيرا إلى أن نسيان أي منهما لايبطل الصلاة ، حتى ولو لم يقم المصلي بسجود السهو في نهاية الصلاة.\nجاء ذلك خلال الفترة الإذاعية المفتوحة (بين السائل و الفقيه) يومي الثلاثاء والجمعة من كل أسبوع على موجات إذاعة القرآن الكريم قدمها الإذاعي فؤاد حسان.",
+            "en": "Reciting a short surah and the middle tashahhud are Sunnah acts, not pillars. Forgetting either of them does not invalidate the prayer, even if the worshiper does not perform the prostration of forgetfulness at the end."
+          },
+          "audioUrl": "10616314",
+          "order": 5,
+          "isVisible": true
+        }
+      ]
+    },
+    {
+      "id": "cc9fabd4-5559-4f4a-8963-cbdf7fdec7b1",
+      "name": {
+        "ar": "سُئل فأجاب",
+        "en": "Asked and Answered"
+      },
+      "icon": "https://quoranmediastg.blob.core.windows.net/quraanradio/QuestionAndAnswerIcons/cc9fabd4-5559-4f4a-8963-cbdf7fdec7b1/cc9fabd4-5559-4f4a-8963-cbdf7fdec7b1-%D8%B3%D8%A6%D9%84%20%D9%81%D8%A3%D8%AC%D8%A7%D8%A8%20%283%29.svg",
+      "order": 5,
+      "isVisible": true,
+      "questions": [
+        {
+          "id": "50b9fc31-73cd-496f-9610-0542e78480f0",
+          "question": {
+            "ar": "من هو صاحب موسى عليه السلام  في رحلته الواردة في سورة الكهف؟",
+            "en": "Who accompanied Musa, peace be upon him, on the journey mentioned in Surat al-Kahf?"
+          },
+          "answer": {
+            "ar": "أوضح برنامج ( سئل فأجاب ) أن الصحابة رضي الله عنهم كانوا يختلفون فيما بينهم في بعض مسائل العلم، بحسب ما عند كل واحد منهم؛ مع مراعاتهم لأدب الخلاف ، واحترام ما عند الآخر من العلم والمعرفة ، ومن هذا أنَّ الصحابيين الجليلين عبد الله بن عباس والحر بن قيس قد اختلفا في صاحب موسى عليه السلام في رحلته الواردة في سورة الكهف .\n\nأشار البرنامج إلى أن قول ابن عباس رضي الله عنهما أنه \"الخضر\"، وهو ما أيده أُبَيُّ بن كعب، بِناءً على ما سمعه من النبي صلى الله عليه وسلم في قصة موسى والخضر عليهما السلام .\n\nتابع البرنامج : روي عن ابْنِ عبَّاسٍ رضي الله عنهما أنَّه تَمارَى هو والحُرُّ بنُ قَيْسِ بنِ حِصْنٍ الفَزارِيُّ في صاحِبِ مُوسَى، قالَ ابنُ عبَّاسٍ: هو خَضِرٌ، فَمَرَّ بهِما أُبَيُّ بنُ كَعْبٍ، فَدَعاهُ ابنُ عبَّاسٍ ؛ فقالَ: \"إنِّي تَمارَيْتُ أنا وصاحِبِي هذا في صاحِبِ مُوسَى، الذي سَأَلَ مُوسَى السَّبِيلَ إلى لُقِيِّهِ، هلْ سَمِعْتَ النبيَّ صَلَّى اللهُ عليه وسلَّمَ يَذْكُرُ شَأْنَهُ؟ قالَ: نَعَمْ، سَمِعْتُ رَسولَ اللَّهِ صَلَّى اللهُ عليه وسلَّمَ يقولُ: بيْنَما مُوسَى في مَلَإٍ مِن بَنِي إسْرائِيلَ جاءَهُ رَجُلٌ فقالَ: هلْ تَعْلَمُ أحَدًا أعْلَمَ مِنْكَ؟ قالَ مُوسَى: لا، فأوْحَى اللَّهُ عزَّ وجلَّ إلى مُوسَى: بَلَى، عَبْدُنا خَضِرٌ، فَسَأَلَ مُوسَى السَّبِيلَ إلَيْهِ، فَجَعَلَ اللَّهُ له الحُوتَ آيَةً، وقِيلَ له: إذا فقَدْتَ الحُوتَ فارْجِعْ، فإنَّكَ سَتَلْقاهُ\".\n\nيذاع برنامج ( سُئل فأجاب ) يوميًا عبر أثير إذاعة القرآن الكريم، تقديم الإذاعي د.محمد مصطفى يحيى",
+            "en": "The companion of Musa, peace be upon him, in the journey mentioned in Surat al-Kahf was al-Khidr. Ibn Abbas held this view and Ubayy ibn Ka‘b supported it based on what he heard from the Prophet ﷺ about the story of Musa and al-Khidr."
+          },
+          "audioUrl": "10689142",
+          "order": 0,
+          "isVisible": true
+        },
+        {
+          "id": "dac383d3-ef1b-41f7-b568-0764680823e9",
+          "question": {
+            "ar": "كيف نقل النبي ﷺ أمته من خرافة \"نجوم المطر\" إلى التوحيد؟",
+            "en": "How did the Prophet ﷺ move his community from belief in rain stars to pure monotheism?"
+          },
+          "answer": {
+            "ar": "أوضح برنامج \"سُئِل فأجاب\" أن النبيَّ صلَّى اللهُ عليه وسلَّمَ كان حريصًا على تصحيح المفاهيم لدى المسلمين، وإخراج أمَّتِه مِن ظلمات الجاهليَّةِ بكُلِّ ما فيها مِن شُرورٍ وآثامِ شِركٍ، إلى نور الإسلامِ وما فيه مِن خَيرٍ وتَوحيدٍ.\nفقد كان الناسُ في الجاهلية يَعتقِدون أنَّ النُّجومَ سَببٌ في نُزولِ المطرِ حقيقةً. \n\nوتصحيحًا لهذا الاعتقاد، سلَّط البرنامج الضوء على ما ورد عن الصحابي زيد بن خالد الجهني رضي الله عنه قال:\n\"صَلَّى رَسولُ اللَّهِ صَلَّى اللهُ عليه وسلَّمَ صَلَاةَ الصُّبْحِ بالحُدَيْبِيَةِ علَى إثْرِ سَمَاءٍ كَانَتْ مِنَ اللَّيْلَةِ. فَلَمَّا انْصَرَفَ، أقْبَلَ علَى النَّاسِ، فَقالَ: \"هلْ تَدْرُونَ مَاذَا قالَ رَبُّكُمْ؟\" قالوا: اللَّهُ ورَسولُهُ أعْلَمُ. قالَ: \"أصْبَحَ مِن عِبَادِي مُؤْمِنٌ بي وكَافِرٌ، فأمَّا مَن قالَ: مُطِرْنَا بفَضْلِ اللَّهِ ورَحْمَتِهِ، فَذلكَ مُؤْمِنٌ بي وكَافِرٌ بالكَوْكَبِ، وأَمَّا مَن قالَ: بنَوْءِ كَذَا وكَذَا، فَذلكَ كَافِرٌ بي ومُؤْمِنٌ بالكَوْكَبِ\".\"\n\nيُذاع برنامج \"سُئِل فأجاب\" يوميًا عبر أثير إذاعة القرآن الكريم، تقديم الإذاعي د.محمد مصطفى يحيى.",
+            "en": "The Prophet ﷺ corrected the pre-Islamic belief that stars independently cause rain. After rainfall at Hudaybiyah, he taught that whoever says rain came by Allah’s favor and mercy is a believer in Allah and rejects attribution to the stars, while whoever attributes it to a star has fallen into disbelief in this matter."
+          },
+          "audioUrl": "11238587",
+          "order": 1,
+          "isVisible": true
+        },
+        {
+          "id": "c564cb9b-f24c-4d6b-9c92-0fb2d321345f",
+          "question": {
+            "ar": "هل \"شرٌّ\" تراه اليوم قد يكون \"خيرًا\" صرفه الله عنك؟ حكمة بليغة للقمان الحكيم.",
+            "en": "Can an apparent harm you see today be a greater good that Allah diverted from you? A wisdom from Luqman."
+          },
+          "answer": {
+            "ar": "سلط برنامج \"سُئِل فأجاب\" الضوء على حكمة بليغة لـ لقمان الحكيم، وجاء فيها ما رواه سعيد بن المسيب قال:\nقال لقمان لابنه: \"يا بُنيّ، لا ينزلنَّ بك أمرٌ رضيته أو كرهته، إلا جعلتَ في الضمير منك أن ذلك خير لك\".\nقال الولد: \"لا أقدر، دون أن أعلم ما قلت\".\nقال: \"يا بني، إن الله قد بعث نبيًا، هلمَّ حتى نتأكد؟ فنأتيه ونصدقه\".\nقال: \"هيا\".\nفخرج على حمار، وابنه على حمار، وتزودا، ثم سارا أيامًا وليالي، واشتدَّ الحر، ونفد الماء والزاد، واستبطآ حماريهما، فنزلا، فجعلا يشتدان على سوقهما (أي يسرعان في المشي على أقدامهما).\nفبينما هما كذلك، إذ نظر لقمان أمامه، فإذا هو بسواد ودخان، فقال في نفسه: \"السواد الشجر، والدخان العمران والناس\".\n\nفبينما هما كذلك يشتدان، إذ وطئ ابن لقمان على عظم، فخرَّ مغشيًا عليه، فوثب إليه لقمان فضمه إلى صدره، واستخرج العظم بأسنانه، ثم نظر إليه، فذَرَفت عيناه.\nفقال: \"يا أبتي، أنت تبكي، وأنت تقول هذا خير لي! كيف يكون هذا خير لي، وقد نفد الطعام والماء، وبقيت أنا وأنت في هذا المكان؟\".\nفقال لقمان: \"يا بُنيّ، أما بكائي، فـ رِقَّةُ الوالدين. وأما ما قلت: كيف يكون هذا خير لي؟ فلعلَّ ما صُرف عنك، أعظم مما ابتُليت به، ولعلَّ ما ابتُليت به، أيسر مما صُرف عنك\".\nثم نظر لقمان أمامهما، فلم يرَ ذلك الدخان والسواد، وإذا بشخص أقبل على فرس أبلق، عليه ثياب بيض وعمامة بيضاء، يمسح الهواء مسحًا.\nفلم يزل يرمقه بعينه حتى كان منه قريبًا، فتواريا. ثم صاح به: \"أأنت لقمان؟\"\nقال: \"نعم\".\nقال: \"أأنت الحكيم؟\"\nقال: \"كذلك يُقال\".\nقال: \"ما قال لك ابنك؟\"\nقال لقمان: \"يا عبد الله، من أنت؟ أسمع كلامك ولا أراك؟\".\nقال: \"أنا جبريل، أمرني ربي بخسف هذه المدينة ومن فيها، وأُخبرت أنكما تريدانها، فدعوت ربي أن يحبسكما عني بما شاء، فحبسكما بما ابتُلي به ابنك، ولولا ذا، لخُسف بكما مع من خُسف. ثم مسح جبريل يده على قدم الغلام، فاستوى قائمًا، ومسح يده على الذي كان فيه الطعام فامتلأ طعامًا، وعلى الذي كان فيه الماء فامتلأ ماءً. ثم حملهما وحماريهما، فزجَلَ بهما (أي رمى بهما بسرعة أو طار بهما) كما يزجَلُ الطير\".\n\nيُذاع برنامج “سُئِل فأجاب” يوميًا عبر أثير إذاعة القرآن الكريم، تقديم الإذاعي د. محمد مصطفى يحيى.",
+            "en": "The reported wisdom from Luqman teaches that a disliked event may protect a person from something worse. In the story, a painful delay prevented Luqman and his son from reaching a city that was to be destroyed. What appears harmful may therefore be lighter than the harm Allah diverted."
+          },
+          "audioUrl": "10948145",
+          "order": 2,
+          "isVisible": true
+        },
+        {
+          "id": "e63ed69c-fadf-4e9d-943e-1a62f90887d4",
+          "question": {
+            "ar": "ما هو الذِكر الذي أوصى به النبي ﷺ أصحابه ؟",
+            "en": "What dhikr did the Prophet ﷺ recommend to his Companions?"
+          },
+          "answer": {
+            "ar": "أكد برنامج (سُئل فأجاب) أنه لا حيلة في الخلاص من المعاصي إلَّا بمشيئة الله وحده ، ولا قوة للعبد على الطاعة وتحصيل الخير إلَّا بعون الله بتَوفيقِه تعالى . \n\nوحول هذا المعنى ، سلط البرنامج الضوء على ذكر أوصى به النبي ﷺ أصحابه ، فعن عبدالله بن أبي أوفى قال: \"جاءَ رجلٌ إلى النَّبيِّ صلَّى اللَّهُ عليهِ وسلَّمَ فقالَ: إنِّي لا أستَطيعُ أن آخذَ منَ القرآنِ شيئًا فعلِّمني ما يُجزئُني منهُ، قالَ: قُل: سُبحانَ اللَّهِ، والحمدُ للَّهِ، ولا إلَهَ إلَّا اللَّهُ، واللَّهُ أَكْبرُ، ولا حَولَ ولا قوَّةَ إلَّا باللَّهِ العليِّ العظيمِ، قالَ: يا رسولَ اللَّهِ، هذا للَّهِ عزَّ وجلَّ فَما لي، قالَ: قُل: اللَّهمَّ ارحَمني وارزُقني وعافِني واهدِني، فلمَّا قامَ قالَ: هَكَذا بيدِهِ فقالَ رسولُ اللَّهِ صلَّى اللَّهُ عليهِ وسلَّمَ: أمَّا هذا فقد ملأَ يدَهُ منَ الخيرِ\"\n[أخرجه أبو داوود والنسائي وأحمد ].\n\nيذاع برنامج (سُئِل فأجاب ) يوميًا عبر أثير إذاعة القرآن الكريم، تقديم الإذاعي د.محمد مصطفى يحيى",
+            "en": "The dhikr mentioned is: \"Subhan Allah, alhamdulillah, la ilaha illa Allah, Allahu akbar, wa la hawla wa la quwwata illa billah al-‘Aliyy al-‘Azim.\" The man was also taught to ask: \"Allahumma irhamni, warzuqni, wa ‘afini, wahdini\" - O Allah, have mercy on me, provide for me, grant me well-being, and guide me."
+          },
+          "audioUrl": "10689151",
+          "order": 3,
+          "isVisible": true
+        },
+        {
+          "id": "dca5dc0e-296c-4c41-b27d-1d1d3c773069",
+          "question": {
+            "ar": "ما هي الغاية التي خلق الله من أجلها الإنسان؟",
+            "en": "What is the purpose for which Allah created humankind?"
+          },
+          "answer": {
+            "ar": "أكد برنامج ( سئل فأجاب ) أن الغاية من  خلق الله سبحانه وتعالى  للخلق هي \"العبادة\" ، وهذا ما أوضحه الله عز وجل في كتابه العزيز في قوله : ﴿ وَمَا خَلَقْتُ الْجِنَّ وَالْإِنسَ إِلَّا لِيَعْبُدُونِ﴾\n[ سورة الذاريات: 56].\n\nوأضاف البرنامج أن هذه الغاية تقتضي أن تكون عبودية الله تعالى في السراء والضراء ، فالمسلم الصادق هو الذي يستقيم على طاعة الله مهما كان حاله.\n\nوأوضح البرنامج أن النبي الكريم صلى الله عليه وسلم بيَّن جزاء المتمسك بدينه ، الصابر عليه ، فقد روي عن عبدالله بن مسعود رضي الله عنه أن رسول الله صلى الله عليه وسلم قال: \"إنَّ مِنْ ورائِكُمْ أيامَ الصبرِ الصبرُ فيهِنَّ كَقَبْضٍ علَى الجمْرِ لِلْعَامِلِ فِيهَا أَجْرُ خَمْسِينَ قالوا يا رسولَ اللهِ أجْرُ خمسينَ منهم أَوْ خمسينَ مِنَّا قال خمسينَ مِنْكُمْ\".\n\nيذاع برنامج (سُئِل فأجاب ) يوميًا عبر أثير إذاعة القرآن الكريم، تقديم الإذاعي د.محمد مصطفى يحيى",
+            "en": "The purpose for which Allah created humankind and jinn is worship, as stated in Surat adh-Dhariyat 51:56. This means servitude to Allah in ease and hardship. A truthful Muslim remains upright in obedience regardless of circumstances, and the one who holds firmly to religion in difficult times has a great reward."
+          },
+          "audioUrl": "10689136",
+          "order": 4,
+          "isVisible": true
+        },
+        {
+          "id": "73cbb029-4667-4b14-aac5-21d4dc32e649",
+          "question": {
+            "ar": "ما هو فضل الصدقة وأثرها في حياة المؤمن؟",
+            "en": "What is the virtue of charity and its effect in a believer’s life?"
+          },
+          "answer": {
+            "ar": "أوضح برنامج \"سُئِل فأجاب\" فضائل الصدقة والإنفاق في سبيل الله، فقد رُوي عن رسول الله صلى الله عليه وسلم أنه قال::  \"إن الصدقة لتطفئ عن أهلها حر القبور، وإنما يستظل المؤمن يوم القيامة في ظل صدقته.\"\nوفي بيان لأفضل أنواع الصدقة، أخرج البخاري في صحيحه عن حكيم بن حزام رضي الله عنه، قال:  \nسُئل النبي صلى الله عليه وسلم عن أفضل الصدقة، فأجاب قائلًا:  \n\"أفضل الصدقة ما كان عن ظهر غِنى، واليد العليا خير من اليد السفلى، وابدأ بمن تعول.\"\n\nيذاع برنامج (سُئِل فأجاب ) يوميًا عبر أثير إذاعة القرآن الكريم، تقديم الإذاعي د.محمد مصطفى يحيى.",
+            "en": "Charity has great virtue and protects its giver. The program mentions reports that charity cools the heat of the grave for its people and that the believer will be shaded by their charity on the Day of Resurrection. The best charity is that given while one has sufficient means, and a person should begin with those under their care."
+          },
+          "audioUrl": "11171397",
+          "order": 5,
+          "isVisible": true
+        }
+      ]
+    }
+  ],
+  "version": "<auto-incremented on upload>"
+}

@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { shouldRefetchContent, markContentFetched } from './content-manifest';
 import { APP_CONFIG } from '../constants/app';
 
 export interface WelcomeBannerConfig {
@@ -215,9 +216,9 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
   },
   downloadLinks: {
     android: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-    ios: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
+    ios: 'https://apps.apple.com/app/id6761651911',
   },
-  storeUrlIos: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
+  storeUrlIos: 'https://apps.apple.com/app/id6761651911',
   storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
   features: {
     quran: true,
@@ -359,88 +360,73 @@ export const getStoreUrls = async (): Promise<{ ios: string; android: string }> 
   };
 };
 
-// اشتراك في التحديثات المباشرة من Firebase
+// Manifest-gated one-shot read of remote app config (replaces a live single-doc
+// listener). subscribeToAppConfig and subscribeToHighlights both read the same
+// doc, so they share the 'appSettings' manifest key — one admin bump notifies
+// both. Returns a no-op unsubscribe.
 export const subscribeToAppConfig = (
   onUpdate: (config: RemoteAppConfig) => void,
   onError?: (error: Error) => void
 ): (() => void) => {
-  const docRef = doc(db, 'config', 'app-settings');
-  
-  const unsubscribe = onSnapshot(
-    docRef,
-    async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as Record<string, any>;
-        const mergedConfig = mergeRemoteConfig(data);
-        
-        // حفظ في AsyncStorage للاستخدام offline
-        await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));
-        
-        console.log('🔄 تم تحديث الإعدادات من Firebase (Real-time)');
-        onUpdate(mergedConfig);
-      }
-    },
-    (error) => {
-      console.error('❌ خطأ في الاشتراك بتحديثات Firebase:', error);
-      if (onError) onError(error);
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('appSettings'))) return;
+      const docSnap = await getDoc(doc(db, 'config', 'app-settings'));
+      await markContentFetched('appSettings');
+      if (!docSnap.exists()) return;
+      const data = docSnap.data() as Record<string, any>;
+      const mergedConfig = mergeRemoteConfig(data);
+      await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));
+      onUpdate(mergedConfig);
+    } catch (error) {
+      console.error('❌ خطأ في تحديثات Firebase:', error);
+      if (onError) onError(error as Error);
     }
-  );
-  
-  return unsubscribe;
+  })();
+  return () => {};
 };
 
 /**
  * Subscribe to real-time updates for highlights
  * الاشتراك في تحديثات الأبرز في الوقت الفعلي
  */
+// Manifest-gated one-shot read of highlights (shares the 'appSettings' key
+// with subscribeToAppConfig — both read the same doc). Returns a no-op unsubscribe.
 export const subscribeToHighlights = (
   onUpdate: (highlights: HighlightItemConfig[]) => void,
   onError?: (error: Error) => void
 ): (() => void) => {
-  const docRef = doc(db, 'config', 'app-settings');
-  
-  const unsubscribe = onSnapshot(
-    docRef,
-    async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const highlights = (data.highlights || []) as HighlightItemConfig[];
-        
-        // Filter: only items that are visible and within date range
-        const now = new Date();
-        const filtered = highlights.filter(h => {
-          // Check isVisible (fallback to enabled for backward compat)
-          const visible = h.isVisible !== undefined ? h.isVisible : h.enabled;
-          if (!visible) return false;
-          
-          // Check date range
-          if (h.visibleFrom && new Date(h.visibleFrom) > now) return false;
-          if (h.visibleUntil && new Date(h.visibleUntil) < now) return false;
-          
-          return true;
-        });
-        
-        // Sort: pinned first, then by order
-        filtered.sort((a, b) => {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-          return (a.order || 0) - (b.order || 0);
-        });
-        
-        // Cache
-        await AsyncStorage.setItem('@highlights_cache', JSON.stringify(filtered));
-        
-        console.log('🔄 تم تحديث الأبرز (Real-time):', filtered.length);
-        onUpdate(filtered);
-      }
-    },
-    (error) => {
-      console.error('❌ خطأ في الاشتراك بتحديثات الأبرز:', error);
-      if (onError) onError(error);
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('appSettings'))) return;
+      const docSnap = await getDoc(doc(db, 'config', 'app-settings'));
+      // markContentFetched is also called by subscribeToAppConfig — harmless
+      // duplicate; it just records the current manifest version.
+      await markContentFetched('appSettings');
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+      const highlights = (data.highlights || []) as HighlightItemConfig[];
+      const now = new Date();
+      const filtered = highlights.filter(h => {
+        const visible = h.isVisible !== undefined ? h.isVisible : h.enabled;
+        if (!visible) return false;
+        if (h.visibleFrom && new Date(h.visibleFrom) > now) return false;
+        if (h.visibleUntil && new Date(h.visibleUntil) < now) return false;
+        return true;
+      });
+      filtered.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return (a.order || 0) - (b.order || 0);
+      });
+      await AsyncStorage.setItem('@highlights_cache', JSON.stringify(filtered));
+      onUpdate(filtered);
+    } catch (error) {
+      console.error('❌ خطأ في تحديثات الأبرز:', error);
+      if (onError) onError(error as Error);
     }
-  );
-  
-  return unsubscribe;
+  })();
+  return () => {};
 };
 
 /**
@@ -763,31 +749,26 @@ export const fetchHomePageConfig = async (): Promise<HomePageConfig | null> => {
  * Subscribe to real-time updates for home page config
  * الاشتراك في تحديثات إعدادات الصفحة الرئيسية
  */
+// Manifest-gated one-shot read of home page config. Returns a no-op unsubscribe.
 export const subscribeToHomePageConfig = (
   onUpdate: (config: HomePageConfig) => void,
   onError?: (error: Error) => void
 ): (() => void) => {
-  const docRef = doc(db, 'appConfig', 'homePageConfig');
-
-  const unsubscribe = onSnapshot(
-    docRef,
-    async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as HomePageConfig;
-
-        await AsyncStorage.setItem(HOME_PAGE_CONFIG_CACHE_KEY, JSON.stringify(data));
-
-        console.log('🔄 تم تحديث إعدادات الصفحة الرئيسية (Real-time)');
-        onUpdate(data);
-      }
-    },
-    (error) => {
-      console.error('❌ خطأ في الاشتراك بتحديثات الصفحة الرئيسية:', error);
-      if (onError) onError(error);
+  (async () => {
+    try {
+      if (!(await shouldRefetchContent('homePageConfig'))) return;
+      const docSnap = await getDoc(doc(db, 'appConfig', 'homePageConfig'));
+      await markContentFetched('homePageConfig');
+      if (!docSnap.exists()) return;
+      const data = docSnap.data() as HomePageConfig;
+      await AsyncStorage.setItem(HOME_PAGE_CONFIG_CACHE_KEY, JSON.stringify(data));
+      onUpdate(data);
+    } catch (error) {
+      console.error('❌ خطأ في تحديثات الصفحة الرئيسية:', error);
+      if (onError) onError(error as Error);
     }
-  );
-
-  return unsubscribe;
+  })();
+  return () => {};
 };
 
 // ==================== الصفحات المؤقتة ====================

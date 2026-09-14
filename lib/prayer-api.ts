@@ -20,6 +20,7 @@ export interface PrayerTimes {
   Isha: string;
   Imsak?: string;
   Midnight?: string;
+  Lastthird?: string;
 }
 
 export interface PrayerTimesResponse {

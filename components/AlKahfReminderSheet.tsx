@@ -18,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
+import { ModalColors } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -88,9 +89,7 @@ export default function AlKahfReminderSheet({ visible, onDismiss }: AlKahfRemind
           >
             <View style={[styles.content, {
               paddingBottom: Math.max(insets.bottom, 16) + 16,
-              backgroundColor: Platform.OS === 'android'
-                ? (isLight ? '#FFFFFF' : '#0f1a14')
-                : (isLight ? 'rgba(255,255,255,0.85)' : 'rgba(28,28,30,0.85)'),
+              backgroundColor: isLight ? ModalColors.cardLight : ModalColors.cardDark,
             }]}>
               {/* Handle bar */}
               <View style={styles.handleBar}>

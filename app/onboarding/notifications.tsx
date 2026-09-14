@@ -25,6 +25,7 @@ import { isRTL as checkIsRTL } from '@/lib/i18n';
 import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { markPermissionRequested } from '@/lib/permission-recovery';
 
 // ========================================
 // الثوابت - مجموعات الإشعارات
@@ -215,6 +216,9 @@ export default function NotificationsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      if (Platform.OS === 'android') {
+        await markPermissionRequested('notifications');
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       
       if (status === 'granted') {

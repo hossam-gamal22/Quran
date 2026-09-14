@@ -53,7 +53,12 @@ export function SourcesList({ sources, title, compact = false }: SourcesListProp
   const muted = (colors as { textLight?: string; muted?: string; text: string }).textLight
     ?? (colors as { muted?: string; text: string }).muted
     ?? colors.text;
-  const borderColor = (colors as { border?: string }).border ?? 'rgba(127,127,127,0.18)';
+  const isDarkSurface = (colors as any).isDarkMode || (colors as any).hasBgOverride;
+  // Use a warm sand/parchment accent for links so they read on dark green
+  // gradients (the previous `colors.primary` greens disappeared on the seerah
+  // backdrop). Header icon keeps the brand accent.
+  const linkColor = isDarkSurface ? '#f5c563' : '#a06a00';
+  const cardBg = isDarkSurface ? 'rgba(15,25,30,0.65)' : 'rgba(255,255,255,0.92)';
   const rowDirection = isRTL ? 'row-reverse' : 'row';
   const textAlign = isRTL ? 'right' : 'left';
   const writingDirection = isRTL ? 'rtl' : 'ltr';
@@ -63,11 +68,11 @@ export function SourcesList({ sources, title, compact = false }: SourcesListProp
       style={[
         styles.container,
         compact && styles.compactContainer,
-        { backgroundColor: colors.card, borderColor },
+        { backgroundColor: cardBg },
       ]}
     >
       <View style={[styles.header, { flexDirection: rowDirection }]}>
-        <MaterialCommunityIcons name="book-open-variant" size={18} color={colors.primary} />
+        <MaterialCommunityIcons name="book-open-variant" size={18} color={linkColor} />
         <Text
           style={[
             styles.headerText,
@@ -84,14 +89,14 @@ export function SourcesList({ sources, title, compact = false }: SourcesListProp
           const inAppHintIcon = quranRef ? 'book-open-page-variant' : null;
           const content = (
             <View style={[styles.item, { flexDirection: rowDirection }]}>
-              <Text style={[styles.bullet, { color: colors.primary }]}>•</Text>
+              <Text style={[styles.bullet, { color: linkColor }]}>•</Text>
               <View style={styles.itemBody}>
                 <View style={[styles.referenceRow, { flexDirection: rowDirection }]}>
                   <Text
                     style={[
                       styles.reference,
                       {
-                        color: isLink ? colors.primary : colors.text,
+                        color: isLink ? linkColor : colors.text,
                         fontFamily: fontSemiBold(),
                         textDecorationLine: isLink ? 'underline' : 'none',
                         textAlign,
@@ -107,7 +112,7 @@ export function SourcesList({ sources, title, compact = false }: SourcesListProp
                     <MaterialCommunityIcons
                       name={inAppHintIcon}
                       size={14}
-                      color={colors.primary}
+                      color={linkColor}
                       style={styles.inAppHint}
                     />
                   ) : null}
@@ -149,10 +154,8 @@ export function SourcesList({ sources, title, compact = false }: SourcesListProp
 const styles = StyleSheet.create({
   container: {
     marginTop: Spacing.lg,
-    marginHorizontal: Spacing.md,
     padding: Spacing.md,
     borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
   },
   compactContainer: {
     marginTop: Spacing.md,
@@ -168,11 +171,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   list: {
-    gap: 6,
+    gap: 10,
   },
   item: {
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 12,
   },
   bullet: {
     fontSize: 16,
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
   },
   referenceRow: {
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   reference: {
     fontSize: 14,

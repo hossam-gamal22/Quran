@@ -819,12 +819,13 @@ function DynamicTimeText({
   anchorDirection?: 'ltr' | 'rtl';
   anchorIsCountdown?: boolean;
 }) {
+  const hideInSnapshot = forSnapshot && Platform.OS !== 'android';
   const textNode = (
     <Text
       numberOfLines={numberOfLines}
       adjustsFontSizeToFit={adjustsFontSizeToFit}
       minimumFontScale={minimumFontScale}
-      style={[style, forSnapshot ? { opacity: 0, color: 'transparent' } : null]}
+      style={[style, hideInSnapshot ? { opacity: 0, color: 'transparent' } : null]}
     >
       {children}
     </Text>
@@ -887,8 +888,8 @@ export function PrayerTablePreview({ size, language, forSnapshot }: { size: Prev
                 // muted color for every row — iOS overlay re-tints the
                 // current active row and writes time text in the active
                 // foreground color, so the PNG never freezes state.
-                const rowBg = (forSnapshot || !active) ? 'transparent' : activeBg;
-                const fgForCapture = forSnapshot ? p.muted : (active ? p.text : p.muted);
+                const rowBg = ((forSnapshot && Platform.OS !== 'android') || !active) ? 'transparent' : activeBg;
+                const fgForCapture = forSnapshot && Platform.OS !== 'android' ? p.muted : (active ? p.text : p.muted);
                 return (
                   <View
                     key={row.keyEn}

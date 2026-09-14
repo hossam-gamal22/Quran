@@ -36,7 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
-import { Spacing, BorderRadius, FONT_SIZES } from '@/constants/theme';
+import { Spacing, BorderRadius, FONT_SIZES, ModalColors } from '@/constants/theme';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
@@ -74,6 +74,20 @@ interface FilteredQuestion {
   answer: string;
   order: number;
   isVisible: boolean;
+  categoryName?: string;
+}
+
+// Normalizes Arabic for forgiving search: strips tashkeel/tatweel and unifies
+// alef/yaa/taa-marbuta variants, and lowercases Latin text.
+const AR_DIACRITICS = /[ً-ْٰـ]/g;
+function normalizeForSearch(text: string): string {
+  return (text || '')
+    .replace(AR_DIACRITICS, '')
+    .replace(/[أإآٱ]/g, 'ا') // أ إ آ ٱ → ا
+    .replace(/ى/g, 'ي') // ى → ي
+    .replace(/ة/g, 'ه') // ة → ه
+    .toLowerCase()
+    .trim();
 }
 
 interface ChatMessage {
@@ -183,6 +197,7 @@ export default function QuestionAnswerScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
 
   // حالة نموذج السؤال
   const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -203,10 +218,30 @@ export default function QuestionAnswerScreen() {
     return cat?.questions ?? [];
   }, [categories, selectedCategory]);
 
+  const isSearching = searchQuery.trim().length > 0;
+
+  // All questions across every category (with their category name) — for global search.
+  const allQuestions = useMemo<FilteredQuestion[]>(() => {
+    return categories.flatMap(cat =>
+      cat.questions.map(q => ({ ...q, categoryName: cat.name }))
+    );
+  }, [categories]);
+
+  // Search matches question + answer + category name (diacritic-insensitive).
+  const searchResults = useMemo<FilteredQuestion[]>(() => {
+    const needle = normalizeForSearch(searchQuery);
+    if (!needle) return [];
+    return allQuestions.filter(q =>
+      normalizeForSearch(`${q.question} ${q.answer} ${q.categoryName ?? ''}`).includes(needle)
+    );
+  }, [allQuestions, searchQuery]);
+
+  // What the list actually renders: search results when searching, else the active category.
+  const listData = isSearching ? searchResults : qaItems;
+
   const tabsScrollRef = useRef<ScrollView>(null);
   const chatScrollRef = useRef<ScrollView>(null);
   const listRef = useRef<FlatList<FilteredQuestion>>(null);
-  const itemLayoutsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -392,16 +427,21 @@ export default function QuestionAnswerScreen() {
         next.delete(id);
       } else {
         next.add(id);
-        InteractionManager.runAfterInteractions(() => {
-          requestAnimationFrame(() => {
-            const y = itemLayoutsRef.current[id] ?? 0;
-            listRef.current?.scrollToOffset({ offset: Math.max(0, y - 32), animated: true });
+        const index = listData.findIndex(q => q.id === id);
+        if (index >= 0) {
+          // Align the tapped question to the top so its (now expanded) answer is visible.
+          // scrollToIndex is reliable here; per-item onLayout y is relative to the FlatList
+          // cell (~0) and would otherwise jump the list back to the top of the page.
+          InteractionManager.runAfterInteractions(() => {
+            requestAnimationFrame(() => {
+              listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+            });
           });
-        });
+        }
       }
       return next;
     });
-  }, []);
+  }, [listData]);
 
   const openManualQuestion = useCallback((prefill = '') => {
     if (prefill.trim()) setQuestionText(prefill.trim().slice(0, MAX_QUESTION_LENGTH));
@@ -598,9 +638,6 @@ export default function QuestionAnswerScreen() {
     return (
       <Pressable
         onPress={() => toggleExpanded(item.id)}
-        onLayout={(event) => {
-          itemLayoutsRef.current[item.id] = event.nativeEvent.layout.y;
-        }}
         style={({ pressed }) => [
           cardStyle,
           { transform: [{ scale: pressed ? 0.98 : 1 }] },
@@ -627,6 +664,22 @@ export default function QuestionAnswerScreen() {
           />
         </View>
         <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, paddingBottom: Spacing.md }}>
+        {/* اسم القسم — يظهر في نتائج البحث */}
+        {!!item.categoryName && (
+          <Text
+            style={{
+              fontFamily: fontMedium(),
+              fontSize: colors.fs(FONT_SIZES.xs),
+              color: ACCENT,
+              textAlign: isRTL ? 'right' : 'left',
+              writingDirection: isRTL ? 'rtl' : 'ltr',
+              marginBottom: Spacing.xs,
+            }}
+            numberOfLines={1}
+          >
+            {item.categoryName}
+          </Text>
+        )}
         {/* السؤال */}
         <View style={questionRowStyle}>
           <View style={questionIconStyle}>
@@ -665,7 +718,7 @@ export default function QuestionAnswerScreen() {
 
   const tabsContainerStyle: ViewStyle = {
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
   };
 
@@ -774,8 +827,68 @@ export default function QuestionAnswerScreen() {
         <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={colors.textLight} />
       </Pressable>
 
-      {/* التبويبات */}
+      {/* تنبيه: المحتوى متاح بالعربية والإنجليزية فقط */}
+      {language !== 'ar' && language !== 'en' && (
+        <View
+          style={[
+            styles.langNotice,
+            {
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="information-outline" size={18} color={colors.textLight} />
+          <Text
+            style={[
+              styles.langNoticeText,
+              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+            ]}
+          >
+            {t('questionAnswer.contentLangNotice')}
+          </Text>
+        </View>
+      )}
+
+      {/* شريط البحث */}
       {categories.length > 0 && (
+        <View
+          style={[
+            styles.searchBar,
+            {
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="magnify" size={20} color={colors.textLight} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('questionAnswer.searchPlaceholder')}
+            placeholderTextColor={colors.textLight}
+            style={[
+              styles.searchInput,
+              { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+            ]}
+            returnKeyType="search"
+            clearButtonMode="never"
+          />
+          {isSearching && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="close-circle" size={20} color={colors.textLight} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* التبويبات */}
+      {!isSearching && categories.length > 0 && (
         <ScrollView
           ref={tabsScrollRef}
           horizontal
@@ -838,34 +951,42 @@ export default function QuestionAnswerScreen() {
       )}
 
       {/* المحتوى */}
-      {qaItems.length === 0 ? (
+      {listData.length === 0 ? (
         <View style={centerContainerStyle}>
-          <MaterialCommunityIcons name="help-box" size={48} color={colors.textLight} />
+          <MaterialCommunityIcons name={isSearching ? 'file-search-outline' : 'help-box'} size={48} color={colors.textLight} />
           <Text style={emptyTextStyle}>
-            {t('questionAnswer.noQuestions')}
+            {isSearching ? t('questionAnswer.noSearchResults') : t('questionAnswer.noQuestions')}
           </Text>
         </View>
       ) : (
         <FlatList
           ref={listRef}
-          key={selectedCategory}
-          data={qaItems}
+          key={isSearching ? '__search__' : selectedCategory}
+          data={listData}
           renderItem={renderQAItem}
           keyExtractor={item => item.id}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            // Item not yet measured — approximate, then retry once it's rendered.
+            listRef.current?.scrollToOffset({ offset: index * (averageItemLength || 120), animated: true });
+            setTimeout(() => {
+              listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+            }, 250);
+          }}
           ListHeaderComponent={<View style={{ height: Spacing.md }} />}
-          ListFooterComponent={qaItems.length >= 4 ? <InlineMrecAd screen="question_answer" darkMode={isDarkMode} /> : null}
+          ListFooterComponent={listData.length >= 4 ? <InlineMrecAd screen="question_answer" darkMode={isDarkMode} /> : null}
         />
       )}
 
       {/* نموذج إرسال السؤال */}
-      <Modal visible={showAssistantModal} animationType="slide" transparent>
+      <Modal visible={showAssistantModal} animationType="slide" transparent statusBarTranslucent>
         <KeyboardAvoidingView
           style={styles.chatOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={[styles.chatPanel, { backgroundColor: isDarkMode ? '#172230' : '#fff', paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
+          <View style={[styles.chatPanel, { backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight, paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
             <View style={styles.modalHandle} />
             <View style={[styles.chatHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.assistantEntryIcon, { backgroundColor: ACCENT }]}>
@@ -1091,90 +1212,97 @@ export default function QuestionAnswerScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={showQuestionModal} animationType="slide" transparent>
+      <Modal visible={showQuestionModal} animationType="slide" transparent statusBarTranslucent>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          // Use padding behavior on Android as well to keep the modal anchored to the bottom
+          behavior={'padding'}
         >
           <Pressable style={{ flex: 1 }} onPress={() => setShowQuestionModal(false)} />
-          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? '#1a2535' : '#fff', paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-            <View style={styles.modalHandle} />
-            <Text style={[styles.modalTitle, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>
-              {t('questionAnswer.sendQuestion')}
-            </Text>
-            <Text style={styles.replyTime}>
-              {t('questionAnswer.replyTime')}
-            </Text>
-
-            <TextInput
-              placeholder={t('questionAnswer.namePlaceholder')}
-              placeholderTextColor="#888"
-              value={userName}
-              onChangeText={setUserName}
-              style={[styles.input, {
-                backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
-                color: isDarkMode ? '#fff' : '#1a1a1a',
-                textAlign: isRTL ? 'right' : 'left',
-              }]}
-            />
-            <TextInput
-              placeholder={t('questionAnswer.emailPlaceholder') + ' *'}
-              placeholderTextColor="#888"
-              value={userEmail}
-              onChangeText={setUserEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={[styles.input, {
-                backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
-                color: isDarkMode ? '#fff' : '#1a1a1a',
-                textAlign: isRTL ? 'right' : 'left',
-                borderColor: !isValidEmail(userEmail) && userEmail.length > 0 ? '#e74c3c' : 'transparent',
-                borderWidth: 1,
-              }]}
-            />
-            <TextInput
-              placeholder={t('questionAnswer.questionPlaceholder')}
-              placeholderTextColor="#888"
-              value={questionText}
-              onChangeText={(val) => setQuestionText(val.slice(0, MAX_QUESTION_LENGTH))}
-              multiline
-              numberOfLines={5}
-              style={[styles.input, styles.textArea, {
-                backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
-                color: isDarkMode ? '#fff' : '#1a1a1a',
-                textAlign: isRTL ? 'right' : 'left',
-              }]}
-            />
-            <Text style={[styles.charCount, { textAlign: isRTL ? 'left' : 'right' }]}>
-              {questionText.length}/{MAX_QUESTION_LENGTH}
-            </Text>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[
-                styles.submitBtn,
-                (isSubmitting || !questionText.trim() || !isValidEmail(userEmail)) && styles.submitBtnDisabled,
-              ]}
-              onPress={handleSubmitQuestion}
-              disabled={isSubmitting || !questionText.trim() || !isValidEmail(userEmail)}
+          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight, paddingBottom: Math.max(insets.bottom, 16) + 16, maxHeight: '88%' }]}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24 }}
             >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>
-                  {t('questionAnswer.submitQuestion')}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowQuestionModal(false)}
-              style={{ paddingVertical: 12 }}
-            >
-              <Text style={styles.cancelText}>
-                {t('common.cancel')}
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>
+                {t('questionAnswer.sendQuestion')}
               </Text>
-            </TouchableOpacity>
+              <Text style={styles.replyTime}>
+                {t('questionAnswer.replyTime')}
+              </Text>
+
+              <TextInput
+                placeholder={t('questionAnswer.namePlaceholder')}
+                placeholderTextColor="#888"
+                value={userName}
+                onChangeText={setUserName}
+                style={[styles.input, {
+                  backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
+                  color: isDarkMode ? '#fff' : '#1a1a1a',
+                  textAlign: isRTL ? 'right' : 'left',
+                }]}
+              />
+              <TextInput
+                placeholder={t('questionAnswer.emailPlaceholder') + ' *'}
+                placeholderTextColor="#888"
+                value={userEmail}
+                onChangeText={setUserEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={[styles.input, {
+                  backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
+                  color: isDarkMode ? '#fff' : '#1a1a1a',
+                  textAlign: isRTL ? 'right' : 'left',
+                  borderColor: !isValidEmail(userEmail) && userEmail.length > 0 ? '#e74c3c' : 'transparent',
+                  borderWidth: 1,
+                }]}
+              />
+              <TextInput
+                placeholder={t('questionAnswer.questionPlaceholder')}
+                placeholderTextColor="#888"
+                value={questionText}
+                onChangeText={(val) => setQuestionText(val.slice(0, MAX_QUESTION_LENGTH))}
+                multiline
+                numberOfLines={5}
+                style={[styles.input, styles.textArea, {
+                  backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
+                  color: isDarkMode ? '#fff' : '#1a1a1a',
+                  textAlign: isRTL ? 'right' : 'left',
+                }]}
+              />
+              <Text style={[styles.charCount, { textAlign: isRTL ? 'left' : 'right' }]}>
+                {questionText.length}/{MAX_QUESTION_LENGTH}
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.submitBtn,
+                  (isSubmitting || !questionText.trim() || !isValidEmail(userEmail)) && styles.submitBtnDisabled,
+                ]}
+                onPress={handleSubmitQuestion}
+                disabled={isSubmitting || !questionText.trim() || !isValidEmail(userEmail)}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>
+                    {t('questionAnswer.submitQuestion')}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowQuestionModal(false)}
+                style={{ paddingVertical: 12 }}
+              >
+                <Text style={styles.cancelText}>
+                  {t('common.cancel')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1197,10 +1325,45 @@ const centerContainerStyle: ViewStyle = {
 
 const styles = StyleSheet.create({
 
+  searchBar: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+    paddingHorizontal: 14,
+    minHeight: 46,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: fontRegular(),
+    fontSize: 14,
+    paddingVertical: 8,
+    includeFontPadding: false,
+  },
+  langNotice: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  langNoticeText: {
+    flex: 1,
+    fontFamily: fontRegular(),
+    fontSize: 12,
+    lineHeight: 18,
+  },
   assistantEntry: {
     marginHorizontal: Spacing.md,
     marginTop: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderRadius: 18,
     padding: 14,

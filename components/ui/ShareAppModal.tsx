@@ -17,6 +17,7 @@ import { fontBold, fontMedium, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
 import { fetchAppConfig, getStoreUrls, type ShareModalConfig } from '@/lib/app-config-api';
+import { APP_STORE_URL, PLAY_STORE_URL } from '@/constants/app';
 
 interface ShareAppModalProps {
   visible: boolean;
@@ -34,8 +35,8 @@ const DEFAULT_CONFIG: ShareModalConfig = {
     'كل من شارك هذا التطبيق كان له مثل أجر من انتفع به — اجعله صدقة جارية تعود عليك وعلى من تحب',
   shareMessageAr: 'حمّل تطبيق روح المسلم — صلوات، أذكار، قرآن وأوقات الصلاة',
   shareUrlFallback: 'https://roohmuslim.app',
-  shareUrlIos: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
-  shareUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
+  shareUrlIos: APP_STORE_URL,
+  shareUrlAndroid: PLAY_STORE_URL,
 };
 
 const ShareAppModal: React.FC<ShareAppModalProps> = ({ visible, onClose, onDismiss, onShared }) => {

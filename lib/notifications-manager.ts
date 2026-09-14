@@ -21,6 +21,7 @@ import { safeParseTime } from './safe-parse-time';
 import { maybeAnchorTimes } from './azkar-auto-anchor';
 import { resolveNotificationSound } from './resolve-notification-sound';
 import { fetchNotificationTexts, getNotifText } from './notification-texts';
+import { markPermissionRequested } from './permission-recovery';
 export { resolveNotificationSound } from './resolve-notification-sound';
 import { getNotificationIconAttachment } from './notification-icons';
 import { getFallbackDailyAyahForDate, getSeasonalAyahForDate } from './seasonal-ayah';
@@ -255,6 +256,7 @@ export async function requestNotifPermission(): Promise<boolean> {
   if (existing === 'granted') return true;
   if (existing === 'denied' && !canAskAgain) return false;
   if (Platform.OS === 'android' && Platform.Version >= 33) {
+    await markPermissionRequested('notifications');
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
   }

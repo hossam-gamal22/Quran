@@ -21,40 +21,11 @@ export interface PrayerTimes {
   lastThird: string;
 }
 
-export interface PrayerTimesResponse {
-  timings: {
-    Fajr: string;
-    Sunrise: string;
-    Dhuhr: string;
-    Asr: string;
-    Maghrib: string;
-    Isha: string;
-    Midnight: string;
-    Lastthird: string;
-  };
-  date: {
-    readable: string;
-    timestamp: string;
-    hijri: {
-      date: string;
-      day: string;
-      month: { number: number; en: string; ar: string };
-      year: string;
-    };
-    gregorian: {
-      date: string;
-      day: string;
-      month: { number: number; en: string };
-      year: string;
-    };
-  };
-  meta: {
-    latitude: number;
-    longitude: number;
-    timezone: string;
-    method: { id: number; name: string };
-  };
-}
+// Source of truth lives in prayer-api.ts. Re-exported here to keep all
+// historical imports from '@/lib/prayer-times' working without duplicating
+// the shape (any drift would break the offline cache + week-cache pipelines).
+import type { PrayerTimesResponse } from './prayer-api';
+export type { PrayerTimesResponse };
 
 export interface Location {
   latitude: number;
@@ -268,23 +239,15 @@ export const fetchMonthlyPrayerTimes = async (
   year: number,
   settings: PrayerSettings = DEFAULT_SETTINGS
 ): Promise<PrayerTimesResponse[]> => {
-  const { latitude, longitude } = location;
-
-  const url = `https://api.aladhan.com/v1/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${settings.calculationMethod}&school=${settings.asrJuristic}`;
-
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.code === 200 && data.status === 'OK') {
-      return data.data;
-    } else {
-      throw new Error('Failed to fetch monthly prayer times');
-    }
-  } catch (error) {
-    console.error('Error fetching monthly prayer times:', error);
-    throw error;
-  }
+  const { fetchMonthlyPrayerTimes: fetchRobust } = await import('./prayer-api');
+  return fetchRobust(
+    location.latitude,
+    location.longitude,
+    month,
+    year,
+    settings.calculationMethod,
+    settings.asrJuristic
+  ) as unknown as Promise<PrayerTimesResponse[]>;
 };
 
 // ========================================
@@ -309,8 +272,8 @@ export const parsePrayerTimes = (response: PrayerTimesResponse): PrayerTimes => 
     asr: cleanTime(timings.Asr),
     maghrib: cleanTime(timings.Maghrib),
     isha: cleanTime(timings.Isha),
-    midnight: cleanTime(timings.Midnight),
-    lastThird: cleanTime(timings.Lastthird),
+    midnight: cleanTime(timings.Midnight ?? ''),
+    lastThird: cleanTime(timings.Lastthird ?? ''),
   };
 };
 

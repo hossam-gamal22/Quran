@@ -15,6 +15,7 @@ import { Platform, Linking, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DISMISS_KEY_PREFIX = '@perm_banner_dismissed_';
+const REQUESTED_KEY_PREFIX = '@perm_requested_';
 const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 ساعة
 const OEM_AUTOSTART_DISMISS_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // شهر
 
@@ -41,6 +42,25 @@ export interface PermissionIssue {
   bodyAr: string;
   actionLabelAr: string;
   action: () => Promise<void>;
+}
+
+export async function markPermissionRequested(key: PermissionKey): Promise<void> {
+  try {
+    await AsyncStorage.setItem(`${REQUESTED_KEY_PREFIX}${key}`, String(Date.now()));
+  } catch {}
+}
+
+export async function hasPermissionBeenRequested(key: PermissionKey): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(`${REQUESTED_KEY_PREFIX}${key}`)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+async function shouldShowAndroidRequestedIssue(key: PermissionKey): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  return hasPermissionBeenRequested(key);
 }
 
 /**
@@ -192,6 +212,7 @@ export async function checkAllPermissions(): Promise<PermissionStatus> {
  */
 export async function requestLocationAndReschedule(): Promise<boolean> {
   try {
+    await markPermissionRequested('location');
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       // المستخدم رفض — افتح إعدادات النظام كحل بديل
@@ -257,7 +278,11 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
   const issues: PermissionIssue[] = [];
 
   // Critical: إشعارات معطّلة → التطبيق لا يستطيع تنبيه المستخدم نهائياً
-  if (s.notifications === 'denied' && (await shouldShowBanner('notifications'))) {
+  if (
+    s.notifications === 'denied' &&
+    (await shouldShowAndroidRequestedIssue('notifications')) &&
+    (await shouldShowBanner('notifications'))
+  ) {
     issues.push({
       key: 'notifications',
       severity: 'critical',
@@ -268,7 +293,11 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     });
   }
   // Critical: إنذار دقيق معطّل (أندرويد 12+) → الأذان مش هيشتغل في وقته
-  if (s.exactAlarm === 'denied' && (await shouldShowBanner('exactAlarm'))) {
+  if (
+    s.exactAlarm === 'denied' &&
+    (await shouldShowAndroidRequestedIssue('exactAlarm')) &&
+    (await shouldShowBanner('exactAlarm'))
+  ) {
     issues.push({
       key: 'exactAlarm',
       severity: 'critical',
@@ -280,7 +309,11 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
   }
 
   // Warning: تحسين البطارية مفعّل → الإشعارات قد تتأخر أو تختفي
-  if (s.batteryOptimization === 'optimized' && (await shouldShowBanner('batteryOptimization'))) {
+  if (
+    s.batteryOptimization === 'optimized' &&
+    (await shouldShowAndroidRequestedIssue('batteryOptimization')) &&
+    (await shouldShowBanner('batteryOptimization'))
+  ) {
     issues.push({
       key: 'batteryOptimization',
       severity: 'warning',
@@ -293,7 +326,11 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
 
   // Warning: OEM Auto-Start لشركات عدوانية (Xiaomi/Oppo/Vivo/Huawei/Honor)
   // حتى لو Battery Optimization معطل، الإشعارات تختفي بدون Auto-Start.
-  if (s.oemAutoStart === 'aggressive' && (await shouldShowBanner('oemAutoStart'))) {
+  if (
+    s.oemAutoStart === 'aggressive' &&
+    (await shouldShowAndroidRequestedIssue('oemAutoStart')) &&
+    (await shouldShowBanner('oemAutoStart'))
+  ) {
     const oemNameAr = getOemNameAr(s.manufacturer);
     issues.push({
       key: 'oemAutoStart',
@@ -305,19 +342,18 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
     });
   }
 
-  // Warning: موقع معطّل أو غير محدد → سيستخدم Makkah كـ fallback
-  // نعرض التنبيه في حالتي denied و undetermined حتى يعرف المستخدم،
-  // والزر يطلب الإذن مباشرة (أسرع من فتح الإعدادات).
-  if ((s.location === 'denied' || s.location === 'undetermined') && (await shouldShowBanner('location'))) {
-    const isDenied = s.location === 'denied';
+  // Warning: موقع مرفوض بعد طلبه → سيستخدم Makkah كـ fallback
+  if (
+    s.location === 'denied' &&
+    (await shouldShowAndroidRequestedIssue('location')) &&
+    (await shouldShowBanner('location'))
+  ) {
     issues.push({
       key: 'location',
       severity: 'warning',
-      titleAr: isDenied ? 'موقعك غير محدد' : 'فعّل الموقع لمواقيت دقيقة',
-      bodyAr: isDenied
-        ? 'مواقيت الصلاة معتمدة حالياً على مكة. فعّل الموقع لمواقيت دقيقة لمدينتك.'
-        : 'للحصول على مواقيت صلاة دقيقة لمدينتك، فعّل خدمة الموقع.',
-      actionLabelAr: isDenied ? 'فتح الإعدادات' : 'تفعيل الموقع',
+      titleAr: 'موقعك غير محدد',
+      bodyAr: 'مواقيت الصلاة معتمدة حالياً على مكة. فعّل الموقع لمواقيت دقيقة لمدينتك.',
+      actionLabelAr: 'فتح الإعدادات',
       action: async () => {
         await requestLocationAndReschedule();
       },
@@ -326,7 +362,12 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
 
   // Phase 4: DND مفعّل + bypass غير مسموح → الأذان قد يُكتم
   // نعرض التنبيه فقط لو DND مفعّل حالياً (لتقليل الإزعاج)
-  if (s.dndAccess === 'denied' && s.dndActive && (await shouldShowBanner('dndAccess'))) {
+  if (
+    s.dndAccess === 'denied' &&
+    s.dndActive &&
+    (await shouldShowAndroidRequestedIssue('dndAccess')) &&
+    (await shouldShowBanner('dndAccess'))
+  ) {
     issues.push({
       key: 'dndAccess',
       severity: 'warning',
@@ -369,6 +410,7 @@ export async function openAppSettings(): Promise<void> {
  */
 export async function openExactAlarmSettings(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  await markPermissionRequested('exactAlarm');
   try {
     const FullAdhan = (NativeModules as any).FullAdhanModule;
     if (FullAdhan?.requestExactAlarmPermission) {
@@ -386,6 +428,7 @@ export async function openExactAlarmSettings(): Promise<void> {
  */
 export async function openBatteryOptimizationSettings(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  await markPermissionRequested('batteryOptimization');
   try {
     const FullAdhan = (NativeModules as any).FullAdhanModule;
     if (FullAdhan?.requestIgnoreBatteryOptimizations) {
@@ -402,6 +445,7 @@ export async function openBatteryOptimizationSettings(): Promise<void> {
  */
 export async function openOemAutoStartSettings(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  await markPermissionRequested('oemAutoStart');
   try {
     const FullAdhan = (NativeModules as any).FullAdhanModule;
     if (FullAdhan?.openOemAutoStartSettings) {
@@ -420,6 +464,7 @@ export async function openOemAutoStartSettings(): Promise<void> {
  */
 export async function openDndAccessSettings(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  await markPermissionRequested('dndAccess');
   try {
     const FullAdhan = (NativeModules as any).FullAdhanModule;
     if (FullAdhan?.openDndAccessSettings) {

@@ -2,7 +2,7 @@
 // كاش أسبوعي لمواقيت الصلاة مع تقدير ذكي للأيام اللاحقة
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PrayerTimes, parsePrayerTimes, applyAdjustments, PrayerSettings, getCachedPrayerTimes, cachePrayerTimes, getTodayDateString } from '@/lib/prayer-times';
+import { PrayerTimes, parsePrayerTimes, applyAdjustments, PrayerSettings, getCachedPrayerTimes, cachePrayerTimes, getTodayDateString, type PrayerTimesResponse } from '@/lib/prayer-times';
 import { calculateLocalPrayerTimes, getCountryFallbackPrayerTimes } from '@/lib/country-prayer-defaults';
 import { getStoredLocation } from '@/lib/prayer-times';
 import { getEffectivePrayerCalcSettings } from '@/lib/prayer-settings-source';
@@ -339,7 +339,7 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
  * Called after successful API fetch to ensure offline coverage.
  */
 export function buildWeekEntries(
-  monthlyData: Array<{ timings: Record<string, string>; date: { gregorian: { date: string; day: string; month: { number: number }; year: string } } }>,
+  monthlyData: PrayerTimesResponse[],
   settings: PrayerSettings | { adjustments?: Record<string, number> },
   todayIndex?: number,
 ): DayPrayerEntry[] {

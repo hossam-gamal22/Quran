@@ -19,13 +19,12 @@ import Slider from '@react-native-community/slider';
 import { useLocalSearchParams } from 'expo-router';
 
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { InlineMrecAd } from '@/components/ads/InlineMrecAd';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { ContentLanguageNotice } from '@/components/ui/ContentLanguageNotice';
 import { PdfShareButton, PdfShareErrorModal } from '@/components/ui/PdfShareControls';
-import { Spacing } from '@/constants/theme';
+import { Spacing, ModalColors } from '@/constants/theme';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useColors } from '@/hooks/use-colors';
@@ -340,7 +339,7 @@ function AudioStatusModal({
   const body = bodyOverride || (isLoading ? labels.loadingAudioBody : mode === 'offline' ? labels.noInternetBody : labels.audioErrorBody);
   const icon = iconOverride || (isLoading ? 'headphones' : mode === 'offline' ? 'wifi-off' : 'alert-circle-outline');
   const tint = mode === 'offline' ? '#f59e0b' : mode === 'error' ? '#ef4444' : ACCENT;
-  const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
+  const cardBg = colors.isDarkMode ? ModalColors.cardDark : ModalColors.cardLight;
   const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
@@ -351,7 +350,7 @@ function AudioStatusModal({
             s.modalCard,
             {
               backgroundColor: cardBg,
-              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
             },
           ]}
         >
@@ -364,7 +363,7 @@ function AudioStatusModal({
           {isLoading ? (
             <Pressable
               onPress={onClose}
-              style={[s.modalButton, s.modalButtonSecondary, { borderColor: colors.textLight, marginTop: 18, alignSelf: 'stretch' }]}
+              style={[s.modalButton, s.modalButtonSecondary, { marginTop: 14, paddingHorizontal: 36, flex: 0 }]}
             >
               <Text style={[s.modalButtonText, { color: colors.text }]}>{labels.close}</Text>
             </Pressable>
@@ -393,7 +392,7 @@ function StoriesUpdateModal({
 }) {
   const labels = copy();
   const s = useScaledStyles(_s, colors.fs);
-  const cardBg = colors.isDarkMode ? 'rgba(15,26,20,0.92)' : 'rgba(255,255,255,0.94)';
+  const cardBg = colors.isDarkMode ? ModalColors.cardDark : ModalColors.cardLight;
   const iconBg = colors.isDarkMode ? 'rgba(6,79,47,0.16)' : 'rgba(6,79,47,0.12)';
 
   return (
@@ -404,7 +403,7 @@ function StoriesUpdateModal({
             s.modalCard,
             {
               backgroundColor: cardBg,
-              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+              borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
             },
           ]}
         >
@@ -899,8 +898,6 @@ function StoryListening({
           />
         </View>
 
-        <InlineMrecAd screen={SCREEN_KEY} darkMode={isDarkMode} />
-
         {hasTranscript && (
           <>
             <View style={s.sectionHeader}>
@@ -934,8 +931,6 @@ function StoryListening({
             </View>
 
             <SourcesList sources={story.sources && story.sources.length > 0 ? story.sources : getStorySources(story)} />
-
-            <InlineMrecAd screen={SCREEN_KEY} darkMode={isDarkMode} />
           </>
         )}
       </ScrollView>
@@ -1426,21 +1421,16 @@ const _s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   modalCard: {
     width: '100%',
     maxWidth: 380,
     borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     paddingVertical: 28,
     paddingHorizontal: 22,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 22,
-    elevation: 8,
   },
   modalIconCircle: {
     width: 78,
@@ -1483,8 +1473,8 @@ const _s = StyleSheet.create({
     backgroundColor: ACCENT,
   },
   modalButtonSecondary: {
-    borderWidth: 1,
-    backgroundColor: 'transparent',
+    borderWidth: 0,
+    backgroundColor: 'rgba(127,127,127,0.18)',
   },
   modalButtonText: {
     fontFamily: fontSemiBold(),

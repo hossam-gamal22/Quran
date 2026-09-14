@@ -1,7 +1,6 @@
 import { View, type ViewProps, StyleSheet } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { cn } from "@/lib/utils";
 import BackgroundWrapper from "@/components/ui/BackgroundWrapper";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useColors } from "@/hooks/use-colors";
@@ -9,9 +8,6 @@ import { DynamicScreenAds } from "@/components/ads/DynamicScreenAds";
 
 export interface ScreenContainerProps extends ViewProps {
   edges?: Edge[];
-  className?: string;
-  containerClassName?: string;
-  safeAreaClassName?: string;
   useAppBackground?: boolean;
   /** When set, auto-renders admin-configured ads for this screen */
   screenKey?: string;
@@ -20,36 +16,26 @@ export interface ScreenContainerProps extends ViewProps {
 }
 
 /**
- * ScreenContainer – handles SafeArea + background color.
- * Uses NativeWind classes with StyleSheet fallback to prevent white screens.
+ * ScreenContainer – handles SafeArea + background color via StyleSheet.
  */
 export function ScreenContainer({
   children,
   edges = ["top", "left", "right"],
-  className,
-  containerClassName,
-  safeAreaClassName,
   style,
   useAppBackground = true,
   screenKey,
   inTabScreen,
   ...props
 }: ScreenContainerProps) {
-  const { settings, isDarkMode } = useSettings();
+  const { settings } = useSettings();
   const colors = useColors();
   const bgKey = settings.display.appBackground;
   const hasBg = useAppBackground;
 
   const content = (
-    <SafeAreaView
-      edges={edges}
-      className={cn("flex-1", safeAreaClassName)}
-      style={styles.safeArea}
-    >
+    <SafeAreaView edges={edges} style={styles.safeArea}>
       <StatusBar style={colors.statusBarStyle} />
-      <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
-        {children}
-      </View>
+      <View style={[styles.inner, style]}>{children}</View>
       {screenKey && <DynamicScreenAds screen={screenKey} position="bottom" inTabScreen={inTabScreen} />}
     </SafeAreaView>
   );
@@ -73,17 +59,12 @@ export function ScreenContainer({
   }
 
   return (
-    <View
-      className={cn("flex-1", "bg-background", containerClassName)}
-      style={[styles.container, { backgroundColor: colors.background }]}
-      {...props}
-    >
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...props}>
       {content}
     </View>
   );
 }
 
-// ─── Fallback styles (used when NativeWind classes don't apply yet) ──────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { db } from '../firebase';
 import { Shield, Save, Loader2, ToggleLeft, ToggleRight, Wifi, AlertCircle } from 'lucide-react';
 
@@ -118,6 +119,7 @@ export default function FeatureGating() {
     setSaving(true);
     try {
       await setDoc(doc(db, 'config', 'feature-gating'), config);
+      await bumpContentVersion('featureGating');
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {

@@ -378,11 +378,27 @@ export function GlassHTML({
   }
 
   // With glass container (iOS BlurView)
+  if (Platform.OS === 'android') {
+    return (
+      <View style={[styles.glassOuter, { borderRadius }]}>
+        <View
+          style={{
+            backgroundColor: colors.background,
+            borderRadius,
+            padding,
+          }}
+        >
+          {htmlRenderer}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.glassOuter, { borderRadius }]}>
       <BlurView
-       
-        intensity={Platform.OS === 'ios' ? blurIntensity : Math.min(blurIntensity, 30)}
+
+        intensity={blurIntensity}
         tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={[styles.blurView, { borderRadius }]}
       >

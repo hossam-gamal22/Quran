@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, where } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   getAllArabicSeasonalBannerCopies,
@@ -688,15 +689,17 @@ export default function WelcomeBanner() {
 
       // Ensure titles/subtitles ar field is synced with title/subtitle
       const unifiedBanner = withUnifiedSeasonCopy(banner);
-      const bannerToSave = {
+      const bannerToSave: WelcomeBannerData = {
         ...unifiedBanner,
         titles: {
           ...unifiedBanner.titles,
           ar: unifiedBanner.titles?.ar || unifiedBanner.title,
+          en: unifiedBanner.titles?.en || unifiedBanner.titles?.ar || unifiedBanner.title,
         },
         subtitles: {
           ...unifiedBanner.subtitles,
           ar: unifiedBanner.subtitles?.ar || unifiedBanner.subtitle,
+          en: unifiedBanner.subtitles?.en || unifiedBanner.subtitles?.ar || unifiedBanner.subtitle,
         },
       };
 
@@ -715,6 +718,10 @@ export default function WelcomeBanner() {
           ...legacyMetadata,
           updatedAt,
         }, { merge: true }),
+      ]);
+      await Promise.all([
+        bumpContentVersion('appSettings'),
+        bumpContentVersion('seasonalBannerCopy'),
       ]);
       setBanner(bannerToSave);
       setSeasonCopyDrafts(savedCopies);

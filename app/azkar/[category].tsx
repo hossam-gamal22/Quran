@@ -150,14 +150,14 @@ const AFTER_PRAYER_TABS: Record<string, Record<string, string>> = {
     ms: 'Umum', hi: 'सामान्य', bn: 'সাধারণ', ru: 'Общие',
   },
   after_fajr: {
-    ar: 'بعد الفجر', en: 'After Fajr', fr: 'Apr\u00e8s Fajr', de: 'Nach Fajr',
-    tr: 'Sabahtan Sonra', es: 'Despu\u00e9s del Fajr', ur: 'فجر کے بعد',
-    id: 'Setelah Subuh', ms: 'Selepas Subuh', hi: 'फज्र के बाद', bn: 'ফজরের পর', ru: 'После Фаджр',
+    ar: 'الفجر', en: 'Fajr', fr: 'Fajr', de: 'Fajr',
+    tr: 'Sabah', es: 'Fajr', ur: 'فجر',
+    id: 'Subuh', ms: 'Subuh', hi: 'फज्र', bn: 'ফজর', ru: 'Фаджр',
   },
   after_maghrib: {
-    ar: 'بعد المغرب', en: 'After Maghrib', fr: 'Apr\u00e8s Maghrib', de: 'Nach Maghrib',
-    tr: 'Ak\u015famdan Sonra', es: 'Despu\u00e9s del Maghrib', ur: 'مغرب کے بعد',
-    id: 'Setelah Maghrib', ms: 'Selepas Maghrib', hi: 'मगरिब के बाद', bn: 'মাগরিবের পর', ru: 'После Магриб',
+    ar: 'المغرب', en: 'Maghrib', fr: 'Maghrib', de: 'Maghrib',
+    tr: 'Ak\u015fam', es: 'Maghrib', ur: 'مغرب',
+    id: 'Maghrib', ms: 'Maghrib', hi: 'मगरिब', bn: 'মাগরিব', ru: 'Магриб',
   },
 };
 
@@ -1520,7 +1520,6 @@ export default function CategoryAzkarScreen() {
             selected={selectedSubcategory}
             onSelect={handleSubcategoryChange}
             indicatorColor={categoryInfo?.color}
-            scrollable
             style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 4 }}
           />
         )}
@@ -1994,8 +1993,8 @@ export default function CategoryAzkarScreen() {
                         <View style={[styles.benefitStarCircle, { backgroundColor: categoryInfo.color + '15' }]}>
                           <MaterialCommunityIcons name="star" size={16} color={categoryInfo.color} />
                         </View>
-                        <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}> 
-                          <Text style={[styles.benefitText, { color: categoryInfo.color, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}> 
+                        <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}>
+                          <Text style={[styles.benefitText, { color: categoryInfo.color, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                             {getZikrBenefit(currentZikr, language) || ''}
                           </Text>
                         </View>
@@ -2611,9 +2610,9 @@ const styles = StyleSheet.create({
   benefitContainer: {
     alignSelf: 'stretch',
     alignItems: 'center',
-    padding: 12,
-    paddingTop: 22,
-    borderRadius: 12,
+    padding: 14,
+    paddingTop: 24,
+    borderRadius: 24,
   },
   benefitText: {
     fontSize: 14,
@@ -2772,7 +2771,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: 10,
-    borderRadius: 10,
+    borderRadius: 20,
     marginBottom: 10,
     gap: Spacing.sm,
   },

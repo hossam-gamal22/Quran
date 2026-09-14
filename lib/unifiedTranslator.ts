@@ -462,10 +462,17 @@ async function tryLingva(
 export async function translateToAll(
   req: TranslateRequest,
   onProgress?: (lang: LangCode, result: TranslationResult) => void,
+  targetLangs?: string[],
 ): Promise<AllTranslations> {
   const results: Partial<AllTranslations> = {};
 
-  for (const lang of LANGUAGES) {
+  // When targetLangs is given, only translate those languages (e.g. ['en']) so we
+  // don't spend network calls on languages the caller will discard.
+  const langs = targetLangs && targetLangs.length
+    ? LANGUAGES.filter(l => targetLangs.includes(l.code))
+    : LANGUAGES;
+
+  for (const lang of langs) {
     const code = lang.code;
 
     // Arabic source text — return original unchanged

@@ -27,6 +27,11 @@ import { useTranslation } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
 const ACCENT = '#0d8e62';
+// Calmer green for the primary purchase CTA — keeps the brand without being a "loud" pop.
+const SUBSCRIBE_GREEN = '#0d8e62';
+// Distinct neutral tone for "Restore purchases" so it reads as a secondary link rather than
+// competing with the primary CTA.
+const RESTORE_COLOR = '#7da8c2';
 
 // Hardcoded premium features that are ACTUALLY implemented and gated
 const PREMIUM_FEATURES = [
@@ -328,9 +333,9 @@ export default function SubscriptionScreen() {
           activeOpacity={0.7}
         >
           {restoring ? (
-            <ActivityIndicator size="small" color={ACCENT} />
+            <ActivityIndicator size="small" color={RESTORE_COLOR} />
           ) : (
-            <Text style={[styles.restoreBtnText, { color: ACCENT }]}>
+            <Text style={[styles.restoreBtnText, { color: RESTORE_COLOR }]}>
               {t('subscription.restorePurchases')}
             </Text>
           )}
@@ -459,7 +464,7 @@ const _styles = StyleSheet.create({
     left: 12,
   },
   purchaseBtn: {
-    backgroundColor: ACCENT,
+    backgroundColor: SUBSCRIBE_GREEN,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',

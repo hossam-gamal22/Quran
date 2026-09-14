@@ -1,7 +1,7 @@
 // app/honor-board.tsx
 // لوحة الشرف — عرض الفائزين الشهريين ورتبة المستخدم
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,14 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { GlassCard } from '@/components/ui';
+import { ModalColors } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncMonthlyEngagementFromLocalWorship, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS, mergeCurrentUserIntoLeaderboard } from '@/lib/rewards-manager';
 import { getUserId, getDisplayName } from '@/lib/firebase-user';
 import type { RewardsConfig } from '@/types/rewards';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -38,6 +39,11 @@ const MEDAL_STYLES = (isDark: boolean) => [
 
 const LEADERBOARD_PREVIEW_COUNT = 5;
 const LEADERBOARD_MAX_VISIBLE_COUNT = 50;
+
+// Detect Arabic/Persian/Urdu script so writingDirection follows the name's own
+// script (iOS left-aligns a Latin string when writingDirection is forced to 'rtl').
+const ARABIC_SCRIPT_RE = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
+const isNameRTL = (name?: string) => ARABIC_SCRIPT_RE.test(name || '');
 type MaterialIconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 type SelectedPointInfo = {
   title: string;
@@ -85,9 +91,11 @@ export default function HonorBoard() {
   const [selectedPointInfo, setSelectedPointInfo] = useState<SelectedPointInfo | null>(null);
   const isArabic = (settings.language || 'ar') === 'ar';
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, []),
+  );
 
   const loadData = async () => {
     // Wrap Firestore work with a hard timeout so the screen never hangs
@@ -110,7 +118,11 @@ export default function HonorBoard() {
       let syncedInfo: Awaited<ReturnType<typeof syncMonthlyEngagementFromLocalWorship>> = null;
       if (userId) {
         setCurrentUserId(userId);
-        syncedInfo = await syncMonthlyEngagementFromLocalWorship(userId).catch(() => null);
+        // Force=true bypasses the 60s throttle and the local-fingerprint
+        // short-circuit. When the user actively opens this screen we always
+        // want a fresh reconcile against the server, even if a background
+        // task just ran moments ago.
+        syncedInfo = await syncMonthlyEngagementFromLocalWorship(userId, { force: true }).catch(() => null);
       }
 
       let board = await withTimeout(getMonthlyLeaderboard(LEADERBOARD_MAX_VISIBLE_COUNT));
@@ -130,7 +142,13 @@ export default function HonorBoard() {
         setUserScore(totalScore);
 
         const displayName = (syncedInfo?.displayName || userName || '').trim();
-        const canShowCurrentUser = !!displayName && totalScore > 0 && syncedInfo?.visibleOnLeaderboard === true;
+        // The user is eligible to appear if the fresh sync confirmed it OR
+        // the cached leaderboard already contains them (meaning the server
+        // previously deemed them eligible). This keeps the user merged with
+        // their fresh local score even on a sync failure / transient skip.
+        const existsInBoard = board.some(u => u.userId === userId);
+        const isLeaderboardVisible = syncedInfo?.visibleOnLeaderboard === true || existsInBoard;
+        const canShowCurrentUser = !!displayName && totalScore > 0 && isLeaderboardVisible;
         if (canShowCurrentUser) {
           board = mergeCurrentUserIntoLeaderboard(
             board,
@@ -575,9 +593,9 @@ export default function HonorBoard() {
                       )}
                       {/* Name */}
                       <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexShrink: 1, width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexShrink: 1, width: '100%', justifyContent: 'flex-start' }}>
                           <Text
-                            style={[styles.leaderboardName, { flexShrink: 1, color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                            style={[styles.leaderboardName, { flexShrink: 1, color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isNameRTL(user.displayName) ? 'rtl' : 'ltr' }]}
                           >
                             {user.displayName}
                           </Text>
@@ -660,7 +678,7 @@ export default function HonorBoard() {
                       </View>
                     )}
                     <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                      <Text style={[styles.winnerName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                      <Text style={[styles.winnerName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isNameRTL(winner.displayName) ? 'rtl' : 'ltr' }]}>
                         {winner.displayName}
                       </Text>
                       <Text style={[styles.winnerScore, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
@@ -690,8 +708,8 @@ export default function HonorBoard() {
         <View style={[
           styles.modalSheet,
           {
-            backgroundColor: isDarkMode ? '#0f1a14' : '#ffffff',
-            borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight,
+            borderColor: isDarkMode ? ModalColors.borderDark : ModalColors.borderLight,
           },
         ]}>
           <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -736,9 +754,9 @@ export default function HonorBoard() {
                       </View>
                     )}
                     <View style={[styles.winnerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexShrink: 1, width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexShrink: 1, width: '100%', justifyContent: 'flex-start' }}>
                         <Text
-                          style={[styles.leaderboardName, { flexShrink: 1, color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+                          style={[styles.leaderboardName, { flexShrink: 1, color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isNameRTL(user.displayName) ? 'rtl' : 'ltr' }]}
                         >
                           {user.displayName}
                         </Text>
@@ -777,8 +795,8 @@ export default function HonorBoard() {
 	        <View style={[
 	          styles.pointsInfoModal,
 	          {
-	            backgroundColor: isDarkMode ? '#0f1a14' : '#ffffff',
-	            borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+	            backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight,
+	            borderColor: isDarkMode ? ModalColors.borderDark : ModalColors.borderLight,
 	          },
 	        ]}>
 	          {selectedPointInfo && (

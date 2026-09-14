@@ -22,7 +22,7 @@
   {
     "id": "dayThuluth",
     "category": "date",
-    "titleAr": "اليوم - ثلث",
+    "titleAr": "اليوم ثلث",
     "titleEn": "Day Thuluth",
     "sizes": [
       "small",
@@ -45,7 +45,7 @@
   {
     "id": "dayDigital",
     "category": "date",
-    "titleAr": "اليوم - رقمي",
+    "titleAr": "اليوم رقمي",
     "titleEn": "Day Digital",
     "sizes": [
       "small"
@@ -98,7 +98,7 @@
   {
     "id": "monthThuluth",
     "category": "date",
-    "titleAr": "الشهر - ثلث",
+    "titleAr": "الشهر ثلث",
     "titleEn": "Month Thuluth",
     "sizes": [
       "medium"

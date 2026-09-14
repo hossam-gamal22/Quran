@@ -11,6 +11,7 @@ import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { t } from '@/lib/i18n';
 import { addIslamicPdfAppLinkAnnotations } from '@/lib/pdf/appLinkAnnotations';
 import { buildIslamicPdfHtmlFromHtmlContent } from '@/lib/pdf/islamicPdfTemplate';
+import { renamePdfToTitle } from '@/lib/pdf/shareIslamicPdf';
 
 export type PdfTemplate = 'emerald' | 'royal' | 'classic' | string;
 export function getPdfTemplates(): { key: PdfTemplate; label: string; desc: string }[] {
@@ -443,7 +444,7 @@ interface PdfLinks {
 }
 
 const DEFAULT_PDF_LINKS: PdfLinks = {
-  appStore: 'https://apps.apple.com/us/app/%D8%B1%D9%88%D8%AD-%D8%A7%D9%84%D9%85%D8%B3%D9%84%D9%85-rooh-al-muslim/id6761651911',
+  appStore: 'https://apps.apple.com/app/id6761651911',
   playStore: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
 };
 
@@ -518,13 +519,14 @@ export async function exportAsPDF(title: string, htmlContent: string, templateOv
       left: 0,
     },
   });
+  const namedUri = await renamePdfToTitle(uri, title).catch(() => uri);
   try {
-    await addIslamicPdfAppLinkAnnotations(uri);
+    await addIslamicPdfAppLinkAnnotations(namedUri);
   } catch (error) {
     console.log('PDF link annotation failed', error);
   }
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  await Sharing.shareAsync(uri, {
+  await Sharing.shareAsync(namedUri, {
     mimeType: 'application/pdf',
     UTI: 'com.adobe.pdf',
     dialogTitle: title,

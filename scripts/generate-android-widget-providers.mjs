@@ -9,7 +9,7 @@
 // Outputs: Java class + widgetprovider XML + strings.xml description +
 // AndroidManifest <receiver> entry.
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -55,8 +55,8 @@ const BASE_PROVIDERS = [
     className: 'RoohSmall',
     xmlRes: 'widgetprovider_roohsmall',
     stringKey: 'widget_roohsmall_description',
-    label: 'Small Widget',
-    description: 'اختر نوع الويدجت بعد الإضافة',
+    label: 'الويدجت الصغيرة',
+    description: 'أضفها ثم اضغط مطولًا واختر النمط.',
     ...SIZE_DIMS.small,
     preview: rememberPreview('daySimple', 'small'),
     category: 'home_screen',
@@ -65,8 +65,8 @@ const BASE_PROVIDERS = [
     className: 'RoohMedium',
     xmlRes: 'widgetprovider_roohmedium',
     stringKey: 'widget_roohmedium_description',
-    label: 'Medium Widget',
-    description: 'اختر نوع الويدجت بعد الإضافة',
+    label: 'الويدجت المتوسطة',
+    description: 'أضفها ثم اضغط مطولًا واختر النمط.',
     ...SIZE_DIMS.medium,
     preview: rememberPreview('daySimple', 'medium'),
     category: 'home_screen',
@@ -75,8 +75,8 @@ const BASE_PROVIDERS = [
     className: 'RoohLarge',
     xmlRes: 'widgetprovider_roohlarge',
     stringKey: 'widget_roohlarge_description',
-    label: 'Large Widget',
-    description: 'اختر نوع الويدجت بعد الإضافة',
+    label: 'الويدجت الكبيرة',
+    description: 'أضفها ثم اضغط مطولًا واختر النمط.',
     ...SIZE_DIMS.large,
     preview: rememberPreview('prayerTable', 'large'),
     category: 'home_screen',
@@ -88,8 +88,8 @@ const LOCK_PROVIDERS = [
     className: 'RoohLockDayThuluth',
     xmlRes: 'widgetprovider_roohlockdaythuluth',
     stringKey: 'widget_roohlockdaythuluth_description',
-    label: 'اليوم - ثلث',
-    description: 'اليوم - ثلث',
+    label: 'اليوم ثلث',
+    description: 'اليوم ثلث',
     ...SIZE_DIMS.small,
     preview: rememberPreview('dayThuluth', 'small'),
     category: 'keyguard',
@@ -98,8 +98,8 @@ const LOCK_PROVIDERS = [
     className: 'RoohLockMonthThuluth',
     xmlRes: 'widgetprovider_roohlockmonththuluth',
     stringKey: 'widget_roohlockmonththuluth_description',
-    label: 'التاريخ الهجري',
-    description: 'التاريخ الهجري',
+    label: 'الشهر ثلث',
+    description: 'الشهر ثلث',
     ...SIZE_DIMS.medium,
     preview: rememberPreview('monthThuluth', 'medium'),
     category: 'keyguard',
@@ -232,6 +232,17 @@ const providers = [
   ...LOCK_PROVIDERS,
 ];
 
+const STALE_PROVIDER_CLASSES = [
+  // Removed from the current iOS/gallery registry. Keeping these receivers in
+  // the Android manifest makes Launcher show old small/large variants that no
+  // longer exist in the app gallery.
+  'RoohVerseOfDaySmall',
+  'RoohVerseOfDayLarge',
+  'RoohAzkarMorningSmall',
+  'RoohAzkarEveningSmall',
+  'RoohDailyDhikrSmall',
+];
+
 // Keep the Android launcher widget picker visually aligned with the in-app
 // gallery. These PNGs are produced by the React snapshot pump and committed as
 // drawable-nodpi resources so Android can show real thumbnails before add-time.
@@ -255,15 +266,22 @@ for (const [lockedDrawable, baseDrawable] of lockedPreviewDrawables.entries()) {
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@drawable/${baseDrawable}" />
     <item
-        android:width="22dp"
-        android:height="22dp"
+        android:width="14dp"
+        android:height="14dp"
         android:gravity="top|end"
-        android:top="8dp"
-        android:right="8dp"
+        android:top="6dp"
+        android:right="6dp"
         android:drawable="@drawable/ic_widget_premium_lock_badge" />
 </layer-list>
 `;
   writeFileSync(dest, content);
+}
+for (const file of readdirSync(ANDROID_DRAWABLE_RES)) {
+  if (!/^widget_preview_.*_locked\.xml$/.test(file)) continue;
+  const drawableName = file.replace(/\.xml$/, '');
+  if (!lockedPreviewDrawables.has(drawableName)) {
+    unlinkSync(resolve(ANDROID_DRAWABLE_RES, file));
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,6 +330,7 @@ ${keyguardLine}    android:previewImage="@drawable/${provider.preview}"
 // Update strings.xml
 // ─────────────────────────────────────────────────────────────────────────────
 let stringsXml = readFileSync(STRINGS, 'utf-8');
+const originalStringsXml = stringsXml;
 const stringMap = new Map();
 for (const provider of providers) {
   stringMap.set(provider.stringKey, provider.description);
@@ -331,6 +350,8 @@ if (newStringLines.length > 0) {
     '</resources>',
     `${newStringLines.join('\n')}\n</resources>`,
   );
+}
+if (stringsXml !== originalStringsXml) {
   writeFileSync(STRINGS, stringsXml);
 }
 
@@ -340,10 +361,24 @@ if (newStringLines.length > 0) {
 // churned unnecessarily.
 // ─────────────────────────────────────────────────────────────────────────────
 let manifestXml = readFileSync(MANIFEST, 'utf-8');
+const originalManifestXml = manifestXml;
 const receiverBlocks = [];
+for (const className of STALE_PROVIDER_CLASSES) {
+  const staleReceiver = new RegExp(
+    `\\s*<receiver\\b(?=[^>]*android:name="\\.widget\\.${escapeRegExp(className)}")[\\s\\S]*?</receiver>`,
+    'g',
+  );
+  manifestXml = manifestXml.replace(staleReceiver, '');
+}
 for (const provider of providers) {
   const className = provider.className;
-  if (manifestXml.includes(`android:name=".widget.${className}"`)) continue; // already there
+  if (manifestXml.includes(`android:name=".widget.${className}"`)) {
+    const receiver = new RegExp(
+      `(<receiver\\b(?=[^>]*android:name="\\.widget\\.${escapeRegExp(className)}")[^>]*android:label=")[^"]*(")`,
+    );
+    manifestXml = manifestXml.replace(receiver, `$1${escapeXml(provider.label)}$2`);
+    continue;
+  }
   receiverBlocks.push(
     `    <receiver android:name=".widget.${className}" android:exported="false" android:label="${escapeXml(provider.label)}">
         <intent-filter>
@@ -359,8 +394,8 @@ if (receiverBlocks.length > 0) {
   if (idx === -1) throw new Error('Could not find </application> in AndroidManifest.xml');
   manifestXml =
     manifestXml.slice(0, idx) + receiverBlocks.join('\n') + '\n' + manifestXml.slice(idx);
-  writeFileSync(MANIFEST, manifestXml);
 }
+if (manifestXml !== originalManifestXml) writeFileSync(MANIFEST, manifestXml);
 
 console.log(`✓ Generated ${homeProviders.length} Android home-screen variant providers`);
 console.log(`✓ Generated ${LOCK_PROVIDERS.length} Android keyguard providers`);

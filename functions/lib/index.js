@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processEngagementTriggers = exports.runEngagementNotifications = exports.cleanupFcmPrayerDedupe = exports.sendPrayerPushFallback = exports.processScheduledAdminNotifications = exports.validateAdminSession = exports.verifyAdminPassword = exports.selectMonthlyWinners = exports.guardMonthlyEngagementRegression = exports.answerUserQuestionAutomatically = void 0;
+exports.processEngagementTriggers = exports.runEngagementNotifications = exports.cleanupFcmPrayerDedupe = exports.sendPrayerPushFallback = exports.processScheduledAdminNotifications = exports.validateAdminSession = exports.verifyAdminPassword = exports.cleanupActivityDaily = exports.cacheLeaderboardSnapshot = exports.selectMonthlyWinners = exports.guardMonthlyEngagementRegression = exports.answerUserQuestionAutomatically = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -1793,13 +1793,17 @@ exports.guardMonthlyEngagementRegression = functions.firestore
     });
 });
 /**
- * Scheduled Cloud Function: runs at 00:05 on the 1st of every month.
+ * Scheduled Cloud Function: runs at 12:00 on the 3rd of every month.
  * Selects top winners from the previous month's leaderboard,
  * grants them admin premium, and sends push notifications.
+ *
+ * The 48h+ grace period after month-end gives clients time to upload
+ * late activity (background sync, force-sync on first app open) so
+ * users with strong last-minute activity aren't penalised for not
+ * having opened the app right at midnight.
  */
-exports.selectMonthlyWinners = (0, scheduler_1.onSchedule)({ schedule: '5 0 1 * *', timeZone: 'Asia/Riyadh', secrets: ['EXPO_ACCESS_TOKEN'] }, async () => {
+exports.selectMonthlyWinners = (0, scheduler_1.onSchedule)({ schedule: '0 12 3 * *', timeZone: 'Asia/Riyadh', secrets: ['EXPO_ACCESS_TOKEN'] }, async () => {
     try {
-        // Calculate previous month key (YYYY-MM-v2 format)
         const now = new Date();
         const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-v2`;
@@ -1818,35 +1822,67 @@ exports.selectMonthlyWinners = (0, scheduler_1.onSchedule)({ schedule: '5 0 1 * 
         }
         const winnersCount = config.winnersCount || 3;
         const rewardDurationDays = config.rewardDurationDays || 30;
-        // Query top users for previous month
-        const snapshot = await db.collection('users')
-            .where('monthlyEngagement.month', '==', monthKey)
-            .orderBy('monthlyEngagement.score', 'desc')
-            .limit(Math.max(winnersCount * 5, 20))
-            .get();
-        const winners = [];
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + rewardDurationDays);
-        snapshot.forEach((docSnap) => {
+        const candidateLimit = Math.max(winnersCount * 5, 20);
+        // Query users in two ways and union the results.
+        // 1) Users whose monthlyEngagement still points at the previous
+        //    month — they haven't synced under the new month yet.
+        // 2) Users who already rolled over into the new month but kept a
+        //    denormalised snapshot of their final previous-month score in
+        //    lastFinalizedMonth. With the 48h+ grace period most active
+        //    users fall in this bucket.
+        const [activeSnapshot, finalizedSnapshot] = await Promise.all([
+            db.collection('users')
+                .where('monthlyEngagement.month', '==', monthKey)
+                .orderBy('monthlyEngagement.score', 'desc')
+                .limit(candidateLimit)
+                .get(),
+            db.collection('users')
+                .where('lastFinalizedMonth.month', '==', monthKey)
+                .orderBy('lastFinalizedMonth.score', 'desc')
+                .limit(candidateLimit)
+                .get(),
+        ]);
+        const candidatesById = new Map();
+        const consider = (userId, data, score, displayName) => {
+            if (!displayName || score <= 0)
+                return;
+            if (data.hiddenFromLeaderboard || data.placeholder)
+                return;
+            const existing = candidatesById.get(userId);
+            if (!existing || score > existing.score) {
+                candidatesById.set(userId, { userId, displayName, score, data });
+            }
+        };
+        activeSnapshot.forEach((docSnap) => {
             const data = docSnap.data();
             const engagement = data.monthlyEngagement;
             const displayName = String(data.displayName || '').trim();
-            if (winners.length < winnersCount &&
-                engagement &&
-                engagement.score > 0 &&
-                displayName &&
-                !data.hiddenFromLeaderboard &&
-                !data.placeholder) {
-                winners.push({
-                    userId: docSnap.id,
-                    displayName,
-                    score: engagement.score,
-                    rewardedAt: new Date().toISOString(),
-                    notified: false,
-                    premiumExpiresAt: expiresAt.toISOString(),
-                });
-            }
+            consider(docSnap.id, data, Number(engagement?.score) || 0, displayName);
         });
+        finalizedSnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const finalized = data.lastFinalizedMonth;
+            const displayName = String(finalized?.displayName || data.displayName || '').trim();
+            consider(docSnap.id, data, Number(finalized?.score) || 0, displayName);
+        });
+        const sortedCandidates = Array.from(candidatesById.values())
+            .sort((a, b) => b.score - a.score)
+            .slice(0, candidateLimit);
+        const winners = [];
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + rewardDurationDays);
+        for (const candidate of sortedCandidates) {
+            if (winners.length >= winnersCount)
+                break;
+            winners.push({
+                userId: candidate.userId,
+                displayName: candidate.displayName,
+                score: candidate.score,
+                rewardedAt: new Date().toISOString(),
+                notified: false,
+                premiumExpiresAt: expiresAt.toISOString(),
+            });
+        }
         if (winners.length === 0) {
             logger.info(`No eligible winners found for ${monthKey}`);
             await db.doc('config/rewards-settings').set({
@@ -1945,6 +1981,119 @@ exports.selectMonthlyWinners = (0, scheduler_1.onSchedule)({ schedule: '5 0 1 * 
     }
     catch (error) {
         logger.error('❌ selectMonthlyWinners failed:', error);
+    }
+});
+/**
+ * Scheduled Cloud Function: builds a single cached snapshot of the
+ * current month's top leaderboard entries and writes it to
+ * `cache/leaderboard-current`.
+ *
+ * Why this exists: without a cache, every client that opens the
+ * honor-board screen executes a 50-doc Firestore query. At 100K DAU
+ * that is millions of reads per day. With this cache the client
+ * fetches a single document (1 read) and the server amortises the
+ * leaderboard query across all viewers.
+ *
+ * Runs every 15 minutes — a small staleness tradeoff for a ~95% read
+ * cost reduction. Display staleness does not affect winner selection,
+ * which reads user docs directly in selectMonthlyWinners.
+ */
+exports.cacheLeaderboardSnapshot = (0, scheduler_1.onSchedule)({ schedule: 'every 15 minutes', timeZone: 'Asia/Riyadh' }, async () => {
+    try {
+        const configSnap = await db.doc('config/rewards-settings').get();
+        const config = configSnap.data() || {};
+        if (config.enabled === false)
+            return;
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
+        const snapshot = await db.collection('users')
+            .where('monthlyEngagement.month', '==', currentMonth)
+            .orderBy('monthlyEngagement.score', 'desc')
+            .limit(50)
+            .get();
+        const entries = [];
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const engagement = data.monthlyEngagement;
+            const displayName = String(data.displayName || '').trim();
+            if (engagement?.score > 0 &&
+                displayName &&
+                !data.hiddenFromLeaderboard &&
+                !data.placeholder) {
+                entries.push({
+                    userId: docSnap.id,
+                    displayName,
+                    score: Number(engagement.score) || 0,
+                });
+            }
+        });
+        // Count all users with a positive score this month. This lets the
+        // client decide whether a user below the cached top 50 should pay
+        // for a `count()` aggregation query (only when there is anyone
+        // beneath the cache to count against). Costs 1 read per schedule
+        // tick (every 15 min) — amortised across all viewers.
+        const totalCountSnap = await db.collection('users')
+            .where('monthlyEngagement.month', '==', currentMonth)
+            .where('monthlyEngagement.score', '>', 0)
+            .count()
+            .get();
+        const totalEligibleCount = totalCountSnap.data().count;
+        const lowestCachedScore = entries.length > 0
+            ? entries[entries.length - 1].score
+            : null;
+        await db.doc('cache/leaderboard-current').set({
+            month: currentMonth,
+            entries,
+            // `lowestCachedScore` is the score of the last user in the cached
+            // top 50; users with a strictly lower score are guaranteed not to
+            // be in the cache and need a `count()` query for an exact rank.
+            // `totalEligibleCount` upper-bounds any rank we report.
+            lowestCachedScore,
+            totalEligibleCount,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+    catch (error) {
+        logger.error('❌ cacheLeaderboardSnapshot failed:', error);
+    }
+});
+/**
+ * Scheduled Cloud Function: delete `activityDaily` documents older than
+ * the retention window (default 180 days). The admin Analytics page only
+ * queries the last 7/30/365 days, so anything older costs storage with
+ * no business value. Runs once a day at 02:00 Riyadh time during a low-
+ * traffic window.
+ */
+exports.cleanupActivityDaily = (0, scheduler_1.onSchedule)({ schedule: '0 2 * * *', timeZone: 'Asia/Riyadh' }, async () => {
+    const RETENTION_DAYS = 180;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
+    const cutoffTs = admin.firestore.Timestamp.fromDate(cutoff);
+    try {
+        let totalDeleted = 0;
+        // Process in batches of 400 (Firestore batch limit is 500; leaving
+        // headroom). Loop until no docs older than the cutoff remain.
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const snap = await db.collection('activityDaily')
+                .where('timestamp', '<', cutoffTs)
+                .limit(400)
+                .get();
+            if (snap.empty)
+                break;
+            const batch = db.batch();
+            snap.forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+            totalDeleted += snap.size;
+            if (snap.size < 400)
+                break;
+        }
+        if (totalDeleted > 0) {
+            logger.info(`🧹 cleanupActivityDaily deleted ${totalDeleted} docs older than ${RETENTION_DAYS} days`);
+        }
+    }
+    catch (error) {
+        logger.error('❌ cleanupActivityDaily failed:', error);
     }
 });
 // ==================== Admin Authentication ====================

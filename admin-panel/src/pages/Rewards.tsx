@@ -500,17 +500,17 @@ export default function Rewards() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-100 rounded-xl">
-            <Trophy className="w-6 h-6 text-amber-600" />
+          <div className="p-3 bg-amber-500/20 border border-amber-500/40 rounded-xl">
+            <Trophy className="w-6 h-6 text-amber-300" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">المكافآت الشهرية</h1>
-            <p className="text-sm text-slate-400">مكافأة أنشط المستخدمين ببريميوم مجاني</p>
+            <p className="text-sm text-slate-300">مكافأة أنشط المستخدمين ببريميوم مجاني</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-sm text-slate-600">{config.enabled ? 'مفعّل' : 'معطّل'}</span>
+            <span className="text-sm text-slate-200">{config.enabled ? 'مفعّل' : 'معطّل'}</span>
             <input
               type="checkbox"
               checked={config.enabled}
@@ -542,8 +542,8 @@ export default function Rewards() {
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
               activeTab === tab.key
-                ? 'bg-amber-100 text-amber-700 font-bold'
-                : 'text-slate-500 hover:bg-slate-100'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                : 'text-slate-300 hover:bg-admin-surface'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -556,14 +556,14 @@ export default function Rewards() {
       {activeTab === 'leaderboard' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-slate-700">
+            <h2 className="font-bold text-white">
               شهر {getCurrentMonth()} — {visibleLeaderboard.length} متسابق ظاهر
             </h2>
             <div className="flex gap-2">
               <button
                 onClick={loadLeaderboard}
                 disabled={loadingBoard}
-                className="px-3 py-1.5 text-sm bg-slate-100 rounded-lg hover:bg-slate-200"
+                className="px-3 py-1.5 text-sm bg-admin-surface-light text-slate-200 border border-admin-border rounded-lg hover:bg-slate-700"
                 aria-label="تحديث لوحة المتصدرين"
                 title="تحديث لوحة المتصدرين"
               >
@@ -571,32 +571,32 @@ export default function Rewards() {
               </button>
               <button
                 onClick={autoSelectWinners}
-                className="px-3 py-1.5 text-sm bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200"
+                className="px-3 py-1.5 text-sm bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg hover:bg-amber-500/30"
                 aria-label="اختيار الفائزين تلقائياً"
                 title="اختيار الفائزين تلقائياً"
               >
                 اختيار تلقائي
               </button>
-              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer mr-auto">
+              <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer mr-auto">
                 <input
                   type="checkbox"
                   checked={showHidden}
                   onChange={() => setShowHidden(v => !v)}
-                  className="w-4 h-4 accent-slate-500"
+                  className="w-4 h-4 accent-emerald-500"
                 />
                 عرض المخفيين ({leaderboard.filter(u => u.hidden).length})
               </label>
             </div>
           </div>
 
-          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
+          <div className="mb-4 rounded-xl border border-admin-border bg-admin-surface p-3">
             <div className="flex items-center gap-2">
               <Search className="w-4 h-4 text-slate-400" />
               <input
                 type="search"
                 value={leaderboardSearch}
                 onChange={(e) => setLeaderboardSearch(e.target.value)}
-                className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-400"
                 placeholder="ابحث بالاسم، ID، الجهاز، المنصة، أو النقاط..."
                 aria-label="بحث في متسابقي الشهر"
                 dir="auto"
@@ -604,7 +604,7 @@ export default function Rewards() {
               {leaderboardSearch && (
                 <button
                   onClick={() => setLeaderboardSearch('')}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-lg p-1 text-slate-400 hover:bg-admin-surface-light hover:text-white"
                   aria-label="مسح البحث"
                   title="مسح البحث"
                 >
@@ -625,47 +625,47 @@ export default function Rewards() {
               <p>لا توجد بيانات للشهر الحالي</p>
             </div>
           ) : filteredLeaderboard.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 bg-white rounded-xl border">
+            <div className="text-center py-12 text-slate-400 bg-admin-surface rounded-xl border border-admin-border">
               <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>لا توجد نتائج مطابقة للبحث</p>
             </div>
           ) : (
             <>
               {mergeSource && (
-                <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3">
-                  <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0" />
-                  <div className="flex-1 text-sm text-orange-700">
+                <div className="mb-3 p-3 bg-orange-500/15 border border-orange-500/40 rounded-xl flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-orange-300 shrink-0" />
+                  <div className="flex-1 text-sm text-orange-200">
                     <strong>وضع الدمج:</strong> اضغط "← دمج هنا" على المستخدم الذي تريد نقل النقاط إليه.
                     المستخدم المصدر: <strong>{leaderboard.find(u => u.id === mergeSource)?.displayName}</strong>
                   </div>
                   <button
                     onClick={() => setMergeSource(null)}
-                    className="px-3 py-1 text-xs bg-slate-200 rounded-lg hover:bg-slate-300"
+                    className="px-3 py-1 text-xs bg-admin-surface-light text-slate-200 border border-admin-border rounded-lg hover:bg-slate-700"
                   >
                     إلغاء
                   </button>
                 </div>
               )}
-              <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="bg-admin-surface rounded-xl border border-admin-border overflow-hidden">
                 <table className="w-full">
-                  <thead className="bg-slate-50">
+                  <thead className="bg-admin-surface-light/60">
                     <tr>
-                      <th className="px-4 py-3 text-right text-sm text-slate-500">#</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-500">المستخدم</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-500">الجهاز</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-500">نقاط</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-500">المنصة</th>
-                      <th className="px-4 py-3 text-right text-sm text-slate-500">آخر نشاط</th>
-                      <th className="px-4 py-3 text-center text-sm text-slate-500">إخفاء</th>
-                      <th className="px-4 py-3 text-center text-sm text-slate-500">دمج</th>
-                      <th className="px-4 py-3 text-center text-sm text-slate-500">فائز</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-300">#</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-300">المستخدم</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-300">الجهاز</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-300">نقاط</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-300">المنصة</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-300">آخر نشاط</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-300">إخفاء</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-300">دمج</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-300">فائز</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredLeaderboard.map((user) => (
                       <tr
                         key={user.id}
-                        className={`border-t ${user.selected ? 'bg-amber-50' : ''} ${user.hidden ? 'opacity-50' : ''} ${
+                        className={`border-t border-admin-border hover:bg-admin-surface-light/40 transition-colors ${user.selected ? 'bg-amber-500/10' : ''} ${user.hidden ? 'opacity-50' : ''} ${
                           user.rank && user.rank <= 3 ? 'font-medium' : ''
                         }`}
                       >
@@ -684,7 +684,7 @@ export default function Rewards() {
                                     if (e.key === 'Enter') saveUserName(user.id);
                                     if (e.key === 'Escape') setEditingNameId(null);
                                   }}
-                                  className="border rounded px-2 py-1 text-sm w-32 text-right"
+                                  className="bg-admin-input text-white border border-admin-border rounded px-2 py-1 text-sm w-32 text-right outline-none focus:ring-2 focus:ring-accent"
                                   autoFocus
                                   dir="auto"
                                   aria-label="تعديل اسم المستخدم"
@@ -693,47 +693,47 @@ export default function Rewards() {
                                 />
                                 <button
                                   onClick={() => saveUserName(user.id)}
-                                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                                  className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-1 rounded hover:bg-emerald-500/30"
                                 >
                                   حفظ
                                 </button>
                                 <button
                                   onClick={() => setEditingNameId(null)}
-                                  className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200"
+                                  className="text-xs bg-slate-700/60 text-slate-200 border border-slate-600 px-2 py-1 rounded hover:bg-slate-700"
                                 >
                                   ✕
                                 </button>
                               </div>
                             ) : (
                               <span
-                                className="cursor-pointer hover:text-blue-600 hover:underline"
+                                className="cursor-pointer text-white hover:text-emerald-300 hover:underline"
                                 onClick={() => { setEditingNameId(user.id); setEditingNameValue(user.displayName || ''); }}
                                 title="انقر لتعديل الاسم"
                               >
                                 {user.displayName}
                               </span>
                             )}
-                            {user.hidden && <span className="text-xs text-red-400 mr-2">(مخفي)</span>}
+                            {user.hidden && <span className="text-xs text-red-300 mr-2">(مخفي)</span>}
                           </div>
                           {user.email && (
-                            <div className="text-xs text-slate-400">{user.email}</div>
+                            <div className="text-xs text-slate-300">{user.email}</div>
                           )}
-                          <div className="text-[10px] text-slate-300 font-mono truncate max-w-[140px]" title={user.id}>{user.id}</div>
+                          <div className="text-[10px] text-slate-400 font-mono truncate max-w-[140px]" title={user.id}>{user.id}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-xs text-slate-600">{user.deviceBrand || ''} {user.deviceName || '-'}</div>
+                          <div className="text-xs text-slate-200">{user.deviceBrand || ''} {user.deviceName || '-'}</div>
                           <div className="text-[10px] text-slate-400">{user.installSource || '-'}</div>
                         </td>
-                        <td className="px-4 py-3 font-bold text-amber-600">{user.score}</td>
-                        <td className="px-4 py-3 text-sm text-slate-500">{user.platform || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-500">{user.lastActive || '-'}</td>
+                        <td className="px-4 py-3 font-bold text-amber-300">{user.score}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{user.platform || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{user.lastActive || '-'}</td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => toggleUserVisibility(user.id)}
-                            className={`px-2 py-1 text-xs rounded-lg transition-colors ${
+                            className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
                               user.hidden
-                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
                             }`}
                             title={user.hidden ? 'إظهار في لوحة الشرف' : 'إخفاء من لوحة الشرف'}
                           >
@@ -744,7 +744,7 @@ export default function Rewards() {
                           {mergeSource === null ? (
                             <button
                               onClick={() => setMergeSource(user.id)}
-                              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                              className="px-2.5 py-1 text-xs bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded-lg hover:bg-blue-500/30 transition-colors"
                               title="اختيار كمصدر للدمج"
                             >
                               دمج
@@ -752,7 +752,7 @@ export default function Rewards() {
                           ) : mergeSource === user.id ? (
                             <button
                               onClick={() => setMergeSource(null)}
-                              className="px-2 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg"
+                              className="px-2.5 py-1 text-xs bg-slate-700/60 text-slate-200 border border-slate-600 rounded-lg"
                               title="إلغاء الدمج"
                             >
                               إلغاء
@@ -765,7 +765,7 @@ export default function Rewards() {
                                 }
                               }}
                               disabled={merging}
-                              className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors disabled:opacity-50"
+                              className="px-2.5 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/40 rounded-lg hover:bg-orange-500/30 transition-colors disabled:opacity-50"
                               title={`دمج في ${user.displayName}`}
                             >
                               {merging ? '...' : '← دمج هنا'}
@@ -803,18 +803,18 @@ export default function Rewards() {
 
           {/* Current Winners */}
           {config.currentWinners.length > 0 && (
-            <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
-              <h3 className="font-bold text-amber-700 mb-3">
+            <div className="mt-6 p-4 bg-amber-500/10 rounded-xl border border-amber-500/40">
+              <h3 className="font-bold text-amber-300 mb-3">
                 🏆 فائزو شهر {config.currentMonth}
               </h3>
               <div className="space-y-2">
                 {config.currentWinners.map((w, i) => (
-                  <div key={w.userId} className="flex items-center justify-between bg-white p-3 rounded-lg">
+                  <div key={w.userId} className="flex items-center justify-between bg-admin-surface border border-admin-border p-3 rounded-lg">
                     <div className="flex items-center gap-2">
                       <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
-                      <span className="font-medium">{w.displayName || w.userId.slice(0, 8)}</span>
+                      <span className="font-medium text-white">{w.displayName || w.userId.slice(0, 8)}</span>
                     </div>
-                    <div className="text-sm text-slate-500">
+                    <div className="text-sm text-slate-300">
                       {w.score} نقطة — ينتهي: {new Date(w.premiumExpiresAt).toLocaleDateString('ar-EG')}
                     </div>
                   </div>
@@ -828,31 +828,31 @@ export default function Rewards() {
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <div className="space-y-4">
-          <div className="bg-white p-5 rounded-xl border">
-            <h3 className="font-bold text-slate-700 mb-4">الإعدادات العامة</h3>
+          <div className="bg-admin-surface p-5 rounded-xl border border-admin-border">
+            <h3 className="font-bold text-white mb-4">الإعدادات العامة</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-600 mb-1">عدد الفائزين</label>
+                <label className="block text-sm text-slate-300 mb-1">عدد الفائزين</label>
                 <input
                   type="number"
                   min={1}
                   max={10}
                   value={config.winnersCount}
                   onChange={e => setConfig(prev => ({ ...prev, winnersCount: Number(e.target.value) }))}
-                  className="w-full p-2 border rounded-lg"
+                  className="input-admin-sm"
                   aria-label="عدد الفائزين"
                   title="عدد الفائزين"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-600 mb-1">مدة المكافأة (أيام)</label>
+                <label className="block text-sm text-slate-300 mb-1">مدة المكافأة (أيام)</label>
                 <input
                   type="number"
                   min={1}
                   max={90}
                   value={config.rewardDurationDays}
                   onChange={e => setConfig(prev => ({ ...prev, rewardDurationDays: Number(e.target.value) }))}
-                  className="w-full p-2 border rounded-lg"
+                  className="input-admin-sm"
                   aria-label="مدة المكافأة"
                   title="مدة المكافأة"
                 />
@@ -860,13 +860,13 @@ export default function Rewards() {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border">
-            <h3 className="font-bold text-slate-700 mb-4">أوزان النقاط</h3>
-            <p className="text-sm text-slate-500 mb-4">كل نشاط يمنح نقاط حسب الوزن المحدد</p>
+          <div className="bg-admin-surface p-5 rounded-xl border border-admin-border">
+            <h3 className="font-bold text-white mb-4">أوزان النقاط</h3>
+            <p className="text-sm text-slate-400 mb-4">كل نشاط يمنح نقاط حسب الوزن المحدد</p>
             <div className="space-y-3">
               {Object.entries(config.scoreWeights).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-4">
-                  <span className="w-28 text-sm text-slate-600">{WEIGHT_LABELS[key] || key}</span>
+                  <span className="w-28 text-sm text-slate-200">{WEIGHT_LABELS[key] || key}</span>
                   <input
                     type="range"
                     min={0}
@@ -877,7 +877,7 @@ export default function Rewards() {
                     aria-label={WEIGHT_LABELS[key] || key}
                     title={WEIGHT_LABELS[key] || key}
                   />
-                  <span className="w-8 text-center font-bold text-amber-600">{value}</span>
+                  <span className="w-8 text-center font-bold text-amber-300">{value}</span>
                 </div>
               ))}
             </div>
@@ -896,9 +896,9 @@ export default function Rewards() {
           ) : (
             <div className="space-y-4">
               {config.history.map((entry, idx) => (
-                <div key={idx} className="bg-white p-4 rounded-xl border">
+                <div key={idx} className="bg-admin-surface p-4 rounded-xl border border-admin-border">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-slate-700">شهر {entry.month}</h3>
+                    <h3 className="font-bold text-white">شهر {entry.month}</h3>
                     <span className="text-xs text-slate-400">
                       {entry.selectedBy === 'auto' ? 'اختيار تلقائي' : 'اختيار يدوي'} —{' '}
                       {new Date(entry.selectedAt).toLocaleDateString('ar-EG')}
@@ -907,11 +907,11 @@ export default function Rewards() {
                   <div className="space-y-2">
                     {entry.winners.map((w, i) => (
                       <div key={w.userId} className="flex items-center justify-between text-sm">
-                        <span>
+                        <span className="text-slate-200">
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}{' '}
                           {w.displayName || w.userId.slice(0, 8)}
                         </span>
-                        <span className="text-amber-600 font-medium">{w.score} نقطة</span>
+                        <span className="text-amber-300 font-medium">{w.score} نقطة</span>
                       </div>
                     ))}
                   </div>
