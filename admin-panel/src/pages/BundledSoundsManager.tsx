@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 
 // ==================== Types ====================
 
@@ -198,6 +199,7 @@ export default function BundledSoundsManager() {
         version: (newConfig.version || 0) + 1,
       };
       await setDoc(doc(db, FIRESTORE_CONFIG_DOC), updated, { merge: true });
+      await bumpContentVersion('soundSettings');
       setConfig(updated);
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);

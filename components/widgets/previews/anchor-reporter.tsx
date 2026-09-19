@@ -36,7 +36,7 @@
 // (logs a one-line warning in debug).
 
 import React from 'react';
-import { View, type LayoutChangeEvent, type ViewStyle } from 'react-native';
+import { Platform, View, type LayoutChangeEvent, type ViewStyle } from 'react-native';
 
 import {
   useAnchorRegistrar,
@@ -79,6 +79,7 @@ export interface AnchorReporterProps {
  */
 export function AnchorReporter(props: AnchorReporterProps): React.ReactElement {
   const capturing = useWidgetSnapshotCapture();
+  const hideDuringCapture = capturing && !(Platform.OS === 'android' && !props.isCountdown);
   const register = useAnchorRegistrar();
   const reportedRef = React.useRef(false);
 
@@ -122,7 +123,7 @@ export function AnchorReporter(props: AnchorReporterProps): React.ReactElement {
       style={[
         // Important: when capturing, opacity:0 hides the visible glyphs but
         // keeps layout — the same trick used by the existing DynamicTimeText.
-        capturing ? { opacity: 0 } : null,
+        hideDuringCapture ? { opacity: 0 } : null,
         props.style,
       ]}
     >

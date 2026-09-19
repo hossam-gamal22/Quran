@@ -25,6 +25,22 @@
       ]
     },
     {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "monthlyEngagement.month", "order": "ASCENDING" },
+        { "fieldPath": "monthlyEngagement.score", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lastFinalizedMonth.month", "order": "ASCENDING" },
+        { "fieldPath": "lastFinalizedMonth.score", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "userPrayerSettings",
       "queryScope": "COLLECTION",
       "fields": [

@@ -126,6 +126,27 @@ TaskManager.defineTask(TASK_NAME, async () => {
       kahfReminder: n.kahfReminder,
     });
 
+    // ── Smart Fajr/Suhoor alarm reschedule ────────────────────────────────────
+    // Re-arms the multi-day alarm cascade so it keeps firing even if the user
+    // never reopens the app. Reads its own config + cached prayer times.
+    try {
+      const { rescheduleSmartAlarmsFromStorage } = await import('./smart-alarm/scheduler');
+      await rescheduleSmartAlarmsFromStorage();
+    } catch (e) {
+      console.warn('[background-task] Smart alarm reschedule failed:', e);
+    }
+
+    // ── Global maintenance reminder ───────────────────────────────────────────
+    // MUST run last — it inspects every scheduled notification to find the
+    // farthest one, then schedules a single "reopen the app" nudge before the
+    // whole schedule (prayers + adhkar + alarm) runs out.
+    try {
+      const { scheduleGlobalMaintenanceReminder } = await import('./maintenance-reminder');
+      await scheduleGlobalMaintenanceReminder();
+    } catch (e) {
+      console.warn('[background-task] Maintenance reminder failed:', e);
+    }
+
     // ── Widget data + snapshot refresh ────────────────────────────────────────
     // Refresh shared widget data AND attempt to regenerate PNG snapshots in
     // the background. The countdown overlay on iOS is already live (SwiftUI

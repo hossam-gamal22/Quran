@@ -112,6 +112,12 @@ const JUZ_NAMES = [
 const qcfWarmupDoneKey = (darkMode: boolean) =>
   `@qcf_font_warmup_done_${darkMode ? 'dark' : 'light'}`;
 
+// Module-level guard: only start the long-running QCF session warmup once per
+// app launch, even if the user re-focuses the Quran tab many times. Without
+// this, rapid tab switching can stack overlapping warmup chains and amplify
+// native font-memory pressure.
+let qcfSessionWarmupStarted = false;
+
 interface JuzInfo {
   number: number;
   name: string;
@@ -254,7 +260,7 @@ export default function QuranScreen() {
   const isRTL = useIsRTL();
   const isArabic = settings.language === 'ar';
   const isLightBg = !isDarkMode && !colors.hasBgOverride;
-  const androidSheetSurface = Platform.OS === 'android' ? colors.modalSurface : undefined;
+  const androidSheetSurface = colors.modalSurface;
 
   const {
     surahs,
@@ -388,11 +394,13 @@ export default function QuranScreen() {
             if (sp >= 1 && sp <= 604) pages.add(sp);
           } catch {}
         }
-        await Promise.all([
-          preloadCriticalPages(Array.from(pages), false, 1500),
-          preloadCriticalPages(Array.from(pages), true, 1500),
-        ]);
-        if (mounted) {
+        // Preload ONLY the active theme's fonts. Loading both light + dark
+        // simultaneously doubles the native font-registration memory spike at
+        // tab-open time and can trigger an iOS OOM kill (the user sees the app
+        // suddenly close). The off-mode loads lazily on first use.
+        await preloadCriticalPages(Array.from(pages), isDarkMode === true, 1500);
+        if (mounted && !qcfSessionWarmupStarted) {
+          qcfSessionWarmupStarted = true;
           const warmupDone =
             (await AsyncStorage.getItem(qcfWarmupDoneKey(isDarkMode === true)).catch(() => null)) === 'true';
           cancelQcfWarmup = startQcfSessionWarmup({
@@ -414,6 +422,10 @@ export default function QuranScreen() {
     return () => {
       mounted = false;
       cancelQcfWarmup?.();
+      // Reset the session-warmup gate so the next focus can resume warming
+      // from where this one was cancelled (Font.loadAsync dedupes already-
+      // loaded pages, so this is cheap).
+      qcfSessionWarmupStarted = false;
     };
   }, [isDarkMode]));
 

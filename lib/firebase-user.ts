@@ -446,11 +446,25 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
   }
 };
 
+const LAST_ACTIVE_WRITTEN_KEY = '@last_active_written_at';
+const LAST_ACTIVE_THROTTLE_MS = 60 * 60 * 1000; // 1 hour
+
 export const updateLastActive = async (): Promise<void> => {
   try {
+    // Throttle to once per hour. `lastActive` only feeds the "active user"
+    // marker used by the FCM fallback server for notification dedup, where
+    // hourly precision is more than enough. Writing on every foreground
+    // also triggers the per-user onSnapshot listener in SubscriptionContext
+    // (one extra read per write), so throttling saves on both sides.
+    try {
+      const raw = await AsyncStorage.getItem(LAST_ACTIVE_WRITTEN_KEY);
+      if (raw && Date.now() - Number(raw) < LAST_ACTIVE_THROTTLE_MS) return;
+    } catch {}
+
     const userId = await getUserId();
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, { lastActive: serverTimestamp() });
+    await AsyncStorage.setItem(LAST_ACTIVE_WRITTEN_KEY, String(Date.now()));
   } catch (error) {
     console.log('Could not update last active');
   }

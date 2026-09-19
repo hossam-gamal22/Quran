@@ -91,42 +91,11 @@ const getRangeStart = (range: DateRange): Date => {
   return start;
 };
 
-const getActivityStatsForRange = async (range: DateRange) => {
-  const start = getRangeStart(range);
-  const snapshot = await getDocs(query(
-    collection(db, 'activity'),
-    where('timestamp', '>=', Timestamp.fromDate(start))
-  ));
-
-  const activeUserIds = new Set<string>();
-  let appOpens = 0;
-  let azkar = 0;
-  let tasbih = 0;
-  let prayers = 0;
-
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    const userId = typeof data.userId === 'string' ? data.userId : '';
-    if (userId) activeUserIds.add(userId);
-
-    if (data.type === 'app_open') appOpens += 1;
-    if (data.type === 'azkar') azkar += 1;
-    if (data.type === 'prayer') prayers += 1;
-    if (data.type === 'tasbih') tasbih += Number(data.count) || 1;
-  });
-
-  return {
-    activeUsers: activeUserIds.size,
-    appOpens,
-    azkar,
-    tasbih,
-    prayers,
-  };
-};
-
-const buildActivityStats = (
-  docs: Array<{ data: () => Record<string, any> }>
-) => {
+// Reads the `activityDaily` collection, which holds one aggregate doc per
+// user per day. Counts are stored as fields (app_open, azkar, prayer,
+// tasbih, …) so active-user counts come from distinct userIds and action
+// totals come from summing the matching field across docs in range.
+const sumDailyActivity = (docs: Array<{ data: () => Record<string, any> }>) => {
   const activeUserIds = new Set<string>();
   let appOpens = 0;
   let azkar = 0;
@@ -138,10 +107,10 @@ const buildActivityStats = (
     const userId = typeof data.userId === 'string' ? data.userId : '';
     if (userId) activeUserIds.add(userId);
 
-    if (data.type === 'app_open') appOpens += 1;
-    if (data.type === 'azkar') azkar += 1;
-    if (data.type === 'prayer') prayers += 1;
-    if (data.type === 'tasbih') tasbih += Number(data.count) || 1;
+    appOpens += Number(data.app_open) || 0;
+    azkar += Number(data.azkar) || 0;
+    prayers += Number(data.prayer) || 0;
+    tasbih += Number(data.tasbih) || 0;
   });
 
   return {
@@ -152,6 +121,19 @@ const buildActivityStats = (
     prayers,
   };
 };
+
+const getActivityStatsForRange = async (range: DateRange) => {
+  const start = getRangeStart(range);
+  const snapshot = await getDocs(query(
+    collection(db, 'activityDaily'),
+    where('timestamp', '>=', Timestamp.fromDate(start))
+  ));
+  return sumDailyActivity(snapshot.docs);
+};
+
+const buildActivityStats = (
+  docs: Array<{ data: () => Record<string, any> }>
+) => sumDailyActivity(docs);
 
 const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -245,7 +227,7 @@ const Analytics: React.FC = () => {
     const start = getRangeStart(dateRange);
     const unsubscribeActivity = onSnapshot(
       query(
-        collection(db, 'activity'),
+        collection(db, 'activityDaily'),
         where('timestamp', '>=', Timestamp.fromDate(start))
       ),
       (snapshot) => {

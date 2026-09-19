@@ -1,9 +1,9 @@
 <libraries>
   <library
       name=":@@:expo-modules-core::release"
-      jars="/Users/hossamgamal/.gradle/caches/8.14.3/transforms/885b8209c31593ca9df015715d394e7d/transformed/out/jars/classes.jar:/Users/hossamgamal/.gradle/caches/8.14.3/transforms/885b8209c31593ca9df015715d394e7d/transformed/out/jars/libs/R.jar"
-      resolved="host.exp.exponent:expo-modules-core:3.0.29"
-      folder="/Users/hossamgamal/.gradle/caches/8.14.3/transforms/885b8209c31593ca9df015715d394e7d/transformed/out"
+      jars="/Users/hossamgamal/.gradle/caches/8.14.3/transforms/95c3d80d315dbe4830812daba3a24c95/transformed/out/jars/classes.jar:/Users/hossamgamal/.gradle/caches/8.14.3/transforms/95c3d80d315dbe4830812daba3a24c95/transformed/out/jars/libs/R.jar"
+      resolved="host.exp.exponent:expo-modules-core:3.0.30"
+      folder="/Users/hossamgamal/.gradle/caches/8.14.3/transforms/95c3d80d315dbe4830812daba3a24c95/transformed/out"
       manifest="AndroidManifest.xml"
       resFolder="res"
       assetsFolder="assets"

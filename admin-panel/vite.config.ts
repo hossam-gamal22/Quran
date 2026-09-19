@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@app-lib': path.resolve(__dirname, '../lib'),
         '@app-data': path.resolve(__dirname, '../data'),
+        // Lets shared files under ../lib that use the app's '@/...' alias resolve here too.
+        // Only matches '@/...', so it never swallows the '@app-lib'/'@app-data' aliases above.
+        '@': path.resolve(__dirname, '..'),
         // Force single React instance — prevents duplicate React from root workspace
         'react': path.resolve(__dirname, 'node_modules/react'),
         'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),

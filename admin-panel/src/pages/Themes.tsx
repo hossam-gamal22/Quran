@@ -32,6 +32,7 @@ import {
   query,
   orderBy,
 } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import {
   ref,
   uploadBytes,
@@ -273,6 +274,7 @@ const ThemesPage: React.FC = () => {
         latinFont: normalizeFontName(fontSettings.latinFont),
         updatedAt: new Date().toISOString(),
       }, { merge: true });
+      await bumpContentVersion('themeConfig');
     } catch (error) {
       console.error('Error saving theme config:', error);
     }

@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import type { CompleteAdhanVoiceKey } from '@/data/adhan-transcript';
+import { ModalColors } from '@/constants/theme';
 
 export const COMPLETE_ADHAN_VOICES: ReadonlyArray<{
   key: CompleteAdhanVoiceKey;
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: Platform.OS === 'android' ? '#14201c' : 'rgba(20,32,28,0.85)',
+    backgroundColor: ModalColors.cardDark,
     overflow: 'hidden',
   },
   handle: {

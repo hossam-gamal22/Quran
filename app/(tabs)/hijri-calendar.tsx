@@ -368,7 +368,7 @@ export default function HijriCalendarScreen() {
     // Event modal
     modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
     modalCard: {
-      backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+      backgroundColor: colors.modalSurface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
       padding: 24, paddingBottom: Math.max(insets.bottom, 16) + 16,
     },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
@@ -443,7 +443,7 @@ export default function HijriCalendarScreen() {
   };
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']} screenKey="hijri" inTabScreen>
+    <ScreenContainer edges={['top', 'left', 'right']} screenKey="hijri" inTabScreen>
       {/* Header */}
       <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.iconBtn} onPress={handleCopy}>

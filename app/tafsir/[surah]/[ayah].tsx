@@ -148,7 +148,7 @@ export default function TafsirScreen() {
   const editionName = TAFSIR_EDITIONS.find(e => e.identifier === selectedEdition)?.name || t('quran.tafsir');
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="tafsir">
+    <ScreenContainer edges={['top', 'left', 'right', 'bottom']} screenKey="tafsir">
       <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.closeBtn} onPress={() => router.back()}>
           <MaterialCommunityIcons name="close" size={22} color={colors.text} />

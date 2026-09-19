@@ -172,26 +172,36 @@ const Dashboard: React.FC = () => {
         };
       }
 
-      // تحميل آخر النشاطات
+      // تحميل آخر النشاطات — من `activityDaily` (نموذج التجميع اليومي).
+      // كل doc بيمثّل ملخص يوم لمستخدم؛ بنرتّب حسب آخر نشاط ونعرض النوع
+      // والوصف الأخيرَين عشان شكل الـ feed يفضل قريب من اللي كان قبل كده.
       try {
         const activitySnapshot = await getDocs(
-          query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(20))
+          query(collection(db, 'activityDaily'), orderBy('lastActivityAt', 'desc'), limit(20))
         );
         activityData = activitySnapshot.docs
           .map(doc => {
             const data = doc.data();
+            const type = typeof data.lastType === 'string' && data.lastType.length > 0
+              ? data.lastType
+              : 'user';
+            const description =
+              (typeof data.lastDescription === 'string' && data.lastDescription.trim().length > 0
+                ? data.lastDescription
+                : getActivityDescription({ ...data, type }));
+            const tsSource = data.lastActivityAt || data.timestamp;
             return {
               id: doc.id,
-              type: data.type || 'user',
-              description: data.description || getActivityDescription(data),
-              time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
+              type,
+              description,
+              time: tsSource?.toDate ? formatTimeAgo(tsSource.toDate()) : 'منذ قليل',
               country: data.country,
             };
           })
           .filter(item => item.type !== 'app_open' && item.description.trim().length > 0)
           .slice(0, 8);
       } catch {
-        console.log('Activity collection not found or empty');
+        console.log('activityDaily collection not found or empty');
       }
 
       setFirebaseConnected(true);

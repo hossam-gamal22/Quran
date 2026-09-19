@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
 import { getAdhanChannelId, getReminderChannelId } from '../services/notifications/channels';
+import { markPermissionRequested } from './permission-recovery';
 
 // ==================== Types ====================
 
@@ -49,6 +50,9 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
+      if (Platform.OS === 'android') {
+        await markPermissionRequested('notifications');
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }

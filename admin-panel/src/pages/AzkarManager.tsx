@@ -9,6 +9,7 @@ import TranslateButton from '../components/TranslateButton';
 import { Styled } from '../components/Styled';
 import { db, storage } from '../firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // ========================================
@@ -380,6 +381,7 @@ const AzkarManager: React.FC = () => {
         createdAt: editingCategory.createdAt || new Date().toISOString(),
       };
       await setDoc(doc(db, CATEGORIES_COLLECTION, payload.id), payload);
+      await bumpContentVersion('azkar_categories');
       setCustomCategories(prev => {
         const exists = prev.some(c => c.id === payload.id);
         return exists ? prev.map(c => (c.id === payload.id ? payload : c)) : [...prev, payload];
@@ -400,6 +402,7 @@ const AzkarManager: React.FC = () => {
     if (!confirm(message)) return;
     try {
       await deleteDoc(doc(db, CATEGORIES_COLLECTION, cat.id));
+      await bumpContentVersion('azkar_categories');
       // best-effort delete of uploaded icon
       if (cat.iconStoragePath) {
         try { await deleteObject(ref(storage, cat.iconStoragePath)); } catch { /* ignore */ }
@@ -618,6 +621,7 @@ const AzkarManager: React.FC = () => {
         }
         await batch.commit();
       }
+      await bumpContentVersion('azkar');
       showNotification(`✅ تم رفع ${azkarList.length} ذكر إلى Firestore`, 'success');
     } catch (e) {
       showNotification(`❌ ${(e as Error).message}`, 'error');
@@ -629,6 +633,7 @@ const AzkarManager: React.FC = () => {
     try {
       const normalized = normalizeZikrForSave(zikr);
       await setDoc(doc(db, 'azkar', String(normalized.id)), normalized);
+      await bumpContentVersion('azkar');
       setAzkarList(prev => {
         const idx = prev.findIndex(z => z.id === normalized.id);
         if (idx >= 0) return sortAzkarList(prev.map(z => z.id === normalized.id ? normalized : z));
@@ -646,6 +651,7 @@ const AzkarManager: React.FC = () => {
     if (!confirm('هل تريد حذف هذا الذكر؟')) return;
     try {
       await deleteDoc(doc(db, 'azkar', String(id)));
+      await bumpContentVersion('azkar');
       setAzkarList(prev => prev.filter(z => z.id !== id));
       showNotification('✅ تم حذف الذكر', 'success');
     } catch (e) {
@@ -694,6 +700,7 @@ const AzkarManager: React.FC = () => {
       if (updatedZikr) {
         const updated = { ...updatedZikr, audio: url };
         await setDoc(doc(db, 'azkar', String(zikrId)), updated);
+        await bumpContentVersion('azkar');
         setAzkarList(prev => sortAzkarList(prev.map(z => z.id === zikrId ? updated : z)));
       }
 
@@ -725,6 +732,7 @@ const AzkarManager: React.FC = () => {
 
       const updated = { ...zikr, audio: '' };
       await setDoc(doc(db, 'azkar', String(zikrId)), updated);
+      await bumpContentVersion('azkar');
       setAzkarList(prev => sortAzkarList(prev.map(z => z.id === zikrId ? updated : z)));
 
       if (editingZikr && editingZikr.id === zikrId) {
@@ -756,6 +764,7 @@ const AzkarManager: React.FC = () => {
         batch.set(doc(db, 'azkar', String(z.id)), z, { merge: true });
       });
       await batch.commit();
+      await bumpContentVersion('azkar');
 
       const updatedById = new Map(normalized.map(z => [z.id, z]));
       setAzkarList(prev => sortAzkarList(prev.map(z => updatedById.get(z.id) || z)));

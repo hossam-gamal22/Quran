@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // ==================== Types ====================
@@ -397,6 +398,7 @@ export default function SoundManager() {
         pageEvents: assignments.pageEvents,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
+      await bumpContentVersion('soundSettings');
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err) {

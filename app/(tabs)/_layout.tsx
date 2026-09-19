@@ -7,7 +7,6 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { NativeTabs, Icon, Label, VectorIcon } from 'expo-router/unstable-native-tabs';
 import { Tabs, TabSlot, TabList, TabTrigger } from 'expo-router/ui';
-import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -114,32 +113,14 @@ function AndroidTabsLayout() {
           style={[
             androidStyles.tabList,
             {
-              paddingBottom: insets.bottom + 8,
+              paddingBottom: Math.max(insets.bottom, 8) + 8,
               borderTopColor: isDarkMode
                 ? 'rgba(255,255,255,0.08)'
                 : 'rgba(0,0,0,0.10)',
+              backgroundColor: isDarkMode ? '#0f1418' : '#ffffff',
             },
           ]}
         >
-          {/* Glass blur background (absolute positioned, won't affect flex layout) */}
-          <BlurView
-            intensity={isDarkMode ? 120 : 120}
-            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Semi-transparent overlay for depth */}
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: hasBg
-                  ? 'rgba(0,0,0,0.85)'
-                  : isDarkMode
-                    ? 'rgba(30, 30, 30, 0.85)'
-                    : 'rgba(255, 255, 255, 0.90)',
-              },
-            ]}
-          />
           {/* Tab triggers */}
           {orderedTabs.map((tab) => (
             <TabTrigger key={tab.name} name={tab.name} href={tab.href} asChild>

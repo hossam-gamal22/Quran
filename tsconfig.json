@@ -29,9 +29,7 @@
     "data/**/*.ts",
     "shared/**/*.ts",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "nativewind-env.d.ts",
-    "global.css"
+    "expo-env.d.ts"
   ],
   "exclude": [
     "node_modules",

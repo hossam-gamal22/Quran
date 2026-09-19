@@ -38,6 +38,7 @@ import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { ModalColors } from '@/constants/theme';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { usePrayerTracker } from '@/contexts/WorshipContext';
@@ -540,7 +541,7 @@ export default function SalatiScreen() {
         {/* Steps */}
         <View style={styles.instructionsList}>
           {/* Step 1 */}
-          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : 'rgba(245,245,247,0.95)' }]}>
             <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.stepNumber, { backgroundColor: ACCENT_GREEN }]}>
                 <Text style={styles.stepNumberText}>1</Text>
@@ -557,7 +558,7 @@ export default function SalatiScreen() {
           </View>
 
           {/* Step 2 */}
-          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : 'rgba(245,245,247,0.95)' }]}>
             <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.stepNumber, { backgroundColor: ACCENT_GREEN }]}>
                 <Text style={styles.stepNumberText}>2</Text>
@@ -574,7 +575,7 @@ export default function SalatiScreen() {
           </View>
 
           {/* Step 3 */}
-          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : 'rgba(245,245,247,0.95)' }]}>
             <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.stepNumber, { backgroundColor: ACCENT_GREEN }]}>
                 <Text style={styles.stepNumberText}>3</Text>
@@ -591,11 +592,11 @@ export default function SalatiScreen() {
           </View>
 
           {/* Tip */}
-          <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(13, 142, 98, 0.12)' : 'rgba(13, 142, 98, 0.08)' }]}>
+          <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.16)' : 'rgba(245,158,11,0.12)' }]}>
             <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={22} color={ACCENT_GREEN} />
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={22} color="#fbbf24" />
               <View style={styles.stepContent}>
-                <Text style={[styles.tipText, { color: ACCENT_GREEN, textAlign: isRTL ? 'right' : 'left' }]}>
+                <Text style={[styles.tipText, { color: isDarkMode ? '#fde68a' : '#92400e', textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('smartTracker.tipDesc')}
                 </Text>
               </View>
@@ -667,9 +668,9 @@ export default function SalatiScreen() {
                 key={prayer}
                 style={[
                   styles.prayerCard,
-                  { 
-                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f2f2f7',
-                    borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)',
+                  {
+                    backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : '#f2f2f7',
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                   },
                   isSelected && styles.prayerCardSelected,
                   isCompleted && styles.prayerCardCompleted,
@@ -727,9 +728,9 @@ export default function SalatiScreen() {
                 key={prayer}
                 style={[
                   styles.prayerCard,
-                  { 
-                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f2f2f7',
-                    borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)',
+                  {
+                    backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : '#f2f2f7',
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                   },
                   isSelected && styles.prayerCardSelected,
                   isCompleted && styles.prayerCardCompleted,
@@ -787,9 +788,9 @@ export default function SalatiScreen() {
                 key={prayer}
                 style={[
                   styles.prayerCard,
-                  { 
-                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f2f2f7',
-                    borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)',
+                  {
+                    backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : '#f2f2f7',
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                   },
                   isSelected && styles.prayerCardSelected,
                   isCompleted && styles.prayerCardCompleted,
@@ -839,8 +840,8 @@ export default function SalatiScreen() {
             style={[
               styles.prayerCard,
               {
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f2f2f7',
-                borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)',
+                backgroundColor: isDarkMode ? 'rgba(15,25,30,0.85)' : '#f2f2f7',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
               },
               selectedPrayer?.kind === 'temporary' && styles.prayerCardSelected,
             ]}
@@ -927,7 +928,7 @@ export default function SalatiScreen() {
           style={[
             styles.modalSheet,
             {
-              backgroundColor: isDarkMode ? 'rgba(30,30,32,0.96)' : 'rgba(255,255,255,0.98)',
+              backgroundColor: isDarkMode ? ModalColors.cardDark : ModalColors.cardLight,
               borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
               paddingBottom: Math.max(insets.bottom, 16) + 16,
             },

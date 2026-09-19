@@ -61,7 +61,7 @@ import {
   getQuranTextColor,
 } from '@/components/ui/QuranBackgroundWrapper';
 import { QURAN_THEMES, getGoldenColor, getSafeThemeIndex, getThemeCount, isThemeLight } from '@/constants/quran-themes';
-import { Spacing, FONT_SIZES, DarkColors } from '@/constants/theme';
+import { Spacing, FONT_SIZES, DarkColors, ModalColors } from '@/constants/theme';
 import { useColors } from '@/hooks/use-colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -2470,7 +2470,7 @@ export default function SurahScreen() {
                 style={s.menuBlur}
               >
                 <View style={[s.menuCard, {
-                  backgroundColor: isLightBg ? 'rgba(255,255,255,0.92)' : 'rgba(38,38,42,0.92)',
+                  backgroundColor: isLightBg ? ModalColors.cardLight : ModalColors.cardDark,
                   borderColor: isLightBg ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)',
                 }]}>
                   {/* Bookmark color row */}
@@ -2546,7 +2546,7 @@ export default function SurahScreen() {
               <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => { if (!tafsirLocked) setShowTafsir(false); }} />
               <View style={[s.sheetContainer, { height: '90%' }]}>
                 <BlurView intensity={Platform.OS === 'ios' ? 40 : 25} tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any} style={s.sheetBlur}>
-                  <View style={[s.sheetContent, { backgroundColor: Platform.OS === 'android' ? (isLightBg ? '#FFFFFF' : '#212d39') : (isLightBg ? 'rgba(255,255,255,0.85)' : '#212d39') }]}>
+                  <View style={[s.sheetContent, { backgroundColor: isLightBg ? ModalColors.cardLight : ModalColors.cardDark }]}>
                     <View style={s.sheetHandle}>
                       <View style={[s.sheetHandleBar, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }]} />
                     </View>
@@ -2615,7 +2615,7 @@ export default function SurahScreen() {
                   style={s.sheetBlur}
                 >
                   <View style={[s.sheetContent, {
-                    backgroundColor: Platform.OS === 'android' ? (settingsIsLight ? '#FFFFFF' : '#0f1a14') : (settingsIsLight ? 'rgba(255,255,255,0.97)' : '#0f1a14'),
+                    backgroundColor: settingsIsLight ? ModalColors.cardLight : ModalColors.cardDark,
                     borderTopWidth: StyleSheet.hairlineWidth,
                     borderTopColor: settingsIsLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)',
                   }]}>

@@ -6,6 +6,18 @@
 export type Language = 'ar' | 'en' | 'fr' | 'de' | 'es' | 'tr' | 'ur' | 'id' | 'ms' | 'hi' | 'bn' | 'ru';
 
 export interface TranslationKeys {
+  // غريب القرآن
+  gharibQuran: {
+    title: string;
+    subtitle: string;
+    wordOfTheDay: string;
+    searchPlaceholder: string;
+    resultsCount: string;
+    noResults: string;
+    surahLabel: string;
+    openInMushaf: string;
+    totalWords: string;
+  };
   // التطبيق
   app: {
     name: string;
@@ -188,6 +200,7 @@ export interface TranslationKeys {
     anotherWisdom: string;
     customize: string;
     customizeQuickAccess: string;
+    quickAccessHint: string;
     resetToDefaults: string;
     searchSection: string;
     searchSurah: string;
@@ -1294,6 +1307,7 @@ export interface TranslationKeys {
     notificationsInfo: string;
     notificationsRequired: string;
     notificationsRequiredMsg: string;
+    systemNotificationsBlockedMsg: string;
     openSettings: string;
     pm: string;
     prayer: string;
@@ -2677,6 +2691,9 @@ export interface TranslationKeys {
     dateToday: string;
     dateYesterday: string;
     daysAgo: string;
+    contentLangNotice: string;
+    searchPlaceholder: string;
+    noSearchResults: string;
   };
   // التتبع الذكي
   smartTracker: {
@@ -2776,6 +2793,17 @@ export interface TranslationKeys {
 }
 // ==================== العربية ====================
 const ar: TranslationKeys = {
+  gharibQuran: {
+    title: 'غريب القرآن',
+    subtitle: 'معاني الكلمات الصعبة والغريبة في القرآن — تصفّح أو ابحث عن كلمة.',
+    wordOfTheDay: 'كلمة اليوم',
+    searchPlaceholder: 'ابحث عن كلمة أو معنى…',
+    resultsCount: 'نتيجة',
+    noResults: 'لا توجد كلمات مطابقة',
+    surahLabel: 'سورة:',
+    openInMushaf: 'افتح في المصحف',
+    totalWords: 'كلمة',
+  },
   app: {
     name: 'روح المسلم',
     slogan: 'رفيقك الإيماني',
@@ -2951,6 +2979,7 @@ const ar: TranslationKeys = {
     anotherWisdom: 'حكمة أخرى',
     customize: 'تخصيص',
     customizeQuickAccess: 'تخصيص الوصول السريع',
+    quickAccessHint: 'يمكنك تخصيص هذه القائمة بإضافة وحذف وترتيب العناصر كما تحب',
     resetToDefaults: 'استعادة الافتراضي',
     searchSection: 'ابحث في الأقسام',
     searchSurah: 'ابحث عن سورة',
@@ -3361,9 +3390,9 @@ const ar: TranslationKeys = {
     targetReached: 'تم الوصول للهدف',
     vibration: 'الاهتزاز',
     sound: 'الصوت',
-    selectDhikr: 'اختر الذكر',
-    customDhikr: 'ذكر مخصص',
-    addCustom: 'إضافة ذكر',
+    selectDhikr: 'اختر التسبيحة',
+    customDhikr: 'تسبيحة مخصصة',
+    addCustom: 'إضافة تسبيحة',
     subhanAllah: 'سبحان الله',
     alhamdulillah: 'الحمد لله',
     allahuAkbar: 'الله أكبر',
@@ -3383,24 +3412,24 @@ const ar: TranslationKeys = {
     mode: 'الوضع',
     freeMode: 'وضع حر',
     targetMode: 'وضع الهدف',
-    addCustomDhikr: 'إضافة ذكر مخصص',
-    approvedDhikr: 'أذكار معتمدة',
+    addCustomDhikr: 'إضافة تسبيحة مخصصة',
+    approvedDhikr: 'تسبيحات معتمدة',
     autoAdvance: 'الانتقال التلقائي',
-    autoAdvanceDesc: 'الانتقال للذكر التالي تلقائياً',
+    autoAdvanceDesc: 'الانتقال للتسبيحة التالية تلقائياً',
     completedRounds: 'الجولات المكتملة',
     dailyAverage: 'المتوسط اليومي',
     dailyResetToast: 'تم حفظ تسبيحات الأمس وإعادة التعيين',
-    deleteConfirm: 'هل تريد حذف هذا الذكر؟',
-    dhikrText: 'نص الذكر',
-    dhikrUnit: 'ذكر',
-    enterDhikrText: 'أدخل نص الذكر',
-    enterTextError: 'أدخل نص الذكر أولاً',
+    deleteConfirm: 'هل تريد حذف هذه التسبيحة؟',
+    dhikrText: 'نص التسبيحة',
+    dhikrUnit: 'تسبيحة',
+    enterDhikrText: 'أدخل نص التسبيحة',
+    enterTextError: 'أدخل نص التسبيحة أولاً',
     logExternal: 'تسجيل خارجي',
     externalCount: 'العدد',
     externalCountPlaceholder: 'ادخل عدد التسبيحات الخارجية التي قمت بها',
     addToCounter: 'إضافة للعداد',
     externalCountError: 'أدخل عدداً صحيحاً بين 1 و99999',
-    myCustomDhikr: 'أذكاري المخصصة',
+    myCustomDhikr: 'تسبيحاتي المخصصة',
     myStats: 'إحصائياتي',
     noDataYet: 'لا توجد بيانات بعد',
     of: 'من',
@@ -4031,6 +4060,7 @@ const ar: TranslationKeys = {
     notificationsInfo: 'معلومات الإشعارات',
     notificationsRequired: 'الإشعارات مطلوبة',
     notificationsRequiredMsg: 'يرجى تفعيل الإشعارات من إعدادات الجهاز',
+    systemNotificationsBlockedMsg: 'الإشعارات مفعّلة داخل التطبيق، لكنها معطّلة من إعدادات النظام في هاتفك. لن تصلك أي تنبيهات حتى تفتح إعدادات النظام وتسمح بالإشعارات لتطبيق روح المسلم.',
     openSettings: 'فتح الإعدادات',
     pm: 'م',
     prayer: 'الصلاة',
@@ -5397,6 +5427,9 @@ const ar: TranslationKeys = {
     dateToday: 'اليوم',
     dateYesterday: 'أمس',
     daysAgo: 'منذ {count} أيام',
+    contentLangNotice: 'الأسئلة والأجوبة متوفرة باللغتين العربية والإنجليزية فقط. وعند اختيار لغة أخرى يتم عرض النص بالإنجليزية.',
+    searchPlaceholder: 'ابحث في الأسئلة والأجوبة…',
+    noSearchResults: 'لا توجد نتائج مطابقة لبحثك',
   },
   smartTracker: {
     title: 'صلاتي',
@@ -5493,6 +5526,17 @@ const ar: TranslationKeys = {
 };
 // ==================== English ====================
 const en: TranslationKeys = {
+  gharibQuran: {
+    title: 'Uncommon Quran Words',
+    subtitle: 'Meanings of difficult and uncommon words in the Quran — browse or search.',
+    wordOfTheDay: 'Word of the Day',
+    searchPlaceholder: 'Search for a word or meaning…',
+    resultsCount: 'results',
+    noResults: 'No matching words found',
+    surahLabel: 'Surah:',
+    openInMushaf: 'Open in Mushaf',
+    totalWords: 'words',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Your Faith Companion',
@@ -5668,6 +5712,7 @@ const en: TranslationKeys = {
     anotherWisdom: 'Another Wisdom',
     customize: 'Customize',
     customizeQuickAccess: 'Customize Quick Access',
+    quickAccessHint: 'You can customize this list — add, remove and reorder items as you like',
     resetToDefaults: 'Reset to Defaults',
     searchSection: 'Search sections',
     searchSurah: 'Search surah',
@@ -6748,6 +6793,7 @@ const en: TranslationKeys = {
     notificationsInfo: 'Notifications Info',
     notificationsRequired: 'Notifications Required',
     notificationsRequiredMsg: 'Please enable notifications from device settings',
+    systemNotificationsBlockedMsg: 'Notifications are enabled in the app, but blocked at the system level. You will not receive any alerts until you open device settings and allow notifications for Ruh Al-Muslim.',
     openSettings: 'Open Settings',
     pm: 'PM',
     prayer: 'Prayer',
@@ -8114,6 +8160,9 @@ const en: TranslationKeys = {
     dateToday: 'Today',
     dateYesterday: 'Yesterday',
     daysAgo: '{count} days ago',
+    contentLangNotice: 'Questions and answers are available in Arabic and English only. For other languages, the English text is shown.',
+    searchPlaceholder: 'Search questions and answers…',
+    noSearchResults: 'No results match your search',
   },
   smartTracker: {
     title: 'My Prayer',
@@ -8210,6 +8259,17 @@ const en: TranslationKeys = {
 };
 //==================== Français ====================
 const fr: TranslationKeys = {
+  gharibQuran: {
+    title: 'Mots rares du Coran',
+    subtitle: 'Significations des mots difficiles et rares du Coran — parcourez ou recherchez.',
+    wordOfTheDay: 'Mot du jour',
+    searchPlaceholder: 'Rechercher un mot ou un sens…',
+    resultsCount: 'résultats',
+    noResults: 'Aucun mot correspondant',
+    surahLabel: 'Sourate :',
+    openInMushaf: 'Ouvrir dans le Mushaf',
+    totalWords: 'mots',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Votre Compagnon de Foi',
@@ -8385,6 +8445,7 @@ const fr: TranslationKeys = {
     anotherWisdom: 'Une autre sagesse',
     customize: 'Personnaliser',
     customizeQuickAccess: 'Personnaliser l\'accès rapide',
+    quickAccessHint: 'Vous pouvez personnaliser cette liste : ajouter, supprimer et réorganiser les éléments',
     resetToDefaults: 'Réinitialiser par défaut',
     searchSection: 'Rechercher des sections',
     searchSurah: 'Rechercher une sourate',
@@ -9463,6 +9524,7 @@ const fr: TranslationKeys = {
     notificationsInfo: 'Informations sur les notifications',
     notificationsRequired: 'Notifications requises',
     notificationsRequiredMsg: 'Veuillez activer les notifications dans les paramètres',
+    systemNotificationsBlockedMsg: 'Les notifications sont activées dans l’application, mais bloquées au niveau du système. Vous ne recevrez aucune alerte tant que vous ne les autoriserez pas dans les paramètres de l’appareil.',
     openSettings: 'Ouvrir les paramètres',
     pm: 'PM',
     prayer: 'Prière',
@@ -10828,6 +10890,9 @@ const fr: TranslationKeys = {
     dateToday: "Aujourd'hui",
     dateYesterday: 'Hier',
     daysAgo: 'Il y a {count} jours',
+    contentLangNotice: 'Les questions et réponses sont disponibles uniquement en arabe et en anglais. Pour les autres langues, le texte anglais est affiché.',
+    searchPlaceholder: 'Rechercher dans les questions et réponses…',
+    noSearchResults: 'Aucun résultat ne correspond à votre recherche',
   },
   smartTracker: {
     title: 'Ma Prière',
@@ -10891,6 +10956,17 @@ const fr: TranslationKeys = {
 
 // ==================== Deutsch ====================
 const de: TranslationKeys = {
+  gharibQuran: {
+    title: 'Seltene Koran-Wörter',
+    subtitle: 'Bedeutungen schwieriger und seltener Wörter im Koran — durchsuchen oder suchen.',
+    wordOfTheDay: 'Wort des Tages',
+    searchPlaceholder: 'Nach Wort oder Bedeutung suchen…',
+    resultsCount: 'Ergebnisse',
+    noResults: 'Keine passenden Wörter gefunden',
+    surahLabel: 'Sure:',
+    openInMushaf: 'Im Mushaf öffnen',
+    totalWords: 'Wörter',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Dein Glaubensbegleiter',
@@ -11066,6 +11142,7 @@ const de: TranslationKeys = {
     anotherWisdom: 'Eine andere Weisheit',
     customize: 'Anpassen',
     customizeQuickAccess: 'Schnellzugriff anpassen',
+    quickAccessHint: 'Sie können diese Liste anpassen – Elemente hinzufügen, entfernen und neu anordnen',
     resetToDefaults: 'Auf Standard zurücksetzen',
     searchSection: 'Abschnitte suchen',
     searchSurah: 'Sure suchen',
@@ -12144,6 +12221,7 @@ const de: TranslationKeys = {
     notificationsInfo: 'Benachrichtigungsinformationen',
     notificationsRequired: 'Benachrichtigungen erforderlich',
     notificationsRequiredMsg: 'Bitte aktivieren Sie Benachrichtigungen in den Einstellungen',
+    systemNotificationsBlockedMsg: 'Benachrichtigungen sind in der App aktiviert, aber auf Systemebene blockiert. Sie erhalten keine Hinweise, bis Sie sie in den Geräteeinstellungen erlauben.',
     openSettings: 'Einstellungen öffnen',
     pm: 'PM',
     prayer: 'Gebet',
@@ -13509,6 +13587,9 @@ const de: TranslationKeys = {
     dateToday: 'Heute',
     dateYesterday: 'Gestern',
     daysAgo: 'Vor {count} Tagen',
+    contentLangNotice: 'Fragen und Antworten sind nur auf Arabisch und Englisch verfügbar. Bei anderen Sprachen wird der englische Text angezeigt.',
+    searchPlaceholder: 'Fragen und Antworten durchsuchen…',
+    noSearchResults: 'Keine Ergebnisse für deine Suche',
   },
   smartTracker: {
     title: 'Mein Gebet',
@@ -13572,6 +13653,17 @@ const de: TranslationKeys = {
 
 // ==================== Türkçe (Turkish) ====================
 const tr: TranslationKeys = {
+  gharibQuran: {
+    title: "Kur'an'ın Garip Kelimeleri",
+    subtitle: "Kur'an'daki zor ve nadir kelimelerin anlamları — göz atın veya arayın.",
+    wordOfTheDay: 'Günün Kelimesi',
+    searchPlaceholder: 'Bir kelime veya anlam arayın…',
+    resultsCount: 'sonuç',
+    noResults: 'Eşleşen kelime bulunamadı',
+    surahLabel: 'Sure:',
+    openInMushaf: "Mushaf'ta aç",
+    totalWords: 'kelime',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Senin İman Arkadaşın',
@@ -13747,6 +13839,7 @@ const tr: TranslationKeys = {
     anotherWisdom: 'Başka Bir Hikmet',
     customize: 'Özelleştir',
     customizeQuickAccess: 'Hızlı Erişimi Özelleştir',
+    quickAccessHint: 'Bu listeyi özelleştirebilirsiniz — öğeleri ekleyin, kaldırın ve yeniden sıralayın',
     resetToDefaults: 'Varsayılana Sıfırla',
     searchSection: 'Bölüm ara',
     searchSurah: 'Sure ara',
@@ -14825,6 +14918,7 @@ const tr: TranslationKeys = {
     notificationsInfo: 'Bildirim Bilgisi',
     notificationsRequired: 'Bildirimler Gerekli',
     notificationsRequiredMsg: 'Lütfen cihaz ayarlarından bildirimleri etkinleştirin',
+    systemNotificationsBlockedMsg: 'Bildirimler uygulamada açık, ancak sistem düzeyinde engellenmiş. Cihaz ayarlarından izin vermediğiniz sürece hiçbir uyarı almazsınız.',
     openSettings: 'Ayarları Aç',
     pm: 'ÖS',
     prayer: 'Namaz',
@@ -16190,6 +16284,9 @@ const tr: TranslationKeys = {
     dateToday: 'Bugün',
     dateYesterday: 'Dün',
     daysAgo: '{count} gün önce',
+    contentLangNotice: 'Sorular ve cevaplar yalnızca Arapça ve İngilizce olarak mevcuttur. Diğer dillerde İngilizce metin gösterilir.',
+    searchPlaceholder: 'Soru ve cevaplarda ara…',
+    noSearchResults: 'Aramanızla eşleşen sonuç yok',
   },
   smartTracker: {
     title: 'Namazım',
@@ -16253,6 +16350,17 @@ const tr: TranslationKeys = {
 
 // ==================== Español ======================================
 const es: TranslationKeys = {
+  gharibQuran: {
+    title: 'Palabras poco comunes del Corán',
+    subtitle: 'Significados de palabras difíciles y poco comunes del Corán: explora o busca.',
+    wordOfTheDay: 'Palabra del día',
+    searchPlaceholder: 'Buscar una palabra o significado…',
+    resultsCount: 'resultados',
+    noResults: 'No se encontraron palabras',
+    surahLabel: 'Sura:',
+    openInMushaf: 'Abrir en el Mushaf',
+    totalWords: 'palabras',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Tu Compañero de Fe',
@@ -16428,6 +16536,7 @@ const es: TranslationKeys = {
     anotherWisdom: 'Otra sabiduría',
     customize: 'Personalizar',
     customizeQuickAccess: 'Personalizar acceso rápido',
+    quickAccessHint: 'Puedes personalizar esta lista: añade, elimina y reordena los elementos',
     resetToDefaults: 'Restablecer valores predeterminados',
     searchSection: 'Buscar secciones',
     searchSurah: 'Buscar sura',
@@ -17506,6 +17615,7 @@ const es: TranslationKeys = {
     notificationsInfo: 'Información de notificaciones',
     notificationsRequired: 'Notificaciones requeridas',
     notificationsRequiredMsg: 'Por favor activa las notificaciones en la configuración',
+    systemNotificationsBlockedMsg: 'Las notificaciones están activadas en la aplicación, pero bloqueadas a nivel del sistema. No recibirás alertas hasta que las permitas en los ajustes del dispositivo.',
     openSettings: 'Abrir configuración',
     pm: 'PM',
     prayer: 'Oración',
@@ -18871,6 +18981,9 @@ const es: TranslationKeys = {
     dateToday: 'Hoy',
     dateYesterday: 'Ayer',
     daysAgo: 'Hace {count} días',
+    contentLangNotice: 'Las preguntas y respuestas solo están disponibles en árabe e inglés. Para otros idiomas se muestra el texto en inglés.',
+    searchPlaceholder: 'Buscar en preguntas y respuestas…',
+    noSearchResults: 'No hay resultados que coincidan con tu búsqueda',
   },
   smartTracker: {
     title: 'Mi Oración',
@@ -18933,6 +19046,17 @@ const es: TranslationKeys = {
 };
 // ==================== اردو (Urdu) ====================
 const ur: TranslationKeys = {
+  gharibQuran: {
+    title: 'غریب القرآن',
+    subtitle: 'قرآن کے مشکل اور نادر الفاظ کے معانی — تلاش کریں یا براؤز کریں۔',
+    wordOfTheDay: 'آج کا لفظ',
+    searchPlaceholder: 'کوئی لفظ یا معنی تلاش کریں…',
+    resultsCount: 'نتائج',
+    noResults: 'کوئی مماثل لفظ نہیں ملا',
+    surahLabel: 'سورہ:',
+    openInMushaf: 'مصحف میں کھولیں',
+    totalWords: 'الفاظ',
+  },
   app: {
     name: 'روح المسلم',
     slogan: 'آپ کا ایمانی ساتھی',
@@ -19108,6 +19232,7 @@ const ur: TranslationKeys = {
     anotherWisdom: 'ایک اور حکمت',
     customize: 'اپنی مرضی سے بنائیں',
     customizeQuickAccess: 'فوری رسائی کو اپنی مرضی سے بنائیں',
+    quickAccessHint: 'آپ اس فہرست کو اپنی مرضی کے مطابق بنا سکتے ہیں — آئٹمز شامل کریں، ہٹائیں اور ترتیب دیں',
     resetToDefaults: 'ڈیفالٹ پر ری سیٹ کریں',
     searchSection: 'سیکشن تلاش کریں',
     searchSurah: 'سورت تلاش کریں',
@@ -20186,6 +20311,7 @@ const ur: TranslationKeys = {
     notificationsInfo: 'نوٹیفکیشنز کی معلومات',
     notificationsRequired: 'نوٹیفکیشنز ضروری ہیں',
     notificationsRequiredMsg: 'براہ کرم ڈیوائس سیٹنگز سے نوٹیفکیشنز فعال کریں',
+    systemNotificationsBlockedMsg: 'نوٹیفکیشنز ایپ میں فعال ہیں لیکن سسٹم کی سطح پر بند ہیں۔ جب تک آپ ڈیوائس سیٹنگز سے اجازت نہیں دیں گے، کوئی الرٹ موصول نہیں ہوگا۔',
     openSettings: 'سیٹنگز کھولیں',
     pm: 'شام',
     prayer: 'نماز',
@@ -21551,6 +21677,9 @@ const ur: TranslationKeys = {
     dateToday: 'آج',
     dateYesterday: 'کل',
     daysAgo: '{count} دن پہلے',
+    contentLangNotice: 'سوالات اور جوابات صرف عربی اور انگریزی میں دستیاب ہیں۔ دیگر زبانوں کے لیے انگریزی متن دکھایا جاتا ہے۔',
+    searchPlaceholder: 'سوالات اور جوابات میں تلاش کریں…',
+    noSearchResults: 'آپ کی تلاش سے کوئی نتیجہ مماثل نہیں',
   },
   smartTracker: {
     title: 'میری نماز',
@@ -21614,6 +21743,17 @@ const ur: TranslationKeys = {
 
 // ==================== Bahasa Indonesia ======================================
 const id: TranslationKeys = {
+  gharibQuran: {
+    title: "Kosakata Sulit Al-Qur'an",
+    subtitle: "Makna kata-kata sulit dan langka dalam Al-Qur'an — telusuri atau cari.",
+    wordOfTheDay: 'Kata Hari Ini',
+    searchPlaceholder: 'Cari kata atau makna…',
+    resultsCount: 'hasil',
+    noResults: 'Tidak ada kata yang cocok',
+    surahLabel: 'Surah:',
+    openInMushaf: 'Buka di Mushaf',
+    totalWords: 'kata',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Sahabat Iman Anda',
@@ -21789,6 +21929,7 @@ const id: TranslationKeys = {
     anotherWisdom: 'Hikmah Lain',
     customize: 'Sesuaikan',
     customizeQuickAccess: 'Sesuaikan Akses Cepat',
+    quickAccessHint: 'Anda dapat menyesuaikan daftar ini — tambah, hapus, dan atur ulang item sesuka Anda',
     resetToDefaults: 'Atur Ulang ke Default',
     searchSection: 'Cari bagian',
     searchSurah: 'Cari surah',
@@ -22867,6 +23008,7 @@ const id: TranslationKeys = {
     notificationsInfo: 'Info Notifikasi',
     notificationsRequired: 'Notifikasi Diperlukan',
     notificationsRequiredMsg: 'Harap aktifkan notifikasi dari pengaturan perangkat',
+    systemNotificationsBlockedMsg: 'Notifikasi aktif di aplikasi, tetapi diblokir di tingkat sistem. Anda tidak akan menerima peringatan sampai mengizinkannya di pengaturan perangkat.',
     openSettings: 'Buka Pengaturan',
     pm: 'PM',
     prayer: 'Sholat',
@@ -24232,6 +24374,9 @@ const id: TranslationKeys = {
     dateToday: 'Hari ini',
     dateYesterday: 'Kemarin',
     daysAgo: '{count} hari yang lalu',
+    contentLangNotice: 'Pertanyaan dan jawaban hanya tersedia dalam bahasa Arab dan Inggris. Untuk bahasa lain, teks bahasa Inggris ditampilkan.',
+    searchPlaceholder: 'Cari pertanyaan dan jawaban…',
+    noSearchResults: 'Tidak ada hasil yang cocok dengan pencarian Anda',
   },
   smartTracker: {
     title: 'Sholat Saya',
@@ -24295,6 +24440,17 @@ const id: TranslationKeys = {
 
 // ==================== Bahasa Melayu ====================
 const ms: TranslationKeys = {
+  gharibQuran: {
+    title: 'Perkataan Sukar Al-Quran',
+    subtitle: 'Makna perkataan sukar dan jarang dalam Al-Quran — lihat atau cari.',
+    wordOfTheDay: 'Perkataan Hari Ini',
+    searchPlaceholder: 'Cari perkataan atau makna…',
+    resultsCount: 'hasil',
+    noResults: 'Tiada perkataan sepadan',
+    surahLabel: 'Surah:',
+    openInMushaf: 'Buka dalam Mushaf',
+    totalWords: 'perkataan',
+  },
   app: {
     name: 'Rooh Al-Muslim',
     slogan: 'Sahabat Iman Anda',
@@ -24470,6 +24626,7 @@ const ms: TranslationKeys = {
     anotherWisdom: 'Hikmah Lain',
     customize: 'Sesuaikan',
     customizeQuickAccess: 'Sesuaikan Akses Pantas',
+    quickAccessHint: 'Anda boleh menyesuaikan senarai ini — tambah, buang dan susun semula item sesuka hati',
     resetToDefaults: 'Tetapkan Semula ke Lalai',
     searchSection: 'Cari bahagian',
     searchSurah: 'Cari surah',
@@ -25548,6 +25705,7 @@ const ms: TranslationKeys = {
     notificationsInfo: 'Maklumat Pemberitahuan',
     notificationsRequired: 'Pemberitahuan Diperlukan',
     notificationsRequiredMsg: 'Sila aktifkan pemberitahuan dari tetapan peranti',
+    systemNotificationsBlockedMsg: 'Pemberitahuan diaktifkan dalam aplikasi tetapi disekat pada peringkat sistem. Anda tidak akan menerima sebarang amaran sehingga membenarkannya dalam tetapan peranti.',
     openSettings: 'Buka Tetapan',
     pm: 'PM',
     prayer: 'Solat',
@@ -26913,6 +27071,9 @@ const ms: TranslationKeys = {
     dateToday: 'Hari ini',
     dateYesterday: 'Semalam',
     daysAgo: '{count} hari yang lalu',
+    contentLangNotice: 'Soalan dan jawapan hanya tersedia dalam bahasa Arab dan Inggeris. Untuk bahasa lain, teks bahasa Inggeris dipaparkan.',
+    searchPlaceholder: 'Cari soalan dan jawapan…',
+    noSearchResults: 'Tiada hasil yang sepadan dengan carian anda',
   },
   smartTracker: {
     title: 'Solat Saya',
@@ -26975,6 +27136,17 @@ const ms: TranslationKeys = {
 };
 // ==================== हिन्दी (Hindi) ======================================
 const hi: TranslationKeys = {
+  gharibQuran: {
+    title: 'क़ुरआन के कठिन शब्द',
+    subtitle: 'क़ुरआन के कठिन और दुर्लभ शब्दों के अर्थ — ब्राउज़ करें या खोजें।',
+    wordOfTheDay: 'आज का शब्द',
+    searchPlaceholder: 'शब्द या अर्थ खोजें…',
+    resultsCount: 'परिणाम',
+    noResults: 'कोई मिलता-जुलता शब्द नहीं मिला',
+    surahLabel: 'सूरह:',
+    openInMushaf: 'मुस्हफ़ में खोलें',
+    totalWords: 'शब्द',
+  },
   app: {
     name: 'रूह अल-मुस्लिम',
     slogan: 'आपका ईमान साथी',
@@ -27150,6 +27322,7 @@ const hi: TranslationKeys = {
     anotherWisdom: 'एक और ज्ञान',
     customize: 'अनुकूलित करें',
     customizeQuickAccess: 'त्वरित पहुंच अनुकूलित करें',
+    quickAccessHint: 'आप इस सूची को अनुकूलित कर सकते हैं — आइटम जोड़ें, हटाएं और पुनः व्यवस्थित करें',
     resetToDefaults: 'डिफ़ॉल्ट पर रीसेट करें',
     searchSection: 'अनुभाग खोजें',
     searchSurah: 'सूरह खोजें',
@@ -28229,6 +28402,7 @@ const hi: TranslationKeys = {
     notificationsInfo: 'अधिसूचना जानकारी',
     notificationsRequired: 'अधिसूचनाएँ आवश्यक',
     notificationsRequiredMsg: 'कृपया डिवाइस सेटिंग्स से अधिसूचनाएँ सक्षम करें',
+    systemNotificationsBlockedMsg: 'सूचनाएँ ऐप में सक्षम हैं लेकिन सिस्टम स्तर पर अवरुद्ध हैं। जब तक आप डिवाइस सेटिंग्स से अनुमति नहीं देंगे, कोई अलर्ट प्राप्त नहीं होगा।',
     openSettings: 'सेटिंग्स खोलें',
     pm: 'PM',
     prayer: 'नमाज़',
@@ -29594,6 +29768,9 @@ const hi: TranslationKeys = {
     dateToday: 'आज',
     dateYesterday: 'कल',
     daysAgo: '{count} दिन पहले',
+    contentLangNotice: 'प्रश्न और उत्तर केवल अरबी और अंग्रेज़ी में उपलब्ध हैं। अन्य भाषाओं के लिए अंग्रेज़ी पाठ दिखाया जाता है।',
+    searchPlaceholder: 'प्रश्न और उत्तर खोजें…',
+    noSearchResults: 'आपकी खोज से मेल खाता कोई परिणाम नहीं',
   },
   smartTracker: {
     title: 'मेरी नमाज़',
@@ -29657,6 +29834,17 @@ const hi: TranslationKeys = {
 
 // ==================== বাংলা (Bengali) ====================
 const bn: TranslationKeys = {
+  gharibQuran: {
+    title: 'কুরআনের কঠিন শব্দ',
+    subtitle: 'কুরআনের কঠিন ও বিরল শব্দের অর্থ — ব্রাউজ করুন বা খুঁজুন।',
+    wordOfTheDay: 'আজকের শব্দ',
+    searchPlaceholder: 'শব্দ বা অর্থ খুঁজুন…',
+    resultsCount: 'ফলাফল',
+    noResults: 'কোনো মিল পাওয়া যায়নি',
+    surahLabel: 'সূরা:',
+    openInMushaf: 'মুসহাফে খুলুন',
+    totalWords: 'শব্দ',
+  },
   app: {
     name: 'রুহ আল-মুসলিম',
     slogan: 'আপনার ঈমানের সঙ্গী',
@@ -29832,6 +30020,7 @@ const bn: TranslationKeys = {
     anotherWisdom: 'আরেকটি প্রজ্ঞা',
     customize: 'কাস্টমাইজ করুন',
     customizeQuickAccess: 'দ্রুত অ্যাক্সেস কাস্টমাইজ করুন',
+    quickAccessHint: 'আপনি এই তালিকাটি কাস্টমাইজ করতে পারেন — আইটেম যোগ, মুছে ও পুনর্বিন্যাস করুন',
     resetToDefaults: 'ডিফল্টে রিসেট করুন',
     searchSection: 'বিভাগ অনুসন্ধান করুন',
     searchSurah: 'সূরা অনুসন্ধান করুন',
@@ -30910,6 +31099,7 @@ const bn: TranslationKeys = {
     notificationsInfo: 'নোটিফিকেশন তথ্য',
     notificationsRequired: 'নোটিফিকেশন প্রয়োজন',
     notificationsRequiredMsg: 'অনুগ্রহ করে ডিভাইস সেটিংস থেকে নোটিফিকেশন চালু করুন',
+    systemNotificationsBlockedMsg: 'অ্যাপে নোটিফিকেশন চালু আছে কিন্তু সিস্টেম স্তরে বন্ধ আছে। ডিভাইস সেটিংস থেকে অনুমতি না দিলে কোনো সতর্কতা পাবেন না।',
     openSettings: 'সেটিংস খুলুন',
     pm: 'PM',
     prayer: 'নামাজ',
@@ -32275,6 +32465,9 @@ const bn: TranslationKeys = {
     dateToday: 'আজ',
     dateYesterday: 'গতকাল',
     daysAgo: '{count} দিন আগে',
+    contentLangNotice: 'প্রশ্ন ও উত্তর কেবল আরবি ও ইংরেজিতে উপলব্ধ। অন্যান্য ভাষার জন্য ইংরেজি লেখা দেখানো হয়।',
+    searchPlaceholder: 'প্রশ্ন ও উত্তরে খুঁজুন…',
+    noSearchResults: 'আপনার অনুসন্ধানের সাথে মিলে এমন কোনো ফলাফল নেই',
   },
   smartTracker: {
     title: 'আমার নামাজ',
@@ -32338,6 +32531,17 @@ const bn: TranslationKeys = {
 
 // ==================== Русский (Russian) ======================================
 const ru: TranslationKeys = {
+  gharibQuran: {
+    title: 'Редкие слова Корана',
+    subtitle: 'Значения трудных и редких слов Корана — просматривайте или ищите.',
+    wordOfTheDay: 'Слово дня',
+    searchPlaceholder: 'Поиск слова или значения…',
+    resultsCount: 'результатов',
+    noResults: 'Совпадений не найдено',
+    surahLabel: 'Сура:',
+    openInMushaf: 'Открыть в Мусхафе',
+    totalWords: 'слов',
+  },
   app: {
     name: 'Рух аль-Муслим',
     slogan: 'Ваш спутник веры',
@@ -32513,6 +32717,7 @@ const ru: TranslationKeys = {
     anotherWisdom: 'Другая мудрость',
     customize: 'Настроить',
     customizeQuickAccess: 'Настроить быстрый доступ',
+    quickAccessHint: 'Вы можете настроить этот список — добавляйте, удаляйте и меняйте порядок элементов',
     resetToDefaults: 'Сбросить по умолчанию',
     searchSection: 'Поиск разделов',
     searchSurah: 'Поиск суры',
@@ -33591,6 +33796,7 @@ const ru: TranslationKeys = {
     notificationsInfo: 'Информация об уведомлениях',
     notificationsRequired: 'Уведомления необходимы',
     notificationsRequiredMsg: 'Включите уведомления в настройках устройства',
+    systemNotificationsBlockedMsg: 'Уведомления включены в приложении, но заблокированы на уровне системы. Вы не получите никаких оповещений, пока не разрешите их в настройках устройства.',
     openSettings: 'Открыть настройки',
     pm: 'PM',
     prayer: 'Молитва',
@@ -34956,6 +35162,9 @@ const ru: TranslationKeys = {
     dateToday: 'Сегодня',
     dateYesterday: 'Вчера',
     daysAgo: '{count} дней назад',
+    contentLangNotice: 'Вопросы и ответы доступны только на арабском и английском языках. Для других языков отображается текст на английском.',
+    searchPlaceholder: 'Поиск по вопросам и ответам…',
+    noSearchResults: 'Нет результатов по вашему запросу',
   },
   smartTracker: {
     title: 'Моя молитва',

@@ -2,7 +2,7 @@
 // غلاف لتطبيق صور الخلفية على الشاشات
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, ImageBackground, ViewProps, ImageSourcePropType, StyleSheet } from 'react-native';
+import { View, ImageBackground, ViewProps, ImageSourcePropType, StyleSheet, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { AppBackgroundKey, useSettings } from '@/contexts/SettingsContext';
 import { BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
@@ -124,12 +124,15 @@ const BackgroundWrapper: React.FC<BackgroundWrapperProps> = ({
           style={StyleSheet.absoluteFill}
           imageStyle={{ resizeMode: 'cover', opacity }}
         >
-          {blurEnabled && (
+          {blurEnabled && Platform.OS !== 'android' && (
             <BlurView
               intensity={blurIntensity}
               tint="default"
               style={StyleSheet.absoluteFill}
             />
+          )}
+          {blurEnabled && Platform.OS === 'android' && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.25)' }]} />
           )}
           {dimEnabled && (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${dimOpacity})` }]} />

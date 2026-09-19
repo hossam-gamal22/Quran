@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Slider from '@react-native-community/slider';
 import { useRouter, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useQuran } from '@/contexts/QuranContext';
@@ -33,7 +34,11 @@ export function GlobalAudioBar() {
   const { playbackState, togglePlayPause: quranToggle, stopPlayback: quranStop, playNext: quranNext, playPrevious: quranPrev, seekTo: quranSeek } = useQuran();
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const [minimized, setMinimized] = useState(false);
+
+  // Lift above the tab bar with a visible gap. Tab bar is ~74-80px, plus a 16px breathing gap.
+  const liftedBottom = (insets.bottom || 0) + 90;
 
   const textColor = colors.text;
   const textSecondary = colors.textLight;
@@ -145,25 +150,34 @@ export function GlobalAudioBar() {
     }
   };
 
+  const Wrapper: any = Platform.OS === 'android' ? View : BlurView;
+  const wrapperProps: any = Platform.OS === 'android'
+    ? { style: styles.blur }
+    : {
+        intensity: Platform.OS === 'ios' ? 35 : 20,
+        tint: (isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any,
+        style: styles.blur,
+      };
+  const innerBg = isDarkMode
+    ? (Platform.OS === 'android' ? '#0f1418' : 'rgba(30,30,30,0.40)')
+    : (Platform.OS === 'android' ? '#ffffff' : 'rgba(255,255,255,0.60)');
+  const innerBorderWidth = Platform.OS === 'android' ? 0 : 0.5;
+
   if (minimized) {
     return (
       <Pressable
         onLongPress={() => setMinimized(false)}
         onPress={navigateToSource}
-        style={[styles.container, styles.globalPosition]}
+        style={[styles.container, styles.globalPosition, { bottom: liftedBottom }]}
       >
-        <BlurView
-         
-          intensity={Platform.OS === 'ios' ? 35 : 20}
-          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-          style={styles.blur}
-        >
+        <Wrapper {...wrapperProps}>
           <View
             style={[
               styles.miniPill,
               {
-                backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)',
+                backgroundColor: innerBg,
                 borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+                borderWidth: innerBorderWidth,
                 flexDirection: isRTL ? 'row-reverse' : 'row',
               },
             ]}
@@ -197,26 +211,22 @@ export function GlobalAudioBar() {
               <MaterialCommunityIcons name="chevron-up" size={18} color={textSecondary} />
             </Pressable>
           </View>
-        </BlurView>
+        </Wrapper>
       </Pressable>
     );
   }
 
   // Expanded view
   return (
-    <Pressable onPress={navigateToSource} style={[styles.container, styles.globalPosition]}>
-      <BlurView
-       
-        intensity={Platform.OS === 'ios' ? 35 : 20}
-        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
-        style={styles.blur}
-      >
+    <Pressable onPress={navigateToSource} style={[styles.container, styles.globalPosition, { bottom: liftedBottom }]}>
+      <Wrapper {...wrapperProps}>
         <View
           style={[
             styles.expanded,
             {
-              backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)',
+              backgroundColor: innerBg,
               borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+              borderWidth: innerBorderWidth,
             },
           ]}
         >
@@ -312,7 +322,7 @@ export function GlobalAudioBar() {
             <View style={styles.speedBtn} />
           </View>
         </View>
-      </BlurView>
+      </Wrapper>
     </Pressable>
   );
 }

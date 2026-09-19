@@ -127,7 +127,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         </View>
         {isSelected && (
           <View style={styles.checkIcon}>
-            <MaterialCommunityIcons name="check-circle" size={24} color="#0d8e62" />
+            <MaterialCommunityIcons name="check-circle" size={24} color="#14b87a" />
           </View>
         )}
       </TouchableOpacity>
@@ -490,13 +490,13 @@ const _styles = StyleSheet.create({
     gap: 12,
   },
   languageItemSelected: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: 'rgba(20,184,122,0.16)',
     borderWidth: 2,
-    borderColor: '#0d8e62',
+    borderColor: '#14b87a',
   },
   languageItemSelectedDark: {
-    backgroundColor: '#1a2f1a',
-    borderColor: '#0d8e62',
+    backgroundColor: 'rgba(20,184,122,0.22)',
+    borderColor: '#14b87a',
   },
   flagEmoji: {
     fontSize: 28,
@@ -509,7 +509,7 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
   },
   languageNameSelected: {
-    color: '#0d8e62',
+    color: '#14b87a',
   },
   languageEnglish: {
     fontSize: 13,

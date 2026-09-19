@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { bumpContentVersion } from '../utils/content-version';
 import { Styled } from '../components/Styled';
 
 // ==================== Types ====================
@@ -251,6 +252,7 @@ export default function HomePageManager() {
         ...config,
         updatedAt: new Date().toISOString(),
       });
+      await bumpContentVersion('homePageConfig');
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err) {
